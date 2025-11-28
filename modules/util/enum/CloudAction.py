@@ -1,9 +1,7 @@
-from enum import Enum
+from modules.util.enum.BaseEnum import BaseEnum
 
 
-class CloudAction(Enum):
+class CloudAction(BaseEnum):
     NONE = 'NONE'
     STOP = 'STOP'
     DELETE = 'DELETE'
-    def __str__(self):
-        return self.value

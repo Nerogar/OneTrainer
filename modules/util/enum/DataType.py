@@ -1,9 +1,9 @@
-from enum import Enum
+from modules.util.enum.BaseEnum import BaseEnum
 
 import torch
 
 
-class DataType(Enum):
+class DataType(BaseEnum):
     NONE = 'NONE'
     FLOAT_8 = 'FLOAT_8'
     FLOAT_16 = 'FLOAT_16'
@@ -14,8 +14,58 @@ class DataType(Enum):
     NFLOAT_4 = 'NFLOAT_4'
     GGUF = 'GGUF'
 
-    def __str__(self):
-        return self.value
+    def pretty_print(self):
+        return {
+            DataType.NONE: '',
+            DataType.FLOAT_8: 'Float8',
+            DataType.FLOAT_16: 'Float16',
+            DataType.FLOAT_32: 'Float32',
+            DataType.BFLOAT_16: 'BFloat16',
+            DataType.TFLOAT_32: 'TFloat32',
+            DataType.INT_8: 'Int8',
+            DataType.NFLOAT_4: 'NFloat4',
+            DataType.GGUF: 'GGUF'
+        }[self]
+
+    @staticmethod
+    def is_enabled(value, context=None):
+        if context == "embeddings" or context == "lora":
+            return value in [DataType.FLOAT_32, DataType.BFLOAT_16]
+        elif context == "convert_window":
+            return value in [DataType.FLOAT_32, DataType.FLOAT_16, DataType.BFLOAT_16]
+        elif context == "training_dtype":
+            return value in [DataType.FLOAT_32, DataType.FLOAT_16, DataType.BFLOAT_16, DataType.TFLOAT_32]
+        elif context == "training_fallback":
+            return value in [DataType.FLOAT_32, DataType.BFLOAT_16]
+        elif context == "output_dtype":
+            return value in [
+                DataType.FLOAT_16,
+                DataType.FLOAT_32,
+                DataType.BFLOAT_16,
+                DataType.FLOAT_8,
+                DataType.NFLOAT_4
+            ]
+        elif context == "transformer_dtype":
+            return value in [
+                DataType.FLOAT_32,
+                DataType.BFLOAT_16,
+                DataType.FLOAT_16,
+                DataType.FLOAT_8,
+                # DataType.INT_8,  # TODO: reactivate when the int8 implementation is fixed in bitsandbytes: https://github.com/bitsandbytes-foundation/bitsandbytes/issues/1332
+                DataType.NFLOAT_4,
+                DataType.GGUF
+            ]
+        else: # model_dtypes
+            return value in [
+                DataType.FLOAT_32,
+                DataType.BFLOAT_16,
+                DataType.FLOAT_16,
+                DataType.FLOAT_8,
+                # DataType.INT_8,  # TODO: reactivate when the int8 implementation is fixed in bitsandbytes: https://github.com/bitsandbytes-foundation/bitsandbytes/issues/1332
+                DataType.NFLOAT_4,
+            ]
+
+        return True
 
     def torch_dtype(
             self,

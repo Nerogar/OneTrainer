@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>400</width>
+    <height>300</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QPushButton" name="datasetBtn">
+     <property name="text">
+      <string>Dataset Tools</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="maskBtn">
+     <property name="text">
+      <string>Mask Tools</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="captionBtn">
+     <property name="text">
+      <string>Caption Tools</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="imageBtn">
+     <property name="text">
+      <string>Image Tools</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="bulkCaptionBtn">
+     <property name="text">
+      <string>Bulk Caption Tools</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="videoBtn">
+     <property name="text">
+      <string>Video Tools</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="convertBtn">
+     <property name="text">
+      <string>Convert Model Tools</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="samplingBtn">
+     <property name="text">
+      <string>Sampling Tools</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="profilingBtn">
+     <property name="text">
+      <string>Profiling Tools</string>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <tabstops>
+  <tabstop>datasetBtn</tabstop>
+  <tabstop>maskBtn</tabstop>
+  <tabstop>captionBtn</tabstop>
+  <tabstop>imageBtn</tabstop>
+  <tabstop>bulkCaptionBtn</tabstop>
+  <tabstop>videoBtn</tabstop>
+  <tabstop>convertBtn</tabstop>
+  <tabstop>samplingBtn</tabstop>
+  <tabstop>profilingBtn</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
+</ui>

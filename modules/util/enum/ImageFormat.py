@@ -1,11 +1,12 @@
-from enum import Enum
+from modules.util.enum.BaseEnum import BaseEnum
 
 
-class ImageFormat(Enum):
+class ImageFormat(BaseEnum):
     PNG = 'PNG'
     JPG = 'JPG'
 
-    def __str__(self):
+
+    def pretty_print(self):
         return self.value
 
     def extension(self) -> str:

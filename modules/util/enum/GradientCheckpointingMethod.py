@@ -1,13 +1,17 @@
-from enum import Enum
+from modules.util.enum.BaseEnum import BaseEnum
 
 
-class GradientCheckpointingMethod(Enum):
+class GradientCheckpointingMethod(BaseEnum):
     OFF = 'OFF'
     ON = 'ON'
     CPU_OFFLOADED = 'CPU_OFFLOADED'
 
-    def __str__(self):
-        return self.value
+    def pretty_print(self):
+        return {
+            GradientCheckpointingMethod.OFF: "Off",
+            GradientCheckpointingMethod.ON: "On",
+            GradientCheckpointingMethod.CPU_OFFLOADED: "CPU Offloaded",
+        }[self]
 
     def enabled(self):
         return self == GradientCheckpointingMethod.ON \

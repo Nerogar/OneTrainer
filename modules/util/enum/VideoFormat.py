@@ -1,13 +1,17 @@
-from enum import Enum
+from modules.util.enum.BaseEnum import BaseEnum
 
 
-class VideoFormat(Enum):
+class VideoFormat(BaseEnum):
     PNG_IMAGE_SEQUENCE = 'PNG_IMAGE_SEQUENCE'
     JPG_IMAGE_SEQUENCE = 'JPG_IMAGE_SEQUENCE'
     MP4 = 'MP4'
 
-    def __str__(self):
-        return self.value
+    def pretty_print(self):
+        return {
+            VideoFormat.PNG_IMAGE_SEQUENCE: "PNG Image Sequence",
+            VideoFormat.JPG_IMAGE_SEQUENCE: "JPG Image Sequence",
+            VideoFormat.MP4: "MP4",
+        }[self]
 
     def extension(self) -> str:
         match self:

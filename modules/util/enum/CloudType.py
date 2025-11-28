@@ -1,8 +1,6 @@
-from enum import Enum
+from modules.util.enum.BaseEnum import BaseEnum
 
 
-class CloudType(Enum):
+class CloudType(BaseEnum):
     RUNPOD = 'RUNPOD'
     LINUX = 'LINUX'
-    def __str__(self):
-        return self.value

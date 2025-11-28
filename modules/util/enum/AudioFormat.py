@@ -1,11 +1,8 @@
-from enum import Enum
+from modules.util.enum.BaseEnum import BaseEnum
 
 
-class AudioFormat(Enum):
+class AudioFormat(BaseEnum):
     MP3 = 'MP3'
-
-    def __str__(self):
-        return self.value
 
     def extension(self) -> str:
         match self:

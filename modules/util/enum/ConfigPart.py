@@ -1,10 +1,7 @@
-from enum import Enum
+from modules.util.enum.BaseEnum import BaseEnum
 
 
-class ConfigPart(Enum):
+class ConfigPart(BaseEnum):
     NONE = 'NONE'
     SETTINGS = 'SETTINGS'
     ALL = 'ALL'
-
-    def __str__(self):
-        return self.value

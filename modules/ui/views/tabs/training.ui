@@ -1,0 +1,1923 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>937</width>
+    <height>538</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="1">
+    <widget class="QScrollArea" name="scrollArea">
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <widget class="QWidget" name="scrollAreaWidgetContents">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>-648</y>
+        <width>1294</width>
+        <height>1660</height>
+       </rect>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_9">
+       <item row="0" column="1">
+        <widget class="QFrame" name="verticalFrame">
+         <layout class="QVBoxLayout" name="verticalLayout_8">
+          <item>
+           <widget class="QGroupBox" name="groupBox_6">
+            <property name="title">
+             <string>Masked Training</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_6">
+             <item row="2" column="0">
+              <widget class="QLabel" name="unmaskedWeightLbl">
+               <property name="text">
+                <string>Unmasked Weight</string>
+               </property>
+               <property name="buddy">
+                <cstring>unmaskedWeightSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QDoubleSpinBox" name="unmaskedWeightSbx">
+               <property name="toolTip">
+                <string>When masked training is enabled, specifies the loss weight of areas outside the masked region</string>
+               </property>
+               <property name="singleStep">
+                <double>0.050000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0">
+              <widget class="QLabel" name="maskedPriorPreservationLbl">
+               <property name="text">
+                <string>Masked Prior Preservation Weight</string>
+               </property>
+               <property name="buddy">
+                <cstring>maskedPriorPreservationSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="1">
+              <widget class="QDoubleSpinBox" name="maskedPriorPreservationSbx">
+               <property name="toolTip">
+                <string>Preserves regions outside the mask using the original untrained model output as a target. Only available for LoRA training. If enabled, use a low unmasked weight</string>
+               </property>
+               <property name="singleStep">
+                <double>0.050000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="unmaskedProbabilityLbl">
+               <property name="text">
+                <string>Unmasked Probability</string>
+               </property>
+               <property name="buddy">
+                <cstring>unmaskedProbabilitySbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QDoubleSpinBox" name="unmaskedProbabilitySbx">
+               <property name="toolTip">
+                <string>When masked training is enabled, specifies the number of training steps done on unmasked samples</string>
+               </property>
+               <property name="maximum">
+                <double>1.000000000000000</double>
+               </property>
+               <property name="singleStep">
+                <double>0.050000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0" colspan="2">
+              <widget class="QCheckBox" name="customConditioningImageCbx">
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When custom conditioning image is enabled, will use png postfix with -condlabel instead of automatically generated. It's suitable for special scenarios, such as object removal, allowing the model to learn a certain behavior concept&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+               <property name="text">
+                <string>Custom Conditioning Image</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0" colspan="2">
+              <widget class="QCheckBox" name="normalizeMaskedAreaCbx">
+               <property name="toolTip">
+                <string>When masked training is enabled, normalizes the loss for each sample based on the sizes of the masked region</string>
+               </property>
+               <property name="text">
+                <string>Normalize Masked Area Loss</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0" colspan="2">
+              <widget class="QCheckBox" name="maskedTrainingCbx">
+               <property name="toolTip">
+                <string>Masks the training samples to let the model focus on certain parts of the image. When enabled, one mask image is loaded for each training sample</string>
+               </property>
+               <property name="text">
+                <string>Masked Training</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="groupBox_7">
+            <property name="title">
+             <string>Regularization</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_7">
+             <item row="8" column="1">
+              <widget class="QComboBox" name="lossScalerCmb">
+               <property name="toolTip">
+                <string>Selects the type of loss scaling to use during training. Functionally equated as: Loss * selection</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="1">
+              <widget class="QDoubleSpinBox" name="vbLossSbx">
+               <property name="toolTip">
+                <string>Variational lower-bound strength for custom loss settings. Should be set to 1 for variational diffusion models</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QDoubleSpinBox" name="maeSbx">
+               <property name="toolTip">
+                <string>Mean Absolute Error strength for custom loss settings. Strengths should generally sum to 1</string>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="1">
+              <widget class="QDoubleSpinBox" name="gammaSbx">
+               <property name="toolTip">
+                <string>Inverse strength of loss weighting. Range: 1-20, only applies to Min SNR and P2</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0">
+              <widget class="QLabel" name="vbLossLbl">
+               <property name="text">
+                <string>VB Strength</string>
+               </property>
+               <property name="buddy">
+                <cstring>vbLossSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_26">
+               <property name="text">
+                <string>MSE Strength</string>
+               </property>
+               <property name="buddy">
+                <cstring>mseSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QDoubleSpinBox" name="mseSbx">
+               <property name="toolTip">
+                <string>Mean Squared Error strength for custom loss settings. Strengths should generally sum to 1</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0">
+              <widget class="QLabel" name="label_28">
+               <property name="text">
+                <string>Log-Cosh Strength</string>
+               </property>
+               <property name="buddy">
+                <cstring>logcoshSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="0">
+              <widget class="QLabel" name="label_30">
+               <property name="text">
+                <string>Gamma</string>
+               </property>
+               <property name="buddy">
+                <cstring>gammaSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="0">
+              <widget class="QLabel" name="label_29">
+               <property name="text">
+                <string>Loss Weight Function</string>
+               </property>
+               <property name="buddy">
+                <cstring>lossWeightFunctionCmb</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="8" column="0">
+              <widget class="QLabel" name="label_31">
+               <property name="text">
+                <string>Loss Scaler</string>
+               </property>
+               <property name="buddy">
+                <cstring>lossScalerCmb</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="1">
+              <widget class="QDoubleSpinBox" name="logcoshSbx">
+               <property name="toolTip">
+                <string>Log - Hyperbolic cosine Error strength for custom loss settings. Strengths should generally sum to 1</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="label_22">
+               <property name="text">
+                <string>Huber Strength</string>
+               </property>
+               <property name="buddy">
+                <cstring>huberStrengthSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="1">
+              <widget class="QComboBox" name="lossWeightFunctionCmb">
+               <property name="toolTip">
+                <string>Choice of loss weight function. Can help the model learn details more accurately</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_27">
+               <property name="text">
+                <string>MAE Strength</string>
+               </property>
+               <property name="buddy">
+                <cstring>maeSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QLabel" name="label_23">
+               <property name="text">
+                <string>Huber Delta</string>
+               </property>
+               <property name="buddy">
+                <cstring>huberDeltaSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QDoubleSpinBox" name="huberStrengthSbx">
+               <property name="toolTip">
+                <string>Huber loss strength for custom loss settings. Less sensitive to outliers than MSE. Strengths should generally sum to 1</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1">
+              <widget class="QDoubleSpinBox" name="huberDeltaSbx">
+               <property name="toolTip">
+                <string>Delta parameter for huber loss</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="te1Gbx">
+            <property name="title">
+             <string>Text Encoder 1 Settings</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_10">
+             <item row="1" column="0" colspan="2">
+              <widget class="QCheckBox" name="te1TrainCbx">
+               <property name="toolTip">
+                <string>Enables training the text encoder 1 model</string>
+               </property>
+               <property name="text">
+                <string>Train Text Encoder 1</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0" colspan="5">
+              <widget class="QCheckBox" name="te1TrainEmbCbx">
+               <property name="toolTip">
+                <string>Enables training embeddings for the text encoder 1 model</string>
+               </property>
+               <property name="text">
+                <string>Train Text Encoder 1 Embedding</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="2" colspan="2">
+              <widget class="QSpinBox" name="te1StopTrainingSbx">
+               <property name="toolTip">
+                <string>When to stop training the text encoder 1</string>
+               </property>
+               <property name="maximum">
+                <number>999999999</number>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0" colspan="3">
+              <widget class="QLabel" name="label_42">
+               <property name="text">
+                <string>Text Encoder 1 Learning Rate</string>
+               </property>
+               <property name="buddy">
+                <cstring>te1LearningRateLed</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QLabel" name="label_40">
+               <property name="text">
+                <string>Dropout Probability</string>
+               </property>
+               <property name="buddy">
+                <cstring>te1DropoutSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="0" colspan="2">
+              <widget class="QLabel" name="te1ClipSkipLbl">
+               <property name="text">
+                <string>Text Encoder 1 Clip Skip</string>
+               </property>
+               <property name="buddy">
+                <cstring>te1ClipSkipSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="4">
+              <widget class="QComboBox" name="te1StopTrainingCmb"/>
+             </item>
+             <item row="4" column="0">
+              <widget class="QLabel" name="label_41">
+               <property name="text">
+                <string>Stop Training After</string>
+               </property>
+               <property name="buddy">
+                <cstring>te1StopTrainingSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="4">
+              <widget class="QSpinBox" name="te1ClipSkipSbx">
+               <property name="toolTip">
+                <string>The number of additional clip layers to skip. 0 = the model default</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="4">
+              <widget class="QDoubleSpinBox" name="te1DropoutSbx">
+               <property name="toolTip">
+                <string>The Probability for dropping the text encoder 1 conditioning</string>
+               </property>
+               <property name="maximum">
+                <double>1.000000000000000</double>
+               </property>
+               <property name="singleStep">
+                <double>0.050000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0">
+              <widget class="QCheckBox" name="te1IncludeCbx">
+               <property name="toolTip">
+                <string>Includes text encoder 1 in the training run</string>
+               </property>
+               <property name="text">
+                <string>Include Text Encoder 1</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="4">
+              <widget class="SNLineEdit" name="te1LearningRateLed" native="true">
+               <property name="toolTip">
+                <string>The learning rate of the text encoder 1. Overrides the base learning rate</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="te2Gbx">
+            <property name="title">
+             <string>Text Encoder 2 Settings</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_15">
+             <item row="2" column="1" colspan="2">
+              <widget class="QCheckBox" name="te2IncludeCbx">
+               <property name="toolTip">
+                <string>Includes text encoder 2 in the training run</string>
+               </property>
+               <property name="text">
+                <string>Include Text Encoder 2</string>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="1">
+              <widget class="QLabel" name="label_51">
+               <property name="text">
+                <string>Stop Training After</string>
+               </property>
+               <property name="buddy">
+                <cstring>te2StopTrainingSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="1">
+              <widget class="QLabel" name="label_49">
+               <property name="text">
+                <string>Dropout Probability</string>
+               </property>
+               <property name="buddy">
+                <cstring>te2DropoutSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="3">
+              <widget class="SNLineEdit" name="te2LearningRateLed" native="true">
+               <property name="toolTip">
+                <string>The learning rate of the text encoder 2. Overrides the base learning rate</string>
+               </property>
+              </widget>
+             </item>
+             <item row="8" column="3">
+              <widget class="QSpinBox" name="te2ClipSkipSbx">
+               <property name="toolTip">
+                <string>The number of additional clip layers to skip. 0 = the model default</string>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="3">
+              <widget class="QComboBox" name="te2StopTrainingCmb"/>
+             </item>
+             <item row="8" column="1">
+              <widget class="QLabel" name="te2ClipSkipLbl">
+               <property name="text">
+                <string>Text Encoder 2 Clip Skip</string>
+               </property>
+               <property name="buddy">
+                <cstring>te2ClipSkipSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="1" colspan="3">
+              <widget class="QCheckBox" name="te2TrainEmbCbx">
+               <property name="toolTip">
+                <string>Enables training embeddings for the text encoder 2 model</string>
+               </property>
+               <property name="text">
+                <string>Train Text Encoder 2 Embedding</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1" colspan="2">
+              <widget class="QCheckBox" name="te2TrainCbx">
+               <property name="toolTip">
+                <string>Enables training the text encoder 2 model</string>
+               </property>
+               <property name="text">
+                <string>Train Text Encoder 2</string>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="1" colspan="2">
+              <widget class="QLabel" name="label_48">
+               <property name="text">
+                <string>Text Encoder 2 Learning Rate</string>
+               </property>
+               <property name="buddy">
+                <cstring>te2LearningRateLed</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="2">
+              <widget class="QSpinBox" name="te2StopTrainingSbx">
+               <property name="toolTip">
+                <string>When to stop training the text encoder 2</string>
+               </property>
+               <property name="maximum">
+                <number>999999999</number>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="3">
+              <widget class="QDoubleSpinBox" name="te2DropoutSbx">
+               <property name="toolTip">
+                <string>The Probability for dropping the text encoder 2 conditioning</string>
+               </property>
+               <property name="maximum">
+                <double>1.000000000000000</double>
+               </property>
+               <property name="singleStep">
+                <double>0.050000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="9" column="1">
+              <widget class="QLabel" name="te2SeqLenLbl">
+               <property name="text">
+                <string>Text Encoder 2 Sequence Length</string>
+               </property>
+               <property name="buddy">
+                <cstring>te2SeqLenSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="9" column="3">
+              <widget class="QSpinBox" name="te2SeqLenSbx">
+               <property name="maximum">
+                <number>512</number>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="te3Gbx">
+            <property name="title">
+             <string>Text Encoder 3 Settings</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_16">
+             <item row="1" column="0">
+              <widget class="QCheckBox" name="te3TrainCbx">
+               <property name="toolTip">
+                <string>Enables training the text encoder 3 model</string>
+               </property>
+               <property name="text">
+                <string>Train Text Encoder 3</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0" colspan="2">
+              <widget class="QCheckBox" name="te3IncludeCbx">
+               <property name="toolTip">
+                <string>Includes text encoder 3 in the training run</string>
+               </property>
+               <property name="text">
+                <string>Include Text Encoder 3</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0" colspan="3">
+              <widget class="QCheckBox" name="te3TrainEmbCbx">
+               <property name="toolTip">
+                <string>Enables training embeddings for the text encoder 3 model</string>
+               </property>
+               <property name="text">
+                <string>Train Text Encoder 3 Embedding</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0">
+              <widget class="QLabel" name="label_52">
+               <property name="text">
+                <string>Stop Training After</string>
+               </property>
+               <property name="buddy">
+                <cstring>te3StopTrainingSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0" colspan="2">
+              <widget class="QLabel" name="label_55">
+               <property name="text">
+                <string>Text Encoder 3 Learning Rate</string>
+               </property>
+               <property name="buddy">
+                <cstring>te3LearningRateLed</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="2">
+              <widget class="QDoubleSpinBox" name="te3DropoutSbx">
+               <property name="toolTip">
+                <string>The Probability for dropping the text encoder 3 conditioning</string>
+               </property>
+               <property name="maximum">
+                <double>1.000000000000000</double>
+               </property>
+               <property name="singleStep">
+                <double>0.050000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QLabel" name="label_54">
+               <property name="text">
+                <string>Dropout Probability</string>
+               </property>
+               <property name="buddy">
+                <cstring>te3DropoutSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="1">
+              <widget class="QSpinBox" name="te3StopTrainingSbx">
+               <property name="toolTip">
+                <string>When to stop training the text encoder 3</string>
+               </property>
+               <property name="maximum">
+                <number>999999999</number>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="0">
+              <widget class="QLabel" name="te3ClipSkipLbl">
+               <property name="text">
+                <string>Text Encoder 3 Clip Skip</string>
+               </property>
+               <property name="buddy">
+                <cstring>te3ClipSkipSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="2">
+              <widget class="QComboBox" name="te3StopTrainingCmb"/>
+             </item>
+             <item row="6" column="2">
+              <widget class="QSpinBox" name="te3ClipSkipSbx">
+               <property name="toolTip">
+                <string>The number of additional clip layers to skip. 0 = the model default</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="2">
+              <widget class="SNLineEdit" name="te3LearningRateLed" native="true">
+               <property name="toolTip">
+                <string>The learning rate of the text encoder 3. Overrides the base learning rate</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="te4Gbx">
+            <property name="title">
+             <string>Text Encoder 4 Settings</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_17">
+             <item row="8" column="1">
+              <widget class="QLabel" name="te4ClipSkipLbl">
+               <property name="text">
+                <string>Text Encoder 4 Clip Skip</string>
+               </property>
+               <property name="buddy">
+                <cstring>te4ClipSkipSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="1">
+              <widget class="QLabel" name="label_63">
+               <property name="text">
+                <string>Stop Training After</string>
+               </property>
+               <property name="buddy">
+                <cstring>te4StopTrainingSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="1">
+              <widget class="QLabel" name="label_66">
+               <property name="text">
+                <string>Text Encoder 4 Learning Rate</string>
+               </property>
+               <property name="buddy">
+                <cstring>te4LearningRateLed</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="3">
+              <widget class="QDoubleSpinBox" name="te4DropoutSbx">
+               <property name="toolTip">
+                <string>The Probability for dropping the text encoder 4 conditioning</string>
+               </property>
+               <property name="maximum">
+                <double>1.000000000000000</double>
+               </property>
+               <property name="singleStep">
+                <double>0.050000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QCheckBox" name="te4IncludeCbx">
+               <property name="toolTip">
+                <string>Includes text encoder 4 in the training run</string>
+               </property>
+               <property name="text">
+                <string>Include Text Encoder 4</string>
+               </property>
+              </widget>
+             </item>
+             <item row="8" column="3">
+              <widget class="QSpinBox" name="te4ClipSkipSbx">
+               <property name="toolTip">
+                <string>The number of additional clip layers to skip. 0 = the model default</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1" colspan="3">
+              <widget class="QCheckBox" name="te4TrainEmbCbx">
+               <property name="toolTip">
+                <string>Enables training embeddings for the text encoder 4 model</string>
+               </property>
+               <property name="text">
+                <string>Train Text Encoder 4 Embedding</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="3">
+              <widget class="QComboBox" name="te4StopTrainingCmb"/>
+             </item>
+             <item row="5" column="2">
+              <widget class="QSpinBox" name="te4StopTrainingSbx">
+               <property name="toolTip">
+                <string>When to stop training the text encoder 4</string>
+               </property>
+               <property name="maximum">
+                <number>999999999</number>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="1">
+              <widget class="QLabel" name="label_65">
+               <property name="text">
+                <string>Dropout Probability</string>
+               </property>
+               <property name="buddy">
+                <cstring>te4DropoutSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QCheckBox" name="te4TrainCbx">
+               <property name="toolTip">
+                <string>Enables training the text encoder 4 model</string>
+               </property>
+               <property name="text">
+                <string>Train Text Encoder 4</string>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="3">
+              <widget class="SNLineEdit" name="te4LearningRateLed" native="true">
+               <property name="toolTip">
+                <string>The learning rate of the text encoder 4. Overrides the base learning rate</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <spacer name="verticalSpacer_2">
+            <property name="orientation">
+             <enum>Qt::Orientation::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>40</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item row="0" column="2">
+        <widget class="QFrame" name="verticalFrame">
+         <layout class="QVBoxLayout" name="verticalLayout_9">
+          <item>
+           <widget class="QGroupBox" name="unetGbx">
+            <property name="title">
+             <string>UNet Settings</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_11">
+             <item row="2" column="0">
+              <widget class="QLabel" name="label_57">
+               <property name="text">
+                <string>UNet Learning Rate</string>
+               </property>
+               <property name="buddy">
+                <cstring>unetLearningRateLed</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QSpinBox" name="unetStopSbx">
+               <property name="toolTip">
+                <string>When to stop training the UNet</string>
+               </property>
+               <property name="maximum">
+                <number>999999999</number>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_56">
+               <property name="text">
+                <string>Stop Training After</string>
+               </property>
+               <property name="buddy">
+                <cstring>unetStopSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="2">
+              <widget class="QComboBox" name="unetStopCmb"/>
+             </item>
+             <item row="3" column="0" colspan="3">
+              <widget class="QCheckBox" name="unetRescaleCbx">
+               <property name="toolTip">
+                <string>Rescales the noise scheduler to a zero terminal signal to noise ratio and switches the model to a v-prediction target</string>
+               </property>
+               <property name="text">
+                <string>Rescale Noise Scheduler + V-pred</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0" colspan="3">
+              <widget class="QCheckBox" name="unetTrainCbx">
+               <property name="toolTip">
+                <string>Enables training the UNet model</string>
+               </property>
+               <property name="text">
+                <string>Train UNet</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="2">
+              <widget class="SNLineEdit" name="unetLearningRateLed" native="true">
+               <property name="toolTip">
+                <string>The learning rate of the UNet. Overrides the base learning rate</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="transformerGbx">
+            <property name="title">
+             <string>Transformer Settings</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_13">
+             <item row="0" column="0" colspan="3">
+              <widget class="QCheckBox" name="transformerTrainCbx">
+               <property name="toolTip">
+                <string>Enables training the Transformer model</string>
+               </property>
+               <property name="text">
+                <string>Train Transformer</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_61">
+               <property name="text">
+                <string>Stop Training After</string>
+               </property>
+               <property name="buddy">
+                <cstring>transformerStopSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QSpinBox" name="transformerStopSbx">
+               <property name="toolTip">
+                <string>When to stop training the Transformer</string>
+               </property>
+               <property name="maximum">
+                <number>999999999</number>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="2">
+              <widget class="QComboBox" name="transformerStopCmb"/>
+             </item>
+             <item row="4" column="0">
+              <widget class="QLabel" name="transformerGuidanceLbl">
+               <property name="text">
+                <string>Guidance Scale</string>
+               </property>
+               <property name="buddy">
+                <cstring>transformerGuidanceSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="label_60">
+               <property name="text">
+                <string>Transformer Learning Rate</string>
+               </property>
+               <property name="buddy">
+                <cstring>transformerLearningRateLed</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QCheckBox" name="transformerAttnMaskCbx">
+               <property name="toolTip">
+                <string>Force enables passing of a text embedding attention mask to the transformer. This can improve training on shorter captions</string>
+               </property>
+               <property name="text">
+                <string>Force Attention Mask</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="1" colspan="2">
+              <widget class="QDoubleSpinBox" name="transformerGuidanceSbx">
+               <property name="toolTip">
+                <string>The guidance scale of guidance distilled models passed to the transformer during training</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="2">
+              <widget class="SNLineEdit" name="transformerLearningRateLed" native="true">
+               <property name="toolTip">
+                <string>The learning rate of the Transformer. Overrides the base learning rate</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="priorGbx">
+            <property name="title">
+             <string>Prior Model Settings</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_12">
+             <item row="0" column="0" colspan="3">
+              <widget class="QCheckBox" name="priorTrainCbx">
+               <property name="toolTip">
+                <string>Enables training the Prior model</string>
+               </property>
+               <property name="text">
+                <string>Train Prior</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_58">
+               <property name="text">
+                <string>Stop Training After</string>
+               </property>
+               <property name="buddy">
+                <cstring>priorStopSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QSpinBox" name="priorStopSbx">
+               <property name="toolTip">
+                <string>When to stop training the Prior</string>
+               </property>
+               <property name="maximum">
+                <number>999999999</number>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="2">
+              <widget class="QComboBox" name="priorStopCmb"/>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="label_59">
+               <property name="text">
+                <string>Prior Learning Rate</string>
+               </property>
+               <property name="buddy">
+                <cstring>priorLearningRateLed</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="2">
+              <widget class="SNLineEdit" name="priorLearningRateLed" native="true">
+               <property name="toolTip">
+                <string>The learning rate of the Prior. Overrides the base learning rate</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="groupBox_3">
+            <property name="title">
+             <string>Embeddings</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_3">
+             <item row="0" column="1">
+              <widget class="SNLineEdit" name="embeddingLearningRateLed" native="true">
+               <property name="toolTip">
+                <string>The learning rate of embeddings. Overrides the base learning rate</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0" colspan="2">
+              <widget class="QCheckBox" name="embeddingNormCbx">
+               <property name="toolTip">
+                <string>Rescales each trained embedding to the median embedding norm</string>
+               </property>
+               <property name="text">
+                <string>Preserve Embedding Norm</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_12">
+               <property name="text">
+                <string>Embeddings Learning Rate</string>
+               </property>
+               <property name="buddy">
+                <cstring>embeddingLearningRateLed</cstring>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="groupBox_8">
+            <property name="title">
+             <string>Trainable Layers</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_4">
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_13">
+               <property name="text">
+                <string>Layer Filter</string>
+               </property>
+               <property name="buddy">
+                <cstring>layerFilterCmb</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QComboBox" name="layerFilterCmb"/>
+             </item>
+             <item row="1" column="0" colspan="2">
+              <widget class="QLineEdit" name="layerFilterLed">
+               <property name="toolTip">
+                <string>Select a preset defining which layers to train, or select 'Custom' to define your own.
+A blank 'custom' field or 'Full' will train all layers</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0" colspan="2">
+              <widget class="QCheckBox" name="layerFilterRegexCbx">
+               <property name="text">
+                <string>Use Regex</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="groupBox_5">
+            <property name="title">
+             <string>Noise</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_5">
+             <item row="3" column="0">
+              <widget class="QLabel" name="label_16">
+               <property name="text">
+                <string>Timestep Distribution</string>
+               </property>
+               <property name="buddy">
+                <cstring>timestepDistributionCmb</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0">
+              <widget class="QLabel" name="label_18">
+               <property name="text">
+                <string>Max Noising Strength</string>
+               </property>
+               <property name="buddy">
+                <cstring>maxNoisingStrengthSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="label_15">
+               <property name="text">
+                <string>Perturbation Noise Weight</string>
+               </property>
+               <property name="buddy">
+                <cstring>perturbationNoiseWeightSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1">
+              <widget class="QComboBox" name="timestepDistributionCmb">
+               <property name="toolTip">
+                <string>Selects the function to sample timesteps during training</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="1">
+              <widget class="QDoubleSpinBox" name="maxNoisingStrengthSbx">
+               <property name="toolTip">
+                <string>Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0">
+              <widget class="QLabel" name="label_17">
+               <property name="text">
+                <string>Min Noising Strength</string>
+               </property>
+               <property name="buddy">
+                <cstring>minNoisingStrengthSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="0">
+              <widget class="QLabel" name="label_19">
+               <property name="text">
+                <string>Noising Weight</string>
+               </property>
+               <property name="buddy">
+                <cstring>noisingWeightSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0" colspan="2">
+              <widget class="QCheckBox" name="generalizedOffsetNoiseCbx">
+               <property name="text">
+                <string>Generalized Offset Noise</string>
+               </property>
+              </widget>
+             </item>
+             <item row="8" column="0">
+              <widget class="QLabel" name="label_21">
+               <property name="text">
+                <string>Timestep Shift</string>
+               </property>
+               <property name="buddy">
+                <cstring>timestepShiftSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="1">
+              <widget class="QDoubleSpinBox" name="noisingBiasSbx">
+               <property name="toolTip">
+                <string>Controls the bias parameter of the timestep distribution function. Use the preview to see more details</string>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="1">
+              <widget class="QDoubleSpinBox" name="noisingWeightSbx">
+               <property name="toolTip">
+                <string>Controls the weight parameter of the timestep distribution function. Use the preview to see more details</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QDoubleSpinBox" name="offsetNoiseWeightSbx">
+               <property name="toolTip">
+                <string>The guidance scale of guidance distilled models passed to the transformer during training</string>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="0">
+              <widget class="QLabel" name="label_20">
+               <property name="text">
+                <string>Noising Bias</string>
+               </property>
+               <property name="buddy">
+                <cstring>noisingBiasSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="12" column="0" colspan="2">
+              <widget class="QPushButton" name="updatePreviewBtn">
+               <property name="text">
+                <string>Update Preview</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="1">
+              <widget class="QDoubleSpinBox" name="minNoisingStrengthSbx">
+               <property name="toolTip">
+                <string>Specifies the minimum noising strength used during training. This can help to improve composition, but prevents finer details from being trained</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QDoubleSpinBox" name="perturbationNoiseWeightSbx">
+               <property name="toolTip">
+                <string>The weight of perturbation noise added to each training step</string>
+               </property>
+              </widget>
+             </item>
+             <item row="8" column="1">
+              <widget class="QDoubleSpinBox" name="timestepShiftSbx">
+               <property name="toolTip">
+                <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Shift the timestep distribution&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_14">
+               <property name="text">
+                <string>Offset Noise Weight</string>
+               </property>
+               <property name="buddy">
+                <cstring>offsetNoiseWeightSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="10" column="0" colspan="2">
+              <widget class="QCheckBox" name="dynamicTimestepShiftingCbx">
+               <property name="toolTip">
+                <string>Dynamically shift the timestep distribution based on resolution. For the preview, a random resolution between 512 and 1024 is used, assuming a VAE scale factor of 8. During training, the actual resolution</string>
+               </property>
+               <property name="text">
+                <string>Dynamic Timestep Shifting</string>
+               </property>
+              </widget>
+             </item>
+             <item row="11" column="0" colspan="2">
+              <layout class="QVBoxLayout" name="previewLay"/>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <spacer name="verticalSpacer_3">
+            <property name="orientation">
+             <enum>Qt::Orientation::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>40</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item row="0" column="0">
+        <widget class="QFrame" name="verticalFrame">
+         <layout class="QVBoxLayout" name="verticalLayout_4">
+          <item>
+           <widget class="QGroupBox" name="groupBox">
+            <property name="title">
+             <string>Optimizer</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_2">
+             <item row="4" column="0" colspan="3">
+              <widget class="QTableWidget" name="tableWidget">
+               <property name="enabled">
+                <bool>true</bool>
+               </property>
+               <property name="toolTip">
+                <string>Key-value pairs for an argument in your scheduler. Some special values can be used, wrapped in percent signs: LR, EPOCHS, STEPS_PER_EPOCH, TOTAL_STEPS, SCHEDULER_STEPS. Note that OneTrainer calls step() after every individual learning step, not every epoch, so what Torch calls 'epoch' you should treat as 'step'</string>
+               </property>
+               <property name="editTriggers">
+                <set>QAbstractItemView::EditTrigger::AnyKeyPressed|QAbstractItemView::EditTrigger::EditKeyPressed|QAbstractItemView::EditTrigger::SelectedClicked</set>
+               </property>
+               <property name="selectionMode">
+                <enum>QAbstractItemView::SelectionMode::NoSelection</enum>
+               </property>
+               <property name="showGrid">
+                <bool>true</bool>
+               </property>
+               <property name="rowCount">
+                <number>1</number>
+               </property>
+               <property name="columnCount">
+                <number>2</number>
+               </property>
+               <attribute name="horizontalHeaderStretchLastSection">
+                <bool>true</bool>
+               </attribute>
+               <attribute name="verticalHeaderVisible">
+                <bool>false</bool>
+               </attribute>
+               <attribute name="verticalHeaderCascadingSectionResizes">
+                <bool>false</bool>
+               </attribute>
+               <row/>
+               <column>
+                <property name="text">
+                 <string>Parameter</string>
+                </property>
+               </column>
+               <column>
+                <property name="text">
+                 <string>Value</string>
+                </property>
+               </column>
+              </widget>
+             </item>
+             <item row="12" column="1" colspan="2">
+              <widget class="QComboBox" name="scalerCmb">
+               <property name="toolTip">
+                <string>Selects the type of learning rate scaling to use during training. Functionally equated as: LR * SQRT(selection)</string>
+               </property>
+              </widget>
+             </item>
+             <item row="8" column="0">
+              <widget class="QLabel" name="label_6">
+               <property name="text">
+                <string>Learning Rate Cycles</string>
+               </property>
+               <property name="buddy">
+                <cstring>cyclesSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="label_2">
+               <property name="text">
+                <string>Learning Rate Scheduler</string>
+               </property>
+               <property name="buddy">
+                <cstring>schedulerCmb</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="0">
+              <widget class="QLabel" name="label_4">
+               <property name="text">
+                <string>Learning Rate Warmup Steps</string>
+               </property>
+               <property name="buddy">
+                <cstring>warmupStepsSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="8" column="1" colspan="2">
+              <widget class="QSpinBox" name="cyclesSbx">
+               <property name="toolTip">
+                <string>The number of learning rate cycles. This is only applicable if the learning rate scheduler supports cycles</string>
+               </property>
+               <property name="maximum">
+                <number>999999999</number>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QLabel" name="schedulerLbl">
+               <property name="enabled">
+                <bool>true</bool>
+               </property>
+               <property name="text">
+                <string>Class Name</string>
+               </property>
+               <property name="buddy">
+                <cstring>schedulerClassLed</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="13" column="1" colspan="2">
+              <widget class="QDoubleSpinBox" name="clipGradNormSbx">
+               <property name="toolTip">
+                <string>Clips the gradient norm. Leave empty to disable gradient clipping</string>
+               </property>
+               <property name="maximum">
+                <double>999999999.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="0">
+              <widget class="QLabel" name="label_5">
+               <property name="text">
+                <string>Learning Rate Min Factor</string>
+               </property>
+               <property name="buddy">
+                <cstring>minFactorSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="10" column="0">
+              <widget class="QLabel" name="label_8">
+               <property name="text">
+                <string>Local Batch Size</string>
+               </property>
+               <property name="buddy">
+                <cstring>batchSizeSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="1" colspan="2">
+              <widget class="QDoubleSpinBox" name="warmupStepsSbx">
+               <property name="toolTip">
+                <string>The number of steps it takes to gradually increase the learning rate from 0 to the specified learning rate. Values &gt;1 are interpeted as a fixed number of steps, values &lt;=1 are intepreted as a percentage of the total training steps (ex. 0.2 = 20% of the total step count)</string>
+               </property>
+               <property name="maximum">
+                <double>999999999.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="1" colspan="2">
+              <widget class="QDoubleSpinBox" name="minFactorSbx">
+               <property name="toolTip">
+                <string>Unit = float. Method = percentage. For a factor of 0.1, the final LR will be 10% of the initial LR. If the initial LR is 1e-4, the final LR will be 1e-5</string>
+               </property>
+               <property name="maximum">
+                <double>999999999.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="2">
+              <widget class="QToolButton" name="optimizerBtn">
+               <property name="text">
+                <string>...</string>
+               </property>
+              </widget>
+             </item>
+             <item row="13" column="0">
+              <widget class="QLabel" name="label_11">
+               <property name="text">
+                <string>Clip Grad Norm</string>
+               </property>
+               <property name="buddy">
+                <cstring>clipGradNormSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="9" column="0">
+              <widget class="QLabel" name="label_7">
+               <property name="text">
+                <string>Epochs</string>
+               </property>
+               <property name="buddy">
+                <cstring>epochsSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1" colspan="2">
+              <widget class="QLineEdit" name="schedulerClassLed">
+               <property name="toolTip">
+                <string>Python class module and name for the custom scheduler class, in the form of &lt;module&gt;.&lt;class_name&gt;</string>
+               </property>
+              </widget>
+             </item>
+             <item row="11" column="1" colspan="2">
+              <widget class="QSpinBox" name="accumulationStepsSbx">
+               <property name="toolTip">
+                <string>Number of accumulation steps. Increase this number to trade batch size for training speed</string>
+               </property>
+               <property name="maximum">
+                <number>999999999</number>
+               </property>
+              </widget>
+             </item>
+             <item row="9" column="1" colspan="2">
+              <widget class="QSpinBox" name="epochsSbx">
+               <property name="toolTip">
+                <string>The number of epochs for a full training run</string>
+               </property>
+               <property name="maximum">
+                <number>999999999</number>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0">
+              <widget class="QLabel" name="label">
+               <property name="text">
+                <string>Optimizer</string>
+               </property>
+               <property name="buddy">
+                <cstring>optimizerCmb</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0">
+              <widget class="QLabel" name="label_3">
+               <property name="text">
+                <string>Learning Rate</string>
+               </property>
+              </widget>
+             </item>
+             <item row="12" column="0">
+              <widget class="QLabel" name="label_10">
+               <property name="text">
+                <string>Learning Rate Scaler</string>
+               </property>
+               <property name="buddy">
+                <cstring>scalerCmb</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="1" colspan="2">
+              <widget class="SNLineEdit" name="learningRateLed" native="true">
+               <property name="toolTip">
+                <string>The base learning rate</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1" colspan="2">
+              <widget class="QComboBox" name="schedulerCmb">
+               <property name="toolTip">
+                <string>Learning rate scheduler that automatically changes the learning rate during training</string>
+               </property>
+              </widget>
+             </item>
+             <item row="11" column="0">
+              <widget class="QLabel" name="label_9">
+               <property name="text">
+                <string>Accumulation Steps</string>
+               </property>
+               <property name="buddy">
+                <cstring>accumulationStepsSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="10" column="1" colspan="2">
+              <widget class="QSpinBox" name="batchSizeSbx">
+               <property name="toolTip">
+                <string>The batch size of one training step</string>
+               </property>
+               <property name="maximum">
+                <number>999999999</number>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QComboBox" name="optimizerCmb">
+               <property name="toolTip">
+                <string>The type of optimizer</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="groupBox_4">
+            <property name="title">
+             <string>General Settings</string>
+            </property>
+            <layout class="QGridLayout" name="gridLayout_8">
+             <item row="13" column="0" colspan="2">
+              <widget class="QCheckBox" name="circularPaddingCbx">
+               <property name="toolTip">
+                <string>Enables circular padding for all conv layers to better train seamless images</string>
+               </property>
+               <property name="text">
+                <string>Force Circular Padding</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QSpinBox" name="emaUpdateIntervalSbx">
+               <property name="toolTip">
+                <string>Number of steps between EMA update steps</string>
+               </property>
+               <property name="maximum">
+                <number>999999999</number>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0" colspan="2">
+              <widget class="QCheckBox" name="asyncOffloadCbx">
+               <property name="toolTip">
+                <string>Enables Asynchronous offloading</string>
+               </property>
+               <property name="text">
+                <string>Async Offloading</string>
+               </property>
+              </widget>
+             </item>
+             <item row="5" column="0" colspan="2">
+              <widget class="QCheckBox" name="offloadActivationsCbx">
+               <property name="toolTip">
+                <string>Enables Activation Offloading</string>
+               </property>
+               <property name="text">
+                <string>Offload Activations</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QLabel" name="label_35">
+               <property name="text">
+                <string>Gradient Checkpointing</string>
+               </property>
+               <property name="buddy">
+                <cstring>gradientCheckpointingCmb</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="label_34">
+               <property name="text">
+                <string>EMA Update Step Interval</string>
+               </property>
+               <property name="buddy">
+                <cstring>emaUpdateIntervalSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="12" column="0">
+              <widget class="QLabel" name="framesLbl">
+               <property name="text">
+                <string>Frames</string>
+               </property>
+               <property name="buddy">
+                <cstring>framesSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="8" column="0">
+              <widget class="QLabel" name="label_38">
+               <property name="text">
+                <string>Fallback Train Data Type</string>
+               </property>
+               <property name="buddy">
+                <cstring>fallbackDTypeCmb</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QComboBox" name="emaCmb">
+               <property name="toolTip">
+                <string>EMA averages the training progress over many steps, better preserving different concepts in big datasets</string>
+               </property>
+              </widget>
+             </item>
+             <item row="11" column="0">
+              <widget class="QLabel" name="label_39">
+               <property name="text">
+                <string>Resolution</string>
+               </property>
+               <property name="buddy">
+                <cstring>resolutionLed</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_32">
+               <property name="text">
+                <string>EMA</string>
+               </property>
+               <property name="buddy">
+                <cstring>emaCmb</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QDoubleSpinBox" name="emaDecaySbx">
+               <property name="toolTip">
+                <string>Decay parameter of the EMA model. Higher numbers will average more steps. For datasets of hundreds or thousands of images, set this to 0.9999. For smaller datasets, set it to 0.999 or even 0.998</string>
+               </property>
+               <property name="maximum">
+                <double>999999999.000000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="12" column="1">
+              <widget class="QSpinBox" name="framesSbx">
+               <property name="toolTip">
+                <string>The number of frames used for training</string>
+               </property>
+               <property name="maximum">
+                <number>999</number>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="0">
+              <widget class="QLabel" name="label_37">
+               <property name="text">
+                <string>Train Data Type</string>
+               </property>
+               <property name="buddy">
+                <cstring>trainDTypeCmb</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="7" column="1">
+              <widget class="QComboBox" name="trainDTypeCmb">
+               <property name="toolTip">
+                <string>The mixed precision data type used for training. This can increase training speed, but reduces precision</string>
+               </property>
+              </widget>
+             </item>
+             <item row="11" column="1">
+              <widget class="QLineEdit" name="resolutionLed">
+               <property name="toolTip">
+                <string>The resolution used for training. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format &lt;width&gt;x&lt;height&gt;</string>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="0">
+              <widget class="QLabel" name="label_36">
+               <property name="text">
+                <string>Layer Offload Fraction</string>
+               </property>
+               <property name="buddy">
+                <cstring>layerOffloadFractionSbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="9" column="0" colspan="2">
+              <widget class="QCheckBox" name="autocastCacheCbx">
+               <property name="toolTip">
+                <string>Enables the autocast cache. Disabling this reduces memory usage, but increases training time</string>
+               </property>
+               <property name="text">
+                <string>Autocast Cache</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1">
+              <widget class="QComboBox" name="gradientCheckpointingCmb">
+               <property name="toolTip">
+                <string>Enables gradient checkpointing. This reduces memory usage, but increases training time</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_33">
+               <property name="text">
+                <string>EMA Decay</string>
+               </property>
+               <property name="buddy">
+                <cstring>emaDecaySbx</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="6" column="1">
+              <widget class="QDoubleSpinBox" name="layerOffloadFractionSbx">
+               <property name="toolTip">
+                <string>Enables offloading of individual layers during training to reduce VRAM usage. Increases training time and uses more RAM. Only available if checkpointing is set to CPU_OFFLOADED. values between 0 and 1, 0=disabled</string>
+               </property>
+               <property name="maximum">
+                <double>1.000000000000000</double>
+               </property>
+               <property name="singleStep">
+                <double>0.100000000000000</double>
+               </property>
+              </widget>
+             </item>
+             <item row="8" column="1">
+              <widget class="QComboBox" name="fallbackDTypeCmb">
+               <property name="toolTip">
+                <string>The mixed precision data type used for training stages that don't support float16 data types. This can increase training speed, but reduces precision</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <spacer name="verticalSpacer">
+            <property name="orientation">
+             <enum>Qt::Orientation::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>40</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>SNLineEdit</class>
+   <extends>QWidget</extends>
+   <header>snlineedit.h</header>
+  </customwidget>
+ </customwidgets>
+ <tabstops>
+  <tabstop>scrollArea</tabstop>
+  <tabstop>optimizerCmb</tabstop>
+  <tabstop>optimizerBtn</tabstop>
+  <tabstop>schedulerCmb</tabstop>
+  <tabstop>schedulerClassLed</tabstop>
+  <tabstop>tableWidget</tabstop>
+  <tabstop>warmupStepsSbx</tabstop>
+  <tabstop>minFactorSbx</tabstop>
+  <tabstop>cyclesSbx</tabstop>
+  <tabstop>epochsSbx</tabstop>
+  <tabstop>batchSizeSbx</tabstop>
+  <tabstop>accumulationStepsSbx</tabstop>
+  <tabstop>scalerCmb</tabstop>
+  <tabstop>clipGradNormSbx</tabstop>
+  <tabstop>emaCmb</tabstop>
+  <tabstop>emaDecaySbx</tabstop>
+  <tabstop>emaUpdateIntervalSbx</tabstop>
+  <tabstop>gradientCheckpointingCmb</tabstop>
+  <tabstop>asyncOffloadCbx</tabstop>
+  <tabstop>offloadActivationsCbx</tabstop>
+  <tabstop>layerOffloadFractionSbx</tabstop>
+  <tabstop>trainDTypeCmb</tabstop>
+  <tabstop>fallbackDTypeCmb</tabstop>
+  <tabstop>autocastCacheCbx</tabstop>
+  <tabstop>resolutionLed</tabstop>
+  <tabstop>framesSbx</tabstop>
+  <tabstop>circularPaddingCbx</tabstop>
+  <tabstop>maskedTrainingCbx</tabstop>
+  <tabstop>unmaskedProbabilitySbx</tabstop>
+  <tabstop>unmaskedWeightSbx</tabstop>
+  <tabstop>normalizeMaskedAreaCbx</tabstop>
+  <tabstop>maskedPriorPreservationSbx</tabstop>
+  <tabstop>customConditioningImageCbx</tabstop>
+  <tabstop>mseSbx</tabstop>
+  <tabstop>maeSbx</tabstop>
+  <tabstop>huberStrengthSbx</tabstop>
+  <tabstop>huberDeltaSbx</tabstop>
+  <tabstop>logcoshSbx</tabstop>
+  <tabstop>vbLossSbx</tabstop>
+  <tabstop>lossWeightFunctionCmb</tabstop>
+  <tabstop>gammaSbx</tabstop>
+  <tabstop>lossScalerCmb</tabstop>
+  <tabstop>te1IncludeCbx</tabstop>
+  <tabstop>te1TrainCbx</tabstop>
+  <tabstop>te1TrainEmbCbx</tabstop>
+  <tabstop>te1DropoutSbx</tabstop>
+  <tabstop>te1StopTrainingSbx</tabstop>
+  <tabstop>te1StopTrainingCmb</tabstop>
+  <tabstop>te1ClipSkipSbx</tabstop>
+  <tabstop>te2IncludeCbx</tabstop>
+  <tabstop>te2TrainCbx</tabstop>
+  <tabstop>te2TrainEmbCbx</tabstop>
+  <tabstop>te2DropoutSbx</tabstop>
+  <tabstop>te2StopTrainingSbx</tabstop>
+  <tabstop>te2StopTrainingCmb</tabstop>
+  <tabstop>te2ClipSkipSbx</tabstop>
+  <tabstop>te2SeqLenSbx</tabstop>
+  <tabstop>te3IncludeCbx</tabstop>
+  <tabstop>te3TrainCbx</tabstop>
+  <tabstop>te3TrainEmbCbx</tabstop>
+  <tabstop>te3DropoutSbx</tabstop>
+  <tabstop>te3StopTrainingSbx</tabstop>
+  <tabstop>te3StopTrainingCmb</tabstop>
+  <tabstop>te3ClipSkipSbx</tabstop>
+  <tabstop>te4IncludeCbx</tabstop>
+  <tabstop>te4TrainCbx</tabstop>
+  <tabstop>te4TrainEmbCbx</tabstop>
+  <tabstop>te4DropoutSbx</tabstop>
+  <tabstop>te4StopTrainingSbx</tabstop>
+  <tabstop>te4StopTrainingCmb</tabstop>
+  <tabstop>te4ClipSkipSbx</tabstop>
+  <tabstop>unetTrainCbx</tabstop>
+  <tabstop>unetStopSbx</tabstop>
+  <tabstop>unetStopCmb</tabstop>
+  <tabstop>unetRescaleCbx</tabstop>
+  <tabstop>transformerTrainCbx</tabstop>
+  <tabstop>transformerStopSbx</tabstop>
+  <tabstop>transformerStopCmb</tabstop>
+  <tabstop>transformerAttnMaskCbx</tabstop>
+  <tabstop>transformerGuidanceSbx</tabstop>
+  <tabstop>priorTrainCbx</tabstop>
+  <tabstop>priorStopSbx</tabstop>
+  <tabstop>priorStopCmb</tabstop>
+  <tabstop>embeddingNormCbx</tabstop>
+  <tabstop>layerFilterCmb</tabstop>
+  <tabstop>layerFilterLed</tabstop>
+  <tabstop>layerFilterRegexCbx</tabstop>
+  <tabstop>offsetNoiseWeightSbx</tabstop>
+  <tabstop>generalizedOffsetNoiseCbx</tabstop>
+  <tabstop>perturbationNoiseWeightSbx</tabstop>
+  <tabstop>timestepDistributionCmb</tabstop>
+  <tabstop>minNoisingStrengthSbx</tabstop>
+  <tabstop>maxNoisingStrengthSbx</tabstop>
+  <tabstop>noisingWeightSbx</tabstop>
+  <tabstop>noisingBiasSbx</tabstop>
+  <tabstop>timestepShiftSbx</tabstop>
+  <tabstop>dynamicTimestepShiftingCbx</tabstop>
+  <tabstop>updatePreviewBtn</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
+</ui>

@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>828</width>
+    <height>300</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="2" column="14">
+    <widget class="QPushButton" name="toggleBtn">
+     <property name="text">
+      <string>Enable</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="13">
+    <widget class="QPushButton" name="addSampleBtn">
+     <property name="text">
+      <string>Add Sample</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="2">
+    <widget class="QComboBox" name="sampleAfterCmb"/>
+   </item>
+   <item row="0" column="5">
+    <widget class="QSpinBox" name="skipSbx">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="toolTip">
+      <string>Start sampling automatically after this interval has elapsed</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="3">
+    <spacer name="horizontalSpacer">
+     <property name="orientation">
+      <enum>Qt::Orientation::Horizontal</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>40</width>
+       <height>20</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item row="0" column="0">
+    <widget class="QLabel" name="label">
+     <property name="text">
+      <string>Sample After</string>
+     </property>
+     <property name="buddy">
+      <cstring>sampleAfterSbx</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="7">
+    <widget class="QLabel" name="label_3">
+     <property name="text">
+      <string>Format</string>
+     </property>
+     <property name="buddy">
+      <cstring>formatCmb</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="11">
+    <widget class="QComboBox" name="formatCmb">
+     <property name="toolTip">
+      <string>File Format used when saving samples</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="14">
+    <widget class="QPushButton" name="manualSampleBtn">
+     <property name="text">
+      <string>Manual Sample</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0" colspan="3">
+    <widget class="QCheckBox" name="nonEmaCbx">
+     <property name="toolTip">
+      <string>Whether to include non-ema sampling when using ema</string>
+     </property>
+     <property name="text">
+      <string>Non-EMA Sampling</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="13">
+    <widget class="QPushButton" name="sampleNowBtn">
+     <property name="text">
+      <string>Sample Now</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="4">
+    <widget class="QLabel" name="label_2">
+     <property name="text">
+      <string>Skip First</string>
+     </property>
+     <property name="buddy">
+      <cstring>skipSbx</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="6">
+    <spacer name="horizontalSpacer_2">
+     <property name="orientation">
+      <enum>Qt::Orientation::Horizontal</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>40</width>
+       <height>20</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item row="0" column="1">
+    <widget class="QSpinBox" name="sampleAfterSbx">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="toolTip">
+      <string>The interval used when automatically sampling from the model during training</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="12">
+    <spacer name="horizontalSpacer_3">
+     <property name="orientation">
+      <enum>Qt::Orientation::Horizontal</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>40</width>
+       <height>20</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item row="3" column="0" colspan="15">
+    <widget class="QListWidget" name="listWidget"/>
+   </item>
+   <item row="1" column="13" colspan="2">
+    <widget class="QCheckBox" name="tensorboardCbx">
+     <property name="toolTip">
+      <string>Whether to include sample images in the Tensorboard output</string>
+     </property>
+     <property name="text">
+      <string>Samples To Tensorboard</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <widget class="QLabel" name="label_4">
+     <property name="text">
+      <string>Preset</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="1" colspan="2">
+    <widget class="QComboBox" name="configCmb">
+     <property name="editable">
+      <bool>true</bool>
+     </property>
+     <property name="currentText">
+      <string/>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <tabstops>
+  <tabstop>sampleAfterSbx</tabstop>
+  <tabstop>sampleAfterCmb</tabstop>
+  <tabstop>skipSbx</tabstop>
+  <tabstop>formatCmb</tabstop>
+  <tabstop>sampleNowBtn</tabstop>
+  <tabstop>manualSampleBtn</tabstop>
+  <tabstop>nonEmaCbx</tabstop>
+  <tabstop>tensorboardCbx</tabstop>
+  <tabstop>configCmb</tabstop>
+  <tabstop>addSampleBtn</tabstop>
+  <tabstop>toggleBtn</tabstop>
+  <tabstop>listWidget</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
+</ui>

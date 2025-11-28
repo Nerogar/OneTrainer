@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
+  <property name="windowModality">
+   <enum>Qt::WindowModality::WindowModal</enum>
+  </property>
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>531</width>
+    <height>578</height>
+   </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="windowTitle">
+   <string>Bulk Caption Tools</string>
+  </property>
+  <property name="sizeGripEnabled">
+   <bool>false</bool>
+  </property>
+  <property name="modal">
+   <bool>true</bool>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="10" column="0" colspan="5">
+    <widget class="QLabel" name="statusLbl">
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="2" colspan="2">
+    <widget class="QLineEdit" name="directoryLed"/>
+   </item>
+   <item row="1" column="0">
+    <widget class="QLabel" name="label_3">
+     <property name="text">
+      <string>Dataset Directory</string>
+     </property>
+     <property name="buddy">
+      <cstring>directoryLed</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="9" column="0" colspan="5">
+    <widget class="QPlainTextEdit" name="previewTed">
+     <property name="lineWrapMode">
+      <enum>QPlainTextEdit::LineWrapMode::NoWrap</enum>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="11" column="0">
+    <widget class="QPushButton" name="previewBtn">
+     <property name="text">
+      <string>Preview</string>
+     </property>
+    </widget>
+   </item>
+   <item row="5" column="2">
+    <widget class="QLineEdit" name="replaceLed"/>
+   </item>
+   <item row="3" column="2" colspan="2">
+    <widget class="QLineEdit" name="addLed"/>
+   </item>
+   <item row="4" column="2" colspan="2">
+    <widget class="QLineEdit" name="removeLed"/>
+   </item>
+   <item row="4" column="0">
+    <widget class="QLabel" name="label_2">
+     <property name="text">
+      <string>Remove Text</string>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="0">
+    <widget class="QLabel" name="label_6">
+     <property name="text">
+      <string>Regex Replace</string>
+     </property>
+    </widget>
+   </item>
+   <item row="8" column="0" colspan="5">
+    <widget class="QLabel" name="label_8">
+     <property name="text">
+      <string>Preview (First 10 captions)</string>
+     </property>
+    </widget>
+   </item>
+   <item row="5" column="4">
+    <widget class="QLineEdit" name="replaceWithLed"/>
+   </item>
+   <item row="6" column="3">
+    <widget class="QLabel" name="label_7">
+     <property name="text">
+      <string>With</string>
+     </property>
+    </widget>
+   </item>
+   <item row="5" column="3">
+    <widget class="QLabel" name="label_5">
+     <property name="text">
+      <string>With</string>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="0">
+    <widget class="QLabel" name="label">
+     <property name="text">
+      <string>Add Text</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="4">
+    <widget class="QToolButton" name="directoryBtn">
+     <property name="text">
+      <string>...</string>
+     </property>
+    </widget>
+   </item>
+   <item row="11" column="1" colspan="4">
+    <widget class="QPushButton" name="applyBtn">
+     <property name="text">
+      <string>Apply Changes</string>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="2">
+    <widget class="QLineEdit" name="regexLed"/>
+   </item>
+   <item row="5" column="0">
+    <widget class="QLabel" name="label_4">
+     <property name="text">
+      <string>Replace</string>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="4">
+    <widget class="QComboBox" name="addCmb"/>
+   </item>
+   <item row="6" column="4">
+    <widget class="QLineEdit" name="regexWithLed"/>
+   </item>
+  </layout>
+ </widget>
+ <tabstops>
+  <tabstop>directoryLed</tabstop>
+  <tabstop>directoryBtn</tabstop>
+  <tabstop>addLed</tabstop>
+  <tabstop>addCmb</tabstop>
+  <tabstop>removeLed</tabstop>
+  <tabstop>replaceLed</tabstop>
+  <tabstop>replaceWithLed</tabstop>
+  <tabstop>regexLed</tabstop>
+  <tabstop>regexWithLed</tabstop>
+  <tabstop>previewBtn</tabstop>
+  <tabstop>applyBtn</tabstop>
+  <tabstop>previewTed</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
+</ui>

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>648</width>
+    <height>47</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <layout class="QHBoxLayout" name="horizontalLayout">
+   <item>
+    <widget class="QToolButton" name="deleteBtn">
+     <property name="text">
+      <string>X</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QToolButton" name="cloneBtn">
+     <property name="text">
+      <string>+</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="enabledCbx">
+     <property name="text">
+      <string/>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="label">
+     <property name="text">
+      <string>Width</string>
+     </property>
+     <property name="buddy">
+      <cstring>widthSbx</cstring>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QSpinBox" name="widthSbx">
+     <property name="buttonSymbols">
+      <enum>QAbstractSpinBox::ButtonSymbols::NoButtons</enum>
+     </property>
+     <property name="maximum">
+      <number>8096</number>
+     </property>
+     <property name="value">
+      <number>512</number>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="label_2">
+     <property name="text">
+      <string>Height</string>
+     </property>
+     <property name="buddy">
+      <cstring>heightSbx</cstring>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QSpinBox" name="heightSbx">
+     <property name="buttonSymbols">
+      <enum>QAbstractSpinBox::ButtonSymbols::NoButtons</enum>
+     </property>
+     <property name="maximum">
+      <number>8096</number>
+     </property>
+     <property name="value">
+      <number>512</number>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="label_3">
+     <property name="text">
+      <string>Seed</string>
+     </property>
+     <property name="buddy">
+      <cstring>seedLed</cstring>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLineEdit" name="seedLed"/>
+   </item>
+   <item>
+    <widget class="QLabel" name="label_4">
+     <property name="text">
+      <string>Prompt</string>
+     </property>
+     <property name="buddy">
+      <cstring>promptLed</cstring>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLineEdit" name="promptLed"/>
+   </item>
+   <item>
+    <widget class="QToolButton" name="openWindowBtn">
+     <property name="text">
+      <string>...</string>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <tabstops>
+  <tabstop>deleteBtn</tabstop>
+  <tabstop>cloneBtn</tabstop>
+  <tabstop>enabledCbx</tabstop>
+  <tabstop>widthSbx</tabstop>
+  <tabstop>heightSbx</tabstop>
+  <tabstop>seedLed</tabstop>
+  <tabstop>promptLed</tabstop>
+  <tabstop>openWindowBtn</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
+</ui>

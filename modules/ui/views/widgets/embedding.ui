@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1024</width>
+    <height>78</height>
+   </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="1" column="4">
+    <widget class="QLabel" name="label_4">
+     <property name="text">
+      <string>Stop Training After</string>
+     </property>
+     <property name="buddy">
+      <cstring>stopTrainingSbx</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0" colspan="2">
+    <widget class="QCheckBox" name="trainCbx">
+     <property name="toolTip">
+      <string>Train this embedding</string>
+     </property>
+     <property name="text">
+      <string>Train</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="5">
+    <widget class="QSpinBox" name="stopTrainingSbx">
+     <property name="toolTip">
+      <string>When to stop training the embedding</string>
+     </property>
+     <property name="maximum">
+      <number>999</number>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="3">
+    <widget class="QLabel" name="label">
+     <property name="text">
+      <string>Base Embedding</string>
+     </property>
+     <property name="buddy">
+      <cstring>baseEmbeddingLed</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QToolButton" name="cloneBtn">
+     <property name="text">
+      <string>+</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="4" colspan="2">
+    <widget class="QLineEdit" name="baseEmbeddingLed">
+     <property name="toolTip">
+      <string>The base embedding to train on. Leave empty to create a new embedding</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="8">
+    <widget class="QLineEdit" name="placeholderLed">
+     <property name="toolTip">
+      <string>The placeholder used when using the embedding in a prompt</string>
+     </property>
+     <property name="text">
+      <string>&lt;embedding&gt;</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="7">
+    <widget class="QLabel" name="label_5">
+     <property name="text">
+      <string>Initial Embedding Text</string>
+     </property>
+     <property name="buddy">
+      <cstring>initialEmbeddingLed</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="7">
+    <widget class="QLabel" name="label_2">
+     <property name="text">
+      <string>Placeholder</string>
+     </property>
+     <property name="buddy">
+      <cstring>placeholderLed</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="3">
+    <widget class="QCheckBox" name="outputEmbeddingCbx">
+     <property name="toolTip">
+      <string>Output embeddings are calculated at the output of the text encoder, not the input. This can improve results for larger text encoders and lower VRAM usage</string>
+     </property>
+     <property name="text">
+      <string>Output Embedding</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="6">
+    <widget class="QComboBox" name="stopTrainingCmb"/>
+   </item>
+   <item row="0" column="10">
+    <widget class="QSpinBox" name="tokenSbx">
+     <property name="toolTip">
+      <string>The token count used when creating a new embedding. Leave empty to auto detect from the initial embedding text</string>
+     </property>
+     <property name="minimum">
+      <number>1</number>
+     </property>
+     <property name="maximum">
+      <number>75</number>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="0">
+    <widget class="QToolButton" name="deleteBtn">
+     <property name="text">
+      <string>X</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="9">
+    <widget class="QLabel" name="label_3">
+     <property name="text">
+      <string>Token Count</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="6">
+    <widget class="QToolButton" name="baseEmbeddingBtn">
+     <property name="text">
+      <string>...</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="8" colspan="3">
+    <widget class="QLineEdit" name="initialEmbeddingLed">
+     <property name="toolTip">
+      <string>The initial embedding text used when creating a new embedding</string>
+     </property>
+     <property name="text">
+      <string>*</string>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <tabstops>
+  <tabstop>deleteBtn</tabstop>
+  <tabstop>cloneBtn</tabstop>
+  <tabstop>baseEmbeddingLed</tabstop>
+  <tabstop>baseEmbeddingBtn</tabstop>
+  <tabstop>placeholderLed</tabstop>
+  <tabstop>tokenSbx</tabstop>
+  <tabstop>trainCbx</tabstop>
+  <tabstop>outputEmbeddingCbx</tabstop>
+  <tabstop>stopTrainingSbx</tabstop>
+  <tabstop>stopTrainingCmb</tabstop>
+  <tabstop>initialEmbeddingLed</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
+</ui>

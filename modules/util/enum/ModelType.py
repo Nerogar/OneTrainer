@@ -1,7 +1,7 @@
-from enum import Enum
+from modules.util.enum.BaseEnum import BaseEnum
 
 
-class ModelType(Enum):
+class ModelType(BaseEnum):
     STABLE_DIFFUSION_15 = 'STABLE_DIFFUSION_15'
     STABLE_DIFFUSION_15_INPAINTING = 'STABLE_DIFFUSION_15_INPAINTING'
     STABLE_DIFFUSION_20 = 'STABLE_DIFFUSION_20'
@@ -36,8 +36,82 @@ class ModelType(Enum):
 
     QWEN = 'QWEN'
 
-    def __str__(self):
-        return self.value
+    def pretty_print(self):
+        return {
+            ModelType.STABLE_DIFFUSION_15: "SD1.5",
+            ModelType.STABLE_DIFFUSION_15_INPAINTING: "SD1.5 Inpainting",
+            ModelType.STABLE_DIFFUSION_20: "SD2.0",
+            #ModelType.STABLE_DIFFUSION_20_BASE: "SD2.0 Base",
+            ModelType.STABLE_DIFFUSION_20_INPAINTING: "SD2.0 Inpainting",
+            #ModelType.STABLE_DIFFUSION_20_DEPTH: "SD2.0 Depth",
+            ModelType.STABLE_DIFFUSION_21: "SD2.1",
+            #ModelType.STABLE_DIFFUSION_21_BASE: "SD2.1 Base",
+            ModelType.STABLE_DIFFUSION_3: "SD3",
+            ModelType.STABLE_DIFFUSION_35: "SD3.5",
+            ModelType.STABLE_DIFFUSION_XL_10_BASE: "SDXL 1.0 Base",
+            ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING: "SDXL 1.0 Base Inpainting",
+            ModelType.WUERSTCHEN_2: "Wuerstchen v2",
+            ModelType.STABLE_CASCADE_1: "Stable Cascade",
+            ModelType.PIXART_ALPHA: "PixArt Alpha",
+            ModelType.PIXART_SIGMA: "PixArt Sigma",
+            ModelType.FLUX_DEV_1: "Flux Dev",
+            ModelType.FLUX_FILL_DEV_1: "Flux Fill Dev",
+            ModelType.SANA: "Sana",
+            ModelType.HUNYUAN_VIDEO: "Hunyuan Video",
+            ModelType.HI_DREAM_FULL: "HiDream Full",
+            ModelType.CHROMA_1: "Chroma1",
+            ModelType.QWEN: "Qwen Image",
+        }[self]
+
+    @staticmethod
+    def is_enabled(value, context=None):
+        if context == "convert_window":
+            return value in [
+                ModelType.STABLE_DIFFUSION_15,
+                ModelType.STABLE_DIFFUSION_15_INPAINTING,
+                ModelType.STABLE_DIFFUSION_20,
+                ModelType.STABLE_DIFFUSION_20_INPAINTING,
+                ModelType.STABLE_DIFFUSION_21,
+                ModelType.STABLE_DIFFUSION_3,
+                ModelType.STABLE_DIFFUSION_35,
+                ModelType.STABLE_DIFFUSION_XL_10_BASE,
+                ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING,
+                ModelType.WUERSTCHEN_2,
+                ModelType.STABLE_CASCADE_1,
+                ModelType.PIXART_ALPHA,
+                ModelType.PIXART_SIGMA,
+                ModelType.FLUX_DEV_1,
+                ModelType.FLUX_FILL_DEV_1,
+                ModelType.HUNYUAN_VIDEO,
+                ModelType.CHROMA_1,  # TODO does this just work? HiDream is not here
+                ModelType.QWEN,  # TODO does this just work? HiDream is not here
+            ]
+        else: # main_window
+            return value in [
+                ModelType.STABLE_DIFFUSION_15,
+                ModelType.STABLE_DIFFUSION_15_INPAINTING,
+                ModelType.STABLE_DIFFUSION_20,
+                # ModelType.STABLE_DIFFUSION_20_BASE,
+                ModelType.STABLE_DIFFUSION_20_INPAINTING,
+                # ModelType.STABLE_DIFFUSION_20_DEPTH,
+                ModelType.STABLE_DIFFUSION_21,
+                # ModelType.STABLE_DIFFUSION_21_BASE,
+                ModelType.STABLE_DIFFUSION_3,
+                ModelType.STABLE_DIFFUSION_35,
+                ModelType.STABLE_DIFFUSION_XL_10_BASE,
+                ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING,
+                ModelType.WUERSTCHEN_2,
+                ModelType.STABLE_CASCADE_1,
+                ModelType.PIXART_ALPHA,
+                ModelType.PIXART_SIGMA,
+                ModelType.FLUX_DEV_1,
+                ModelType.FLUX_FILL_DEV_1,
+                ModelType.SANA,
+                ModelType.HUNYUAN_VIDEO,
+                ModelType.HI_DREAM_FULL,
+                ModelType.CHROMA_1,
+                ModelType.QWEN,
+            ]
 
     def is_stable_diffusion(self):
         return self == ModelType.STABLE_DIFFUSION_15 \
@@ -143,10 +217,14 @@ class ModelType(Enum):
             or self.is_hi_dream()
 
 
-class PeftType(Enum):
+class PeftType(BaseEnum):
     LORA = 'LORA'
     LOHA = 'LOHA'
     OFT_2 = 'OFT_2'
 
-    def __str__(self):
-        return self.value
+    def pretty_print(self):
+        return {
+            PeftType.LORA: "LoRA",
+            PeftType.LOHA: "LoHA",
+            PeftType.OFT_2: "OFT 2",
+        }[self]

@@ -1,7 +1,7 @@
-from enum import Enum
+from modules.util.enum.BaseEnum import BaseEnum
 
 
-class ModelFormat(Enum):
+class ModelFormat(BaseEnum):
     DIFFUSERS = 'DIFFUSERS'
     CKPT = 'CKPT'
     SAFETENSORS = 'SAFETENSORS'
@@ -9,9 +9,15 @@ class ModelFormat(Enum):
 
     INTERNAL = 'INTERNAL'  # an internal format that stores all information to resume training
 
-    def __str__(self):
-        return self.value
+    @staticmethod
+    def is_enabled(value, context=None):
+        if context == "convert_window":
+            return value in [ModelFormat.SAFETENSORS, ModelFormat.DIFFUSERS]
+        else: # model tab
+            pass
 
+        return True
+        # TODO
 
     def file_extension(self) -> str:
         match self:

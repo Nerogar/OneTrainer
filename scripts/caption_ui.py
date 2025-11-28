@@ -2,16 +2,32 @@ from util.import_util import script_imports
 
 script_imports()
 
-from modules.ui.CaptionUI import CaptionUI
-from modules.util.args.CaptionUIArgs import CaptionUIArgs
+import os
+import sys
+
+from modules.ui.controllers.windows.DatasetController import DatasetController
+from modules.ui.utils.OneTrainerApplication import OnetrainerApplication
+from modules.ui.utils.SNLineEdit import SNLineEdit
+
+from PySide6.QtUiTools import QUiLoader
 
 
 def main():
-    args = CaptionUIArgs.parse_args()
+    os.environ["QT_QPA_PLATFORM"] = "xcb"  # Suppress Wayland warnings on NVidia drivers.
+    # TODO: scalene (modules.ui.models.StateModel) changes locale on import, change QT6 locale to suppress warning here?
 
-    ui = CaptionUI(None, args.dir, args.include_subdirectories)
-    ui.mainloop()
+    app = OnetrainerApplication(sys.argv)
+    loader = QUiLoader()
+    loader.registerCustomWidget(SNLineEdit)
+
+    onetrainer = DatasetController(loader)
+
+    # Invalidate ui elements after the controllers are set up, but before showing them.
+    app.stateChanged.emit()
+    onetrainer.ui.show()
+
+    sys.exit(app.exec())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

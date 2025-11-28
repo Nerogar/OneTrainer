@@ -1,13 +1,21 @@
-from enum import Enum
+from modules.util.enum.BaseEnum import BaseEnum
 
 import torch
 
 
-class GradientReducePrecision(Enum):
+class GradientReducePrecision(BaseEnum):
     WEIGHT_DTYPE = 'WEIGHT_DTYPE'
     FLOAT_32 = 'FLOAT_32'
     WEIGHT_DTYPE_STOCHASTIC = 'WEIGHT_DTYPE_STOCHASTIC'
     FLOAT_32_STOCHASTIC = 'FLOAT_32_STOCHASTIC'
+
+    def pretty_print(self):
+        return {
+            GradientReducePrecision.WEIGHT_DTYPE: "Weight DType",
+            GradientReducePrecision.FLOAT_32: "Float32",
+            GradientReducePrecision.WEIGHT_DTYPE_STOCHASTIC: "Weight DType Stochastic",
+            GradientReducePrecision.FLOAT_32_STOCHASTIC: "Float32 Stochastic"
+        }[self]
 
     def torch_dtype(self, weight_dtype: torch.dtype) -> torch.dtype:
         match self:
@@ -34,6 +42,3 @@ class GradientReducePrecision(Enum):
                 return weight_dtype == torch.bfloat16
             case _:
                 raise ValueError
-
-    def __str__(self):
-        return self.value

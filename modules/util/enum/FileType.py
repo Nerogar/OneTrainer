@@ -1,10 +1,7 @@
-from enum import Enum
+from modules.util.enum.BaseEnum import BaseEnum
 
 
-class FileType(Enum):
+class FileType(BaseEnum):
     IMAGE = 'IMAGE'
     VIDEO = 'VIDEO'
     AUDIO = 'AUDIO'
-
-    def __str__(self):
-        return self.value

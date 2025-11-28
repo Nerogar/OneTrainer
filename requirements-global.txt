@@ -50,7 +50,12 @@ adv_optm==1.1.3 # advanced optimizers
 scalene==1.5.51
 
 # ui
-customtkinter==5.2.2
+#customtkinter==5.2.2
+pyside6==6.10.0 # 6.4.2
+pyqt6==6.10.0 # 6.4.2
+PyQt6-Qt6==6.10.0 # 6.4.2
+matplotlib
+show-in-file-manager
 
 # cloud
 runpod==1.7.10
@@ -60,3 +65,7 @@ fabric==3.2.2
 psutil==7.0.0
 requests==2.32.3
 deepdiff==8.6.1 # output easy to read diff for troublshooting
+
+# dataset tools
+pyoxipng==9.1.0 # Multithreaded PNG optimisation
+pepedpid==0.1.1 # required for DPID resizing https://dl.acm.org/doi/10.1145/2980179.2980239 https://pypi.org/project/pepedpid/

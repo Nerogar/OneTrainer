@@ -1,0 +1,595 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>765</width>
+    <height>585</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <widget class="QScrollArea" name="scrollArea">
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <widget class="QWidget" name="scrollAreaWidgetContents">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>745</width>
+        <height>565</height>
+       </rect>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_2">
+       <item row="0" column="1" colspan="5">
+        <widget class="QLineEdit" name="huggingfaceLed">
+         <property name="toolTip">
+          <string>Enter your Hugging Face access token if you have used a protected Hugging Face repository below.
+This value is stored separately, not saved to your configuration file. Go to https://huggingface.co/settings/tokens to create an access token</string>
+         </property>
+        </widget>
+       </item>
+       <item row="16" column="4">
+        <widget class="QLabel" name="label_3">
+         <property name="text">
+          <string>Include Config</string>
+         </property>
+         <property name="buddy">
+          <cstring>configCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="16" column="0">
+        <widget class="QLabel" name="label_6">
+         <property name="text">
+          <string>Output Format</string>
+         </property>
+         <property name="buddy">
+          <cstring>outputFormatCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="10" column="2">
+        <widget class="QToolButton" name="vaeBtn">
+         <property name="text">
+          <string>...</string>
+         </property>
+        </widget>
+       </item>
+       <item row="13" column="5">
+        <widget class="QComboBox" name="vqganDTypeCmb">
+         <property name="toolTip">
+          <string>Overrides the decoder vqgan weight data type</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>Base Model</string>
+         </property>
+         <property name="buddy">
+          <cstring>baseModelLed</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="4">
+        <widget class="QLabel" name="te2DTypeLbl">
+         <property name="text">
+          <string>Override Text Encoder 2 Data Type</string>
+         </property>
+         <property name="buddy">
+          <cstring>te2DTypeCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="11" column="5">
+        <widget class="QComboBox" name="effnetDTypeCmb">
+         <property name="toolTip">
+          <string>Overrides the effnet encoder weight data type</string>
+         </property>
+        </widget>
+       </item>
+       <item row="10" column="1">
+        <widget class="QLineEdit" name="vaeLed">
+         <property name="toolTip">
+          <string>Directory or Hugging Face repository of a VAE model in diffusers format. Can be used to override the VAE included in the base model. Using a safetensor VAE file will cause an error that the model cannot be loaded</string>
+         </property>
+        </widget>
+       </item>
+       <item row="9" column="1">
+        <widget class="QLineEdit" name="te4Led">
+         <property name="toolTip">
+          <string>Filename, directory or Hugging Face repository of the text encoder 4 model</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="4">
+        <widget class="QLabel" name="te1DTypeLbl">
+         <property name="text">
+          <string>Override Text Encoder 1 Data Type</string>
+         </property>
+         <property name="buddy">
+          <cstring>te1DTypeCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="0">
+        <widget class="QLabel" name="label">
+         <property name="text">
+          <string>Huggingface Token</string>
+         </property>
+         <property name="buddy">
+          <cstring>huggingfaceLed</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="11" column="1">
+        <widget class="QLineEdit" name="effnetLed">
+         <property name="toolTip">
+          <string>Filename, directory or Hugging Face repository of the effnet encoder model</string>
+         </property>
+        </widget>
+       </item>
+       <item row="10" column="4">
+        <widget class="QLabel" name="vaeDTypeLbl">
+         <property name="text">
+          <string>Override VAE Data Type</string>
+         </property>
+         <property name="buddy">
+          <cstring>vaeDTypeCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="5">
+        <widget class="QComboBox" name="unetDTypeCmb">
+         <property name="toolTip">
+          <string>Overrides the unet weight data type</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="2">
+        <widget class="QToolButton" name="transformerBtn">
+         <property name="text">
+          <string>...</string>
+         </property>
+        </widget>
+       </item>
+       <item row="10" column="0">
+        <widget class="QLabel" name="vaeLbl">
+         <property name="text">
+          <string>VAE Override</string>
+         </property>
+         <property name="buddy">
+          <cstring>vaeLed</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="priorLbl">
+         <property name="text">
+          <string>Prior Model</string>
+         </property>
+         <property name="buddy">
+          <cstring>priorLed</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="14" column="4">
+        <widget class="QLabel" name="decTeDTypeLbl">
+         <property name="text">
+          <string>Override Decoder Text Encoder Data Type</string>
+         </property>
+         <property name="buddy">
+          <cstring>decTeDTypeCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="15" column="2">
+        <widget class="QToolButton" name="modelOutputBtn">
+         <property name="text">
+          <string>...</string>
+         </property>
+        </widget>
+       </item>
+       <item row="8" column="5">
+        <widget class="QComboBox" name="te3DTypeCmb">
+         <property name="toolTip">
+          <string>Overrides the text encoder 3 weight data type</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QLineEdit" name="priorLed">
+         <property name="toolTip">
+          <string>Filename, directory or Hugging Face repository of the prior model</string>
+         </property>
+        </widget>
+       </item>
+       <item row="17" column="1">
+        <spacer name="verticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>10</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="4" column="5">
+        <widget class="QComboBox" name="transformerDTypeCmb">
+         <property name="toolTip">
+          <string>Overrides the transformer weight data type</string>
+         </property>
+        </widget>
+       </item>
+       <item row="8" column="4">
+        <widget class="QLabel" name="te3DTypeLbl">
+         <property name="text">
+          <string>Override Text Encoder 3 Data Type</string>
+         </property>
+         <property name="buddy">
+          <cstring>te3DTypeCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="4">
+        <widget class="QLabel" name="transformerDTypeLbl">
+         <property name="text">
+          <string>Override Transformer Data Type</string>
+         </property>
+         <property name="buddy">
+          <cstring>transformerDTypeCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="9" column="5">
+        <widget class="QComboBox" name="te4DTypeCmb">
+         <property name="toolTip">
+          <string>Overrides the text encoder 4 weight data type</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="4">
+        <widget class="QLabel" name="unetDTypeLbl">
+         <property name="text">
+          <string>Override UNet Data Type</string>
+         </property>
+         <property name="buddy">
+          <cstring>unetDTypeCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="9" column="2">
+        <widget class="QToolButton" name="te4Btn">
+         <property name="text">
+          <string>...</string>
+         </property>
+        </widget>
+       </item>
+       <item row="11" column="4">
+        <widget class="QLabel" name="effnetDTypeLbl">
+         <property name="text">
+          <string>Override Effnet Encoder Data Type</string>
+         </property>
+         <property name="buddy">
+          <cstring>effnetDTypeCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="16" column="5">
+        <widget class="QComboBox" name="configCmb">
+         <property name="toolTip">
+          <string>Include the training configuration in the final model. Only supported for safetensors files. None: No config is included. Settings: All training settings are included. All: All settings, including the samples and concepts are included</string>
+         </property>
+        </widget>
+       </item>
+       <item row="13" column="4">
+        <widget class="QLabel" name="vqganDTypeLbl">
+         <property name="text">
+          <string>Override Decoder VQGAN Data Type</string>
+         </property>
+         <property name="buddy">
+          <cstring>vqganDTypeCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="15" column="1">
+        <widget class="QLineEdit" name="modelOutputLed">
+         <property name="toolTip">
+          <string>Filename or directory where the output model is saved</string>
+         </property>
+        </widget>
+       </item>
+       <item row="16" column="1" colspan="2">
+        <widget class="QComboBox" name="outputFormatCmb">
+         <property name="toolTip">
+          <string>Format to use when saving the output model</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="transformerLbl">
+         <property name="text">
+          <string>Override Transformer / GGUF</string>
+         </property>
+         <property name="buddy">
+          <cstring>transformerLed</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QLineEdit" name="transformerLed">
+         <property name="toolTip">
+          <string>Can be used to override the transformer in the base model. Safetensors and GGUF files are supported, local and on Huggingface. If a GGUF file is used, the DataType must also be set to GGUF</string>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="5">
+        <widget class="QComboBox" name="te2DTypeCmb">
+         <property name="toolTip">
+          <string>Overrides the text encoder 2 weight data type</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="4">
+        <widget class="QLabel" name="label_11">
+         <property name="text">
+          <string>Weight Data Type</string>
+         </property>
+         <property name="buddy">
+          <cstring>weightDTypeCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="14" column="5">
+        <widget class="QComboBox" name="decTeDTypeCmb">
+         <property name="toolTip">
+          <string>Overrides the decoder text encoder weight data type</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="4">
+        <widget class="QLabel" name="priorDTypeLbl">
+         <property name="text">
+          <string>Override Prior Data Type</string>
+         </property>
+         <property name="buddy">
+          <cstring>priorDTypeCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="4" colspan="2">
+        <widget class="QCheckBox" name="compileTransformerCbx">
+         <property name="toolTip">
+          <string>Uses torch.compile and Triton to significantly speed up training. Only applies to transformer/unet. Disable in case of compatibility issues</string>
+         </property>
+         <property name="text">
+          <string>Compile Transformer Blocks</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="2">
+        <widget class="QToolButton" name="baseModelBtn">
+         <property name="text">
+          <string>...</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="5">
+        <widget class="QComboBox" name="priorDTypeCmb">
+         <property name="toolTip">
+          <string>Overrides the prior weight data type</string>
+         </property>
+        </widget>
+       </item>
+       <item row="10" column="5">
+        <widget class="QComboBox" name="vaeDTypeCmb">
+         <property name="toolTip">
+          <string>Overrides the vae weight data type</string>
+         </property>
+        </widget>
+       </item>
+       <item row="15" column="5">
+        <widget class="QComboBox" name="outputDTypeCmb">
+         <property name="toolTip">
+          <string>Precision to use when saving the output model</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="5">
+        <widget class="QComboBox" name="te1DTypeCmb">
+         <property name="toolTip">
+          <string>Overrides the text encoder weight data type</string>
+         </property>
+        </widget>
+       </item>
+       <item row="15" column="4">
+        <widget class="QLabel" name="label_10">
+         <property name="text">
+          <string>Output Data Type</string>
+         </property>
+         <property name="buddy">
+          <cstring>outputDTypeCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="5">
+        <widget class="QComboBox" name="weightDTypeCmb">
+         <property name="toolTip">
+          <string>The base model weight data type used for training. This can reduce memory consumption, but reduces precision</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="2">
+        <widget class="QToolButton" name="priorBtn">
+         <property name="text">
+          <string>...</string>
+         </property>
+        </widget>
+       </item>
+       <item row="9" column="3">
+        <spacer name="horizontalSpacer">
+         <property name="orientation">
+          <enum>Qt::Orientation::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="9" column="4">
+        <widget class="QLabel" name="te4DTypeLbl">
+         <property name="text">
+          <string>Override Text Encoder 4 Data Type</string>
+         </property>
+         <property name="buddy">
+          <cstring>te4DTypeCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QLineEdit" name="baseModelLed">
+         <property name="toolTip">
+          <string>Filename, directory or Hugging Face repository of the base model</string>
+         </property>
+        </widget>
+       </item>
+       <item row="9" column="0">
+        <widget class="QLabel" name="te4Lbl">
+         <property name="text">
+          <string>Text Encoder 4 Override</string>
+         </property>
+         <property name="buddy">
+          <cstring>te4Led</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="11" column="2">
+        <widget class="QToolButton" name="effnetBtn">
+         <property name="text">
+          <string>...</string>
+         </property>
+        </widget>
+       </item>
+       <item row="15" column="0">
+        <widget class="QLabel" name="label_5">
+         <property name="text">
+          <string>Model Output Destination</string>
+         </property>
+         <property name="buddy">
+          <cstring>modelOutputLed</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="11" column="0">
+        <widget class="QLabel" name="effnetLbl">
+         <property name="text">
+          <string>Effnet Encoder Model</string>
+         </property>
+         <property name="buddy">
+          <cstring>effnetLed</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="12" column="5">
+        <widget class="QComboBox" name="decDTypeCmb">
+         <property name="toolTip">
+          <string>Overrides the decoder weight data type</string>
+         </property>
+        </widget>
+       </item>
+       <item row="12" column="4">
+        <widget class="QLabel" name="decDTypeLbl">
+         <property name="text">
+          <string>Override Decoder Data Type</string>
+         </property>
+         <property name="buddy">
+          <cstring>decDTypeCmb</cstring>
+         </property>
+        </widget>
+       </item>
+       <item row="12" column="2">
+        <widget class="QToolButton" name="decBtn">
+         <property name="text">
+          <string>...</string>
+         </property>
+        </widget>
+       </item>
+       <item row="12" column="1">
+        <widget class="QLineEdit" name="decLed">
+         <property name="toolTip">
+          <string>Filename, directory or Hugging Face repository of the decoder model</string>
+         </property>
+        </widget>
+       </item>
+       <item row="12" column="0">
+        <widget class="QLabel" name="decLbl">
+         <property name="text">
+          <string>Decoder Model</string>
+         </property>
+         <property name="buddy">
+          <cstring>decLed</cstring>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <tabstops>
+  <tabstop>scrollArea</tabstop>
+  <tabstop>huggingfaceLed</tabstop>
+  <tabstop>baseModelLed</tabstop>
+  <tabstop>baseModelBtn</tabstop>
+  <tabstop>weightDTypeCmb</tabstop>
+  <tabstop>unetDTypeCmb</tabstop>
+  <tabstop>priorLed</tabstop>
+  <tabstop>priorBtn</tabstop>
+  <tabstop>priorDTypeCmb</tabstop>
+  <tabstop>transformerLed</tabstop>
+  <tabstop>transformerBtn</tabstop>
+  <tabstop>transformerDTypeCmb</tabstop>
+  <tabstop>compileTransformerCbx</tabstop>
+  <tabstop>te1DTypeCmb</tabstop>
+  <tabstop>te2DTypeCmb</tabstop>
+  <tabstop>te3DTypeCmb</tabstop>
+  <tabstop>te4Led</tabstop>
+  <tabstop>te4Btn</tabstop>
+  <tabstop>te4DTypeCmb</tabstop>
+  <tabstop>vaeLed</tabstop>
+  <tabstop>vaeBtn</tabstop>
+  <tabstop>vaeDTypeCmb</tabstop>
+  <tabstop>effnetLed</tabstop>
+  <tabstop>effnetBtn</tabstop>
+  <tabstop>effnetDTypeCmb</tabstop>
+  <tabstop>decLed</tabstop>
+  <tabstop>decBtn</tabstop>
+  <tabstop>decDTypeCmb</tabstop>
+  <tabstop>vqganDTypeCmb</tabstop>
+  <tabstop>decTeDTypeCmb</tabstop>
+  <tabstop>modelOutputLed</tabstop>
+  <tabstop>modelOutputBtn</tabstop>
+  <tabstop>outputDTypeCmb</tabstop>
+  <tabstop>outputFormatCmb</tabstop>
+  <tabstop>configCmb</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
+</ui>

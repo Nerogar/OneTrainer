@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
+  <property name="windowModality">
+   <enum>Qt::WindowModality::WindowModal</enum>
+  </property>
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>382</width>
+    <height>297</height>
+   </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="windowTitle">
+   <string>Generate Captions</string>
+  </property>
+  <property name="sizeGripEnabled">
+   <bool>false</bool>
+  </property>
+  <property name="modal">
+   <bool>true</bool>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="2" colspan="2">
+    <widget class="QComboBox" name="modelCmb"/>
+   </item>
+   <item row="5" column="0">
+    <widget class="QLabel" name="label_6">
+     <property name="text">
+      <string>Caption Postfix</string>
+     </property>
+     <property name="buddy">
+      <cstring>captionPostfixLed</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0">
+    <widget class="QLabel" name="label_2">
+     <property name="text">
+      <string>Folder</string>
+     </property>
+     <property name="buddy">
+      <cstring>folderLed</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="2" colspan="2">
+    <widget class="QLineEdit" name="initialCaptionLed"/>
+   </item>
+   <item row="8" column="0">
+    <widget class="QLabel" name="label_9">
+     <property name="text">
+      <string>Progress</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="0">
+    <widget class="QLabel" name="label">
+     <property name="text">
+      <string>Model</string>
+     </property>
+     <property name="buddy">
+      <cstring>modelCmb</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="2">
+    <widget class="QLineEdit" name="folderLed"/>
+   </item>
+   <item row="9" column="0" colspan="4">
+    <widget class="QPushButton" name="createMaskBtn">
+     <property name="text">
+      <string>Create Caption</string>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="0">
+    <widget class="QLabel" name="label_5">
+     <property name="text">
+      <string>Caption Prefix</string>
+     </property>
+     <property name="buddy">
+      <cstring>captionPrefixLed</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="7" column="0" colspan="4">
+    <widget class="QCheckBox" name="includeSubfolderCbx">
+     <property name="text">
+      <string>Include Subfolders</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <widget class="QLabel" name="label_3">
+     <property name="text">
+      <string>Initial Caption</string>
+     </property>
+     <property name="buddy">
+      <cstring>initialCaptionLed</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="8" column="2" colspan="2">
+    <widget class="QProgressBar" name="progressBar">
+     <property name="value">
+      <number>24</number>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="3">
+    <widget class="QToolButton" name="folderBtn">
+     <property name="text">
+      <string>...</string>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="0">
+    <widget class="QLabel" name="label_4">
+     <property name="text">
+      <string>Mode</string>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="2" colspan="2">
+    <widget class="QComboBox" name="modeCmb"/>
+   </item>
+   <item row="4" column="2" colspan="2">
+    <widget class="QLineEdit" name="captionPrefixLed"/>
+   </item>
+   <item row="5" column="2" colspan="2">
+    <widget class="QLineEdit" name="captionPostfixLed"/>
+   </item>
+  </layout>
+ </widget>
+ <tabstops>
+  <tabstop>modelCmb</tabstop>
+  <tabstop>folderLed</tabstop>
+  <tabstop>folderBtn</tabstop>
+  <tabstop>initialCaptionLed</tabstop>
+  <tabstop>captionPrefixLed</tabstop>
+  <tabstop>captionPostfixLed</tabstop>
+  <tabstop>modeCmb</tabstop>
+  <tabstop>includeSubfolderCbx</tabstop>
+  <tabstop>createMaskBtn</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
+</ui>

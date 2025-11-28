@@ -1,9 +1,6 @@
-from enum import Enum
+from modules.util.enum.BaseEnum import BaseEnum
 
 
-class BalancingStrategy(Enum):
+class BalancingStrategy(BaseEnum):
     REPEATS = 'REPEATS'
     SAMPLES = 'SAMPLES'
-
-    def __str__(self):
-        return self.value
