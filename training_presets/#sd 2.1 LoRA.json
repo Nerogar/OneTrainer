@@ -11,5 +11,10 @@
     "vae": {
         "weight_dtype": "FLOAT_16"
     },
-    "weight_dtype": "FLOAT_16"
+    "unet": {
+        "weight_dtype": "FLOAT_16"
+    },
+    "text_encoder": {
+        "weight_dtype": "FLOAT_16"
+    }
 }

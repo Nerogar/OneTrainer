@@ -122,10 +122,15 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("loading the model")
 
+        if self.config.quantization.cache_dir is None:
+            self.config.quantization.cache_dir = self.config.cache_dir + "/quantization"
+            os.makedirs(self.config.quantization.cache_dir, exist_ok=True)
+
         self.model = self.model_loader.load(
             model_type=self.config.model_type,
             model_names=model_names,
             weight_dtypes=self.config.weight_dtypes(),
+            quantization=self.config.quantization,
         )
         self.model.train_config = self.config
 

@@ -14,8 +14,16 @@
         "train": false
     },
     "training_method": "LORA",
+    "unet": {
+        "weight_dtype": "FLOAT_16"
+    },
+    "text_encoder": {
+        "weight_dtype": "FLOAT_16"
+    },
+    "text_encoder_2": {
+        "weight_dtype": "FLOAT_16"
+    },
     "vae": {
         "weight_dtype": "FLOAT_32"
-    },
-    "weight_dtype": "FLOAT_16"
+    }
 }
