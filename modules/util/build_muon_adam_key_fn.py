@@ -133,10 +133,7 @@ def build_muon_adam_key_fn(
             print("\n[MuonWithAuxAdam] Warning: No trainable parameters found.\n")
 
 
-    def layer_key_fn(p: torch.nn.Parameter) -> str:
-        return param_map.get(id(p), 'adam')
-
-    return layer_key_fn
+    return lambda p: param_map.get(id(p), 'adam')
 
 def split_parameters_for_muon(
     parameters: list[dict],
