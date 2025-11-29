@@ -58,7 +58,7 @@ def build_muon_adam_key_fn(
     def get_optim_type(param_name: str, p: torch.nn.Parameter) -> str:
         """Applies the simplified rule hierarchy to a single parameter."""
         # Rule 1: Check against the exclusion filters first.
-        if any(f.matches(param_name) for f in filters) and len(p.shape) != 1:
+        if any(f.matches(param_name) for f in filters) and p.ndim != 1:
             return 'muon'
 
         # Rule 2: For everything else, use Adam
@@ -97,17 +97,12 @@ def build_muon_adam_key_fn(
     adam_params_count = 0
     for p in all_processed_params:
         optim_type = param_map.get(id(p))
-
-        if optim_type is None:
-            optim_type = 'adam'
-
         if optim_type != 'muon':
             adam_params_count += p.numel()
 
     if adam_params_count == 0:
         print("\n[MuonWithAuxAdam] WARNING: 100% of trainable parameters are assigned to Muon.")
         print("Consider disabling 'MuonWithAuxAdam' in your configuration since the auxiliary AdamW optimizer is not being used.")
-        print("----------------------------------------------\n")
 
     if config.optimizer.muon_hidden_layers is not None:
         unused_filters = [f._pattern for f in filters if not f.was_used()]
