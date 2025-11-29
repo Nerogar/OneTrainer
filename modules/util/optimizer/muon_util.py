@@ -104,10 +104,10 @@ def build_muon_adam_key_fn(
         if optim_type != 'muon':
             adam_params_count += p.numel()
 
-        if adam_params_count == 0:
-            print("\n[MuonWithAuxAdam] WARNING: 100% of trainable parameters are assigned to Muon.")
-            print("Consider disabling 'MuonWithAuxAdam' in your configuration since the auxiliary AdamW optimizer is not being used.")
-            print("----------------------------------------------\n")
+    if adam_params_count == 0:
+        print("\n[MuonWithAuxAdam] WARNING: 100% of trainable parameters are assigned to Muon.")
+        print("Consider disabling 'MuonWithAuxAdam' in your configuration since the auxiliary AdamW optimizer is not being used.")
+        print("----------------------------------------------\n")
 
     if config.optimizer.muon_hidden_layers is not None:
         unused_filters = [f._pattern for f in filters if not f.was_used()]
