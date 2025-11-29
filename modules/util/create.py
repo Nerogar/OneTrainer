@@ -1,6 +1,6 @@
 import ast
 import importlib
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.ChromaBaseDataLoader import ChromaBaseDataLoader
@@ -496,7 +496,7 @@ def create_optimizer(
         parameter_group_collection: NamedParameterGroupCollection,
         state_dict: dict | None,
         config: TrainConfig,
-        layer_key_fn: Callable | None = None,
+        layer_key_fn: dict[int, str] | None = None,
 ) -> torch.optim.Optimizer | None:
     optimizer = None
     optimizer_config = config.optimizer

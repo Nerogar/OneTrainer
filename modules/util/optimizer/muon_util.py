@@ -115,11 +115,11 @@ def build_muon_adam_key_fn(
             print(f"WARNING: The following hidden layer patterns did not match any parameters: {unused_filters}")
 
 
-    return lambda p: param_map.get(id(p), 'adam')
+    return param_map
 
 def split_parameters_for_muon(
     parameters: list[dict],
-    layer_key_fn: Callable,
+    layer_key_fn: dict[int, str],
     config: TrainConfig,
 ) -> tuple[list[dict], bool]:
     """
@@ -132,7 +132,7 @@ def split_parameters_for_muon(
     if layer_key_fn:
         for group in parameters:
             for p in group['params']:
-                if p.requires_grad and layer_key_fn(p) == 'adam':
+                if p.requires_grad and layer_key_fn.get(id(p)) != 'muon':
                     has_adam_params = True
                     break
             if has_adam_params:
@@ -148,8 +148,8 @@ def split_parameters_for_muon(
 
     final_param_groups = []
     for group in parameters:
-        muon_params = [p for p in group['params'] if p.requires_grad and layer_key_fn(p) == 'muon']
-        adam_params = [p for p in group['params'] if p.requires_grad and layer_key_fn(p) == 'adam']
+        muon_params = [p for p in group['params'] if p.requires_grad and layer_key_fn.get(id(p)) == 'muon']
+        adam_params = [p for p in group['params'] if p.requires_grad and layer_key_fn.get(id(p)) != 'muon']
 
         if muon_params:
             muon_group = group.copy()
