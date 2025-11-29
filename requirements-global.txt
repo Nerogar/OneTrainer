@@ -52,7 +52,7 @@ scalene==1.5.55
 # ui
 customtkinter==5.2.2
 tkinterdnd2==0.4.3
-friendlywords=1.2.0
+friendlywords==1.2.0
 
 # cloud
 runpod==1.7.10
