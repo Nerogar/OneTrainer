@@ -39,10 +39,14 @@ class CloudSecretsConfig(BaseConfig):
         return str(Path(key_file).expanduser())
 
     def connect_kwargs(self) -> dict[str, str]:
+        kwargs: dict[str, str] = {}
         key_file = self.expanded_key_file()
-        if key_file == "":
-            return {}
-        return {"key_filename": key_file}
+        if key_file:
+            kwargs["key_filename"] = key_file
+        password = getattr(self, "password", "").strip()
+        if password:
+            kwargs["password"] = password
+        return kwargs
 
 
 class CloudConfig(BaseConfig):
