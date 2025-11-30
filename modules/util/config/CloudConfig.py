@@ -14,6 +14,7 @@ class CloudSecretsConfig(BaseConfig):
     user: str
     id: str
     key_file: str
+    password: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -28,6 +29,7 @@ class CloudSecretsConfig(BaseConfig):
         data.append(("port", 0, str, False))
         data.append(("user", "root", str, False))
         data.append(("key_file", "", str, False)) # whilst not a secret, makes more semantic sense here
+        data.append(("password", "", str, False))
         return CloudSecretsConfig(data)
 
     def expanded_key_file(self) -> str:

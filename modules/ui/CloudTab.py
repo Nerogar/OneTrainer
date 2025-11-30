@@ -66,15 +66,19 @@ class CloudTab:
 
         components.label(self.frame, 7, 0, "SSH keyfile path",
                  tooltip="Absolute path to the private key file used for SSH connections. Leave empty to rely on your system SSH configuration.")
-        components.entry(self.frame, 7, 1, self.ui_state, "secrets.cloud.key_file")
+        components.file_entry(self.frame, 7, 1, self.ui_state, "secrets.cloud.key_file") #TODO Replace with path_entry in a future PR
 
-        components.label(self.frame, 8, 0, "Cloud id",
+        components.label(self.frame, 8, 0, "SSH password",
+                         tooltip="SSH password for password-based authentication. If you try to use native SCP requires sshpass to be installed. Leave empty to use key-based authentication.")
+        components.entry(self.frame, 8, 1, self.ui_state, "secrets.cloud.password")
+
+        components.label(self.frame, 9, 0, "Cloud id",
                          tooltip="RUNPOD Cloud ID. The cloud service must have a public IP and SSH service. Leave empty if you want to automatically create a new RUNPOD cloud, or if you're connecting to another cloud provider via SSH Hostname and Port.")
-        components.entry(self.frame, 8, 1, self.ui_state, "secrets.cloud.id")
+        components.entry(self.frame, 9, 1, self.ui_state, "secrets.cloud.id")
 
-        components.label(self.frame, 9, 0, "Tensorboard TCP tunnel",
+        components.label(self.frame, 10, 0, "Tensorboard TCP tunnel",
                          tooltip="Instead of starting tensorboard locally, make a TCP tunnel to a tensorboard on the cloud")
-        components.switch(self.frame, 9, 1, self.ui_state, "cloud.tensorboard_tunnel")
+        components.switch(self.frame, 10, 1, self.ui_state, "cloud.tensorboard_tunnel")
 
 
 
