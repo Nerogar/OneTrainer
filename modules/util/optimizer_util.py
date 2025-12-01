@@ -1,10 +1,10 @@
 import modules.util.multi_gpu_util as multi
 from modules.model.BaseModel import BaseModel
 from modules.util import create
-from modules.util.build_muon_adam_key_fn import build_muon_adam_key_fn
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
+from modules.util.optimizer.muon_util import build_muon_adam_key_fn
 from modules.util.torch_util import optimizer_to_device_
 
 import torch
@@ -458,6 +458,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta1": 0.9,
         "beta2": 0.99,
         "eps": 1e-8,
+        "cautious_wd": False,
         "weight_decay": 0.0,
         "use_bias_correction": True,
         "nnmf_factor": False,
@@ -477,6 +478,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta1": 0.9,
         "beta2": 0.9999,
         "eps": 1e-6,
+        "cautious_wd": False,
         "weight_decay": 0.0,
         "nnmf_factor": False,
         "stochastic_rounding": True,
@@ -498,6 +500,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta2": 0.99,
         "beta3": None,
         "eps": 1e-8,
+        "cautious_wd": False,
         "weight_decay": 0.0,
         "nnmf_factor": False,
         "stochastic_rounding": True,
@@ -524,6 +527,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta1": 0.99,
         "beta2": 0.99,
         "eps": 1e-8,
+        "cautious_wd": False,
         "weight_decay": 0.0,
         "alpha_grad": 100.0,
         "beta1_warmup": None,
@@ -539,6 +543,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
     Optimizer.LION_ADV: {
         "beta1": 0.9,
         "beta2": 0.99,
+        "cautious_wd": False,
         "weight_decay": 0.0,
         "clip_threshold": None,
         "nnmf_factor": False,
@@ -551,6 +556,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta1": 0.9,
         "beta2": 0.99,
         "beta3": None,
+        "cautious_wd": False,
         "weight_decay": 0.0,
         "clip_threshold": None,
         "nnmf_factor": False,
@@ -567,6 +573,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
     },
     Optimizer.MUON_ADV: {
         "beta1": 0.9,
+        "cautious_wd": False,
         "weight_decay": 0.0,
         "accelerated_ns": False,
         "ns_steps": 5,
@@ -585,7 +592,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "nesterov": True,
         "Simplified_AdEMAMix": False,
         "alpha_grad": 100.0,
-        "normuon_variant": False,
+        "normuon_variant": True,
         "beta2_normuon": 0.95,
         "normuon_eps": 1e-8,
         "orthogonal_gradient": False,
@@ -595,6 +602,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta1": 0.95,
         "beta2": 0.95,
         "eps": 1e-8,
+        "cautious_wd": False,
         "weight_decay": 0.0,
         "accelerated_ns": False,
         "ns_steps": 5,
@@ -614,7 +622,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "use_atan2": False,
         "Simplified_AdEMAMix": False,
         "alpha_grad": 100.0,
-        "normuon_variant": False,
+        "normuon_variant": True,
         "orthogonal_gradient": False,
         "muon_adam_config": None,
     },
