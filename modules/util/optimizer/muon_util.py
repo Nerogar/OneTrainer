@@ -27,8 +27,6 @@ def build_muon_adam_key_fn(
         # Create filters from the user's configuration string
         patterns_list = [p.strip() for p in config.optimizer.muon_hidden_layers.split(',') if p.strip()]
         filters = [ModuleFilter(p, use_regex=config.optimizer.muon_adam_regex) for p in patterns_list]
-        if True:
-            print(f"[MuonWithAuxAdam] Using custom hidden layer patterns: {patterns_list}")
     else:
         # Default list of "hidden" parts.
         match model.model_type:
@@ -65,18 +63,7 @@ def build_muon_adam_key_fn(
         return 'adam'
 
     # Module-based iteration & parameter mapping
-    sub_modules_to_check = [
-        'text_encoder', 'text_encoder_1', 'text_encoder_2', 'text_encoder_3', 'text_encoder_4',
-        'unet', 'transformer',
-        'text_encoder_lora', 'text_encoder_1_lora', 'text_encoder_2_lora', 'text_encoder_3_lora', 'text_encoder_4_lora',
-        'unet_lora', 'transformer_lora'
-    ]
-
-    for module_prefix in sub_modules_to_check:
-        module = getattr(model, module_prefix, None)
-        if module is None:
-            continue
-
+    for module_prefix, module in vars(model).items():
         if isinstance(module, LoRAModuleWrapper):
             for lora_module in module.lora_modules.values():
                 # For LoRA, the full name includes the original module's prefix
@@ -86,7 +73,7 @@ def build_muon_adam_key_fn(
                         full_param_name = f"{full_prefix}.{param_name}"
                         param_map[id(p)] = get_optim_type(full_param_name, p)
                         all_processed_params.append(p)
-        elif any(p.requires_grad for p in module.parameters()):
+        elif isinstance(module, torch.nn.Module) and any(p.requires_grad for p in module.parameters()):
             for param_name, p in module.named_parameters():
                 if p.requires_grad:
                     full_param_name = f"{module_prefix}.{param_name}"
