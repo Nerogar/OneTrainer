@@ -88,7 +88,7 @@ class LinuxCloud(BaseCloud):
         #for interactive shells. On RunPod, cuda is missing from $PATH; on vast.ai, python is missing.
         #We cannot pretend to be interactive either, because then vast.ai starts a tmux screen.
         #Add these paths manually:
-        cmd_env = f"export PATH=$PATH:/usr/local/cuda/bin:/venv/main/bin:~/.pyenv/shims/python\
+        cmd_env = f"export PATH=$PATH:/usr/local/cuda/bin:/venv/main/bin:~/.pyenv/shims/python \
                    && export OT_LAZY_UPDATES=true \
                    && cd {shlex.quote(config.onetrainer_dir)}"
 
