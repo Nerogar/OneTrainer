@@ -134,12 +134,13 @@ class BaseController:
         @Slot(dict)
         def f(data):
             if "value" in data and "max_value" in data:
-                val = int(elem.minimum() + data["value"] / data["max_value"] * (
-                            elem.maximum() - elem.minimum())) if data["max_value"] > elem.minimum() else elem.minimum()
                 if isinstance(elem, QtW.QProgressBar):
-                    elem.setValue(val)
+                    elem.setMaximum(data["max_value"])
+                    elem.setValue(data["value"])
                 elif isinstance(elem, QtW.QLabel):
-                    elem.setText(str(val))
+                    val = int(data["value"] / data["max_value"]) * 100 if data["max_value"] > 0 else 0
+
+                    elem.setText(f"{val}% ({data['value']}/{data['max_value']})")
         return f
 
     ###Utils###

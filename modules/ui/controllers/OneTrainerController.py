@@ -52,6 +52,8 @@ class OnetrainerController(BaseController):
         # Non-editable QComboBoxes do not honor the maxVisibleItems property, unless the following style is enforced.
         self.ui.configCmb.setStyleSheet("QComboBox { combobox-popup: 0; }")
 
+        self.__enableControls("enabled")()
+
     def _connectUIBehavior(self):
         self._connect(self.ui.wikiBtn.clicked, lambda: self._openUrl("https://github.com/Nerogar/OneTrainer/wiki"))
         self._connect(self.ui.saveConfigBtn.clicked, lambda: self._openWindow(self.save_window, fixed_size=True))
@@ -198,11 +200,11 @@ class OnetrainerController(BaseController):
                 self.ui.etaLbl.setText(f"ETA: {data['eta']}")
 
             if "step" in data and "max_steps" in data:
-                val = int(data["step"] / data["max_steps"] * self.ui.stepPrg.maximum()) if data["max_steps"] > 0 else 0
-                self.ui.stepPrg.setValue(val)
+                self.ui.stepPrg.setMaximum(data["max_steps"])
+                self.ui.stepPrg.setValue(data["step"])
             if "epoch" in data and "max_epochs" in data:
-                val = int(data["epoch"] / data["max_epochs"] * self.ui.epochPrg.maximum()) if data["max_epochs"] > 0 else 0
-                self.ui.epochPrg.setValue(val)
+                self.ui.epochPrg.setMaximum(data["max_epochs"])
+                self.ui.epochPrg.setValue(data["epoch"])
 
             if "event" in data:
                 self.__enableControls(data["event"])()
