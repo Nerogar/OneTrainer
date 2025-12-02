@@ -74,7 +74,9 @@ class BaseController:
                     callback = functools.partial(BaseController._writeControl, ui_elem, var, model)
                     if signal is not None:
                         self._connect(signal, callback)
-                    self.invalidation_callbacks.append((callback, None))
+
+                    if update_after_connect:
+                        self.invalidation_callbacks.append((callback, None))
 
     # Override this method to connect signals and slots intended for visual behavior (e.g., enable/disable controls).
     def _connectUIBehavior(self):

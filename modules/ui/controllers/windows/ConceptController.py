@@ -142,7 +142,8 @@ class ConceptController(BaseController):
         @Slot()
         def f():
             self._disconnectGroup("idx")
-            self._connectStateUI(self.dynamic_state_ui_connections, ConceptModel.instance(), signal=None, group="idx", update_after_connect=True, idx=self.idx)
+            self._connectStateUI(self.dynamic_state_ui_connections, ConceptModel.instance(), signal=QtW.QApplication.instance().openConcept, group="idx", update_after_connect=True, idx=self.idx)
+            self._invalidateUI()
         return f
 
     def __updateStats(self):
