@@ -69,7 +69,6 @@ class Optimizer(Enum):
 
     # MUON
     MUON = 'MUON'
-    MUON_AUXADAM = 'MUON_AUXADAM'
     MUON_ADV = 'MUON_ADV'
     ADAMUON_ADV = 'ADAMUON_ADV'
 

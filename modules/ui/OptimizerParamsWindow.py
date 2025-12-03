@@ -1,7 +1,7 @@
 import contextlib
 from tkinter import TclError
 
-from modules.ui.MuonAdamWindow import MuonAdamWindow
+from modules.ui.MuonAdamWindow import MuonAdamWindow, MUON_AUX_ADAM_DEFAULTS
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.optimizer_util import (
@@ -264,22 +264,27 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
     def open_muon_adam_window(self):
         current_optimizer = self.train_config.optimizer.optimizer
-        adam_type = Optimizer.MUON_AUXADAM if current_optimizer == Optimizer.MUON else Optimizer.ADAMW_ADV
 
         adam_config = TrainOptimizerConfig.default_values()
         current_state = self.train_config.optimizer.muon_adam_config
 
+        if current_optimizer == Optimizer.MUON:
+            defaults = MUON_AUX_ADAM_DEFAULTS
+        else:
+            defaults = OPTIMIZER_DEFAULT_PARAMETERS[Optimizer.ADAMW_ADV]
+
         if current_state is None:
-            adam_config.from_dict(OPTIMIZER_DEFAULT_PARAMETERS[adam_type])
-            adam_config.optimizer = adam_type
+            adam_config.from_dict(defaults)
+            if current_optimizer != Optimizer.MUON:
+                adam_config.optimizer = Optimizer.ADAMW_ADV
         elif isinstance(current_state, dict):
             adam_config.from_dict(current_state)
         else:
             # Should not happen if TrainConfig defines it as dict, but for safety
             adam_config = current_state
 
-        temp_adam_ui_state = UIState(self, self.train_config.optimizer.muon_adam_config)
-        window = MuonAdamWindow(self, self.train_config, temp_adam_ui_state, adam_type)
+        temp_adam_ui_state = UIState(self, adam_config)
+        window = MuonAdamWindow(self, self.train_config, temp_adam_ui_state, current_optimizer)
         self.wait_window(window)
 
         self.train_config.optimizer.muon_adam_config = adam_config.to_dict()

@@ -294,7 +294,7 @@ class TrainingTab:
         # optimizer
         components.label(frame, 0, 0, "Optimizer",
                          tooltip="The type of optimizer")
-        components.options_adv(frame, 0, 1, [str(x) for x in list(Optimizer)  if x != Optimizer.MUON_AUXADAM], self.ui_state, "optimizer.optimizer",
+        components.options_adv(frame, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer.optimizer",
                                command=self.__restore_optimizer_config, adv_command=self.__open_optimizer_params_window)
 
         # learning rate scheduler

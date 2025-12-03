@@ -7,6 +7,12 @@ from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
 
+MUON_AUX_ADAM_DEFAULTS = {
+    "beta1": 0.9,
+    "beta2": 0.999,
+    "eps": 1e-8,
+    "weight_decay": 0.0,
+}
 
 class MuonAdamWindow(ctk.CTkToplevel):
     def __init__(
@@ -24,10 +30,12 @@ class MuonAdamWindow(ctk.CTkToplevel):
         self.adam_ui_state = ui_state
         self.adam_optimizer_type = adam_optimizer_type
 
-        if self.adam_optimizer_type == Optimizer.MUON_AUXADAM:
+        if self.adam_optimizer_type == Optimizer.MUON:
             self.title("Muon's Auxiliary AdamW Settings")
-        elif self.adam_optimizer_type == Optimizer.ADAMW_ADV:
+            self.adam_params_def = MUON_AUX_ADAM_DEFAULTS
+        else:
             self.title("Muon_adv's Auxiliary AdamW_adv Settings")
+            self.adam_params_def = OPTIMIZER_DEFAULT_PARAMETERS[Optimizer.ADAMW_ADV]
 
         self.geometry("800x500")
         self.resizable(True, True)
@@ -79,7 +87,7 @@ class MuonAdamWindow(ctk.CTkToplevel):
         }
         # @formatter:on
 
-        adam_params = OPTIMIZER_DEFAULT_PARAMETERS[self.adam_optimizer_type]
+        adam_params = self.adam_params_def
 
         for index, key in enumerate(adam_params.keys()):
             if key not in KEY_DETAIL_MAP:
