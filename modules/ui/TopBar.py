@@ -99,6 +99,7 @@ class TopBar:
                 ("HiDream Full", ModelType.HI_DREAM_FULL),
                 ("Chroma1", ModelType.CHROMA_1),
                 ("QwenImage", ModelType.QWEN),
+                ("Z-Image", ModelType.Z_IMAGE),
             ],
             ui_state=self.ui_state,
             var_name="model_type",
@@ -132,7 +133,8 @@ class TopBar:
                 ("LoRA", TrainingMethod.LORA),
                 ("Embedding", TrainingMethod.EMBEDDING),
             ]
-        elif self.train_config.model_type.is_qwen():
+        elif self.train_config.model_type.is_qwen() \
+             or self.train_config.model_type.is_z_image():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),

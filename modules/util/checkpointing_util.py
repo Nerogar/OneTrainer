@@ -2,6 +2,7 @@ import inspect
 from collections.abc import Callable
 from typing import Any
 
+from modules.util.compile_util import init_compile
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
 from modules.util.torch_util import add_dummy_grad_fn_, has_grad_fn
@@ -25,9 +26,10 @@ from transformers.models.clip.modeling_clip import CLIPEncoderLayer
 from transformers.models.gemma2.modeling_gemma2 import Gemma2DecoderLayer
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import Qwen2_5_VLDecoderLayer
+from transformers.models.qwen3.modeling_qwen3 import Qwen3DecoderLayer
 from transformers.models.t5.modeling_t5 import T5Block
 
-torch._dynamo.config.cache_size_limit = 8192
+init_compile()
 
 def _kwargs_to_args(fun: Callable, args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[Any, ...]:
     signature = dict(inspect.signature(fun).parameters)
@@ -312,6 +314,14 @@ def enable_checkpointing_for_qwen_encoder_layers(
         (Qwen2_5_VLDecoderLayer, []),  # TODO No activation offloading for other encoders, see above. But clip skip is not implemented for QwenVL. Then do activation offloading?
     ])
 
+def enable_checkpointing_for_z_image_encoder_layers(
+        model: nn.Module,
+        config: TrainConfig,
+) -> LayerOffloadConductor:
+    return enable_checkpointing(model, config, False, [
+        (Qwen3DecoderLayer, []),  # TODO No activation offloading for other encoders, see above. But clip skip is not implemented for QwenVL. Then do activation offloading?
+    ])
+
 def enable_checkpointing_for_stable_diffusion_3_transformer(
         model: nn.Module,
         config: TrainConfig,
@@ -346,6 +356,14 @@ def enable_checkpointing_for_qwen_transformer(
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, config.compile, [
         (model.transformer_blocks, ["hidden_states", "encoder_hidden_states"]),
+    ])
+
+def enable_checkpointing_for_z_image_transformer(
+        model: nn.Module,
+        config: TrainConfig,
+) -> LayerOffloadConductor:
+    return enable_checkpointing(model, config, config.compile, [
+        (model.layers, ["x"]),
     ])
 
 

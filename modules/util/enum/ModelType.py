@@ -36,6 +36,8 @@ class ModelType(Enum):
 
     QWEN = 'QWEN'
 
+    Z_IMAGE = 'Z_IMAGE'
+
     def __str__(self):
         return self.value
 
@@ -92,6 +94,9 @@ class ModelType(Enum):
 
     def is_hi_dream(self):
         return self == ModelType.HI_DREAM_FULL
+
+    def is_z_image(self):
+        return self == ModelType.Z_IMAGE
 
     def has_mask_input(self) -> bool:
         return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \

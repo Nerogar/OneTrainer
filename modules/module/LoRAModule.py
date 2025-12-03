@@ -651,7 +651,8 @@ class LoRAModuleWrapper:
                 unsuitable.append(name)
                 continue
             if len(self.module_filters) == 0 or any(f.matches(name) for f in self.module_filters):
-                lora_module = self.klass(self.prefix + "." + name, child_module, *self.additional_args, **self.additional_kwargs)
+                prefixed_name = (self.prefix + "." + name) if self.prefix != "" else name
+                lora_module = self.klass(prefixed_name, child_module, *self.additional_args, **self.additional_kwargs)
                 lora_modules[name] = lora_module
                 if self.peft_type == PeftType.OFT_2 and lora_module.adjustment_info:
                     old, new = lora_module.adjustment_info

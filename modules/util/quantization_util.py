@@ -12,6 +12,7 @@ from torch import Tensor, nn
 
 from diffusers.quantizers.gguf.utils import GGUFLinear, dequantize_gguf_tensor
 
+import accelerate
 from tqdm import tqdm
 
 try:
@@ -82,11 +83,13 @@ from modules.module.quantized.LinearW8A8 import LinearW8A8
 
 def __create_linear_layer(construct_fn, module: nn.Linear, copy_parameters: bool) -> nn.Module:
     bias = module.bias is not None
-    quant_linear = construct_fn(
-        in_features=module.in_features,
-        out_features=module.out_features,
-        bias=bias,
-    )
+
+    with accelerate.init_empty_weights():
+        quant_linear = construct_fn(
+            in_features=module.in_features,
+            out_features=module.out_features,
+            bias=bias,
+        )
 
     if copy_parameters:
         quant_linear.weight = type(quant_linear.weight)(module.weight, requires_grad=False)
@@ -118,14 +121,14 @@ def __replace_linear_layers(
 
     visited_modules.add(id(parent_module))
 
-    if isinstance(parent_module, (nn.ModuleList, nn.Sequential)):
-        for i, module in enumerate(parent_module):
+    if isinstance(parent_module, (nn.ModuleList, nn.Sequential, nn.ModuleDict)):
+        for key, module in parent_module.items() if isinstance(parent_module, nn.ModuleDict) else enumerate(parent_module):
             if isinstance(module, convert_type):
                 if filters is not None and len(filters) > 0 and not any(f.matches(name_prefix) for f in filters):
                     continue
 
                 quant_linear = __create_linear_layer(construct_fn, module, copy_parameters)
-                parent_module[i] = quant_linear
+                parent_module[key] = quant_linear
                 del module
             elif id(module) not in visited_modules:
                 __replace_linear_layers(
@@ -134,7 +137,7 @@ def __replace_linear_layers(
                     keep_in_fp32_modules=keep_in_fp32_modules,
                     filters=filters,
                     copy_parameters=copy_parameters,
-                    name_prefix=f"{name_prefix}[{i}]",
+                    name_prefix=f"{name_prefix}[{key}]",
                     visited_modules=visited_modules,
                 )
     else:
@@ -259,6 +262,7 @@ def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataTy
         for child_module in tqdm(child_modules, desc="Quantizing model weights", total=len(child_modules), delay=5, smoothing=0.1):
             if isinstance(child_module, (QuantizedModuleMixin, GGUFLinear)):
                 child_module.compute_dtype = train_dtype.torch_dtype()
+
             if isinstance(child_module, QuantizedModuleMixin):
                 child_module.quantize(device=device)
 
