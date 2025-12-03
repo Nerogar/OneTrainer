@@ -240,7 +240,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
     def update_user_pref(self, *args):
         update_optimizer_config(self.train_config)
-        if self.train_config.optimizer.optimizer in (Optimizer.MUON_ADV, Optimizer.MUON):
+        if self.train_config.optimizer.optimizer in (Optimizer.MUON_ADV, Optimizer.ADAMUON_ADV, Optimizer.MUON):
             self.toggle_muon_adam_button()
 
     def on_optimizer_change(self, *args):
