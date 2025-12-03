@@ -1,7 +1,7 @@
 import contextlib
 from tkinter import TclError
 
-from modules.ui.MuonAdamWindow import MuonAdamWindow, MUON_AUX_ADAM_DEFAULTS
+from modules.ui.MuonAdamWindow import MUON_AUX_ADAM_DEFAULTS, MuonAdamWindow
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.optimizer_util import (
