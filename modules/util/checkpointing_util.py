@@ -8,7 +8,6 @@ from modules.util.torch_util import add_dummy_grad_fn_, has_grad_fn
 
 import torch
 from torch import nn
-from torch.utils.checkpoint import checkpoint
 
 from diffusers.models.attention import BasicTransformerBlock, JointTransformerBlock
 from diffusers.models.transformers.sana_transformer import SanaTransformerBlock
@@ -86,7 +85,7 @@ class CheckpointLayer(BaseCheckpointLayer):
 
     def forward(self, *args, **kwargs):
         if torch.is_grad_enabled():
-            return checkpoint(
+            return torch.utils.checkpoint.checkpoint(
                 self.__checkpointing_forward,
                 self.dummy,
                 *args,
@@ -132,7 +131,7 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
         args = _kwargs_to_args(self.orig_forward if self.checkpoint is None else self.checkpoint.forward, args, kwargs)
 
         if torch.is_grad_enabled():
-            return checkpoint(
+            return torch.utils.checkpoint.checkpoint(
                 self.__checkpointing_forward,
                 self.dummy,
                 call_id,

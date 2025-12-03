@@ -130,6 +130,10 @@ class TrainUI(ctk.CTk):
         self.training_callbacks = None
         self.training_commands = None
 
+        self.start_time = None
+        self.session_start_epoch = 0
+        self.session_start_epoch_step = 0
+
         self.always_on_tensorboard_subprocess = None
         self.current_workspace_dir = self.train_config.workspace_dir
         self._check_start_always_on_tensorboard()
@@ -640,12 +644,18 @@ class TrainUI(ctk.CTk):
 
     def _calculate_eta_string(self, train_progress: TrainProgress, max_step: int, max_epoch: int) -> str | None:
         spent_total = time.monotonic() - self.start_time
-        steps_done = train_progress.epoch * max_step + train_progress.epoch_step
-        remaining_steps = (max_epoch - train_progress.epoch - 1) * max_step + (max_step - train_progress.epoch_step)
-        total_eta = spent_total / steps_done * remaining_steps
 
-        if train_progress.global_step <= 30:
+        # calculate steps done in THIS SESSION only
+        current_total_steps = train_progress.epoch * max_step + train_progress.epoch_step
+        session_start_total_steps = self.session_start_epoch * max_step + self.session_start_epoch_step
+        steps_done_this_session = current_total_steps - session_start_total_steps
+
+        remaining_steps = (max_epoch - train_progress.epoch - 1) * max_step + (max_step - train_progress.epoch_step)
+
+        if steps_done_this_session <= 30:
             return "Estimating ..."
+
+        total_eta = spent_total / steps_done_this_session * remaining_steps
 
         td = datetime.timedelta(seconds=total_eta)
         days = td.days
@@ -750,6 +760,11 @@ class TrainUI(ctk.CTk):
             trainer.start()
             if self.train_config.cloud.enabled:
                 self.ui_state.get_var("secrets.cloud").update(self.train_config.secrets.cloud)
+
+            train_progress = trainer.model.train_progress
+            self.session_start_epoch = train_progress.epoch
+            self.session_start_epoch_step = train_progress.epoch_step
+
             self.start_time = time.monotonic()
             trainer.train()
         except Exception:

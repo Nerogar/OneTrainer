@@ -3,6 +3,7 @@ import traceback
 
 from modules.model.SanaModel import SanaModel
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
+from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -24,9 +25,10 @@ class SanaModelLoader(
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             vae_model_name: str,
+            quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
-            self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name)
+            self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name, quantization)
         else:
             raise Exception("not an internal model")
 
@@ -37,6 +39,7 @@ class SanaModelLoader(
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             vae_model_name: str,
+            quantization: QuantizationConfig,
     ):
         tokenizer = GemmaTokenizer.from_pretrained(
             base_model_name,
@@ -78,6 +81,7 @@ class SanaModelLoader(
             weight_dtypes.train_dtype,
             base_model_name,
             "transformer",
+            quantization,
         )
 
         model.model_type = model_type
@@ -93,19 +97,20 @@ class SanaModelLoader(
             model_type: ModelType,
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
+            quantization: QuantizationConfig,
     ) -> SanaModel | None:
         stacktraces = []
 
         base_model_name = model_names.base_model
 
         try:
-            self.__load_internal(model, model_type, weight_dtypes, base_model_name, model_names.vae_model)
+            self.__load_internal(model, model_type, weight_dtypes, base_model_name, model_names.vae_model, quantization)
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
-            self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, model_names.vae_model)
+            self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, model_names.vae_model, quantization)
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
