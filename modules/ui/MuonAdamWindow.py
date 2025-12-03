@@ -20,7 +20,7 @@ class MuonAdamWindow(ctk.CTkToplevel):
             parent,
             train_config: TrainConfig,
             ui_state: UIState,
-            adam_optimizer_type: Optimizer,
+            parent_optimizer_type: Optimizer,
             *args, **kwargs,
     ):
         super().__init__(parent, *args, **kwargs)
@@ -28,9 +28,9 @@ class MuonAdamWindow(ctk.CTkToplevel):
         self.parent = parent
         self.train_config = train_config
         self.adam_ui_state = ui_state
-        self.adam_optimizer_type = adam_optimizer_type
+        self.parent_optimizer_type = parent_optimizer_type
 
-        if self.adam_optimizer_type == Optimizer.MUON:
+        if self.parent_optimizer_type == Optimizer.MUON:
             self.title("Muon's Auxiliary AdamW Settings")
             self.adam_params_def = MUON_AUX_ADAM_DEFAULTS
         else:
