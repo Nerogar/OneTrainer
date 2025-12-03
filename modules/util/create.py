@@ -2,6 +2,7 @@ import ast
 import importlib
 from collections.abc import Iterable
 
+import modules.util.multi_gpu_util as multi
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.ChromaBaseDataLoader import ChromaBaseDataLoader
 from modules.dataLoader.FluxBaseDataLoader import FluxBaseDataLoader
@@ -1279,6 +1280,59 @@ def create_optimizer(
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 **adam_kwargs
             )
+
+        # MUON Optimizer
+        case Optimizer.MUON:
+
+            from muon import MuonWithAuxAdam, SingleDeviceMuonWithAuxAdam
+
+            params_for_optimizer, ___ = split_parameters_for_muon(parameters, layer_key_fn, config)
+
+            final_param_groups  = []
+            for group in params_for_optimizer:
+                is_muon = group.get('optim_type') == 'muon'
+
+                if is_muon:
+                    final_group = {
+                        'params': group['params'],
+                        'lr': group['lr'],
+                        'use_muon': True,
+                        'momentum': optimizer_config.momentum if optimizer_config.momentum is not None else 0.95,
+                        'weight_decay': optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                    }
+                else:  # is adam
+                    adam_config = optimizer_config.muon_adam_config
+                    if adam_config is None:
+                        adam_config = {}
+                    elif not isinstance(adam_config, dict):
+                        adam_config = adam_config.to_dict()
+
+                    beta1 = adam_config.get('beta1')
+                    beta2 = adam_config.get('beta2')
+                    eps = adam_config.get('eps')
+                    weight_decay = adam_config.get('weight_decay')
+
+                    final_group = {
+                        'params': group['params'],
+                        'lr': group['lr'],
+                        'use_muon': False,
+                        'betas': (beta1 if beta1 is not None else 0.9,
+                                  beta2 if beta2 is not None else 0.95),
+                        'eps': eps if eps is not None else 1e-10,
+                        'weight_decay': weight_decay if weight_decay is not None else 0.0,
+                    }
+                final_param_groups.append(final_group)
+
+            OptimizerClass = MuonWithAuxAdam if multi.world_size() > 1 else SingleDeviceMuonWithAuxAdam
+            optimizer = OptimizerClass(param_groups=final_param_groups )
+
+            # Add metadata back to the optimizer's param_groups for the framework to use.
+            for i, group in enumerate(optimizer.param_groups):
+                original_group = params_for_optimizer[i]
+                group['initial_lr'] = original_group.get('initial_lr', original_group['lr'])
+                group['name'] = original_group.get('name')
+                group['optim_type'] = original_group.get('optim_type')
+
 
         # ADABELIEF Optimizer
         case Optimizer.ADABELIEF:

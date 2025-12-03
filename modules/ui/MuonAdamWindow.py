@@ -7,6 +7,12 @@ from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
 
+MUON_AUX_ADAM_DEFAULTS = {
+    "beta1": 0.9,
+    "beta2": 0.999,
+    "eps": 1e-8,
+    "weight_decay": 0.0,
+}
 
 class MuonAdamWindow(ctk.CTkToplevel):
     def __init__(
@@ -14,6 +20,7 @@ class MuonAdamWindow(ctk.CTkToplevel):
             parent,
             train_config: TrainConfig,
             ui_state: UIState,
+            parent_optimizer_type: Optimizer,
             *args, **kwargs,
     ):
         super().__init__(parent, *args, **kwargs)
@@ -21,8 +28,15 @@ class MuonAdamWindow(ctk.CTkToplevel):
         self.parent = parent
         self.train_config = train_config
         self.adam_ui_state = ui_state
+        self.parent_optimizer_type = parent_optimizer_type
 
-        self.title("Muon's Auxiliary AdamW_adv Settings")
+        if self.parent_optimizer_type == Optimizer.MUON:
+            self.title("Muon's Auxiliary AdamW Settings")
+            self.adam_params_def = MUON_AUX_ADAM_DEFAULTS
+        else:
+            self.title("Muon_adv's Auxiliary AdamW_adv Settings")
+            self.adam_params_def = OPTIMIZER_DEFAULT_PARAMETERS[Optimizer.ADAMW_ADV]
+
         self.geometry("800x500")
         self.resizable(True, True)
 
@@ -73,9 +87,9 @@ class MuonAdamWindow(ctk.CTkToplevel):
         }
         # @formatter:on
 
-        adamw_adv_params = OPTIMIZER_DEFAULT_PARAMETERS[Optimizer.ADAMW_ADV]
+        adam_params = self.adam_params_def
 
-        for index, key in enumerate(adamw_adv_params.keys()):
+        for index, key in enumerate(adam_params.keys()):
             if key not in KEY_DETAIL_MAP:
                 continue
 

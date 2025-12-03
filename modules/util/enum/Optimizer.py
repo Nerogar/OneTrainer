@@ -68,6 +68,7 @@ class Optimizer(Enum):
     CAME_8BIT = 'CAME_8BIT'
 
     # MUON
+    MUON = 'MUON'
     MUON_ADV = 'MUON_ADV'
     ADAMUON_ADV = 'ADAMUON_ADV'
 

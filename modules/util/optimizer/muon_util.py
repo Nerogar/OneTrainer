@@ -106,7 +106,7 @@ def split_parameters_for_muon(
 ) -> tuple[list[dict], bool]:
     """
     Splits parameter groups into 'muon' and 'adam' subgroups for MuonWithAuxAdam.
-    If MuonWithAuxAdam is not active, returns the original parameters.
+    If MuonWithAuxAdam is not active, it configures all groups for Muon.
     """
     optimizer_config = config.optimizer
 
@@ -157,4 +157,4 @@ def split_parameters_for_muon(
             adam_group['initial_lr'] = adam_lr
             final_param_groups.append(adam_group)
 
-    return final_param_groups, MuonWithAuxAdam
+    return final_param_groups, True
