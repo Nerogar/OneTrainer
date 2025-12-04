@@ -2,6 +2,7 @@
     "backup_after": 10,
     "base_model_name": "stabilityai/stable-diffusion-xl-base-1.0",
     "batch_size": 4,
+    "layer_filter_preset": "attn-mlp",
     "learning_rate": 0.0003,
     "model_type": "STABLE_DIFFUSION_XL_10_BASE",
     "output_model_destination": "models/lora.safetensors",
