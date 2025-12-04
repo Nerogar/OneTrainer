@@ -16,6 +16,7 @@ scenedetect==0.6.6
 accelerate==1.7.0
 safetensors==0.5.3
 tensorboard==2.19.0
+StrEnum==0.4.15; python_version < "3.11" # For tensoboardMode on 3.10
 pytorch-lightning==2.5.1.post0
 
 # diffusion models
@@ -52,7 +53,7 @@ scalene==1.5.55
 # ui
 customtkinter==5.2.2
 tkinterdnd2==0.4.3
-friendlywords=1.2.0
+friendlywords==1.2.0
 
 # cloud
 runpod==1.7.10
