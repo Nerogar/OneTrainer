@@ -131,8 +131,8 @@ class TrainUI(ctk.CTk):
         self.training_commands = None
 
         self.start_time = None
-        self.session_start_epoch = 0
-        self.session_start_epoch_step = 0
+        self.session_start_epoch = None
+        self.session_start_epoch_step = None
 
         self.always_on_tensorboard_subprocess = None
         self.current_workspace_dir = self.train_config.workspace_dir
@@ -643,6 +643,10 @@ class TrainUI(ctk.CTk):
         webbrowser.open("http://localhost:" + str(self.train_config.tensorboard_port), new=0, autoraise=False)
 
     def _calculate_eta_string(self, train_progress: TrainProgress, max_step: int, max_epoch: int) -> str | None:
+        # Guard against None values before first progress callback
+        if self.start_time is None or self.session_start_epoch is None:
+            return "Estimating ..."
+
         spent_total = time.monotonic() - self.start_time
 
         # calculate steps done in THIS SESSION only
@@ -681,6 +685,11 @@ class TrainUI(ctk.CTk):
         self.eta_label.configure(text="")
 
     def on_update_train_progress(self, train_progress: TrainProgress, max_step: int, max_epoch: int):
+        # capture session start on first progress update - hopefully works on cloud, multi and local.
+        if self.session_start_epoch is None:
+            self.session_start_epoch = train_progress.epoch
+            self.session_start_epoch_step = train_progress.epoch_step
+
         self.set_step_progress(train_progress.epoch_step, max_step)
         self.set_epoch_progress(train_progress.epoch, max_epoch)
         self.set_eta_label(train_progress, max_step, max_epoch)
@@ -761,10 +770,9 @@ class TrainUI(ctk.CTk):
             if self.train_config.cloud.enabled:
                 self.ui_state.get_var("secrets.cloud").update(self.train_config.secrets.cloud)
 
-            train_progress = trainer.model.train_progress
-            self.session_start_epoch = train_progress.epoch
-            self.session_start_epoch_step = train_progress.epoch_step
-
+            # Reset session tracking - actual values captured on first progress callback
+            self.session_start_epoch = None
+            self.session_start_epoch_step = None
             self.start_time = time.monotonic()
             trainer.train()
         except Exception:
