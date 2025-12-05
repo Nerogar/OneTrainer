@@ -124,6 +124,22 @@ class TrainOptimizerConfig(BaseConfig):
     kourkoutas_beta: False
     k_warmup_steps: int
     schedulefree_c: float
+    ns_steps: int
+    MuonWithAuxAdam: False
+    muon_hidden_layers: str
+    muon_adam_regex: False
+    muon_adam_lr: float
+    muon_te1_adam_lr: float
+    muon_te2_adam_lr: float
+    muon_adam_config: dict
+    rms_rescaling: True
+    normuon_variant: False
+    beta2_normuon: float
+    normuon_eps: float
+    low_rank_ortho: False
+    ortho_rank: int
+    accelerated_ns: False
+    cautious_wd: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -223,6 +239,22 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("kourkoutas_beta", False, bool, False))
         data.append(("k_warmup_steps", None, int, True))
         data.append(("schedulefree_c", None, float, True))
+        data.append(("ns_steps", None, int, True))
+        data.append(("MuonWithAuxAdam", False, bool, False))
+        data.append(("muon_hidden_layers", None, str, True))
+        data.append(("muon_adam_regex", False, bool, False))
+        data.append(("muon_adam_lr", None, float, True))
+        data.append(("muon_te1_adam_lr", None, float, True))
+        data.append(("muon_te2_adam_lr", None, float, True))
+        data.append(("muon_adam_config", None, dict, True))
+        data.append(("rms_rescaling", True, bool, True))
+        data.append(("normuon_variant", False, bool, False))
+        data.append(("beta2_normuon", None, float, True))
+        data.append(("normuon_eps", None, float, True))
+        data.append(("low_rank_ortho", False, bool, False))
+        data.append(("ortho_rank", None, int, True))
+        data.append(("accelerated_ns", False, bool, False))
+        data.append(("cautious_wd", False, bool, False))
 
         return TrainOptimizerConfig(data)
 

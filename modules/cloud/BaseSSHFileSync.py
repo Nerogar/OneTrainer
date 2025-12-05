@@ -11,7 +11,10 @@ import fabric
 class BaseSSHFileSync(BaseFileSync):
     def __init__(self, config: CloudConfig, secrets: CloudSecretsConfig):
         super().__init__(config, secrets)
-        self.sync_connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
+        self.sync_connection=fabric.Connection(host=secrets.host,
+                               port=secrets.port,
+                               user=secrets.user,
+                               connect_kwargs=secrets.connect_kwargs())
 
     def close(self):
         if self.sync_connection:
