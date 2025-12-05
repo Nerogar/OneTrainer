@@ -590,6 +590,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta2_normuon": 0.95,
         "normuon_eps": 1e-8,
         "orthogonal_gradient": False,
+        "approx_mars": False,
         "muon_adam_config": None,
     },
     Optimizer.ADAMUON_ADV: {
@@ -618,6 +619,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "alpha_grad": 100.0,
         "normuon_variant": True,
         "orthogonal_gradient": False,
+        "approx_mars": False,
         "muon_adam_config": None,
     },
     Optimizer.ADABELIEF: {
