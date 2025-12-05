@@ -140,6 +140,7 @@ class TrainOptimizerConfig(BaseConfig):
     ortho_rank: int
     accelerated_ns: False
     cautious_wd: False
+    approx_mars: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -255,6 +256,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("ortho_rank", None, int, True))
         data.append(("accelerated_ns", False, bool, False))
         data.append(("cautious_wd", False, bool, False))
+        data.append(("approx_mars", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
