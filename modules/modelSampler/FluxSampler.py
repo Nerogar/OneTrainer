@@ -254,13 +254,7 @@ class FluxSampler(BaseModelSampler):
                 latent_conditioning_image = (latent_conditioning_image - vae.config.shift_factor) \
                                             * vae.config.scaling_factor
 
-                latent_conditioning_image = self.model.pack_latents(
-                    latent_conditioning_image,
-                    latent_conditioning_image.shape[0],
-                    latent_conditioning_image.shape[1],
-                    height // vae_scale_factor,
-                    width // vae_scale_factor,
-                )
+                latent_conditioning_image = self.model.pack_latents(latent_conditioning_image)
 
                 # batch_size, height, 8, width, 8
                 mask = mask.view(
@@ -280,13 +274,7 @@ class FluxSampler(BaseModelSampler):
                     width // vae_scale_factor,
                 )
 
-                latent_mask = self.model.pack_latents(
-                    mask,
-                    mask.shape[0],
-                    mask.shape[1],
-                    height // vae_scale_factor,
-                    width // vae_scale_factor,
-                )
+                latent_mask = self.model.pack_latents(mask)
             else:
                 conditioning_image = torch.zeros(
                     (1, 3, height, width),
@@ -296,13 +284,8 @@ class FluxSampler(BaseModelSampler):
                 latent_conditioning_image = vae.encode(conditioning_image).latent_dist.mode()
                 latent_conditioning_image = (latent_conditioning_image - vae.config.shift_factor) \
                                             * vae.config.scaling_factor
-                latent_conditioning_image = self.model.pack_latents(
-                    latent_conditioning_image,
-                    latent_conditioning_image.shape[0],
-                    latent_conditioning_image.shape[1],
-                    height // vae_scale_factor,
-                    width // vae_scale_factor,
-                )
+
+                latent_conditioning_image = self.model.pack_latents(latent_conditioning_image)
 
                 latent_mask = torch.ones(
                     size=(1, (height // vae_scale_factor // 2) * (width // vae_scale_factor // 2), 256),
