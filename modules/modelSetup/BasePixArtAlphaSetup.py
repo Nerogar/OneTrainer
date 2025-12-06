@@ -197,6 +197,7 @@ class BasePixArtAlphaSetup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+                betas=model.noise_scheduler.betas,
             )
 
             scaled_noisy_latent_image = self._add_noise_discrete(
