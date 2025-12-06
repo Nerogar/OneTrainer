@@ -212,13 +212,14 @@ class BaseWuerstchenSetup(
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
 
-            latent_noise = self._create_noise(scaled_latent_image, config, generator)
+            latent_noise = self._create_noise(scaled_latent_image, config, batch['config'], generator)
 
             timestep = self._get_timestep_continuous(
                 deterministic,
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+                batch['config'],
             )
 
             if model.model_type.is_wuerstchen_v2():
