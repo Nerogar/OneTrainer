@@ -44,6 +44,7 @@ class OFTRotationModule(nn.Module):
         coft=False,
         coft_eps=6e-5,
         block_share=False,
+        compile_cayley=False,
         use_cayley_neumann=True,
         num_cayley_neumann_terms=5,
         dropout_probability=0.0,
@@ -57,6 +58,7 @@ class OFTRotationModule(nn.Module):
         self.coft = coft
         self.coft_eps = coft_eps
         self.block_share = block_share
+        self.compile_cayley = compile_cayley
         self.use_cayley_neumann = use_cayley_neumann
         self.num_cayley_neumann_terms = num_cayley_neumann_terms
         # Create indices for upper triangle (excluding diagonal)
@@ -64,7 +66,8 @@ class OFTRotationModule(nn.Module):
         self.register_buffer("rows", rows, persistent=False)
         self.register_buffer("cols", cols, persistent=False)
         self.dropout = MultiplicativeDropoutLayer(p=dropout_probability)
-
+        if self.compile_cayley:
+            self._cayley_batch = torch.compile(self._cayley_batch, fullgraph=True)
 
     def _pytorch_skew_symmetric(self, vec, block_size):
         batch_size = vec.shape[0]

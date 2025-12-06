@@ -344,16 +344,18 @@ class OFTModule(PeftBase):
     coft: bool
     coft_eps: float
     block_share: bool
+    compile_cayley: bool
     dropout_probability: float
     adjustment_info: tuple[int, int] | None # for reporting
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, coft: bool, coft_eps: float, block_share: bool, **kwargs):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, coft: bool, coft_eps: float, block_share: bool, compile_cayley: bool, **kwargs):
         super().__init__(prefix, orig_module)
         self.oft_block_size = oft_block_size
         self.rank = 0
         self.coft = coft
         self.coft_eps = coft_eps
         self.block_share = block_share
+        self.compile_cayley = compile_cayley
         self.dropout_probability = kwargs.pop('dropout_probability', 0.0)
         self.oft_R = None
         self.adjustment_info = None
@@ -421,6 +423,7 @@ class OFTModule(PeftBase):
             coft=self.coft,
             coft_eps=self.coft_eps,
             block_share=self.block_share,
+            compile_cayley=self.compile_cayley,
             use_cayley_neumann=True,
             num_cayley_neumann_terms=5,
             dropout_probability=self.dropout_probability,
@@ -628,6 +631,7 @@ class LoRAModuleWrapper:
                 config.oft_coft,
                 config.coft_eps,
                 config.oft_block_share,
+                config.compile_oft_cayley,
             ]
             self.additional_kwargs = {
                 'dropout_probability': config.dropout_probability,
