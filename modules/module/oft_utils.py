@@ -69,6 +69,7 @@ class OFTRotationModule(nn.Module):
         if self.compile_cayley:
             self._cayley_batch = torch.compile(self._cayley_batch, fullgraph=True)
 
+
     def _pytorch_skew_symmetric(self, vec, block_size):
         batch_size = vec.shape[0]
         matrix = torch.zeros(batch_size, block_size, block_size, device=vec.device, dtype=vec.dtype)
