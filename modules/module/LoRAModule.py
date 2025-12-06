@@ -651,7 +651,8 @@ class LoRAModuleWrapper:
                 unsuitable.append(name)
                 continue
             if len(self.module_filters) == 0 or any(f.matches(name) for f in self.module_filters):
-                lora_module = self.klass(self.prefix + "." + name, child_module, *self.additional_args, **self.additional_kwargs)
+                prefixed_name = (self.prefix + "." + name) if self.prefix != "" else name
+                lora_module = self.klass(prefixed_name, child_module, *self.additional_args, **self.additional_kwargs)
                 lora_modules[name] = lora_module
                 if self.peft_type == PeftType.OFT_2 and lora_module.adjustment_info:
                     old, new = lora_module.adjustment_info
@@ -727,6 +728,16 @@ class LoRAModuleWrapper:
         """
         # create a copy, so the modules can pop states
         state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
+        state_dict = {k.replace("lora_A", "lora_down").replace("lora_B", "lora_up"): v for k, v in state_dict.items()}
+        new_state_dict = {}
+        for k, v in state_dict.items():
+            new_state_dict[k] = v
+            if k.endswith(".lora_up.weight"):
+                alpha_key = k.replace("lora_up.weight", "alpha")
+                if alpha_key not in state_dict:
+                    new_state_dict[alpha_key] = torch.tensor(self.rank)
+                    print("warning: .alpha key missing; assuming alpha == rank")
+        state_dict = new_state_dict
 
         self._check_rank_matches(state_dict)
 
