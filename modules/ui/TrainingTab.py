@@ -570,7 +570,7 @@ class TrainingTab:
 
         # Diff2Flow
         rescale_diff_label = components.label(frame, 4, 0, "Diff2Flow",
-                         tooltip="Enables finetuning with the Diff2Flow objective. Instead of predicting noise (epsilon), this method adapts the UNet to predict a velocity field for flow matching. This alignment can significantly speed up training convergence and allows for high-quality generation while preserving the model pre-train knowledge.")
+                         tooltip="Aligns the standard diffusion noise to a straight Flow Matching trajectory. This improves training convergence, speeds up generation, and resolves contrast issues like Zero-Terminal SNR ('grayish' output problem), while preserving the model's original knowledge. Compatible with both eps- and v- prediction mdoels.")
         rescale_diff_label.configure(wraplength=130, justify="left")
         components.switch(frame, 4, 1, self.ui_state, "diff2flow")
 

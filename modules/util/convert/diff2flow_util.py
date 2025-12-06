@@ -30,10 +30,6 @@ def enable_diff2flow(model):
     to_torch = partial(torch.tensor, dtype=torch.float32, device=device)
 
     # Store base constants
-    model.df_betas = to_torch(betas)
-    model.df_alphas_cumprod = to_torch(alphas_cumprod)
-    model.df_alphas_cumprod_full = to_torch(alphas_cumprod_full)
-
     model.df_sqrt_alphas_cumprod = to_torch(np.sqrt(alphas_cumprod))
     model.df_sqrt_one_minus_alphas_cumprod = to_torch(np.sqrt(1. - alphas_cumprod))
 
@@ -47,7 +43,6 @@ def enable_diff2flow(model):
 
     # Store 'rectified' constants used for Flow-to-Diffusion timestep conversion
     model.df_rectified_alphas_cumprod_full = model.df_sqrt_alphas_cumprod_full / (model.df_sqrt_alphas_cumprod_full + model.df_sqrt_one_minus_alphas_cumprod_full)
-    model.df_rectified_sqrt_alphas_cumprod_full = model.df_sqrt_one_minus_alphas_cumprod_full / (model.df_sqrt_alphas_cumprod_full + model.df_sqrt_one_minus_alphas_cumprod_full)
 
     # Bind methods to the model instance for easy access
     model._df_extract_into_tensor = MethodType(_df_extract_into_tensor, model)
@@ -163,20 +158,22 @@ def _df_predict_start_from_eps(self, x_t: torch.Tensor, t: torch.Tensor, noise: 
 def _df_get_vector_field_from_v(self, v: torch.Tensor, x_t: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
     """
     Calculates the vector field from the predicted velocity.
+    Returns: Noise - Data
     """
     z_pred = self._df_predict_start_from_z_and_v(x_t, t, v)
     eps_pred = self._df_predict_eps_from_z_and_v(x_t, t, v)
-    vector_field = z_pred - eps_pred
+    vector_field = eps_pred - z_pred
     return vector_field
 
 
 def _df_get_vector_field_from_eps(self, noise: torch.Tensor, x_t: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
     """
     Calculates the vector field from the predicted noise.
+    Returns: Noise - Data
     """
     z_pred = self._df_predict_start_from_eps(x_t, t, noise)
     eps_pred = noise
-    vector_field = z_pred - eps_pred
+    vector_field = eps_pred - z_pred
     return vector_field
 
 

@@ -97,7 +97,7 @@ class StableDiffusionSampler(BaseModelSampler):
 
                 velocity_uncond, velocity_cond = velocity_pred.chunk(2)
                 velocity = velocity_uncond + cfg_scale * (velocity_cond - velocity_uncond)
-                latent_image = latent_image + dt * velocity
+                latent_image = latent_image - dt * velocity
                 on_update_progress(i + 1, diffusion_steps)
 
             self.model.unet_to(self.temp_device)
