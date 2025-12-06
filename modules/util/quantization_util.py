@@ -12,6 +12,7 @@ from torch import Tensor, nn
 
 from diffusers.quantizers.gguf.utils import GGUFLinear, dequantize_gguf_tensor
 
+import accelerate
 from tqdm import tqdm
 
 try:
@@ -82,11 +83,13 @@ from modules.module.quantized.LinearW8A8 import LinearW8A8
 
 def __create_linear_layer(construct_fn, module: nn.Linear, copy_parameters: bool) -> nn.Module:
     bias = module.bias is not None
-    quant_linear = construct_fn(
-        in_features=module.in_features,
-        out_features=module.out_features,
-        bias=bias,
-    )
+
+    with accelerate.init_empty_weights():
+        quant_linear = construct_fn(
+            in_features=module.in_features,
+            out_features=module.out_features,
+            bias=bias,
+        )
 
     if copy_parameters:
         quant_linear.weight = type(quant_linear.weight)(module.weight, requires_grad=False)
