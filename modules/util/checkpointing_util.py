@@ -2,6 +2,7 @@ import inspect
 from collections.abc import Callable
 from typing import Any
 
+from modules.util.compile_util import init_compile
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
 from modules.util.torch_util import add_dummy_grad_fn_, has_grad_fn
@@ -27,7 +28,8 @@ from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import Qwen2_5_VLDecoderLayer
 from transformers.models.t5.modeling_t5 import T5Block
 
-torch._dynamo.config.cache_size_limit = 8192
+init_compile()
+
 
 def _kwargs_to_args(fun: Callable, args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[Any, ...]:
     signature = dict(inspect.signature(fun).parameters)
