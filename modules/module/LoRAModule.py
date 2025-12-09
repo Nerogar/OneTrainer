@@ -288,22 +288,17 @@ class LoHaModule(PeftBase):
 class LoKrModule(PeftBase):
     """Implementation of LoKr from Lycoris."""
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, dim: int, alpha: float, decompose_both: bool, decompose_factor: int, use_tucker: bool, rank_dropout: float, module_dropout: float, use_scalar: bool, rank_dropout_scale: bool, weight_decompose: bool, dora_on_output: bool, unbalanced_factorization: bool, rs_lora: bool, full_matrix: bool, train_device: torch.device):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, dim: int, alpha: float, decompose_both: bool, decompose_factor: int, use_tucker: bool, weight_decompose: bool, dora_on_output: bool, rs_lora: bool, full_matrix: bool, train_device: torch.device):
         super().__init__(prefix, orig_module)
         self.rank = dim  # LoKr uses 'dim' as its rank parameter
+        self.dropout = Dropout(0)
         self.register_buffer("alpha", torch.tensor(alpha))
-
-        self.rank_dropout = rank_dropout
-        self.module_dropout = module_dropout
-        self.rank_dropout_scale = rank_dropout_scale
 
         self.decompose_both = decompose_both
         self.decompose_factor = int(decompose_factor)
         self.use_tucker = use_tucker
-        self.use_scalar = use_scalar
         self.weight_decompose = weight_decompose
         self.dora_on_output = dora_on_output
-        self.unbalanced_factorization = unbalanced_factorization
         self.train_device = train_device
         self.rs_lora = rs_lora
         self.full_matrix = full_matrix
@@ -328,8 +323,6 @@ class LoKrModule(PeftBase):
                 in_dim, out_dim = self.orig_module.in_features, self.orig_module.out_features
                 in_m, in_n = factorization(in_dim, self.decompose_factor)
                 out_l, out_k = factorization(out_dim, self.decompose_factor)
-                if self.unbalanced_factorization:
-                    out_l, out_k = out_k, out_l
                 shape = ((out_l, out_k), (in_m, in_n))
 
                 # Create w1, or w1_a and w1_b
@@ -355,8 +348,6 @@ class LoKrModule(PeftBase):
                 k_size = self.orig_module.kernel_size
                 in_m, in_n = factorization(in_dim, self.decompose_factor)
                 out_l, out_k = factorization(out_dim, self.decompose_factor)
-                if self.unbalanced_factorization:
-                    out_l, out_k = out_k, out_l
                 shape = ((out_l, out_k), (in_m, in_n), *k_size)
                 self.tucker = self.use_tucker and any(i != 1 for i in k_size)
 
@@ -384,12 +375,6 @@ class LoKrModule(PeftBase):
             case _:
                 raise NotImplementedError("Only Linear and Conv2d are supported layers.")
 
-        # Scalar
-        if self.use_scalar:
-            self.scalar = Parameter(torch.tensor(0.0))
-        else:
-            self.register_buffer("scalar", torch.tensor(1.0), persistent=False)
-
         # Initialize weights
         if self.use_w1:
             nn.init.kaiming_uniform_(self.lokr_w1, a=math.sqrt(5))
@@ -407,32 +392,35 @@ class LoKrModule(PeftBase):
 
     def get_weight(self):
         """Computes the LoKr delta weight."""
-        w1 = self.lokr_w1 if self.use_w1 else self.lokr_w1_a @ self.lokr_w1_b
-
-        if self.use_w2:
-            w2 = self.lokr_w2
-        elif self.tucker:
-            w2 = rebuild_tucker(self.lokr_t2, self.lokr_w2_a, self.lokr_w2_b)
+        # If using DoRA (weight_decompose), we want clean weights here so we can 
+        # apply dropout to the input 'x' later.
+        # If not using DoRA, we apply dropout to the internal factors here.
+        if self.weight_decompose:
+            d = lambda x: x
         else:
-            w2 = self.lokr_w2_a @ self.lokr_w2_b
+            d = self.dropout
+
+        # Handle W1
+        if self.use_w1:
+            w1 = d(self.lokr_w1)
+        else:
+            w1 = d(self.lokr_w1_a) @ d(self.lokr_w1_b)
+
+        # Handle W2
+        if self.use_w2:
+            w2 = d(self.lokr_w2)
+        elif self.tucker:
+            w2 = rebuild_tucker(d(self.lokr_t2), d(self.lokr_w2_a), d(self.lokr_w2_b))
+        else:
+            w2 = d(self.lokr_w2_a) @ d(self.lokr_w2_b)
 
         weight = make_kron(w1, w2.to(w1.dtype))
         weight = weight.view(self.shape)
 
-        if self.training and self.rank_dropout > 0:
-            drop = (torch.rand(weight.size(0), device=weight.device) > self.rank_dropout).to(weight.dtype)
-            drop = drop.view(-1, *[1] * (weight.dim() - 1))
-            if self.rank_dropout_scale:
-                drop /= drop.mean()
-            weight *= drop
-
-        return weight * self.scalar
+        return weight
 
     def forward(self, x, *args, **kwargs):
         self.check_initialized()
-
-        if self.training and self.module_dropout > 0 and torch.rand(1) < self.module_dropout:
-            return self.orig_forward(x, *args, **kwargs)
 
         r_factor = self.rank
         if self.rs_lora:
@@ -473,7 +461,8 @@ class LoKrModule(PeftBase):
 
             wp = self.lokr_dora_scale * (wp / norm)
 
-            return self.op(x, wp.to(x.dtype), self.orig_module.bias, **self.layer_kwargs)
+            # Apply dropout to the input 'x' (DoRA style)
+            return self.op(self.dropout(x), wp.to(x.dtype), self.orig_module.bias, **self.layer_kwargs)
         else:
             w = self.get_weight() * scale
             return self.orig_forward(x) + self.op(x, w.to(x.dtype), bias=None, **self.layer_kwargs)
@@ -845,13 +834,8 @@ class LoRAModuleWrapper:
                 'decompose_both': config.lokr_decompose_both,
                 'decompose_factor': config.lokr_decompose_factor,
                 'use_tucker': config.lokr_use_tucker,
-                'rank_dropout': config.lokr_rank_dropout,
-                'module_dropout': config.lokr_module_dropout,
-                'use_scalar': config.lokr_use_scalar,
-                'rank_dropout_scale': config.lokr_rank_dropout_scale,
                 'weight_decompose': config.lokr_weight_decompose,
                 'dora_on_output': config.lokr_dora_on_output,
-                'unbalanced_factorization': config.lokr_unbalanced_factorization,
                 'rs_lora': config.lokr_rs_lora,
                 'full_matrix': config.lokr_full_matrix,
                 'train_device': torch.device(config.train_device),
@@ -1041,12 +1025,7 @@ class LoRAModuleWrapper:
         """
         Sets the dropout probability
         """
-        if not 0 <= dropout_probability <= 1:
+        if dropout_probability < 0 or dropout_probability > 1:
             raise ValueError("Dropout probability must be in [0, 1]")
         for module in self.lora_modules.values():
-            if isinstance(module, LoKrModule):
-                # LoKr handles its own complex dropout internally, so we set its probabilities directly.
-                module.module_dropout = dropout_probability
-            elif hasattr(module, 'dropout'):
-                # Other modules (LoRA, LoHa) have a standard dropout layer.
-                module.dropout.p = dropout_probability
+            module.dropout.p = dropout_probability

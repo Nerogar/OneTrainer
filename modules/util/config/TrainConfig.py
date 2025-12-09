@@ -534,13 +534,8 @@ class TrainConfig(BaseConfig):
     lokr_decompose_both: bool
     lokr_decompose_factor: int
     lokr_use_tucker: bool
-    lokr_rank_dropout: float
-    lokr_module_dropout: float
-    lokr_use_scalar: bool
-    lokr_rank_dropout_scale: bool
     lokr_weight_decompose: bool
     lokr_dora_on_output: bool
-    lokr_unbalanced_factorization: bool
     lokr_rs_lora: bool
     lokr_full_matrix: bool
 
@@ -1177,13 +1172,8 @@ class TrainConfig(BaseConfig):
         data.append(("lokr_decompose_both", False, bool, False))
         data.append(("lokr_decompose_factor", -1, int, False))
         data.append(("lokr_use_tucker", False, bool, False))
-        data.append(("lokr_rank_dropout", 0.0, float, False))
-        data.append(("lokr_module_dropout", 0.0, float, False))
-        data.append(("lokr_use_scalar", False, bool, False))
-        data.append(("lokr_rank_dropout_scale", False, bool, False))
         data.append(("lokr_weight_decompose", False, bool, False))
         data.append(("lokr_dora_on_output", True, bool, False))
-        data.append(("lokr_unbalanced_factorization", False, bool, False))
         data.append(("lokr_rs_lora", False, bool, False))
         data.append(("lokr_full_matrix", False, bool, False))
 

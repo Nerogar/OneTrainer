@@ -201,32 +201,13 @@ class LoraTab:
                              tooltip="Apply the DoRA weight decomposition on the output axis instead of the input axis.")
             components.switch(master, 4, 4, self.ui_state, "lokr_dora_on_output")
 
-            # LoKr Dropout Settings
-            components.label(master, 5, 0, "Rank Dropout",
-                             tooltip="Dropout probability for the rank dimension. Helps with overfitting.")
-            components.entry(master, 5, 1, self.ui_state, "lokr_rank_dropout")
+            # LoKr Dropout Settings 5 , 3-4
 
-            components.label(master, 5, 3, "Module Dropout",
-                             tooltip="Dropout probability for the entire LoKr module. A percentage of modules will be skipped during training steps.")
-            components.entry(master, 5, 4, self.ui_state, "lokr_module_dropout")
+            # LoKr Advanced/Expert Settings 6 , 0-1
+            components.label(master, 6, 0, "Force Full Matrix (W2)",
+                             tooltip="Forces the second Kronecker matrix (W2) to be a full matrix, ignoring the dimension setting. For expert use.")
+            components.switch(master, 6, 1, self.ui_state, "lokr_full_matrix")
 
-            components.label(master, 6, 0, "Scale Rank Dropout",
-                             tooltip="If using Rank Dropout, scale the remaining weights to maintain variance.")
-            components.switch(master, 6, 1, self.ui_state, "lokr_rank_dropout_scale")
-
-            # LoKr Advanced/Expert Settings
-            components.label(master, 7, 0, "Use Scalar",
-                             tooltip="Use a learnable scalar parameter. Can sometimes improve performance.")
-            components.switch(master, 7, 1, self.ui_state, "lokr_use_scalar")
-
-            components.label(master, 7, 3, "Unbalanced Factorization",
-                             tooltip="Use an unbalanced factorization for dimensions. Experimental.")
-            components.switch(master, 7, 4, self.ui_state, "lokr_unbalanced_factorization")
-
-            components.label(master, 8, 0, "Force Full Matrix (W2)",
-                             tooltip="Forces the second Kronecker matrix (W2) to be a full matrix, ignoring the dimension/rank setting. For expert use.")
-            components.switch(master, 8, 1, self.ui_state, "lokr_full_matrix")
-
-            components.label(master, 8, 3, "Use RS-LoKr Scaling",
+            components.label(master, 5, 3, "Use RS-LoKr Scaling",
                              tooltip="Root-Squared LoKr scaling. Changes the scaling factor from alpha/dim to alpha/sqrt(dim). Experimental.")
-            components.switch(master, 8, 4, self.ui_state, "lokr_rs_lora")
+            components.switch(master, 5, 4, self.ui_state, "lokr_rs_lora")
