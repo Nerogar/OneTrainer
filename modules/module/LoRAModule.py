@@ -398,18 +398,12 @@ class LoKrModule(PeftBase):
             nn.init.kaiming_uniform_(self.lokr_w1_b, a=math.sqrt(5))
 
         if self.use_w2:
-            if self.use_scalar:
-                nn.init.kaiming_uniform_(self.lokr_w2, a=math.sqrt(5))
-            else:
-                nn.init.constant_(self.lokr_w2, 0)
+            nn.init.constant_(self.lokr_w2, 0) 
         else:
             if self.tucker:
                 nn.init.kaiming_uniform_(self.lokr_t2, a=math.sqrt(5))
             nn.init.kaiming_uniform_(self.lokr_w2_a, a=math.sqrt(5))
-            if self.use_scalar:
-                nn.init.kaiming_uniform_(self.lokr_w2_b, a=math.sqrt(5))
-            else:
-                nn.init.constant_(self.lokr_w2_b, 0)
+            nn.init.constant_(self.lokr_w2_b, 0)
 
     def get_weight(self):
         """Computes the LoKr delta weight."""
