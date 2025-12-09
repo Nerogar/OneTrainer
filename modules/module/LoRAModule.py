@@ -395,16 +395,10 @@ class LoKrModule(PeftBase):
         # If using DoRA (weight_decompose), we want clean weights here so we can
         # apply dropout to the input 'x' later.
         # If not using DoRA, we apply dropout to the internal factors here.
-        if self.weight_decompose:
-            d = lambda x: x
-        else:
-            d = self.dropout
+        d = (lambda x: x) if self.weight_decompose else self.dropout
 
         # Handle W1
-        if self.use_w1:
-            w1 = d(self.lokr_w1)
-        else:
-            w1 = d(self.lokr_w1_a) @ d(self.lokr_w1_b)
+        w1 = d(self.lokr_w1) if self.use_w1 else d(self.lokr_w1_a) @ d(self.lokr_w1_b)
 
         # Handle W2
         if self.use_w2:
