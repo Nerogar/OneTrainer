@@ -46,5 +46,5 @@ def rebuild_tucker(t, wa, wb):
     wb: [r, d]
     rebuild: [b, d, k1, k2]
     """
-    rebuild = torch.einsum("i j ..., i p, j r -> p r ...", t, wa, wb)
+    rebuild = torch.einsum('i j k l, i p, j r -> p r k l', t, wa, wb) # [c, d, k1, k2]
     return rebuild

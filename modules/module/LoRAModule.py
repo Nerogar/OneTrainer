@@ -1,6 +1,5 @@
 import copy
 import math
-import warnings
 from abc import abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping
@@ -347,7 +346,7 @@ class LoKrModule(PeftBase):
                     self.lokr_w2_b = Parameter(torch.empty(lokr_dim, shape[1][1], device=device))
                 else:
                     if not self.full_matrix:
-                        warnings.warn(f"LoKr rank {lokr_dim} is too large for dims ({in_dim}, {out_dim}) and factor {self.decompose_factor}, using full matrix mode.", stacklevel=2)
+                        print(f"LoKr rank {lokr_dim} is too large for dims ({in_dim}, {out_dim}) and factor {self.decompose_factor}, using full matrix mode.")
                     self.use_w2 = True
                     self.lokr_w2 = Parameter(torch.empty(shape[0][1], shape[1][1], device=device))
 
@@ -372,7 +371,7 @@ class LoKrModule(PeftBase):
                 # Create w2, or decomposed/tucker variants
                 if self.full_matrix or lokr_dim >= max(shape[0][1], shape[1][1]) / 2:
                     if not self.full_matrix:
-                        warnings.warn(f"LoKr rank {lokr_dim} is too large for dims ({in_dim}, {out_dim}) and factor {self.decompose_factor}, using full matrix mode.", stacklevel=2)
+                        print(f"LoKr rank {lokr_dim} is too large for dims ({in_dim}, {out_dim}) and factor {self.decompose_factor}, using full matrix mode.")
                     self.use_w2 = True
                     self.lokr_w2 = Parameter(torch.empty(shape[0][1], shape[1][1], *k_size, device=device))
                 elif self.tucker:
