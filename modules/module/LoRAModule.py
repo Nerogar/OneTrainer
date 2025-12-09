@@ -290,7 +290,7 @@ class LoKrModule(PeftBase):
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, dim: int, alpha: float, decompose_both: bool, decompose_factor: int, use_tucker: bool, weight_decompose: bool, dora_on_output: bool, rs_lora: bool, full_matrix: bool, train_device: torch.device):
         super().__init__(prefix, orig_module)
-        self.rank = dim  # LoKr uses 'dim' as its rank parameter
+        self.dim = dim  # LoKr uses 'dim' as its parameter
         self.dropout = Dropout(0)
         self.register_buffer("alpha", torch.tensor(alpha))
 
@@ -315,7 +315,7 @@ class LoKrModule(PeftBase):
 
     def initialize_weights(self):
         self._initialized = True
-        lokr_dim = self.rank
+        lokr_dim = self.dim
         device = self.orig_module.weight.device
 
         match self.orig_module:
@@ -416,10 +416,10 @@ class LoKrModule(PeftBase):
     def forward(self, x, *args, **kwargs):
         self.check_initialized()
 
-        r_factor = self.rank
+        r_factor = self.dim
         if self.rs_lora:
             r_factor = math.sqrt(r_factor)
-        scale = self.alpha.item() / r_factor
+        scale = self.alpha / r_factor
 
         # DoRA for LoKr
         if self.weight_decompose:

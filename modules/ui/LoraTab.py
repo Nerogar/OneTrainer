@@ -167,25 +167,30 @@ class LoraTab:
                              tooltip="Factor for Kronecker product decomposition. -1 for auto, which is recommended. Changing this drastically affects parameter count.")
             components.entry(master, 2, 1, self.ui_state, "lokr_decompose_factor")
 
+            # alpha
+            components.label(master, 3, 0, f"{name} alpha",
+                            tooltip=f"The alpha parameter used when creating a new {name}")
+            components.entry(master, 3, 1, self.ui_state, "lora_alpha")
+
+            # RS scaling
+            components.label(master, 4, 0, "Use RS-LoKr Scaling",
+                             tooltip="Root-Squared LoKr scaling. Changes the scaling factor from alpha/dim to alpha/sqrt(dim). Experimental.")
+            components.switch(master, 4, 1, self.ui_state, "lokr_rs_lora")
+
             # Dropout Percentage
-            components.label(master, 3, 0, "Dropout Probability",
+            components.label(master, 5, 0, "Dropout Probability",
                             tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
-            components.entry(master, 3, 1, self.ui_state, "dropout_probability")
+            components.entry(master, 5, 1, self.ui_state, "dropout_probability")
 
             # LoKr weight dtype
-            components.label(master, 3, 3, f"{name} Weight Data Type",
+            components.label(master, 6, 0, f"{name} Weight Data Type",
                             tooltip=f"The {name} weight data type used for training. This can reduce memory consumption, but reduces precision")
-            components.options_kv(master, 3, 4, [
+            components.options_kv(master, 6, 1, [
                 ("float32", DataType.FLOAT_32),
                 ("bfloat16", DataType.BFLOAT_16),
             ], self.ui_state, "lora_weight_dtype")
 
-            # Additional embeddings
-            components.label(master, 6, 3, "Bundle Embeddings",
-                            tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
-            components.switch(master, 6, 4, self.ui_state, "bundle_additional_embeddings")
-
-            # LoKr Decomposition
+            #LoKr Decomposition Settings
             components.label(master, 1, 3, "Decompose Both Matrices",
                              tooltip="Perform rank decomposition on both Kronecker product matrices (W1 and W2). Only effective for very small dimensions.")
             components.switch(master, 1, 4, self.ui_state, "lokr_decompose_both")
@@ -194,20 +199,21 @@ class LoraTab:
                              tooltip="Use Tucker decomposition for convolutional layers. Can be more efficient for some architectures.")
             components.switch(master, 2, 4, self.ui_state, "lokr_use_tucker")
 
-            # LoKr DoRA Settings
-            components.label(master, 4, 0, "Decompose Weights (DoRA)",
-                             tooltip="Apply weight decomposition (DoRA) on top of the LoKr update.")
-            components.switch(master, 4, 1, self.ui_state, "lokr_weight_decompose")
-
-            components.label(master, 4, 3, "Apply DoRA on Output Axis",
-                             tooltip="Apply the DoRA weight decomposition on the output axis instead of the input axis.")
-            components.switch(master, 4, 4, self.ui_state, "lokr_dora_on_output")
-
-            # LoKr Advanced/Expert Settings
-            components.label(master, 6, 0, "Force Full Matrix (W2)",
+            components.label(master, 3, 3, "Force Full Matrix (W2)",
                              tooltip="Forces the second Kronecker matrix (W2) to be a full matrix, ignoring the dimension setting. For expert use.")
-            components.switch(master, 6, 1, self.ui_state, "lokr_full_matrix")
+            components.switch(master, 3, 4, self.ui_state, "lokr_full_matrix")
 
-            components.label(master, 5, 3, "Use RS-LoKr Scaling",
-                             tooltip="Root-Squared LoKr scaling. Changes the scaling factor from alpha/dim to alpha/sqrt(dim). Experimental.")
-            components.switch(master, 5, 4, self.ui_state, "lokr_rs_lora")
+            # LoKr DoRA Settings
+            components.label(master, 4, 3, "Decompose Weights (DoRA)",
+                             tooltip="Apply weight decomposition (DoRA) on top of the LoKr update.")
+            components.switch(master, 4, 4, self.ui_state, "lokr_weight_decompose")
+
+            components.label(master, 5, 3, "Apply DoRA on Output Axis",
+                             tooltip="Apply the DoRA weight decomposition on the output axis instead of the input axis.")
+            components.switch(master, 5, 4, self.ui_state, "lokr_dora_on_output")
+
+
+            # Additional embeddings
+            components.label(master, 6, 3, "Bundle Embeddings",
+                            tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
+            components.switch(master, 6, 4, self.ui_state, "bundle_additional_embeddings")
