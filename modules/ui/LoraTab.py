@@ -172,6 +172,7 @@ class LoraTab:
                             tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
             components.entry(master, 3, 1, self.ui_state, "dropout_probability")
 
+            # LoKr weight dtype
             components.label(master, 3, 3, f"{name} Weight Data Type",
                             tooltip=f"The {name} weight data type used for training. This can reduce memory consumption, but reduces precision")
             components.options_kv(master, 3, 4, [
@@ -179,6 +180,7 @@ class LoraTab:
                 ("bfloat16", DataType.BFLOAT_16),
             ], self.ui_state, "lora_weight_dtype")
 
+            # Additional embeddings
             components.label(master, 6, 3, "Bundle Embeddings",
                             tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
             components.switch(master, 6, 4, self.ui_state, "bundle_additional_embeddings")
@@ -201,9 +203,7 @@ class LoraTab:
                              tooltip="Apply the DoRA weight decomposition on the output axis instead of the input axis.")
             components.switch(master, 4, 4, self.ui_state, "lokr_dora_on_output")
 
-            # LoKr Dropout Settings 5 , 3-4
-
-            # LoKr Advanced/Expert Settings 6 , 0-1
+            # LoKr Advanced/Expert Settings
             components.label(master, 6, 0, "Force Full Matrix (W2)",
                              tooltip="Forces the second Kronecker matrix (W2) to be a full matrix, ignoring the dimension setting. For expert use.")
             components.switch(master, 6, 1, self.ui_state, "lokr_full_matrix")

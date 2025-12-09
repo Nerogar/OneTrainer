@@ -383,7 +383,7 @@ class LoKrModule(PeftBase):
             nn.init.kaiming_uniform_(self.lokr_w1_b, a=math.sqrt(5))
 
         if self.use_w2:
-            nn.init.constant_(self.lokr_w2, 0) 
+            nn.init.constant_(self.lokr_w2, 0)
         else:
             if self.tucker:
                 nn.init.kaiming_uniform_(self.lokr_t2, a=math.sqrt(5))
@@ -392,7 +392,7 @@ class LoKrModule(PeftBase):
 
     def get_weight(self):
         """Computes the LoKr delta weight."""
-        # If using DoRA (weight_decompose), we want clean weights here so we can 
+        # If using DoRA (weight_decompose), we want clean weights here so we can
         # apply dropout to the input 'x' later.
         # If not using DoRA, we apply dropout to the internal factors here.
         if self.weight_decompose:
