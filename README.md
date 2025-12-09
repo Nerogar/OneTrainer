@@ -51,7 +51,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
     2. Navigate into the cloned directory `cd OneTrainer`
     3. Set up a virtual environment `python -m venv venv`
     4. Activate the new venv:
-        - Windows: `venv/scripts/activate`
+        - Windows: `venv\scripts\activate`
         - Linux and Mac: Depends on your shell, activate the venv accordingly
     5. Install the requirements `pip install -r requirements.txt`
 

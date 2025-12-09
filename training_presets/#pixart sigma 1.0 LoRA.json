@@ -13,8 +13,13 @@
     "training_method": "LORA",
     "lora_rank": 16,
 	"lora_alpha": 1.0,
+    "transformer": {
+        "weight_dtype": "BFLOAT_16"
+    },
+    "text_encoder": {
+        "weight_dtype": "BFLOAT_16"
+    },
     "vae": {
         "weight_dtype": "FLOAT_32"
-    },
-    "weight_dtype": "BFLOAT_16"
+    }
 }

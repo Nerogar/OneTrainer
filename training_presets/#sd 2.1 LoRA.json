@@ -1,7 +1,8 @@
 {
     "backup_after": 10,
-    "base_model_name": "stabilityai/stable-diffusion-2-1",
+    "base_model_name": "sd2-community/stable-diffusion-2-1",
     "batch_size": 4,
+    "layer_filter_preset": "attn-mlp",
     "learning_rate": 0.0003,
     "model_type": "STABLE_DIFFUSION_21",
     "output_model_destination": "models/lora.safetensors",
@@ -11,5 +12,10 @@
     "vae": {
         "weight_dtype": "FLOAT_16"
     },
-    "weight_dtype": "FLOAT_16"
+    "unet": {
+        "weight_dtype": "FLOAT_16"
+    },
+    "text_encoder": {
+        "weight_dtype": "FLOAT_16"
+    }
 }

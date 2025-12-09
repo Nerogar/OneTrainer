@@ -11,8 +11,13 @@
         "train": false
     },
     "training_method": "FINE_TUNE",
+    "transformer": {
+        "weight_dtype": "BFLOAT_16"
+    },
+    "text_encoder": {
+        "weight_dtype": "BFLOAT_16"
+    },
     "vae": {
         "weight_dtype": "FLOAT_32"
-    },
-    "weight_dtype": "BFLOAT_16"
+    }
 }
