@@ -98,7 +98,6 @@ class ConceptTextConfig(BaseConfig):
     caps_randomize_mode: str
     caps_randomize_lowercase: bool
 
-
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
 
@@ -125,6 +124,35 @@ class ConceptTextConfig(BaseConfig):
         return ConceptTextConfig(data)
 
 
+class ConceptOverridesConfig(BaseConfig):
+    offset_noise_weight: float
+    perturbation_noise_weight: float
+
+    min_noising_strength: float
+    max_noising_strength: float
+    noising_weight: float
+    noising_bias: float
+    timestep_shift: float
+
+    def __init__(self, data: list[(str, Any, type, bool)]):
+        super().__init__(data)
+
+    @staticmethod
+    def default_values():
+        data = []
+
+        data.append(("offset_noise_weight", None, float, True))
+        data.append(("perturbation_noise_weight", None, float, True))
+
+        data.append(("min_noising_strength", None, float, True))
+        data.append(("max_noising_strength", None, float, True))
+        data.append(("noising_weight", None, float, True))
+        data.append(("noising_bias", None, float, True))
+        data.append(("timestep_shift", None, float, True))
+
+        return ConceptOverridesConfig(data)
+
+
 class ConceptConfig(BaseConfig):
     name: str
     path: str
@@ -140,6 +168,7 @@ class ConceptConfig(BaseConfig):
 
     image: ConceptImageConfig
     text: ConceptTextConfig
+    overrides: ConceptOverridesConfig
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
@@ -175,6 +204,7 @@ class ConceptConfig(BaseConfig):
         as_dict = super().to_dict()
         as_dict['image'] = self.image.to_dict()
         as_dict['text'] = self.text.to_dict()
+        as_dict['overrides'] = self.overrides.to_dict()
         return as_dict
 
     @staticmethod
@@ -183,6 +213,7 @@ class ConceptConfig(BaseConfig):
 
         data.append(("image", ConceptImageConfig.default_values(), ConceptImageConfig, False))
         data.append(("text", ConceptTextConfig.default_values(), ConceptTextConfig, False))
+        data.append(("overrides", ConceptOverridesConfig.default_values(), ConceptOverridesConfig, False))
 
         data.append(("name", "", str, False))
         data.append(("path", "", str, False))
