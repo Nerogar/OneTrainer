@@ -84,7 +84,6 @@ class ZImageSampler(BaseModelSampler):
             )
 
             # prepare timesteps
-            #sigmas = np.linspace(1.0, 1 / diffusion_steps, diffusion_steps) #TODO not here?
             noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
             timesteps = noise_scheduler.timesteps
 
@@ -107,7 +106,7 @@ class ZImageSampler(BaseModelSampler):
                     return_dict=True
                 ).sample
 
-                noise_pred = - torch.stack(output_list, dim=0).squeeze(dim=2) #TODO why does diffuser cast to float?
+                noise_pred = - torch.stack(output_list, dim=0).squeeze(dim=2)
 
                 if cfg_scale > 1.0:
                     noise_pred_positive, noise_pred_negative = noise_pred.chunk(2)
