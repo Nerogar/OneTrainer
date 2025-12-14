@@ -728,16 +728,6 @@ class LoRAModuleWrapper:
         """
         # create a copy, so the modules can pop states
         state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
-        state_dict = {k.replace("lora_A", "lora_down").replace("lora_B", "lora_up"): v for k, v in state_dict.items()}
-        new_state_dict = {}
-        for k, v in state_dict.items():
-            new_state_dict[k] = v
-            if k.endswith(".lora_up.weight"):
-                alpha_key = k.replace("lora_up.weight", "alpha")
-                if alpha_key not in state_dict:
-                    new_state_dict[alpha_key] = torch.tensor(self.rank)
-                    print("warning: .alpha key missing; assuming alpha == rank")
-        state_dict = new_state_dict
 
         self._check_rank_matches(state_dict)
 
