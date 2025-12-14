@@ -262,7 +262,6 @@ def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataTy
         for child_module in tqdm(child_modules, desc="Quantizing model weights", total=len(child_modules), delay=5, smoothing=0.1):
             if isinstance(child_module, (QuantizedModuleMixin, GGUFLinear)):
                 child_module.compute_dtype = train_dtype.torch_dtype()
-
             if isinstance(child_module, QuantizedModuleMixin):
                 child_module.quantize(device=device)
 
