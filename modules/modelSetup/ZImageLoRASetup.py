@@ -51,7 +51,7 @@ class ZImageLoRASetup(
             config: TrainConfig,
     ):
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "transformer", config, config.layer_filter.split(",")
+            model.transformer, "diffusion_model", config, config.layer_filter.split(",") #FIXME https://github.com/comfyanonymous/ComfyUI/pull/11135
         )
 
         if model.lora_state_dict:
