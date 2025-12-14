@@ -21,8 +21,9 @@
     "train_dtype": "BFLOAT_16",
     "weight_dtype": "BFLOAT_16",
     "output_dtype": "BFLOAT_16",
-    "layer_filter": "layers",
-    "layer_filter_preset": "blocks",
+    "layer_filter": "^(?=.*attention)(?!.*refiner).*,^(?=.*feed_forward)(?!.*refiner).*",
+    "layer_filter_preset": "attn-mlp",
+    "layer_filter_regex": true,
     "quantization": {
         "layer_filter": "layers",
         "layer_filter_preset": "blocks"

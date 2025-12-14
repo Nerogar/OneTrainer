@@ -209,7 +209,7 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False, supports_force_attention_mask=False)
-        self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=False)
+        self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)

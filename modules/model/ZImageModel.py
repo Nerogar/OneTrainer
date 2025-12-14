@@ -1,3 +1,4 @@
+import math
 from contextlib import nullcontext
 from random import Random
 
@@ -177,7 +178,8 @@ class ZImageModel(BaseModel):
     def unscale_latents(self, latents: Tensor) -> Tensor:
         return latents / self.vae.config.scaling_factor + self.vae.config.shift_factor
 
-    '''def calculate_timestep_shift(self, latent_width: int, latent_height: int):
+    def calculate_timestep_shift(self, latent_width: int, latent_height: int):
+        #these values are not defined in the scheduler config of Z-Image. They are therefore taken from the default of FlowMatchEulerDiscreteScheduler - which are Flux settings
         base_seq_len = self.noise_scheduler.config.base_image_seq_len
         max_seq_len = self.noise_scheduler.config.max_image_seq_len
         base_shift = self.noise_scheduler.config.base_shift
@@ -188,4 +190,4 @@ class ZImageModel(BaseModel):
         m = (max_shift - base_shift) / (max_seq_len - base_seq_len)
         b = base_shift - m * base_seq_len
         mu = image_seq_len * m + b
-        return math.exp(mu)'''
+        return math.exp(mu)

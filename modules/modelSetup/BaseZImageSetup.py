@@ -25,6 +25,8 @@ from torch import Tensor
 PRESETS = {
     "full": [],
     "blocks": ["layers"],
+    "attn-mlp": {'patterns': ["^(?=.*attention)(?!.*refiner).*", "^(?=.*feed_forward)(?!.*refiner).*"], 'regex': True},
+    "attn-only": {'patterns': ["^(?=.*attention)(?!.*refiner).*"], 'regex': True},
 }
 
 class BaseZImageSetup(
@@ -108,12 +110,14 @@ class BaseZImageSetup(
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
+            shift = model.calculate_timestep_shift(scaled_latent_image.shape[-2], scaled_latent_image.shape[-1])
             timestep = self._get_timestep_discrete(
                 model.noise_scheduler.config['num_train_timesteps'],
                 deterministic,
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+                shift = shift if config.dynamic_timestep_shifting else config.timestep_shift,
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(

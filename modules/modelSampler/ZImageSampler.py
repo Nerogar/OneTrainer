@@ -83,13 +83,9 @@ class ZImageSampler(BaseModelSampler):
                 dtype=torch.float32,
             )
 
-            #TODO in diffusers code, but seems unnecessary. dynamic shifting is disabled
-            #shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
-            #mu = math.log(shift)
-
             # prepare timesteps
             #sigmas = np.linspace(1.0, 1 / diffusion_steps, diffusion_steps) #TODO not here?
-            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device) #TODO , mu=mu, sigmas=sigmas)
+            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
             timesteps = noise_scheduler.timesteps
 
             # denoising loop
