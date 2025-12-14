@@ -105,7 +105,7 @@ class BaseSSHFileSync(BaseFileSync):
         return (
             remote not in sync_info
             or local.stat().st_size != sync_info[remote]['size']
-            or local.stat().st_mtime > sync_info[remote]['mtime']
+            or int(local.stat().st_mtime) > sync_info[remote]['mtime']
         )
 
     @staticmethod

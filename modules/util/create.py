@@ -1155,6 +1155,8 @@ def create_optimizer(
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                kappa_p=optimizer_config.kappa_p if optimizer_config.kappa_p is not None else 1.0,
+                auto_kappa_p=optimizer_config.auto_kappa_p if optimizer_config.auto_kappa_p is not None else False,
             )
 
         # LION_PRODIGY_ADV Optimizer
@@ -1179,6 +1181,8 @@ def create_optimizer(
                 d_limiter=optimizer_config.d_limiter if optimizer_config.d_limiter is not None else False,
                 cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                kappa_p=optimizer_config.kappa_p if optimizer_config.kappa_p is not None else 1.0,
+                auto_kappa_p=optimizer_config.auto_kappa_p if optimizer_config.auto_kappa_p is not None else False,
             )
 
         # MUON_ADV Optimizer

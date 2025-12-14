@@ -41,8 +41,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         if keep_in_fp32_modules is None:
             keep_in_fp32_modules = []
 
-        with accelerate.init_empty_weights():
-            replace_linear_with_quantized_layers(sub_module, dtype, keep_in_fp32_modules, quantization, copy_parameters=False)
+        replace_linear_with_quantized_layers(sub_module, dtype, keep_in_fp32_modules, quantization, copy_parameters=False)
 
         is_local = os.path.isdir(pretrained_model_name_or_path)
 

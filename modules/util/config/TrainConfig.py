@@ -141,6 +141,8 @@ class TrainOptimizerConfig(BaseConfig):
     accelerated_ns: False
     cautious_wd: False
     approx_mars: False
+    kappa_p: float
+    auto_kappa_p: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -257,6 +259,8 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("accelerated_ns", False, bool, False))
         data.append(("cautious_wd", False, bool, False))
         data.append(("approx_mars", False, bool, False))
+        data.append(("kappa_p", None, float, True))
+        data.append(("auto_kappa_p", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
