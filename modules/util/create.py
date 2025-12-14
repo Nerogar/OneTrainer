@@ -1178,6 +1178,8 @@ def create_optimizer(
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                kappa_p=optimizer_config.kappa_p if optimizer_config.kappa_p is not None else 1.0,
+                auto_kappa_p=optimizer_config.auto_kappa_p if optimizer_config.auto_kappa_p is not None else False,
             )
 
         # LION_PRODIGY_ADV Optimizer
@@ -1202,6 +1204,8 @@ def create_optimizer(
                 d_limiter=optimizer_config.d_limiter if optimizer_config.d_limiter is not None else False,
                 cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                kappa_p=optimizer_config.kappa_p if optimizer_config.kappa_p is not None else 1.0,
+                auto_kappa_p=optimizer_config.auto_kappa_p if optimizer_config.auto_kappa_p is not None else False,
             )
 
         # MUON_ADV Optimizer
@@ -1249,6 +1253,7 @@ def create_optimizer(
                 ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
                 accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                approx_mars=optimizer_config.approx_mars if optimizer_config.approx_mars is not None else False,
                 **adam_kwargs
             )
 
@@ -1301,6 +1306,7 @@ def create_optimizer(
                 normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
                 accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                approx_mars=optimizer_config.approx_mars if optimizer_config.approx_mars is not None else False,
                 **adam_kwargs
             )
 
