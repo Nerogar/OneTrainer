@@ -16,6 +16,7 @@ from modules.dataLoader.StableDiffusionBaseDataLoader import StableDiffusionBase
 from modules.dataLoader.StableDiffusionFineTuneVaeDataLoader import StableDiffusionFineTuneVaeDataLoader
 from modules.dataLoader.StableDiffusionXLBaseDataLoader import StableDiffusionXLBaseDataLoader
 from modules.dataLoader.WuerstchenBaseDataLoader import WuerstchenBaseDataLoader
+from modules.dataLoader.ZImageBaseDataLoader import ZImageBaseDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.ChromaEmbeddingModelLoader import ChromaEmbeddingModelLoader
@@ -50,6 +51,7 @@ from modules.modelLoader.StableDiffusionXLLoRAModelLoader import StableDiffusion
 from modules.modelLoader.WuerstchenEmbeddingModelLoader import WuerstchenEmbeddingModelLoader
 from modules.modelLoader.WuerstchenFineTuneModelLoader import WuerstchenFineTuneModelLoader
 from modules.modelLoader.WuerstchenLoRAModelLoader import WuerstchenLoRAModelLoader
+from modules.modelLoader.ZImageModelLoader import ZImageFineTuneModelLoader, ZImageLoRAModelLoader
 from modules.modelSampler import BaseModelSampler
 from modules.modelSampler.ChromaSampler import ChromaSampler
 from modules.modelSampler.FluxSampler import FluxSampler
@@ -63,6 +65,7 @@ from modules.modelSampler.StableDiffusionSampler import StableDiffusionSampler
 from modules.modelSampler.StableDiffusionVaeSampler import StableDiffusionVaeSampler
 from modules.modelSampler.StableDiffusionXLSampler import StableDiffusionXLSampler
 from modules.modelSampler.WuerstchenSampler import WuerstchenSampler
+from modules.modelSampler.ZImageSampler import ZImageSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.ChromaEmbeddingModelSaver import ChromaEmbeddingModelSaver
 from modules.modelSaver.ChromaFineTuneModelSaver import ChromaFineTuneModelSaver
@@ -95,6 +98,8 @@ from modules.modelSaver.StableDiffusionXLLoRAModelSaver import StableDiffusionXL
 from modules.modelSaver.WuerstchenEmbeddingModelSaver import WuerstchenEmbeddingModelSaver
 from modules.modelSaver.WuerstchenFineTuneModelSaver import WuerstchenFineTuneModelSaver
 from modules.modelSaver.WuerstchenLoRAModelSaver import WuerstchenLoRAModelSaver
+from modules.modelSaver.ZImageFineTuneModelSaver import ZImageFineTuneModelSaver
+from modules.modelSaver.ZImageLoRAModelSaver import ZImageLoRAModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.ChromaEmbeddingSetup import ChromaEmbeddingSetup
 from modules.modelSetup.ChromaFineTuneSetup import ChromaFineTuneSetup
@@ -129,6 +134,8 @@ from modules.modelSetup.StableDiffusionXLLoRASetup import StableDiffusionXLLoRAS
 from modules.modelSetup.WuerstchenEmbeddingSetup import WuerstchenEmbeddingSetup
 from modules.modelSetup.WuerstchenFineTuneSetup import WuerstchenFineTuneSetup
 from modules.modelSetup.WuerstchenLoRASetup import WuerstchenLoRASetup
+from modules.modelSetup.ZImageFineTuneSetup import ZImageFineTuneSetup
+from modules.modelSetup.ZImageLoRASetup import ZImageLoRASetup
 from modules.module.EMAModule import EMAModuleWrapper
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
@@ -192,6 +199,8 @@ def create_model_loader(
                 return ChromaFineTuneModelLoader()
             if model_type.is_qwen():
                 return QwenFineTuneModelLoader()
+            if model_type.is_z_image():
+                return ZImageFineTuneModelLoader()
             if model_type.is_sana():
                 return SanaFineTuneModelLoader()
             if model_type.is_hunyuan_video():
@@ -218,6 +227,8 @@ def create_model_loader(
                 return ChromaLoRAModelLoader()
             if model_type.is_qwen():
                 return QwenLoRAModelLoader()
+            if model_type.is_z_image():
+                return ZImageLoRAModelLoader()
             if model_type.is_sana():
                 return SanaLoRAModelLoader()
             if model_type.is_hunyuan_video():
@@ -271,6 +282,8 @@ def create_model_saver(
                 return ChromaFineTuneModelSaver()
             if model_type.is_qwen():
                 return QwenFineTuneModelSaver()
+            if model_type.is_z_image():
+                return ZImageFineTuneModelSaver()
             if model_type.is_sana():
                 return SanaFineTuneModelSaver()
             if model_type.is_hunyuan_video():
@@ -295,6 +308,8 @@ def create_model_saver(
                 return ChromaLoRAModelSaver()
             if model_type.is_qwen():
                 return QwenLoRAModelSaver()
+            if model_type.is_z_image():
+                return ZImageLoRAModelSaver()
             if model_type.is_sana():
                 return SanaLoRAModelSaver()
             if model_type.is_hunyuan_video():
@@ -351,6 +366,8 @@ def create_model_setup(
                 return ChromaFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_qwen():
                 return QwenFineTuneSetup(train_device, temp_device, debug_mode)
+            if model_type.is_z_image():
+                return ZImageFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_sana():
                 return SanaFineTuneSetup(train_device, temp_device, debug_mode)
             if model_type.is_hunyuan_video():
@@ -377,6 +394,8 @@ def create_model_setup(
                 return ChromaLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_qwen():
                 return QwenLoRASetup(train_device, temp_device, debug_mode)
+            if model_type.is_z_image():
+                return ZImageLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_sana():
                 return SanaLoRASetup(train_device, temp_device, debug_mode)
             if model_type.is_hunyuan_video():
@@ -433,6 +452,8 @@ def create_model_sampler(
                 return ChromaSampler(train_device, temp_device, model, model_type)
             if model_type.is_qwen():
                 return QwenSampler(train_device, temp_device, model, model_type)
+            if model_type.is_z_image():
+                return ZImageSampler(train_device, temp_device, model, model_type)
             if model_type.is_sana():
                 return SanaSampler(train_device, temp_device, model, model_type)
             if model_type.is_hunyuan_video():
@@ -480,6 +501,8 @@ def create_data_loader(
                 return ChromaBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_qwen():
                 return QwenBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+            if model_type.is_z_image():
+                return ZImageBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_sana():
                 return SanaBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
             if model_type.is_hunyuan_video():
@@ -1155,6 +1178,8 @@ def create_optimizer(
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                kappa_p=optimizer_config.kappa_p if optimizer_config.kappa_p is not None else 1.0,
+                auto_kappa_p=optimizer_config.auto_kappa_p if optimizer_config.auto_kappa_p is not None else False,
             )
 
         # LION_PRODIGY_ADV Optimizer
@@ -1179,6 +1204,8 @@ def create_optimizer(
                 d_limiter=optimizer_config.d_limiter if optimizer_config.d_limiter is not None else False,
                 cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                kappa_p=optimizer_config.kappa_p if optimizer_config.kappa_p is not None else 1.0,
+                auto_kappa_p=optimizer_config.auto_kappa_p if optimizer_config.auto_kappa_p is not None else False,
             )
 
         # MUON_ADV Optimizer
@@ -1226,6 +1253,7 @@ def create_optimizer(
                 ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
                 accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                approx_mars=optimizer_config.approx_mars if optimizer_config.approx_mars is not None else False,
                 **adam_kwargs
             )
 
@@ -1278,6 +1306,7 @@ def create_optimizer(
                 normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
                 accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                approx_mars=optimizer_config.approx_mars if optimizer_config.approx_mars is not None else False,
                 **adam_kwargs
             )
 
