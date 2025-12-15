@@ -31,6 +31,7 @@ from transformers.models.t5.modeling_t5 import T5Block
 
 init_compile()
 
+
 def _kwargs_to_args(fun: Callable, args: tuple[Any, ...], kwargs: dict[str, Any]) -> tuple[Any, ...]:
     signature = dict(inspect.signature(fun).parameters)
     parameters = []
