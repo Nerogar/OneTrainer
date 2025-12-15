@@ -11,6 +11,7 @@ from modules.modelSetup.BaseStableDiffusion3Setup import PRESETS as sd3_presets
 from modules.modelSetup.BaseStableDiffusionSetup import PRESETS as sd_presets
 from modules.modelSetup.BaseStableDiffusionXLSetup import PRESETS as sdxl_presets
 from modules.modelSetup.BaseWuerstchenSetup import PRESETS as sc_presets
+from modules.modelSetup.BaseZImageSetup import PRESETS as z_image_presets
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
@@ -67,6 +68,8 @@ class ModelTab:
             self.__setup_pixart_alpha_ui(base_frame)
         elif self.train_config.model_type.is_flux():
             self.__setup_flux_ui(base_frame)
+        elif self.train_config.model_type.is_z_image():
+            self.__setup_z_image_ui(base_frame)
         elif self.train_config.model_type.is_chroma():
             self.__setup_chroma_ui(base_frame)
         elif self.train_config.model_type.is_qwen():
@@ -129,6 +132,25 @@ class ModelTab:
             allow_override_transformer=True,
             has_text_encoder_1=True,
             has_text_encoder_2=True,
+            has_vae=True,
+        )
+        row = self.__create_output_components(
+            frame,
+            row,
+            allow_safetensors=True,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
+        )
+
+    def __setup_z_image_ui(self, frame):
+        row = 0
+        row = self.__create_base_dtype_components(frame, row)
+        row = self.__create_base_components(
+            frame,
+            row,
+            has_transformer=True,
+            allow_override_transformer=True,
+            has_text_encoder_1=True,
             has_vae=True,
         )
         row = self.__create_output_components(
@@ -430,6 +452,8 @@ class ModelTab:
             presets = sana_presets
         elif self.train_config.model_type.is_hunyuan_video():
             presets = hunyuan_video_presets
+        elif self.train_config.model_type.is_z_image():
+            presets = z_image_presets
         elif self.train_config.model_type.is_hi_dream():
             presets = hidream_presets
         else:

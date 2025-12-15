@@ -125,6 +125,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
 
         #tensors that will be quantized are loaded at their original dtype. non-quantized tensors are converted
         #to their intended dtype here
+        #TODO the following code requires quite a few workarounds by now. Is there a better way?
         for key, value in state_dict.items():
             module = sub_module
             tensor_name = key
