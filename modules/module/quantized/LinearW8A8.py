@@ -1,6 +1,7 @@
 
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
+from modules.util.mm_8bit import mm_8bit as mm_8bit
 from modules.util.quantization_util import (
     dequantize,
     quantize_fp8_axiswise,
@@ -8,7 +9,6 @@ from modules.util.quantization_util import (
     quantize_int8_axiswise,
     quantize_int8_tensorwise,
 )
-from modules.util.triton_mm_8bit import mm_8bit as triton_mm_8bit
 
 import torch
 from torch import Tensor, nn
@@ -37,13 +37,13 @@ def fp8_forward_tokenwise(x: Tensor, weight: Tensor, weight_scale: float, bias: 
 def int8_backward_axiswise(output: Tensor, weight: Tensor, weight_scale: float) -> Tensor:
     output_8, output_scale = quantize_int8_axiswise(output, dim=-1)
     #almost always, grad outputs are already contiguous and this is a no-op. But there are some grad outputs from SDXL that are non-contiguous:
-    mm_res = triton_mm_8bit(output_8.contiguous(), weight)
+    mm_res = mm_8bit(output_8.contiguous(), weight)
     return mm_res.float().mul_(weight_scale * output_scale).to(output.dtype)
 
 @torch.no_grad()
 def fp8_backward_axiswise(output: Tensor, weight: Tensor, weight_scale: float) -> Tensor:
     output_8, output_scale = quantize_fp8_axiswise(output, dim=-1)
-    mm_res = triton_mm_8bit(output_8.contiguous(), weight)
+    mm_res = mm_8bit(output_8.contiguous(), weight)
     return mm_res.float().mul_(weight_scale * output_scale).to(output.dtype)
 
 
@@ -158,11 +158,11 @@ def benchmark_int8(m, k, n, device = 'cuda'):
 
 
     run_benchmark(lambda: torch._int_mm(x_8, w_8.T), "torch mm int")
-    run_benchmark(lambda: triton_mm_8bit(x_8, w_8.T), "triton mm int")
+    run_benchmark(lambda: mm_8bit(x_8, w_8.T), "triton mm int")
     def torch_backward(a, b):
         torch._int_mm(a, b.T.contiguous().T)
     run_benchmark(lambda: torch_backward(y_8, w_8), "torch mm backward int8")
-    run_benchmark(lambda: triton_mm_8bit(y_8, w_8), "triton mm backward int8")
+    run_benchmark(lambda: mm_8bit(y_8, w_8), "triton mm backward int8")
 
     run_benchmark(lambda: int8_forward_tokenwise(x, w_8, w_scale), "torch forward int", compile=True)
     run_benchmark(lambda: int8_backward_axiswise(y, w_8, w_scale), "triton backward int", compile=True)
@@ -179,11 +179,11 @@ def benchmark_fp8(m, k, n, device = 'cuda'):
     one_scale = torch.ones(1, device=device)
 
     run_benchmark(lambda: torch._scaled_mm(x_8, w_8.T, out_dtype=torch.bfloat16, scale_a=one_scale.float(), scale_b=w_scale.float()), "torch mm fp8")
-    run_benchmark(lambda: triton_mm_8bit(x_8, w_8.T), "triton mm fp8")
+    run_benchmark(lambda: mm_8bit(x_8, w_8.T), "triton mm fp8")
     def torch_backward(a, b):
         torch._scaled_mm(a, b.T.contiguous().T, out_dtype=torch.bfloat16, scale_a=one_scale.float(), scale_b=w_scale.float())
     run_benchmark(lambda: torch_backward(y_8, w_8), "torch mm backward fp8")
-    run_benchmark(lambda: triton_mm_8bit(y_8, w_8), "triton mm backward fp8")
+    run_benchmark(lambda: mm_8bit(y_8, w_8), "triton mm backward fp8")
     run_benchmark(lambda: fp8_forward_tokenwise(x, w_8, w_scale), "torch forward fp8", compile=True)
     run_benchmark(lambda: fp8_backward_axiswise(y, w_8, w_scale), "triton backward fp8", compile=True)
 
