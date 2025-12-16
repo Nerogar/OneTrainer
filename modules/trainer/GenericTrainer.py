@@ -1,6 +1,7 @@
 import contextlib
 import copy
 import json
+import math
 import os
 import shutil
 import traceback
@@ -119,10 +120,15 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("loading the model")
 
+        if self.config.quantization.cache_dir is None:
+            self.config.quantization.cache_dir = self.config.cache_dir + "/quantization"
+            os.makedirs(self.config.quantization.cache_dir, exist_ok=True)
+
         self.model = self.model_loader.load(
             model_type=self.config.model_type,
             model_names=model_names,
             weight_dtypes=self.config.weight_dtypes(),
+            quantization=self.config.quantization,
         )
         self.model.train_config = self.config
 
@@ -776,6 +782,9 @@ class GenericTrainer(BaseTrainer):
                             )
 
                             accumulated_loss_cpu = accumulated_loss.item()
+                            if math.isnan(accumulated_loss_cpu):
+                                raise RuntimeError("Training loss became NaN. This may be due to invalid parameters, precision issues, or a bug in the loss computation.")
+
                             self.tensorboard.add_scalar("loss/train_step",accumulated_loss_cpu , train_progress.global_step)
                             ema_loss = ema_loss or accumulated_loss_cpu
                             ema_loss_steps += 1

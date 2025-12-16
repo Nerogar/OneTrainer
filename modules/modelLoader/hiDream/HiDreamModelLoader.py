@@ -4,6 +4,7 @@ import traceback
 
 from modules.model.HiDreamModel import HiDreamModel
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
+from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -42,11 +43,12 @@ class HiDreamModelLoader(
             include_text_encoder_2: bool,
             include_text_encoder_3: bool,
             include_text_encoder_4: bool,
+            quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(
                 model, model_type, weight_dtypes, base_model_name, text_encoder_4_model_name, vae_model_name,
-                include_text_encoder_1, include_text_encoder_2, include_text_encoder_3, include_text_encoder_4,
+                include_text_encoder_1, include_text_encoder_2, include_text_encoder_3, include_text_encoder_4, quantization,
             )
         else:
             raise Exception("not an internal model")
@@ -63,6 +65,7 @@ class HiDreamModelLoader(
             include_text_encoder_2: bool,
             include_text_encoder_3: bool,
             include_text_encoder_4: bool,
+            quantization: QuantizationConfig,
     ):
         diffusers_sub = []
         transformers_sub = []
@@ -191,6 +194,7 @@ class HiDreamModelLoader(
             weight_dtypes.train_dtype,
             base_model_name,
             "transformer",
+            quantization,
         )
 
         model.model_type = model_type
@@ -218,6 +222,7 @@ class HiDreamModelLoader(
             include_text_encoder_2: bool,
             include_text_encoder_3: bool,
             include_text_encoder_4: bool,
+            quantization: QuantizationConfig,
     ):
         pipeline = HiDreamImagePipeline.from_single_file(
             pretrained_model_link_or_path=base_model_name,
@@ -264,7 +269,7 @@ class HiDreamModelLoader(
             print("text encoder 2 (t5) not loaded, continuing without it")
 
         transformer = self._convert_diffusers_sub_module_to_dtype(
-            pipeline.transformer, weight_dtypes.transformer, weight_dtypes.train_dtype
+            pipeline.transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization,
         )
 
         model.model_type = model_type
@@ -290,6 +295,7 @@ class HiDreamModelLoader(
             model_type: ModelType,
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
+            quantization: QuantizationConfig,
     ):
         stacktraces = []
 
@@ -298,7 +304,7 @@ class HiDreamModelLoader(
                 model, model_type, weight_dtypes, model_names.base_model,
                 model_names.text_encoder_4, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2,
-                model_names.include_text_encoder_3, model_names.include_text_encoder_4,
+                model_names.include_text_encoder_3, model_names.include_text_encoder_4, quantization,
             )
             self.__after_load(model)
             return
@@ -310,7 +316,7 @@ class HiDreamModelLoader(
                 model, model_type, weight_dtypes, model_names.base_model,
                 model_names.text_encoder_4, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2,
-                model_names.include_text_encoder_3, model_names.include_text_encoder_4,
+                model_names.include_text_encoder_3, model_names.include_text_encoder_4, quantization,
             )
             self.__after_load(model)
             return
@@ -322,7 +328,7 @@ class HiDreamModelLoader(
                 model, model_type, weight_dtypes, model_names.base_model,
                 model_names.text_encoder_4, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2,
-                model_names.include_text_encoder_3, model_names.include_text_encoder_4,
+                model_names.include_text_encoder_3, model_names.include_text_encoder_4, quantization,
             )
             self.__after_load(model)
             return

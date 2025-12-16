@@ -617,6 +617,113 @@ def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_n
 
     return frame
 
+def layer_filter_entry(master, row, column, ui_state: UIState, preset_var_name: str, preset_label: str, preset_tooltip: str, presets, entry_var_name, entry_tooltip: str, regex_var_name, regex_tooltip: str, frame_color=None):
+    frame = ctk.CTkFrame(master=master, corner_radius=5, fg_color=frame_color)
+    frame.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
+    frame.grid_columnconfigure(0, weight=1)
+
+    layer_entry = entry(
+        frame, 1, 0, ui_state, entry_var_name,
+        tooltip=entry_tooltip
+    )
+    layer_entry_fg_color = layer_entry.cget("fg_color")
+    layer_entry_text_color = layer_entry.cget("text_color")
+
+    regex_label = label(
+        frame, 2, 0, "Use Regex",
+        tooltip=regex_tooltip,
+    )
+    regex_switch = switch(
+        frame, 2, 1, ui_state, regex_var_name
+    )
+
+    # Let the user set their own layer filter
+    # TODO
+    #if self.train_config.layer_filter and self.train_config.layer_filter_preset == "custom":
+    #    self.prior_custom = self.train_config.layer_filter
+    #else:
+    #    self.prior_custom = ""
+
+    layer_entry.grid_configure(columnspan=2, sticky="ew")
+
+    presets_list = list(presets.keys()) + ["custom"]
+
+
+    def hide_layer_entry():
+        if layer_entry and layer_entry.winfo_manager():
+            layer_entry.grid_remove()
+
+    def show_layer_entry():
+        if layer_entry and not layer_entry.winfo_manager():
+            layer_entry.grid()
+
+
+    def preset_set_layer_choice(selected: str):
+        if not selected or selected not in presets_list:
+            selected = presets_list[0]
+
+        if selected == "custom":
+            # Allow editing + regex toggle
+            show_layer_entry()
+            layer_entry.configure(state="normal", fg_color=layer_entry_fg_color, text_color=layer_entry_text_color)
+            #layer_entry.cget('textvariable').set("")
+            regex_label.grid()
+            regex_switch.grid()
+        else:
+            # Preserve custom text before overwriting
+            #if self.prior_selected == "custom":
+            #    self.prior_custom = self.layer_entry.get()
+
+            # Resolve preset definition (list[str] OR {'patterns': [...], 'regex': bool})
+            preset_def = presets.get(selected, [])
+            if isinstance(preset_def, dict):
+                patterns = preset_def.get("patterns", [])
+                preset_uses_regex = bool(preset_def.get("regex", False))
+            else:
+                patterns = preset_def
+                preset_uses_regex = False
+
+            disabled_color = ("gray85", "gray17")
+            disabled_text_color = ("gray30", "gray70")
+            layer_entry.configure(state="disabled", fg_color=disabled_color, text_color=disabled_text_color)
+            layer_entry.cget('textvariable').set(",".join(patterns))
+
+            ui_state.get_var(entry_var_name).set(",".join(patterns))
+            ui_state.get_var(regex_var_name).set(preset_uses_regex)
+
+            regex_label.grid_remove()
+            regex_switch.grid_remove()
+
+            if selected == "full" and not patterns:
+                hide_layer_entry()
+            else:
+                show_layer_entry()
+
+#        self.prior_selected = selected
+
+    label(frame, 0, 0, preset_label,
+                     tooltip=preset_tooltip)
+
+
+    ui_state.remove_all_var_traces(preset_var_name)
+
+    layer_selector = options(
+        frame, 0, 1, presets_list, ui_state, preset_var_name,
+        command=preset_set_layer_choice
+    )
+
+    def on_layer_filter_preset_change():
+        if not layer_selector:
+            return
+        selected = ui_state.get_var(preset_var_name).get()
+        preset_set_layer_choice(selected)
+
+    ui_state.add_var_trace(
+        preset_var_name,
+        on_layer_filter_preset_change,
+    )
+
+    preset_set_layer_choice(layer_selector.get())
 
 def icon_button(master, row, column, text, command):
     component = ctk.CTkButton(master, text=text, width=40, command=command)

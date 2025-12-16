@@ -888,6 +888,7 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
             trainer.start()
             if self.train_config.cloud.enabled:
                 self.ui_state.get_var("secrets.cloud").update(self.train_config.secrets.cloud)
+
             self.start_time = time.monotonic()
             trainer.train()
         except Exception:
