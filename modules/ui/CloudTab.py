@@ -66,7 +66,7 @@ class CloudTab:
 
         components.label(self.frame, 7, 0, "SSH keyfile path",
                  tooltip="Absolute path to the private key file used for SSH connections. Leave empty to rely on your system SSH configuration.")
-        components.file_entry(self.frame, 7, 1, self.ui_state, "secrets.cloud.key_file") #TODO Replace with path_entry in a future PR
+        components.path_entry(self.frame, 7, 1, self.ui_state, "secrets.cloud.key_file")
 
         components.label(self.frame, 8, 0, "SSH password",
                          tooltip="SSH password for password-based authentication. If you try to use native SCP requires sshpass to be installed. Leave empty to use key-based authentication.")
