@@ -94,6 +94,6 @@ class ModelSetupDebugMixin(metaclass=ABCMeta):
         directory = config.debug_dir + "/training_batches"
         self._save_image(self._project_latent_to_image(latent), directory, name, train_progress.global_step)
 
-    def _save_tokens(self, name, tokens: Tensor, tokenizer, config: TrainConfig, train_progress: TrainProgress):
+    def _save_tokens(self, name: str, tokens: Tensor, tokenizer, config: TrainConfig, train_progress: TrainProgress):
         directory = config.debug_dir + "/training_batches"
         self._save_text(self._decode_tokens(tokens, tokenizer), directory, name, train_progress.global_step)
