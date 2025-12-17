@@ -25,13 +25,6 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
-PRESETS = {
-    "attn-mlp": ["attn", "ff.net"],
-    "attn-only": ["attn"],
-    "blocks": ["transformer_block"],
-    "full": [],
-}
-
 
 class BaseHunyuanVideoSetup(
     BaseModelSetup,
@@ -42,6 +35,12 @@ class BaseHunyuanVideoSetup(
     ModelSetupEmbeddingMixin,
     metaclass=ABCMeta
 ):
+    LAYER_PRESETS = {
+        "attn-mlp": ["attn", "ff.net"],
+        "attn-only": ["attn"],
+        "blocks": ["transformer_block"],
+        "full": [],
+    }
 
     def setup_optimizations(
             self,

@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 from modules.model.FluxModel import FluxModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
@@ -450,3 +451,6 @@ class FluxSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
+
+factory.register(BaseModelSampler, FluxSampler, ModelType.FLUX_DEV_1)
+factory.register(BaseModelSampler, FluxSampler, ModelType.FLUX_FILL_DEV_1)

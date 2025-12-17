@@ -1,17 +1,6 @@
 from pathlib import Path
 
-from modules.modelSetup.BaseChromaSetup import PRESETS as chroma_presets
-from modules.modelSetup.BaseFluxSetup import PRESETS as flux_presets
-from modules.modelSetup.BaseHiDreamSetup import PRESETS as hidream_presets
-from modules.modelSetup.BaseHunyuanVideoSetup import PRESETS as hunyuan_video_presets
-from modules.modelSetup.BasePixArtAlphaSetup import PRESETS as pixart_presets
-from modules.modelSetup.BaseQwenSetup import PRESETS as qwen_presets
-from modules.modelSetup.BaseSanaSetup import PRESETS as sana_presets
-from modules.modelSetup.BaseStableDiffusion3Setup import PRESETS as sd3_presets
-from modules.modelSetup.BaseStableDiffusionSetup import PRESETS as sd_presets
-from modules.modelSetup.BaseStableDiffusionXLSetup import PRESETS as sdxl_presets
-from modules.modelSetup.BaseWuerstchenSetup import PRESETS as sc_presets
-from modules.modelSetup.BaseZImageSetup import PRESETS as z_image_presets
+from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
@@ -431,33 +420,8 @@ class ModelTab:
 
             row += 1
 
-        presets = []
-        if self.train_config.model_type.is_stable_diffusion(): #TODO simplify and de-duplicate with layer filter on training tab
-            presets = sd_presets
-        elif self.train_config.model_type.is_stable_diffusion_xl():
-            presets = sdxl_presets
-        elif self.train_config.model_type.is_stable_diffusion_3():
-            presets = sd3_presets
-        elif self.train_config.model_type.is_wuerstchen():
-            presets = sc_presets
-        elif self.train_config.model_type.is_pixart():
-            presets = pixart_presets
-        elif self.train_config.model_type.is_flux():
-            presets = flux_presets
-        elif self.train_config.model_type.is_qwen():
-            presets = qwen_presets
-        elif self.train_config.model_type.is_chroma():
-            presets = chroma_presets
-        elif self.train_config.model_type.is_sana():
-            presets = sana_presets
-        elif self.train_config.model_type.is_hunyuan_video():
-            presets = hunyuan_video_presets
-        elif self.train_config.model_type.is_z_image():
-            presets = z_image_presets
-        elif self.train_config.model_type.is_hi_dream():
-            presets = hidream_presets
-        else:
-            presets = {"full": []}
+        cls = create.get_model_setup_class(self.train_config.model_type, self.train_config.training_method)
+        presets = cls.LAYER_PRESETS if cls is not None else {"full": []}
 
         components.label(frame, row, 0, "Quantization")
         components.layer_filter_entry(frame, row, 1, self.ui_state,
