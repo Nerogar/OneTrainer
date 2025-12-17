@@ -120,12 +120,6 @@ def create_data_loader(
         cls = factory.get(BaseDataLoader, model_type)
     return cls(train_device, temp_device, config, model, train_progress, is_validation) if cls is not None else None
 
-
-def get_layer_presets(
-    model_type: ModelType,
-) -> dict:
-    return factory.get("layer_preset", model_type)
-
 def create_optimizer(
         parameter_group_collection: NamedParameterGroupCollection,
         state_dict: dict | None,
