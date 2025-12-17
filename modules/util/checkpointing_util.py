@@ -365,6 +365,8 @@ def enable_checkpointing_for_z_image_transformer(
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, config.compile, [
         (model.layers, ["x"]),
+        (model.noise_refiner, ["x"]),
+        (model.context_refiner, ["x"]),
     ])
 
 
