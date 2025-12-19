@@ -1,6 +1,10 @@
 from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
@@ -107,3 +111,12 @@ class StableDiffusionFineTuneVaeSetup(
             train_progress: TrainProgress
     ):
         pass
+
+factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE_VAE)

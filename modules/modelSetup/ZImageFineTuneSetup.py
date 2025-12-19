@@ -1,6 +1,10 @@
 from modules.model.ZImageModel import ZImageModel
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseZImageSetup import BaseZImageSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
@@ -80,3 +84,5 @@ class ZImageFineTuneSetup(
             train_progress: TrainProgress
     ):
         self.__setup_requires_grad(model, config)
+
+factory.register(BaseModelSetup, ZImageFineTuneSetup, ModelType.Z_IMAGE, TrainingMethod.FINE_TUNE)

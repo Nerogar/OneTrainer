@@ -1,6 +1,10 @@
 from modules.model.WuerstchenModel import WuerstchenModel
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
@@ -100,3 +104,6 @@ class WuerstchenEmbeddingSetup(
             self._normalize_output_embeddings(model.all_prior_text_encoder_embeddings())
             model.prior_embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
+
+factory.register(BaseModelSetup, WuerstchenEmbeddingSetup, ModelType.WUERSTCHEN_2, TrainingMethod.EMBEDDING)
+factory.register(BaseModelSetup, WuerstchenEmbeddingSetup, ModelType.STABLE_CASCADE_1, TrainingMethod.EMBEDDING)

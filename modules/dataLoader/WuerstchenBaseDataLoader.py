@@ -5,7 +5,9 @@ from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
 from modules.dataLoader.wuerstchen.EncodeWuerstchenEffnet import EncodeWuerstchenEffnet
 from modules.model.WuerstchenModel import WuerstchenModel
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
@@ -237,3 +239,6 @@ class WuerstchenBaseDataLoader(
             train_progress,
             is_validation,
         )
+
+factory.register(BaseDataLoader, WuerstchenBaseDataLoader, ModelType.WUERSTCHEN_2)
+factory.register(BaseDataLoader, WuerstchenBaseDataLoader, ModelType.STABLE_CASCADE_1)

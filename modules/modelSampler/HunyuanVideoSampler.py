@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
@@ -205,3 +206,5 @@ class HunyuanVideoSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
+
+factory.register(BaseModelSampler, HunyuanVideoSampler, ModelType.HUNYUAN_VIDEO)

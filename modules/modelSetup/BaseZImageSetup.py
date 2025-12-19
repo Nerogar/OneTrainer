@@ -22,12 +22,6 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
-PRESETS = {
-    "full": [],
-    "blocks": ["layers"],
-    "attn-mlp": {'patterns': ["^(?=.*attention)(?!.*refiner).*", "^(?=.*feed_forward)(?!.*refiner).*"], 'regex': True},
-    "attn-only": {'patterns': ["^(?=.*attention)(?!.*refiner).*"], 'regex': True},
-}
 
 class BaseZImageSetup(
     BaseModelSetup,
@@ -38,6 +32,12 @@ class BaseZImageSetup(
     ModelSetupEmbeddingMixin,
     metaclass=ABCMeta
 ):
+    LAYER_PRESETS = {
+        "full": [],
+        "blocks": ["layers"],
+        "attn-mlp": {'patterns': ["^(?=.*attention)(?!.*refiner).*", "^(?=.*feed_forward)(?!.*refiner).*"], 'regex': True},
+        "attn-only": {'patterns': ["^(?=.*attention)(?!.*refiner).*"], 'regex': True},
+    }
 
     def setup_optimizations(
             self,

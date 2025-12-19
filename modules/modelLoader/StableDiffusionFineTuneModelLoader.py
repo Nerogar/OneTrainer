@@ -3,6 +3,7 @@ from modules.modelLoader.GenericFineTuneModelLoader import make_fine_tune_model_
 from modules.modelLoader.stableDiffusion.StableDiffusionEmbeddingLoader import StableDiffusionEmbeddingLoader
 from modules.modelLoader.stableDiffusion.StableDiffusionModelLoader import StableDiffusionModelLoader
 from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 
 StableDiffusionFineTuneModelLoader = make_fine_tune_model_loader(
     model_spec_map={
@@ -18,4 +19,5 @@ StableDiffusionFineTuneModelLoader = make_fine_tune_model_loader(
     model_class=StableDiffusionModel,
     model_loader_class=StableDiffusionModelLoader,
     embedding_loader_class=StableDiffusionEmbeddingLoader,
+    training_methods=[TrainingMethod.FINE_TUNE, TrainingMethod.FINE_TUNE_VAE],
 )

@@ -2,11 +2,13 @@ from collections.abc import Callable
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.enum.VideoFormat import VideoFormat
 
 import torch
@@ -76,3 +78,12 @@ class StableDiffusionVaeSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
+
+factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE_VAE)

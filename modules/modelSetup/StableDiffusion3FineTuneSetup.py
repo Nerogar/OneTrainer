@@ -1,6 +1,10 @@
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseStableDiffusion3Setup import BaseStableDiffusion3Setup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
@@ -161,3 +165,6 @@ class StableDiffusion3FineTuneSetup(
             if model.embedding_wrapper_3 is not None:
                 model.embedding_wrapper_3.normalize_embeddings()
         self.__setup_requires_grad(model, config)
+
+factory.register(BaseModelSetup, StableDiffusion3FineTuneSetup, ModelType.STABLE_DIFFUSION_3, TrainingMethod.FINE_TUNE)
+factory.register(BaseModelSetup, StableDiffusion3FineTuneSetup, ModelType.STABLE_DIFFUSION_35, TrainingMethod.FINE_TUNE)

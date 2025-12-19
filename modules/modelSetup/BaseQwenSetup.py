@@ -22,13 +22,6 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
-PRESETS = {
-    "attn-mlp": ["attn", "img_mlp", "txt_mlp"],
-    "attn-only": ["attn"],
-    "blocks": ["transformer_block"],
-    "full": [],
-}
-
 
 #TODO share more code with other models
 class BaseQwenSetup(
@@ -39,6 +32,12 @@ class BaseQwenSetup(
     ModelSetupFlowMatchingMixin,
     metaclass=ABCMeta
 ):
+    LAYER_PRESETS = {
+        "attn-mlp": ["attn", "img_mlp", "txt_mlp"],
+        "attn-only": ["attn"],
+        "blocks": ["transformer_block"],
+        "full": [],
+    }
 
     def setup_optimizations(
             self,

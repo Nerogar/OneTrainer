@@ -1,6 +1,10 @@
 from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
@@ -117,3 +121,12 @@ class StableDiffusionFineTuneSetup(
             self._normalize_output_embeddings(model.all_text_encoder_embeddings())
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
+
+factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE)
+factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE)
+factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE)
+factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE)
+factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE)
+factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE)
+factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE)
+factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE)
