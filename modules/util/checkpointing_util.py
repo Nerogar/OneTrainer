@@ -120,10 +120,9 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
 
         self.conductor.after_layer(self.layer_index, call_id, args)
 
-        #TODO how can this be the case? Is there a backward that does not produce gradients wrt to any of its inputs?
-        #despite many tests, this assert was never triggered
-        assert not (torch.is_grad_enabled() and not has_grad_fn(output))
-        # make sure at least one of the output tensors has a grad_fn so the output of the checkpoint has a grad_fn
+        # make sure at least one of the output tensors has a grad_fn so the output of the checkpoint has a grad_fn.
+        # this can only happen if a checkpointed block has no trainable parameters, because of a layer filter
+        # was used. Adding a dummy grad function is a workaround required by use_reentrant==True checkpointing:
         if torch.is_grad_enabled() and not has_grad_fn(output):
             output = add_dummy_grad_fn_(output)
 
@@ -216,7 +215,7 @@ def enable_checkpointing(
         model: nn.Module,
         config: TrainConfig,
         compile: bool,
-        lists,
+        lists, # if there are multiple entries in this list, they must be in the exact order they are executed - otherwise offloading fails
         offload_enabled: bool = True,
 ) -> LayerOffloadConductor:
     conductor = LayerOffloadConductor(model, config)
@@ -364,9 +363,9 @@ def enable_checkpointing_for_z_image_transformer(
         config: TrainConfig,
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, config.compile, [
-        (model.layers, ["x"]),
         (model.noise_refiner, ["x"]),
         (model.context_refiner, ["x"]),
+        (model.layers, ["x"]),
     ])
 
 
