@@ -294,8 +294,8 @@ class BaseFluxSetup(
                 guidance=guidance.to(dtype=model.train_dtype.torch_dtype()),
                 pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                 encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                txt_ids=text_ids.to,
-                img_ids=image_ids.to,
+                txt_ids=text_ids,
+                img_ids=image_ids,
                 joint_attention_kwargs=None,
                 return_dict=True
             ).sample
