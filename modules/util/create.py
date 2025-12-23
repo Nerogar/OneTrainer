@@ -472,6 +472,7 @@ def create_data_loader(
         temp_device: torch.device,
         model: BaseModel,
         model_type: ModelType,
+        model_setup: BaseModelSetup,
         training_method: TrainingMethod = TrainingMethod.FINE_TUNE,
         config: TrainConfig = None,
         train_progress: TrainProgress | None = None,
@@ -486,32 +487,32 @@ def create_data_loader(
     match training_method:
         case TrainingMethod.FINE_TUNE | TrainingMethod.LORA | TrainingMethod.EMBEDDING:
             if model_type.is_stable_diffusion():
-                return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+                return StableDiffusionBaseDataLoader(train_device, temp_device, config, model, model_setup, train_progress, is_validation)
             if model_type.is_stable_diffusion_xl():
-                return StableDiffusionXLBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+                return StableDiffusionXLBaseDataLoader(train_device, temp_device, config, model, model_setup, train_progress, is_validation)
             if model_type.is_wuerstchen():
-                return WuerstchenBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+                return WuerstchenBaseDataLoader(train_device, temp_device, config, model, model_setup, train_progress, is_validation)
             if model_type.is_pixart():
-                return PixArtAlphaBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+                return PixArtAlphaBaseDataLoader(train_device, temp_device, config, model, model_setup, train_progress, is_validation)
             if model_type.is_stable_diffusion_3():
-                return StableDiffusion3BaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+                return StableDiffusion3BaseDataLoader(train_device, temp_device, config, model, model_setup, train_progress, is_validation)
             if model_type.is_flux():
-                return FluxBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+                return FluxBaseDataLoader(train_device, temp_device, config, model, model_setup, train_progress, is_validation)
             if model_type.is_chroma():
-                return ChromaBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+                return ChromaBaseDataLoader(train_device, temp_device, config, model, model_setup, train_progress, is_validation)
             if model_type.is_qwen():
-                return QwenBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+                return QwenBaseDataLoader(train_device, temp_device, config, model, model_setup, train_progress, is_validation)
             if model_type.is_z_image():
-                return ZImageBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+                return ZImageBaseDataLoader(train_device, temp_device, config, model, model_setup, train_progress, is_validation)
             if model_type.is_sana():
-                return SanaBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+                return SanaBaseDataLoader(train_device, temp_device, config, model, model_setup, train_progress, is_validation)
             if model_type.is_hunyuan_video():
-                return HunyuanVideoBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+                return HunyuanVideoBaseDataLoader(train_device, temp_device, config, model, model_setup, train_progress, is_validation)
             if model_type.is_hi_dream():
-                return HiDreamBaseDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+                return HiDreamBaseDataLoader(train_device, temp_device, config, model, model_setup, train_progress, is_validation)
         case TrainingMethod.FINE_TUNE_VAE:
             if model_type.is_stable_diffusion():
-                return StableDiffusionFineTuneVaeDataLoader(train_device, temp_device, config, model, train_progress, is_validation)
+                return StableDiffusionFineTuneVaeDataLoader(train_device, temp_device, config, model, model_setup, train_progress, is_validation)
 
     return None
 

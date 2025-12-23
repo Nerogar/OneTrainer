@@ -872,6 +872,12 @@ class TrainConfig(BaseConfig):
             or ((self.text_encoder_4.train_embedding or not self.model_type.has_multiple_text_encoders())
                 and self.train_any_embedding())
 
+    def train_any_text_encoder_or_embedding(self) -> bool:
+        return (self.train_text_encoder_or_embedding()
+                or self.train_text_encoder_2_or_embedding()
+                or self.train_text_encoder_3_or_embedding()
+                or self.train_text_encoder_4_or_embedding())
+
     def all_embedding_configs(self):
         if self.training_method == TrainingMethod.EMBEDDING:
             return self.additional_embeddings + [self.embedding]
