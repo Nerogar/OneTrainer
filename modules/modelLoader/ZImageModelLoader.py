@@ -8,6 +8,7 @@ from modules.modelLoader.GenericLoRAModelLoader import make_lora_model_loader
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.modelLoader.mixin.LoRALoaderMixin import LoRALoaderMixin
 from modules.util.config.TrainConfig import QuantizationConfig
+from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -24,8 +25,6 @@ from transformers import (
     Qwen2Tokenizer,
     Qwen3ForCausalLM,
 )
-
-from omi_model_standards.convert.lora.convert_lora_util import LoraConversionKeySet
 
 
 class ZImageModelLoader(
