@@ -288,15 +288,14 @@ class BaseFluxSetup(
             )
 
             packed_latent_input = model.pack_latents(latent_input)
-
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
                 timestep=timestep / 1000,
                 guidance=guidance.to(dtype=model.train_dtype.torch_dtype()),
                 pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                 encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                txt_ids=text_ids.to(dtype=model.train_dtype.torch_dtype()),
-                img_ids=image_ids.to(dtype=model.train_dtype.torch_dtype()),
+                txt_ids=text_ids,
+                img_ids=image_ids,
                 joint_attention_kwargs=None,
                 return_dict=True
             ).sample
