@@ -274,7 +274,10 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
     ):
         if before_cache_image_fun is None:
             def prepare_vae():
-                model_setup.prepare_vae(model)
+                model.to(self.temp_device)
+                model.vae_to(self.train_device)
+                model.eval()
+                torch_gc()
             before_cache_image_fun = prepare_vae
 
         sort_names = output_names + ['concept']
