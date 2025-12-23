@@ -131,8 +131,8 @@ class FluxSampler(BaseModelSampler):
                     guidance=guidance.to(dtype=self.model.train_dtype.torch_dtype()),
                     pooled_projections=pooled_prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
                     encoder_hidden_states=prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
-                    txt_ids=text_ids.to(dtype=self.model.train_dtype.torch_dtype()),
-                    img_ids=image_ids.to(dtype=self.model.train_dtype.torch_dtype()),
+                    txt_ids=text_ids,
+                    img_ids=image_ids,
                     joint_attention_kwargs=None,
                     return_dict=True
                 ).sample
