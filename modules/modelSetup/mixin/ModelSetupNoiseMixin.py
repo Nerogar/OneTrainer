@@ -5,6 +5,7 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 
 import torch
+import torch.distributions
 from torch import Generator, Tensor
 
 
@@ -145,7 +146,8 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             if config.timestep_distribution in [
                 TimestepDistribution.UNIFORM,
                 TimestepDistribution.LOGIT_NORMAL,
-                TimestepDistribution.HEAVY_TAIL
+                TimestepDistribution.HEAVY_TAIL,
+                TimestepDistribution.BETA
             ]:
                 # continuous implementations
                 if config.timestep_distribution == TimestepDistribution.UNIFORM:
@@ -167,6 +169,26 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                         device=generator.device,
                     )
                     u = 1.0 - u - scale * (torch.cos(math.pi / 2.0 * u) ** 2.0 - 1.0 + u)
+                    timestep = u * num_timestep + min_timestep
+                elif config.timestep_distribution == TimestepDistribution.BETA:
+                    # B-TTDM uses Beta distribution.
+                    # Config mapping:
+                    # Noising Weight -> Alpha (Paper recommends < 1, e.g., 0.6 to 0.8)
+                    # Noising Bias   -> Beta  (Paper recommends 1)
+
+                    # Ensure parameters are positive to prevent crashing (Beta requirement > 0)
+                    alpha = max(0.0001, config.noising_weight)
+                    beta = max(0.0001, config.noising_bias)
+
+                    # Initialize Beta distribution
+                    m = torch.distributions.Beta(
+                        torch.tensor(alpha, device=generator.device),
+                        torch.tensor(beta, device=generator.device)
+                    )
+
+                    # Sample u from [0, 1]
+                    u = m.sample((batch_size,))
+                    
                     timestep = u * num_timestep + min_timestep
 
                 timestep = num_train_timesteps * shift * timestep / ((shift - 1) * timestep + num_train_timesteps)
