@@ -27,9 +27,6 @@ sentencepiece==0.2.1 # transitive dependency of transformers for tokenizer loadi
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
 
-# model conversion
--e git+https://github.com/Open-Model-Initiative/OMI-Model-Standards.git@f14b1da#egg=omi_model_standards
-
 # other models
 pooch==1.8.2
 open-clip-torch==2.32.0
