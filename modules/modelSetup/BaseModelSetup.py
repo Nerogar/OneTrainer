@@ -244,7 +244,7 @@ class BaseModelSetup(
                 component.set_attention_backend("native")
             case AttentionMechanism.FLASH:
                 if mask or varlen:
-                    raise NotImplementedError("FLASH attention cannot be used with this model")
+                    print("Warning: FLASH attention might fail for this model, depending on other configuration (batch size > 1, etc.)")
                 component.set_attention_backend("flash")
             case _:
                 raise NotImplementedError(f"attention mechanism {str(attn)} not implemented")
