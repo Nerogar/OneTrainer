@@ -7,6 +7,9 @@
 debug*.ipynb
 debug*.py
 /debug*
+profile.json
+profile.html
+stacks.txt
 
 # user data
 /workspace*
