@@ -20,7 +20,7 @@ pytorch-lightning==2.5.1.post0
 
 # diffusion models
 #Note: check whether Qwen bugs in diffusers have been fixed before upgrading diffusers (see BaseQwenSetup):
--e git+https://github.com/huggingface/diffusers.git@256e010#egg=diffusers
+-e git+https://github.com/huggingface/diffusers.git@check_attn_mask#egg=diffusers
 gguf==0.17.1
 transformers==4.56.2
 sentencepiece==0.2.1 # transitive dependency of transformers for tokenizer loading
