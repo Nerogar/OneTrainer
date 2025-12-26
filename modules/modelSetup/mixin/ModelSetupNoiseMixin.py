@@ -171,25 +171,44 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                     u = 1.0 - u - scale * (torch.cos(math.pi / 2.0 * u) ** 2.0 - 1.0 + u)
                     timestep = u * num_timestep + min_timestep
                 elif config.timestep_distribution == TimestepDistribution.BETA:
-                    # B-TTDM uses Beta distribution.
-                    # Config mapping:
-                    # Noising Weight -> Alpha (Paper recommends < 1, e.g., 0.6 to 0.8)
-                    # Noising Bias   -> Beta  (Paper recommends 1)
+                    # B-TTDM Configuration
+                    # Noising Weight -> Alpha
+                    # Noising Bias   -> Beta
+                    alpha = max(1e-4, config.noising_weight)
+                    beta = max(1e-4, config.noising_bias)
 
-                    # Ensure parameters are positive to prevent crashing (Beta requirement > 0)
-                    alpha = max(0.0001, config.noising_weight)
-                    beta = max(0.0001, config.noising_bias)
+                    # B-TTDM Paper optimization (Section 3.3):
+                    # They strictly recommend Beta=1 and Alpha < 1.
+                    # When Beta=1, we can use Inverse Transform Sampling (CDF inversion)
+                    # which allows us to use torch.rand with the generator
+                    # CDF^(-1)(u) = u^(1/alpha)
+                    if abs(beta - 1.0) < 1e-5:
+                        u = torch.rand(batch_size, generator=generator, device=generator.device)
+                        u = u.pow(1.0 / alpha)
+                        timestep = u * num_timestep + min_timestep
 
-                    # Initialize Beta distribution
-                    m = torch.distributions.Beta(
-                        torch.tensor(alpha, device=generator.device),
-                        torch.tensor(beta, device=generator.device)
-                    )
+                    # Inverse case: Alpha=1, Beta != 1
+                    # x = 1 - u^(1/beta)
+                    elif abs(alpha - 1.0) < 1e-5:
+                        u = torch.rand(
+                            batch_size,
+                            generator=generator,
+                            device=generator.device)
+                        u = 1.0 - u.pow(1.0 / beta)
+                        timestep = u * num_timestep + min_timestep
 
-                    # Sample u from [0, 1]
-                    u = m.sample((batch_size,))
-                    
-                    timestep = u * num_timestep + min_timestep
+                    else:
+                        # Fallback for arbitrary Beta values (Beta != 1 and Alpha != 1).
+                        # PyTorch's Beta distribution does not accept a generator directly.
+                        # This path is mathematically correct for distribution shape, but
+                        # technically bypasses the generator seed (uses global device seed).
+                        # Since B-TTDM requires Beta=1, this path is rarely taken for this specific paper.
+                        m = torch.distributions.Beta(
+                            torch.tensor(alpha, device=generator.device),
+                            torch.tensor(beta, device=generator.device)
+                        )
+                        u = m.sample((batch_size,))
+                        timestep = u * num_timestep + min_timestep
 
                 timestep = num_train_timesteps * shift * timestep / ((shift - 1) * timestep + num_train_timesteps)
             else:
