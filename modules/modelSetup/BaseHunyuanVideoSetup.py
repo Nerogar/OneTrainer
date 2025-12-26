@@ -91,6 +91,8 @@ class BaseHunyuanVideoSetup(
         quantize_layers(model.transformer, self.train_device, model.transformer_train_dtype, config)
 
         model.vae.enable_tiling()
+        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=True)
+
 
     def _setup_embeddings(
             self,
