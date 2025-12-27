@@ -203,6 +203,10 @@ class BaseChromaSetup(
                 config,
             )
 
+            # E-TSDM: Map the timestep for U-Net conditioning only. 
+            # The physical noise addition and loss target remain based on the original 'timestep'.
+            model_timestep = self._apply_etsdm_timestep_mapping(timestep, config)
+
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(
                 scaled_latent_image,
                 latent_noise,
@@ -231,7 +235,7 @@ class BaseChromaSetup(
 
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
-                timestep=timestep / 1000,
+                timestep=model_timestep / 1000,
                 encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                 txt_ids=text_ids.to(dtype=model.train_dtype.torch_dtype()),
                 img_ids=image_ids.to(dtype=model.train_dtype.torch_dtype()),

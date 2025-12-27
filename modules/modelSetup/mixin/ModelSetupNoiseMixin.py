@@ -119,6 +119,32 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
 
         return noise
 
+    def _apply_etsdm_timestep_mapping(self, timestep: Tensor, config: TrainConfig) -> Tensor:
+        """
+        Applies Early Timestep-shared Diffusion Model (E-TSDM) logic.
+        Paper: Lipschitz Singularities in Diffusion Models (ICLR 2024)
+
+        Maps timesteps < t_tilde to shared values within n sub-intervals.
+        """
+        if not getattr(config, 'etsdm_enabled', True):
+            return timestep
+
+        # Paper defaults: t_tilde=100, n=5 (for T=1000)
+        t_tilde = getattr(config, 'etsdm_t_tilde', 100)
+        n = getattr(config, 'etsdm_n', 5)
+
+        interval_size = t_tilde // n
+
+        # Create mask for steps within the "early" region [0, t_tilde)
+        mask = timestep < t_tilde
+
+        # Calculate shared timestep: floor(t / interval) * interval
+        # This maps [0, 19] -> 0, [20, 39] -> 20, etc.
+        mapped_timestep = (timestep // interval_size) * interval_size
+
+        # Apply mapping only where mask is True
+        return torch.where(mask, mapped_timestep, timestep)
+
     def _get_timestep_discrete(
             self,
             num_train_timesteps: int,

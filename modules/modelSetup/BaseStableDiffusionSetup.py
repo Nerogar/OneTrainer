@@ -181,6 +181,10 @@ class BaseStableDiffusionSetup(
                 config,
             )
 
+            # E-TSDM: Map the timestep for U-Net conditioning only. 
+            # The physical noise addition and loss target remain based on the original 'timestep'.
+            model_timestep = self._apply_etsdm_timestep_mapping(timestep, config)
+
             latent_noise = self._create_noise(
                 scaled_latent_image,
                 config,
@@ -206,14 +210,14 @@ class BaseStableDiffusionSetup(
             if config.model_type.has_depth_input():
                 predicted_latent_noise = model.unet(
                     latent_input.to(dtype=model.train_dtype.torch_dtype()),
-                    timestep,
+                    model_timestep,
                     text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                     batch['latent_depth'].to(dtype=model.train_dtype.torch_dtype()),
                 ).sample
             else:
                 predicted_latent_noise = model.unet(
                     latent_input.to(dtype=model.train_dtype.torch_dtype()),
-                    timestep,
+                    model_timestep,
                     text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                 ).sample
 

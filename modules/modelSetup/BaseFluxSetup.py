@@ -287,10 +287,14 @@ class BaseFluxSetup(
                 model.train_dtype.torch_dtype()
             )
 
+            # E-TSDM: Map the timestep for U-Net conditioning only. 
+            # The physical noise addition and loss target remain based on the original 'timestep'.
+            model_timestep = self._apply_etsdm_timestep_mapping(timestep, config)
+
             packed_latent_input = model.pack_latents(latent_input)
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
-                timestep=timestep / 1000,
+                timestep=model_timestep / 1000,
                 guidance=guidance.to(dtype=model.train_dtype.torch_dtype()),
                 pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                 encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
