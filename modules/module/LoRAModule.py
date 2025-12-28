@@ -685,7 +685,7 @@ class LoRAModuleWrapper:
             print("\n".join(summary_lines))
 
         # Apply scaling based on max block size
-        if self.peft_type == PeftType.OFT_2:
+        if self.peft_type == PeftType.OFT_2 and config.oft_sqrt_scaling:
             oft_modules = [m for m in lora_modules.values() if isinstance(m, OFTModule)]
             if oft_modules:
                 # Find the largest block size used in the network
