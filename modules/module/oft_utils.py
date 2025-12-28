@@ -146,10 +146,7 @@ class OFTRotationModule(nn.Module):
                 self.weight.copy_(self._project_batch(self.weight, coft_eps=self.coft_eps))
 
         # Apply scaling to the weight (Q matrix) before Cayley transform
-        if scale != 1.0:
-            effective_weight = self.weight * scale
-        else:
-            effective_weight = self.weight
+        effective_weight = self.weight * scale if scale != 1.0 else self.weight
 
         orth_rotate = self._cayley_batch(
             effective_weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms
