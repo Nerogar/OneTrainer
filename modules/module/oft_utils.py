@@ -134,7 +134,7 @@ class OFTRotationModule(nn.Module):
 
         return self._pytorch_skew_symmetric_inv(out, self.block_size)
 
-    def forward(self, x):
+    def forward(self, x, scale: float = 1.0):
         required_dtype = x.dtype
         if required_dtype != self.weight.dtype:
             x = x.to(self.weight.dtype)
@@ -145,8 +145,14 @@ class OFTRotationModule(nn.Module):
             with torch.no_grad():
                 self.weight.copy_(self._project_batch(self.weight, coft_eps=self.coft_eps))
 
+        # Apply scaling to the weight (Q matrix) before Cayley transform
+        if scale != 1.0:
+            effective_weight = self.weight * scale
+        else:
+            effective_weight = self.weight
+
         orth_rotate = self._cayley_batch(
-            self.weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms
+            effective_weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms
         )
         orth_rotate = self.dropout(orth_rotate)
 

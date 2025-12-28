@@ -346,6 +346,7 @@ class OFTModule(PeftBase):
     block_share: bool
     dropout_probability: float
     adjustment_info: tuple[int, int] | None # for reporting
+    oft_scale: float
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, coft: bool, coft_eps: float, block_share: bool, **kwargs):
         super().__init__(prefix, orig_module)
@@ -357,6 +358,7 @@ class OFTModule(PeftBase):
         self.dropout_probability = kwargs.pop('dropout_probability', 0.0)
         self.oft_R = None
         self.adjustment_info = None
+        self.oft_scale = 1.0
 
 
         if orig_module is not None:
@@ -433,12 +435,19 @@ class OFTModule(PeftBase):
 
         # For Linear layers, rotating the input is mathematically equivalent to rotating the weights.
         if isinstance(self.orig_module, nn.Linear):
-            rotated_x = self.oft_R(x)
+            rotated_x = self.oft_R(x, scale=self.oft_scale)
             return self.orig_forward(rotated_x, *args, **kwargs)
 
         # For Conv2d, we must rotate the weights, not the input, to preserve spatial information.
+
+        # Apply Scale
+        if self.oft_scale != 1.0:
+            effective_weight = self.oft_R.weight * self.oft_scale
+        else:
+            effective_weight = self.oft_R.weight
+
         orth_rotate = self.oft_R._cayley_batch(
-            self.oft_R.weight, self.oft_R.block_size, self.oft_R.use_cayley_neumann, self.oft_R.num_cayley_neumann_terms
+            effective_weight, self.oft_R.block_size, self.oft_R.use_cayley_neumann, self.oft_R.num_cayley_neumann_terms
         )
         orth_rotate = self.oft_R.dropout(orth_rotate)
 
@@ -674,6 +683,22 @@ class LoRAModuleWrapper:
             ]
             print(f"OFT Block Size automatically adjusted for {len(oft_adjustments)} layers. Changes:")
             print("\n".join(summary_lines))
+
+        # Apply scaling based on max block size
+        if self.peft_type == PeftType.OFT_2:
+            oft_modules = [m for m in lora_modules.values() if isinstance(m, OFTModule)]
+            if oft_modules:
+                # Find the largest block size used in the network
+                max_block_size = max(m.oft_block_size for m in oft_modules)
+
+                print(f"OFT Scaling: Max Block Size is {max_block_size}. Adjusting scales for smaller blocks.")
+
+                for m in oft_modules:
+                    if m.oft_block_size < max_block_size:
+                        # Boost small blocks
+                        m.oft_scale = math.sqrt(max_block_size / m.oft_block_size)
+                    else:
+                        m.oft_scale = 1.0
 
         if len(self.module_filters) > 0:
             if config.debug_mode:
