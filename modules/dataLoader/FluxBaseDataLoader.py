@@ -3,8 +3,10 @@ import os
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.flux.ShuffleFluxFillMaskChannels import ShuffleFluxFillMaskChannels
 from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
+from modules.model.BaseModel import BaseModel
 from modules.model.FluxModel import FluxModel
 from modules.modelSetup.BaseFluxSetup import BaseFluxSetup
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
@@ -170,8 +172,8 @@ class FluxBaseDataLoader(
     def _create_dataset(
             self,
             config: TrainConfig,
-            model: FluxModel,
-            model_setup: BaseFluxSetup,
+            model: BaseModel,
+            model_setup: BaseModelSetup,
             train_progress: TrainProgress,
             is_validation: bool = False,
     ):
