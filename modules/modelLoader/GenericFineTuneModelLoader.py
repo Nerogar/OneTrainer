@@ -2,8 +2,10 @@ from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoaderMixin
 from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
+from modules.util import factory
 from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 
@@ -13,7 +15,11 @@ def make_fine_tune_model_loader(
     model_class: type[BaseModel],
     model_loader_class: type,
     embedding_loader_class: type | None,
+    training_methods: list[TrainingMethod] = None,
 ):
+    if training_methods is None:
+        training_methods = [TrainingMethod.FINE_TUNE]
+
     class GenericFineTuneModelLoader(
         BaseModelLoader,
         ModelSpecModelLoaderMixin,
@@ -50,4 +56,7 @@ def make_fine_tune_model_loader(
 
             return model
 
+    for model_type in model_spec_map:
+        for method in training_methods:
+            factory.register(BaseModelLoader, GenericFineTuneModelLoader, model_type, method)
     return GenericFineTuneModelLoader

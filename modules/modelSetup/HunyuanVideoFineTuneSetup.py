@@ -1,7 +1,10 @@
-
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
 from modules.modelSetup.BaseHunyuanVideoSetup import BaseHunyuanVideoSetup
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
@@ -135,3 +138,5 @@ class HunyuanVideoFineTuneSetup(
             if model.embedding_wrapper_2 is not None:
                 model.embedding_wrapper_2.normalize_embeddings()
         self.__setup_requires_grad(model, config)
+
+factory.register(BaseModelSetup, HunyuanVideoFineTuneSetup, ModelType.HUNYUAN_VIDEO, TrainingMethod.FINE_TUNE)

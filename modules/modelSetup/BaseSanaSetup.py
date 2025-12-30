@@ -19,17 +19,11 @@ from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.quantization_util import quantize_layers
+from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor
-
-PRESETS = {
-    "attn-mlp": ["attn1", "attn2", "ff."],
-    "attn-only": ["attn1", "attn2"],
-    "blocks": ["transformer_block"],
-    "full": [],
-}
 
 
 class BaseSanaSetup(
@@ -41,6 +35,12 @@ class BaseSanaSetup(
     ModelSetupEmbeddingMixin,
     metaclass=ABCMeta,
 ):
+    LAYER_PRESETS = {
+        "attn-mlp": ["attn1", "attn2", "ff."],
+        "attn-only": ["attn1", "attn2"],
+        "blocks": ["transformer_block"],
+        "full": [],
+    }
 
     def __init__(self, train_device: torch.device, temp_device: torch.device, debug_mode: bool):
         super().__init__(train_device, temp_device, debug_mode)
@@ -241,63 +241,14 @@ class BaseSanaSetup(
 
             if self.debug_mode:
                 with torch.no_grad():
-                    self._save_text(
-                        self._decode_tokens(batch['tokens'], model.tokenizer),
-                        config.debug_dir + "/training_batches",
-                        "7-prompt",
-                        train_progress.global_step,
-                    )
-
-                    # noise
-                    self._save_image(
-                        self._project_latent_to_image(latent_noise),
-                        config.debug_dir + "/training_batches",
-                        "1-noise",
-                        train_progress.global_step,
-                    )
-
-                    # noisy image
-                    self._save_image(
-                        self._project_latent_to_image(scaled_noisy_latent_image),
-                        config.debug_dir + "/training_batches",
-                        "2-noisy_image",
-                        train_progress.global_step,
-                    )
-
-                    # predicted flow
-                    self._save_image(
-                        self._project_latent_to_image(predicted_flow),
-                        config.debug_dir + "/training_batches",
-                        "3-predicted_flow",
-                        train_progress.global_step,
-                    )
-
-                    # flow
-                    flow = latent_noise - scaled_latent_image
-                    self._save_image(
-                        self._project_latent_to_image(flow),
-                        config.debug_dir + "/training_batches",
-                        "4-flow",
-                        train_progress.global_step,
-                    )
-
                     predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
-
-                    # predicted image
-                    self._save_image(
-                        self._project_latent_to_image(predicted_scaled_latent_image),
-                        config.debug_dir + "/training_batches",
-                        "5-predicted_image",
-                        train_progress.global_step,
-                    )
-
-                    # image
-                    self._save_image(
-                        self._project_latent_to_image(scaled_latent_image),
-                        config.debug_dir + "/training_batches",
-                        "6-image",
-                        model.train_progress.global_step,
-                    )
+                    self._save_tokens("7-prompt", batch['tokens'], model.tokenizer, config, train_progress)
+                    self._save_latent("1-noise", latent_noise, config, train_progress)
+                    self._save_latent("2-noisy_image", scaled_noisy_latent_image, config, train_progress)
+                    self._save_latent("3-predicted_flow", predicted_flow, config, train_progress)
+                    self._save_latent("4-flow", flow, config, train_progress)
+                    self._save_latent("5-predicted_image", predicted_scaled_latent_image, config, train_progress)
+                    self._save_latent("6-image", scaled_latent_image, config, train_progress)
 
         return model_output_data
 
@@ -315,3 +266,12 @@ class BaseSanaSetup(
             train_device=self.train_device,
             betas=model.noise_scheduler.betas,
         ).mean()
+
+    def prepare_text_caching(self, model: SanaModel, config: TrainConfig):
+        model.to(self.temp_device)
+
+        if not config.train_text_encoder_or_embedding():
+            model.text_encoder_to(self.train_device)
+
+        model.eval()
+        torch_gc()
