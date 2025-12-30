@@ -106,6 +106,12 @@ class BaseZImageSetup(
                 text_encoder_output=batch.get('text_encoder_hidden_state'),
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability,
             )
+
+            if config.cep_enabled:
+                text_encoder_output = self._apply_conditional_embedding_perturbation(
+                    text_encoder_output, config.cep_gamma, generator
+                )
+
             scaled_latent_image = model.scale_latents(batch['latent_image'])
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
