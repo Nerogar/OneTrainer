@@ -19,6 +19,7 @@ from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.quantization_util import quantize_layers
+from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -383,3 +384,15 @@ class BaseStableDiffusionXLSetup(
             train_device=self.train_device,
             betas=model.noise_scheduler.betas,
         ).mean()
+
+    def prepare_text_caching(self, model: StableDiffusionXLModel, config: TrainConfig):
+        model.to(self.temp_device)
+
+        if not config.train_text_encoder_or_embedding():
+            model.text_encoder_to(self.train_device)
+
+        if not config.train_text_encoder_2_or_embedding():
+            model.text_encoder_2_to(self.train_device)
+
+        model.eval()
+        torch_gc()
