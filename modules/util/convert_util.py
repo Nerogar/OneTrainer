@@ -185,11 +185,9 @@ def _create_conversion_from_tuple_list(input: list):
     return [_create_conversion_pattern_from_tuple(entry) for entry in input]
 
 def fuse_qkv(q, k, v):
-    raise NotImplementedError #TODO handle alpha
     return torch.cat([q, k, v], dim=0)
 
 def fuse_qkv_mlp(q, k, v, mlp):
-    raise NotImplementedError #TODO handle alpha
     return torch.cat([q, k, v, mlp], dim=0)
 
 
