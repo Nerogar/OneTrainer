@@ -24,11 +24,6 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
-PRESETS = {
-    "attn-mlp": ["attentions"],
-    "attn-only": ["attn"],
-    "full": [],
-}
 
 class BaseStableDiffusionSetup(
     BaseModelSetup,
@@ -39,6 +34,11 @@ class BaseStableDiffusionSetup(
     ModelSetupEmbeddingMixin,
     metaclass=ABCMeta,
 ):
+    LAYER_PRESETS = {
+        "attn-mlp": ["attentions"],
+        "attn-only": ["attn"],
+        "full": [],
+    }
 
     def __init__(self, train_device: torch.device, temp_device: torch.device, debug_mode: bool):
         super().__init__(train_device, temp_device, debug_mode)

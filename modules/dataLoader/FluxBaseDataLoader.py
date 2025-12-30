@@ -5,7 +5,9 @@ from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.flux.ShuffleFluxFillMaskChannels import ShuffleFluxFillMaskChannels
 from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
 from modules.model.FluxModel import FluxModel
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
@@ -296,3 +298,6 @@ class FluxBaseDataLoader(
             train_progress,
             is_validation
         )
+
+factory.register(BaseDataLoader, FluxBaseDataLoader, ModelType.FLUX_DEV_1)
+factory.register(BaseDataLoader, FluxBaseDataLoader, ModelType.FLUX_FILL_DEV_1)

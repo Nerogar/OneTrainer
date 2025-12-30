@@ -24,11 +24,6 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
-PRESETS = {
-    "attn-mlp": ["attentions"],
-    "attn-only": ["attn"],
-    "full": [],
-}
 
 class BaseStableDiffusionXLSetup(
     BaseModelSetup,
@@ -39,6 +34,11 @@ class BaseStableDiffusionXLSetup(
     ModelSetupEmbeddingMixin,
     metaclass=ABCMeta
 ):
+    LAYER_PRESETS = {
+        "attn-mlp": ["attentions"],
+        "attn-only": ["attn"],
+        "full": [],
+    }
 
     def setup_optimizations(
             self,

@@ -9,7 +9,9 @@ from modules.model.QwenModel import (
     PROMPT_MAX_LENGTH,
     QwenModel,
 )
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
@@ -258,3 +260,5 @@ class QwenBaseDataLoader(
             train_progress,
             is_validation
         )
+
+factory.register(BaseDataLoader, QwenBaseDataLoader, ModelType.QWEN)
