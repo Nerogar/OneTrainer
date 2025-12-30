@@ -669,14 +669,14 @@ class TrainingTab:
             components.switch(frame, 9, 1, self.ui_state, "dynamic_timestep_shifting")
 
         # Conditional Embedding Perturbation (CEP)
-        cep_label = components.label(frame, 9, 0, "Conditional Embedding Perturbation (CEP)",
+        cep_label = components.label(frame, 10, 0, "Conditional Embedding Perturbation (CEP)",
                          tooltip="Inject a slight noise into the TEs outputs to enhance the quality, diversity, and fidelity of the generated images.")
         cep_label.configure(wraplength=130, justify="left")
-        components.switch(frame, 9, 1, self.ui_state, "cep_enabled")
+        components.switch(frame, 10, 1, self.ui_state, "cep_enabled")
 
-        components.label(frame, 10, 0, "CEP Gamma",
+        components.label(frame, 11, 0, "CEP Gamma",
                          tooltip="Gamma controls perturbation noise magnitude, paper's default is 1. Only has an effect if CEP is enabled")
-        components.entry(frame, 10, 1, self.ui_state, "cep_gamma")
+        components.entry(frame, 11, 1, self.ui_state, "cep_gamma")
 
     def __create_masked_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
