@@ -660,9 +660,17 @@ class LoRAModuleWrapper:
                 prefixed_name = (self.prefix + "." + name) if self.prefix != "" else name
                 lora_module = self.klass(prefixed_name, child_module, *self.additional_args, **self.additional_kwargs)
                 lora_modules[name] = lora_module
-                if self.peft_type == PeftType.OFT_2 and lora_module.adjustment_info:
-                    old, new = lora_module.adjustment_info
-                    oft_adjustments.append({'old': old, 'new': new})
+                if self.peft_type == PeftType.OFT_2:
+                    if lora_module.adjustment_info:
+                        old, new = lora_module.adjustment_info
+                        oft_adjustments.append({'old': old, 'new': new})
+
+                    if config.oft_sqrt_scaling:
+                        # Normalize against the configured block size
+                        # If actual < config, scale > 1.0 (Boosting small blocks).
+                        # If actual > config, scale < 1.0 (Damping large blocks).
+                        lora_module.oft_scale = config.oft_block_size / lora_module.oft_block_size
+
                 selected.append(name)
             else:
                 deselected.append(name)
@@ -680,22 +688,6 @@ class LoRAModuleWrapper:
             ]
             print(f"OFT Block Size automatically adjusted for {len(oft_adjustments)} layers. Changes:")
             print("\n".join(summary_lines))
-
-        # Apply scaling based on max block size
-        if self.peft_type == PeftType.OFT_2 and config.oft_sqrt_scaling:
-            oft_modules = [m for m in lora_modules.values() if isinstance(m, OFTModule)]
-            if oft_modules:
-                # Find the largest block size used in the network
-                max_block_size = max(m.oft_block_size for m in oft_modules)
-
-                print(f"OFT Scaling: Max Block Size is {max_block_size}. Adjusting scales for smaller blocks.")
-
-                for m in oft_modules:
-                    if m.oft_block_size < max_block_size:
-                        # Boost small blocks
-                        m.oft_scale = math.sqrt(max_block_size / m.oft_block_size)
-                    else:
-                        m.oft_scale = 1.0
 
         if len(self.module_filters) > 0:
             if config.debug_mode:
