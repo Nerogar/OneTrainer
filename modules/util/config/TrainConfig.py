@@ -1035,7 +1035,7 @@ class TrainConfig(BaseConfig):
         data.append(("timestep_shift", 1.0, float, False))
         data.append(("dynamic_timestep_shifting", False, bool, False))
         data.append(("cep_enabled", False, bool, False))
-        data.append(("cep_gamma", 0.0, float, False))
+        data.append(("cep_gamma", 1.0, float, False))
 
 
         # unet
