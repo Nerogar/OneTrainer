@@ -665,7 +665,7 @@ class LoRAModuleWrapper:
                         old, new = lora_module.adjustment_info
                         oft_adjustments.append({'old': old, 'new': new})
 
-                    if config.oft_sqrt_scaling:
+                    if config.oft_linear_scaling:
                         # Normalize against the configured block size
                         # If actual < config, scale > 1.0 (Boosting small blocks).
                         # If actual > config, scale < 1.0 (Damping large blocks).

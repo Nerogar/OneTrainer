@@ -136,9 +136,9 @@ class LoraTab:
             components.switch(master, 3, 4, self.ui_state, "oft_block_share")
 
             # SQRT Scaling
-            components.label(master, 4, 3, "SQRT Scaling",
-                             tooltip="Automatically scales the weights of OFT layers that have reduced block sizes using a square root strategy. Ensures that layers with smaller blocks maintain the same 'energy' and learning rate as the largest blocks, preventing them from becoming negligible during training due to dimension mismatches.")
-            components.switch(master, 4, 4, self.ui_state, "oft_sqrt_scaling")
+            components.label(master, 4, 3, "Linear Scaling",
+                             tooltip="Automatically scales the weights of OFT layers that have different block sizes using a linear strategy. Ensures that layers with different blocks maintain similar 'energy' and learning rate, preventing them from exploding or becoming negligible during training due to dimension mismatches.")
+            components.switch(master, 4, 4, self.ui_state, "oft_linear_scaling")
 
             # Dropout Percentage
             components.label(master, 2, 0, "Dropout Probability",
