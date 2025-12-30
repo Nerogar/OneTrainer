@@ -341,7 +341,7 @@ class FluxModel(BaseModel):
 
         return latents
 
-    def calculate_timestep_shift(self, latent_width: int, latent_height: int):
+    def calculate_timestep_shift(self, latent_height: int, latent_width: int):
         base_seq_len = self.noise_scheduler.config.base_image_seq_len
         max_seq_len = self.noise_scheduler.config.max_image_seq_len
         base_shift = self.noise_scheduler.config.base_shift
