@@ -58,6 +58,9 @@ class StableDiffusionEmbeddingSetup(
             model.rescale_noise_scheduler_to_zero_terminal_snr()
             model.force_v_prediction()
 
+        if config.diff2flow:
+            model.enable_diff2flow()
+
         self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
