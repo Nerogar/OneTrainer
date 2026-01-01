@@ -110,7 +110,6 @@ def _drop_enter(event):
 def _drop_leave(event):
     return event.action
 
-
 def _create_drop_handler(entry_widget, ui_state, var_name, command=None):
     def drop(event):
         if event.data:

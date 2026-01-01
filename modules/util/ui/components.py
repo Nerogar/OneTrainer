@@ -21,7 +21,6 @@ from PIL import Image
 
 PAD = 10
 
-# Common filetypes for dialogs
 MODEL_FILETYPES = [
     ("All Files", "*.*"),
     ("Diffusers", "model_index.json"),
