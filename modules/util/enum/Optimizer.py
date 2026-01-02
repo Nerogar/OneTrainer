@@ -42,6 +42,7 @@ class Optimizer(Enum):
     # 32 bit is torch and not bnb
     SGD = 'SGD'
     SGD_8BIT = 'SGD_8BIT'
+    SIGN_SGD = 'SIGN_SGD'
 
     # Schedule-free optimizers
     SCHEDULE_FREE_ADAMW = 'SCHEDULE_FREE_ADAMW'
