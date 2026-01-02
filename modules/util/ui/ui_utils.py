@@ -110,22 +110,27 @@ def _drop_enter(event):
 def _drop_leave(event):
     return event.action
 
-def _create_drop_handler(entry_widget, ui_state, var_name, command=None):
+def _create_drop_handler(entry_widget, ui_state, var_name, command=None, drop_validator=None, on_reject=None):
     def drop(event):
         if event.data:
             paths = _parse_dropped_paths(event.data)
             if paths:
-                file_path = paths[0]  # only take the first path for single-value entries
+                dropped_path = paths[0]
 
-                ui_state.get_var(var_name).set(file_path)
+                if drop_validator and not drop_validator(dropped_path):
+                    if on_reject:
+                        on_reject(dropped_path)
+                    return event.action
+
+                ui_state.get_var(var_name).set(dropped_path)
 
                 entry_widget.focus_force()
                 entry_widget.event_generate('<FocusIn>')
-                entry_widget.event_generate('<Key>')  # mark as touched
+                entry_widget.event_generate('<Key>')
                 entry_widget.event_generate('<FocusOut>')
 
                 if command:
-                    command(file_path)
+                    command(dropped_path)
         return event.action
     return drop
 
@@ -155,11 +160,11 @@ def _parse_dropped_paths(event_data: str) -> list[str]:
 
     return [p.strip() for p in paths if p.strip()]
 
-def register_drop_target(entry_widget, ui_state, var_name, command=None):
+def register_drop_target(entry_widget, ui_state, var_name, command=None, drop_validator=None, on_reject=None):
     try:
         entry_widget.drop_target_register(DND_FILES)
         for event, handler in [('<<DropEnter>>', _drop_enter), ('<<DropLeave>>', _drop_leave),
-                               ('<<Drop>>', _create_drop_handler(entry_widget, ui_state, var_name, command))]:
+                               ('<<Drop>>', _create_drop_handler(entry_widget, ui_state, var_name, command, drop_validator, on_reject))]:
             entry_widget.dnd_bind(event, handler)
     except Exception:
         pass

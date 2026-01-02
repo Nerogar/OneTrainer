@@ -119,6 +119,9 @@ class EntryValidationHandler:
     def _show_validation_tooltip(self):
         if not self.should_show_tooltip() or not self.validation_state:
             return
+        # Don't show validation tooltip if a drop rejection is active
+        if getattr(self.component, '_drop_rejection_active', False):
+            return
         if self.validation_state.status == 'error':
             self.validation_tooltip.show_error(self.validation_state.message, duration_ms=None)
         elif self.validation_state.status == 'warning':
@@ -542,7 +545,53 @@ def path_entry(
 
     entry_widget.destroy = new_destroy
 
-    register_drop_target(entry_widget, ui_state, var_name, command)
+    drop_validator = None
+    on_reject = None
+    if use_model_validator:
+        valid_model_extensions = {'.safetensors', '.ckpt', '.pt', '.bin'}
+        valid_extensions_display = ', '.join(sorted(valid_model_extensions))
+
+        def drop_validator(file_path: str) -> bool:
+            dropped_path = Path(file_path)
+            return dropped_path.is_dir() or dropped_path.suffix.lower() in valid_model_extensions
+
+        def on_reject(file_path: str):
+            tooltip = getattr(entry_widget, '_validation_tooltip', None)
+            if not tooltip:
+                return
+
+            entry_widget._drop_rejection_active = True
+            saved_status = validation_state.status if validation_state else None
+            saved_message = validation_state.message if validation_state else ""
+            tooltip.hide()
+
+            rejected_path = Path(file_path)
+            extension = rejected_path.suffix or "(no extension)"
+            reject_message = (
+                f"Rejected: {rejected_path.name}\n"
+                f"'{extension}' is not a valid model output format.\n"
+                f"Expected: {valid_extensions_display} or a directory"
+            )
+
+            def show_rejection():
+                tooltip.show_error(reject_message, duration_ms=5000)
+
+            def restore_prior_state():
+                entry_widget._drop_rejection_active = False
+                tooltip.hide()
+                try:
+                    if saved_status and saved_message and entry_widget.focus_get() == entry_widget:
+                        if saved_status == 'error':
+                            tooltip.show_error(saved_message, duration_ms=5000)
+                        elif saved_status == 'warning':
+                            tooltip.show_warning(saved_message, duration_ms=5000)
+                except Exception:
+                    pass
+
+            entry_widget.after(10, show_rejection)
+            entry_widget.after(5000, restore_prior_state)
+
+    register_drop_target(entry_widget, ui_state, var_name, command, drop_validator, on_reject)
 
     # Browse button
     def open_dialog():
