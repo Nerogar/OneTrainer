@@ -432,7 +432,7 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("Creating backup")
 
-        backup_name = f"{get_string_timestamp()}-backup-{train_progress.filename_string()}"
+        backup_name = f"{get_string_timestamp()}-{self.config.get_run_name()}-backup-{train_progress.filename_string()}"
         backup_path = os.path.join(self.config.workspace_dir, "backup", backup_name)
 
         # Special case for schedule-free optimizers.
@@ -482,7 +482,7 @@ class GenericTrainer(BaseTrainer):
         save_path = os.path.join(
             self.config.workspace_dir,
             "save",
-            f"{self.config.save_filename_prefix}{get_string_timestamp()}-save-{train_progress.filename_string()}{self.config.output_model_format.file_extension()}"
+            f"{self.config.save_filename_prefix}{get_string_timestamp()}-{self.config.get_run_name()}-save-{train_progress.filename_string()}{self.config.output_model_format.file_extension()}"
         )
         if print_msg:
             print_cb("Saving " + save_path)
