@@ -33,7 +33,7 @@ if not exist "%VENV_DIR%\Scripts\python.exe" (
 )
 set PYTHON="%VENV_DIR%\Scripts\python.exe" -X utf8
 set LAUNCH_CMD=%PYTHON%
-if defined PROFILE (set LAUNCH_CMD=%PYTHON% -m scalene --off --cpu --gpu --profile-all --no-browser)
+if defined OT_PROFILE (set LAUNCH_CMD=%PYTHON% -m scalene --off --cpu --gpu --profile-all --no-browser)
 echo Using Python %PYTHON%
 
 REM Disable HF_HUB_DISABLE_XET, buggy; default disables Xet (set to 0 to enable) - https://github.com/Nerogar/OneTrainer/issues/949
