@@ -92,8 +92,7 @@ class ConfigList(metaclass=ABCMeta):
         if show_toggle_button:
             # tooltips break if you initialize with an empty string, default to a single space
             self.toggle_button = components.button(self.top_frame, 0, 3, " ", self._toggle, tooltip="Disables/Enables all visible items in the current view", width=30, padx=5)
-            if hasattr(self, 'widgets'):
-                self._update_toggle_button_text()
+            self._update_toggle_button_text()
 
     def __deferred_initialization(self):
         if self._deferred_init_done:
@@ -137,7 +136,7 @@ class ConfigList(metaclass=ABCMeta):
 
     def _update_item_enabled_state(self):
         # Only count items that match current filters
-        if not hasattr(self, 'widgets') or not self.widgets:
+        if not self.widgets:
             self._is_current_item_enabled = False
             return
 
