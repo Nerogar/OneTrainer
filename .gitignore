@@ -19,7 +19,7 @@ stacks.txt
 /training_user_settings
 /external
 /update.var
-config.json
+config*.json
 secrets.json
 *.zip
 
