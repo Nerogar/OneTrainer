@@ -12,7 +12,7 @@ import webbrowser
 from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 
 import scripts.generate_debug_report
 from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
@@ -142,6 +142,16 @@ class TrainUI(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.__close)
 
     def __close(self):
+        # Check if training is in progress
+        if self.training_thread is not None:
+            response = messagebox.askyesno(
+                "Training in Progress",
+                "Training is currently running. Are you sure you want to close OneTrainer?\n\nThis will stop the training process.",
+                icon='warning'
+            )
+            if not response:
+                return  # User clicked "No", don't close
+
         self.top_bar_component.save_default()
         self._stop_always_on_tensorboard()
         if hasattr(self, 'workspace_dir_trace_id'):
