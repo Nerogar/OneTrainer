@@ -1,0 +1,111 @@
+[workspace]
+authors = ["Hameer Abbasi <2190658+hameerabbasi@users.noreply.github.com>"]
+channels = ["conda-forge"]
+name = "OneTrainer"
+platforms = ["osx-arm64", "linux-64", "win-64"]
+version = "0.1.0"
+
+[feature.core.tasks]
+train = { cmd = "python scripts/train.py", cwd = "." }
+ui = { cmd = "python scripts/train_ui.py", cwd = "." }
+
+[dependencies]
+
+[feature.cpu.pypi-dependencies]
+torch = "==2.8.0"
+torchvision = "==0.23.0"
+onnxruntime = "==1.22.1"
+
+[feature.cuda]
+platforms = ["linux-64", "win-64"]
+
+[feature.cuda.system-requirements]
+cuda = "12.8"
+
+[feature.cuda.pypi-options]
+extra-index-urls = ["https://download.pytorch.org/whl/cu128"]
+
+[feature.cuda.pypi-dependencies]
+torch = "==2.8.0+cu128"
+torchvision = "==0.23.0+cu128"
+onnxruntime-gpu = "==1.22.0"
+bitsandbytes = "==0.46.0"
+
+[feature.cuda.target.linux-64.pypi-dependencies]
+nvidia-nccl-cu12 = "==2.27.3"
+
+[feature.cuda.target.win-64.pypi-dependencies]
+triton-windows = "==3.4.0.post20"
+
+[feature.rocm]
+platforms = ["linux-64"]
+
+[feature.rocm.pypi-options]
+extra-index-urls = ["https://download.pytorch.org/whl/rocm6.3"]
+
+[feature.rocm.pypi-dependencies]
+torch = "==2.7.1+rocm6.3"
+torchvision = "==0.22.1+rocm6.3"
+onnxruntime = "==1.22.1"
+
+[feature.core.dependencies]
+python = "3.13.*"
+
+[feature.core.target.linux-64.dependencies]
+tk = "*"
+libgl = "*"
+
+[feature.core.system-requirements]
+linux = "5.17"
+libc = { family="glibc", version="2.28" }
+macos  = "15.0"
+
+[feature.core.pypi-options]
+index-strategy = "unsafe-best-match"
+
+[feature.core.pypi-dependencies]
+numpy = "==2.2.6"
+opencv-python = "==4.11.0.86"
+pillow = "==11.3.0"
+imagesize = "==1.4.1"
+tqdm = "==4.67.1"
+pyyaml = "==6.0.2"
+huggingface-hub = "==0.34.4"
+scipy = "==1.15.3"
+matplotlib = "==3.10.3"
+av = "==14.4.0"
+yt-dlp = "*"
+scenedetect = "==0.6.6"
+accelerate = "==1.7.0"
+safetensors = "==0.5.3"
+tensorboard = "==2.19.0"
+pytorch-lightning = "==2.5.1.post0"
+diffusers = { git = "https://github.com/huggingface/diffusers.git", rev = "256e0106749363fce06c28000698edeaf56a874d" }
+gguf = "==0.17.1"
+transformers = "==4.56.2"
+sentencepiece = "==0.2.1"
+omegaconf = "==2.3.0"
+invisible-watermark = "==0.2.0"
+pooch = "==1.8.2"
+open-clip-torch = "==2.32.0"
+mgds = { git = "https://github.com/Nerogar/mgds.git", rev = "385578f8c9e7861bd98c85d8855a23cb6b48661d" }
+dadaptation = "==3.2"
+lion-pytorch = "==0.2.3"
+prodigyopt = "==1.1.2"
+schedulefree = "==1.4.1"
+pytorch-optimizer = "==3.6.0"
+prodigy-plus-schedule-free = "==2.0.1"
+adv-optm = "==1.4.1"
+muon-optimizer = { git = "https://github.com/KellerJordan/Muon.git", rev = "f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd" }
+scalene = "==2.0.1"
+customtkinter = "==5.2.2"
+runpod = "==1.7.10"
+fabric = "==3.2.2"
+psutil = "==7.0.0"
+requests = "==2.32.3"
+deepdiff = "==8.6.1"
+
+[environments]
+cpu = { features = ["cpu", "core"], no-default-feature = true }
+cuda = { features = ["cuda", "core"], no-default-feature = true }
+rocm = { features = ["rocm", "core"], no-default-feature = true }
