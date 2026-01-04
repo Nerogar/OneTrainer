@@ -21,7 +21,7 @@ tensorboard==2.20.0
 pytorch-lightning==2.6.1
 
 # diffusion models
--e git+https://github.com/huggingface/diffusers.git@99daaa8#egg=diffusers
+diffusers @ git+https://github.com/huggingface/diffusers.git@99daaa802da01ef4cff5141f4f3c0329a57fb591
 gguf==0.17.1
 transformers==4.57.6
 sentencepiece==0.2.1 # transitive dependency of transformers for tokenizer loading
@@ -33,7 +33,7 @@ pooch==1.8.2
 open-clip-torch==2.32.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@5bbafa5#egg=mgds
+mgds @ git+https://github.com/Nerogar/mgds.git@5bbafa54386da925f769ca3a767f8bb337637b7d
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers
@@ -43,7 +43,7 @@ schedulefree==1.4.1 # schedule-free optimizers
 pytorch_optimizer==3.6.0 # pytorch optimizers
 prodigy-plus-schedule-free==2.0.1 # Prodigy plus optimizer
 adv_optm==2.2.3 # advanced optimizers
--e git+https://github.com/KellerJordan/Muon.git@f90a42b#egg=muon-optimizer
+muon-optimizer @ git+https://github.com/KellerJordan/Muon.git@f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd
 
 # Profiling
 scalene==1.5.51
