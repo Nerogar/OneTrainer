@@ -1167,10 +1167,10 @@ def create_optimizer(
                 compiled_optimizer=optimizer_config.compiled_optimizer if optimizer_config.compiled_optimizer is not None else False,
             )
 
-        # SIGN_SGD Optimizer
-        case Optimizer.SIGN_SGD:
-            from adv_optm import SignSGD
-            optimizer = SignSGD(
+        # SignSGD_ADV Optimizer
+        case Optimizer.SignSGD_ADV:
+            from adv_optm import SignSGD_adv
+            optimizer = SignSGD_adv(
                 params=parameters,
                 lr=config.learning_rate,
                 momentum=optimizer_config.momentum if optimizer_config.momentum is not None else 0,

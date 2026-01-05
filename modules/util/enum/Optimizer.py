@@ -42,7 +42,7 @@ class Optimizer(Enum):
     # 32 bit is torch and not bnb
     SGD = 'SGD'
     SGD_8BIT = 'SGD_8BIT'
-    SIGN_SGD = 'SIGN_SGD'
+    SignSGD_ADV = 'SignSGD_ADV'
 
     # Schedule-free optimizers
     SCHEDULE_FREE_ADAMW = 'SCHEDULE_FREE_ADAMW'
@@ -117,6 +117,7 @@ class Optimizer(Enum):
             Optimizer.LION_PRODIGY_ADV,
             Optimizer.MUON_ADV,
             Optimizer.ADAMUON_ADV,
+            Optimizer.SignSGD_ADV,
         ]
 
     # Small helper for adjusting learning rates to adaptive optimizers.

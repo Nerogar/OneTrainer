@@ -538,7 +538,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "kourkoutas_beta": False,
         "k_warmup_steps": None,
     },
-    Optimizer.SIGN_SGD: {
+    Optimizer.SignSGD_ADV: {
         "momentum": 0.9,
         "cautious_wd": False,
         "weight_decay": 0.0,
