@@ -5,6 +5,7 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 
 import torch
+import torch.distributions
 from torch import Generator, Tensor
 
 
@@ -118,6 +119,32 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
 
         return noise
 
+    def _apply_etsdm_timestep_mapping(self, timestep: Tensor, config: TrainConfig) -> Tensor:
+        """
+        Applies Early Timestep-shared Diffusion Model (E-TSDM) logic.
+        Paper: Lipschitz Singularities in Diffusion Models (ICLR 2024)
+
+        Maps timesteps < t_tilde to shared values within n sub-intervals.
+        """
+        if not getattr(config, 'etsdm_enabled', True):
+            return timestep
+
+        # Paper defaults: t_tilde=100, n=5 (for T=1000)
+        t_tilde = getattr(config, 'etsdm_t_tilde', 100)
+        n = getattr(config, 'etsdm_n', 5)
+
+        interval_size = t_tilde // n
+
+        # Create mask for steps within the "early" region [0, t_tilde)
+        mask = timestep < t_tilde
+
+        # Calculate shared timestep: floor(t / interval) * interval
+        # This maps [0, 19] -> 0, [20, 39] -> 20, etc.
+        mapped_timestep = (timestep // interval_size) * interval_size
+
+        # Apply mapping only where mask is True
+        return torch.where(mask, mapped_timestep, timestep)
+
     def _get_timestep_discrete(
             self,
             num_train_timesteps: int,
@@ -145,7 +172,8 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             if config.timestep_distribution in [
                 TimestepDistribution.UNIFORM,
                 TimestepDistribution.LOGIT_NORMAL,
-                TimestepDistribution.HEAVY_TAIL
+                TimestepDistribution.HEAVY_TAIL,
+                TimestepDistribution.BETA
             ]:
                 # continuous implementations
                 if config.timestep_distribution == TimestepDistribution.UNIFORM:
@@ -168,6 +196,45 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                     )
                     u = 1.0 - u - scale * (torch.cos(math.pi / 2.0 * u) ** 2.0 - 1.0 + u)
                     timestep = u * num_timestep + min_timestep
+                elif config.timestep_distribution == TimestepDistribution.BETA:
+                    # B-TTDM Configuration
+                    # Noising Weight -> Alpha
+                    # Noising Bias   -> Beta
+                    alpha = max(1e-4, config.noising_weight)
+                    beta = max(1e-4, config.noising_bias)
+
+                    # B-TTDM Paper optimization (Section 3.3):
+                    # They strictly recommend Beta=1 and Alpha < 1.
+                    # When Beta=1, we can use Inverse Transform Sampling (CDF inversion)
+                    # which allows us to use torch.rand with the generator
+                    # CDF^(-1)(u) = u^(1/alpha)
+                    if abs(beta - 1.0) < 1e-5:
+                        u = torch.rand(batch_size, generator=generator, device=generator.device)
+                        u = u.pow(1.0 / alpha)
+                        timestep = u * num_timestep + min_timestep
+
+                    # Inverse case: Alpha=1, Beta != 1
+                    # x = 1 - u^(1/beta)
+                    elif abs(alpha - 1.0) < 1e-5:
+                        u = torch.rand(
+                            batch_size,
+                            generator=generator,
+                            device=generator.device)
+                        u = 1.0 - u.pow(1.0 / beta)
+                        timestep = u * num_timestep + min_timestep
+
+                    else:
+                        # Fallback for arbitrary Beta values (Beta != 1 and Alpha != 1).
+                        # PyTorch's Beta distribution does not accept a generator directly.
+                        # This path is mathematically correct for distribution shape, but
+                        # technically bypasses the generator seed (uses global device seed).
+                        # Since B-TTDM requires Beta=1, this path is rarely taken for this specific paper.
+                        m = torch.distributions.Beta(
+                            torch.tensor(alpha, device=generator.device),
+                            torch.tensor(beta, device=generator.device)
+                        )
+                        u = m.sample((batch_size,))
+                        timestep = u * num_timestep + min_timestep
 
                 timestep = num_train_timesteps * shift * timestep / ((shift - 1) * timestep + num_train_timesteps)
             else:
