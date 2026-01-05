@@ -539,7 +539,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "k_warmup_steps": None,
     },
     Optimizer.SignSGD_ADV: {
-        "momentum": 0.9,
+        "momentum": 0.99,
         "cautious_wd": False,
         "weight_decay": 0.0,
         "nnmf_factor": False,
