@@ -547,8 +547,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "compiled_optimizer": False,
         "fused_back_pass": False,
         "orthogonal_gradient": False,
-        "kappa_p": 1.0,
-        "auto_kappa_p": True,
         "Simplified_AdEMAMix": False,
         "alpha_grad": 100.0,
     },
