@@ -59,3 +59,4 @@ def Mod_patched_eval(cls, p, q):
 def init_compile():
     torch._dynamo.config.cache_size_limit = 8192
     torch.utils._sympy.functions.Mod.eval = Mod_patched_eval
+    torch.set_float32_matmul_precision('medium')
