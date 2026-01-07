@@ -538,6 +538,18 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "kourkoutas_beta": False,
         "k_warmup_steps": None,
     },
+    Optimizer.SIGNSGD_ADV: {
+        "momentum": 0.99,
+        "cautious_wd": False,
+        "weight_decay": 0.0,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "compiled_optimizer": False,
+        "fused_back_pass": False,
+        "orthogonal_gradient": False,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
+    },
     Optimizer.LION_ADV: {
         "beta1": 0.9,
         "beta2": 0.99,
