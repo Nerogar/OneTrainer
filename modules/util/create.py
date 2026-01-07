@@ -1168,7 +1168,7 @@ def create_optimizer(
             )
 
         # SignSGD_ADV Optimizer
-        case Optimizer.SignSGD_ADV:
+        case Optimizer.SIGNSGD_ADV:
             from adv_optm import SignSGD_adv
             optimizer = SignSGD_adv(
                 params=parameters,
@@ -1179,7 +1179,7 @@ def create_optimizer(
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
-                compiled_optimizer=optimizer_config.compiled_optimizer if optimizer_config.compiled_optimizer is not None else False,
+                compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
                 Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
                 alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
             )
