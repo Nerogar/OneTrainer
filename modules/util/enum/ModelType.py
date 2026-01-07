@@ -36,6 +36,8 @@ class ModelType(Enum):
 
     QWEN = 'QWEN'
 
+    Z_IMAGE = 'Z_IMAGE'
+
     def __str__(self):
         return self.value
 
@@ -93,6 +95,9 @@ class ModelType(Enum):
     def is_hi_dream(self):
         return self == ModelType.HI_DREAM_FULL
 
+    def is_z_image(self):
+        return self == ModelType.Z_IMAGE
+
     def has_mask_input(self) -> bool:
         return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \
             or self == ModelType.STABLE_DIFFUSION_20_INPAINTING \
@@ -133,10 +138,20 @@ class ModelType(Enum):
     def is_stable_cascade(self):
         return self == ModelType.STABLE_CASCADE_1
 
+    def is_flow_matching(self) -> bool:
+        return self.is_stable_diffusion_3() \
+            or self.is_flux() \
+            or self.is_chroma() \
+            or self.is_qwen() \
+            or self.is_sana() \
+            or self.is_hunyuan_video() \
+            or self.is_hi_dream()
+
 
 class PeftType(Enum):
     LORA = 'LORA'
     LOHA = 'LOHA'
+    OFT_2 = 'OFT_2'
 
     def __str__(self):
         return self.value

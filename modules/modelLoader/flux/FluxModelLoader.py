@@ -3,6 +3,7 @@ import traceback
 
 from modules.model.FluxModel import FluxModel
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
+from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -14,6 +15,7 @@ from diffusers import (
     FlowMatchEulerDiscreteScheduler,
     FluxPipeline,
     FluxTransformer2DModel,
+    GGUFQuantizationConfig,
 )
 from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer
 
@@ -34,11 +36,12 @@ class FluxModelLoader(
             vae_model_name: str,
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
+            quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(
                 model, model_type, weight_dtypes, base_model_name, transformer_model_name, vae_model_name,
-                include_text_encoder_1, include_text_encoder_2,
+                include_text_encoder_1, include_text_encoder_2, quantization,
             )
         else:
             raise Exception("not an internal model")
@@ -53,6 +56,7 @@ class FluxModelLoader(
             vae_model_name: str,
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
+            quantization: QuantizationConfig,
     ):
         diffusers_sub = []
         transformers_sub = []
@@ -134,18 +138,20 @@ class FluxModelLoader(
             transformer = FluxTransformer2DModel.from_single_file(
                 transformer_model_name,
                 #avoid loading the transformer in float32:
-                torch_dtype = torch.bfloat16 if weight_dtypes.prior.torch_dtype() is None else weight_dtypes.prior.torch_dtype()
+                torch_dtype = torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype(),
+                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16) if weight_dtypes.transformer.is_gguf() else None,
             )
             transformer = self._convert_diffusers_sub_module_to_dtype(
-                transformer, weight_dtypes.prior, weight_dtypes.train_dtype
+                transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization,
             )
         else:
             transformer = self._load_diffusers_sub_module(
                 FluxTransformer2DModel,
-                weight_dtypes.prior,
+                weight_dtypes.transformer,
                 weight_dtypes.train_dtype,
                 base_model_name,
                 "transformer",
+                quantization,
             )
 
         model.model_type = model_type
@@ -167,11 +173,12 @@ class FluxModelLoader(
             vae_model_name: str,
             include_text_encoder_1: bool,
             include_text_encoder_2: bool,
+            quantization: QuantizationConfig,
     ):
         transformer = FluxTransformer2DModel.from_single_file(
             #always load transformer separately even though FluxPipeLine.from_single_file() could load it, to avoid loading in float32:
             transformer_model_name if transformer_model_name else base_model_name,
-            torch_dtype = torch.bfloat16 if weight_dtypes.prior.torch_dtype() is None else weight_dtypes.prior.torch_dtype()
+            torch_dtype = torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype()
         )
         pipeline = FluxPipeline.from_single_file(
             pretrained_model_link_or_path=base_model_name,
@@ -219,7 +226,7 @@ class FluxModelLoader(
             print("text encoder 2 (t5) not loaded, continuing without it")
 
         transformer = self._convert_diffusers_sub_module_to_dtype(
-            pipeline.transformer, weight_dtypes.prior, weight_dtypes.train_dtype
+            pipeline.transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization,
         )
 
         model.model_type = model_type
@@ -237,13 +244,14 @@ class FluxModelLoader(
             model_type: ModelType,
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
+            quantization: QuantizationConfig,
     ):
         stacktraces = []
 
         try:
             self.__load_internal(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.prior_model, model_names.vae_model,
-                model_names.include_text_encoder, model_names.include_text_encoder_2,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model,
+                model_names.include_text_encoder, model_names.include_text_encoder_2, quantization,
             )
             return
         except Exception:
@@ -251,8 +259,8 @@ class FluxModelLoader(
 
         try:
             self.__load_diffusers(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.prior_model, model_names.vae_model,
-                model_names.include_text_encoder, model_names.include_text_encoder_2,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model,
+                model_names.include_text_encoder, model_names.include_text_encoder_2, quantization,
             )
             return
         except Exception:
@@ -260,8 +268,8 @@ class FluxModelLoader(
 
         try:
             self.__load_safetensors(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.prior_model, model_names.vae_model,
-                model_names.include_text_encoder, model_names.include_text_encoder_2,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model,
+                model_names.include_text_encoder, model_names.include_text_encoder_2, quantization,
             )
             return
         except Exception:

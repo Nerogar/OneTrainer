@@ -4,6 +4,7 @@ from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
+from modules.util.optimizer.muon_util import build_muon_adam_key_fn
 from modules.util.torch_util import optimizer_to_device_
 
 import torch
@@ -58,7 +59,15 @@ def init_model_parameters(
     #to be safe, do that before the optimizer is created because the optimizer could take copies
     multi.broadcast_parameters(parameters.parameters(), train_device)
 
-    model.optimizer = create.create_optimizer(parameters, model.optimizer_state_dict, model.train_config)
+    layer_key_fn = None
+    if model.train_config.optimizer.MuonWithAuxAdam:
+        print("INFO: Creating layer keys for MuonWithAuxAdam.")
+        layer_key_fn = build_muon_adam_key_fn(model, model.train_config)
+
+    model.optimizer = create.create_optimizer(
+        parameters, model.optimizer_state_dict, model.train_config, layer_key_fn
+    )
+
     if model.optimizer is not None:
         optimizer_to_device_(model.optimizer, train_device)
     model.optimizer_state_dict = None
@@ -69,7 +78,17 @@ def init_model_parameters(
         model.ema = None
     model.ema_state_dict = None
 
-    model.param_group_mapping = parameters.unique_name_mapping
+    if model.optimizer is not None and any('optim_type' in g for g in model.optimizer.param_groups):
+        new_param_group_mapping = []
+        for group in model.optimizer.param_groups:
+            original_name = group.get('name')
+
+            optim_type = group.get('optim_type', 'unknown')
+            unique_name = f"{original_name}_{optim_type}"
+            new_param_group_mapping.append(unique_name)
+        model.param_group_mapping = new_param_group_mapping
+    else:
+        model.param_group_mapping = parameters.unique_name_mapping
 
 
 # Optimizer Key map with defaults
@@ -131,6 +150,17 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "percentile_clipping": 100,
         "block_wise": True,
         "is_paged": False,
+    },
+    Optimizer.MUON: {
+        "momentum": 0.95,
+        "weight_decay": 0.0,
+        "MuonWithAuxAdam": True,
+        "muon_hidden_layers": None,
+        "muon_adam_regex": False,
+        "muon_adam_lr": 3e-4,
+        "muon_te1_adam_lr": None,
+        "muon_te2_adam_lr": None,
+        "muon_adam_config": None,
     },
     Optimizer.AdEMAMix_8BIT: {
         "beta1": 0.9,
@@ -299,10 +329,10 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "use_cautious": False,
         "use_grams": False,
         "use_adopt": False,
-        "use_focus": False,
         "d_limiter": True,
         "stochastic_rounding": True,
         "use_schedulefree": True,
+        "schedulefree_c": 0.0,
         "use_orthograd": False,
     },
     Optimizer.DADAPT_ADA_GRAD: {
@@ -422,6 +452,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta1": 0.9,
         "beta2": 0.99,
         "eps": 1e-8,
+        "cautious_wd": False,
         "weight_decay": 0.0,
         "use_bias_correction": True,
         "nnmf_factor": False,
@@ -441,6 +472,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta1": 0.9,
         "beta2": 0.9999,
         "eps": 1e-6,
+        "cautious_wd": False,
         "weight_decay": 0.0,
         "nnmf_factor": False,
         "stochastic_rounding": True,
@@ -462,6 +494,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta2": 0.99,
         "beta3": None,
         "eps": 1e-8,
+        "cautious_wd": False,
         "weight_decay": 0.0,
         "nnmf_factor": False,
         "stochastic_rounding": True,
@@ -488,6 +521,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta1": 0.99,
         "beta2": 0.99,
         "eps": 1e-8,
+        "cautious_wd": False,
         "weight_decay": 0.0,
         "alpha_grad": 100.0,
         "beta1_warmup": None,
@@ -503,6 +537,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
     Optimizer.LION_ADV: {
         "beta1": 0.9,
         "beta2": 0.99,
+        "cautious_wd": False,
         "weight_decay": 0.0,
         "clip_threshold": None,
         "nnmf_factor": False,
@@ -510,11 +545,14 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "fused_back_pass": False,
         "cautious_mask": False,
         "orthogonal_gradient": False,
+        "kappa_p": 1.0,
+        "auto_kappa_p": True,
     },
     Optimizer.LION_PRODIGY_ADV: {
         "beta1": 0.9,
         "beta2": 0.99,
         "beta3": None,
+        "cautious_wd": False,
         "weight_decay": 0.0,
         "clip_threshold": None,
         "nnmf_factor": False,
@@ -528,6 +566,65 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "d_limiter": True,
         "cautious_mask": False,
         "orthogonal_gradient": False,
+        "kappa_p": 1.0,
+        "auto_kappa_p": True,
+    },
+    Optimizer.MUON_ADV: {
+        "beta1": 0.9,
+        "cautious_wd": False,
+        "weight_decay": 0.0,
+        "accelerated_ns": False,
+        "ns_steps": 5,
+        "low_rank_ortho": False,
+        "ortho_rank": 128,
+        "rms_rescaling": True,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "fused_back_pass": False,
+        "MuonWithAuxAdam": True,
+        "muon_hidden_layers": None,
+        "muon_adam_regex": False,
+        "muon_adam_lr": 1e-6,
+        "muon_te1_adam_lr": None,
+        "muon_te2_adam_lr": None,
+        "nesterov": True,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
+        "normuon_variant": True,
+        "beta2_normuon": 0.95,
+        "normuon_eps": 1e-8,
+        "orthogonal_gradient": False,
+        "approx_mars": False,
+        "muon_adam_config": None,
+    },
+    Optimizer.ADAMUON_ADV: {
+        "beta1": 0.95,
+        "beta2": 0.95,
+        "eps": 1e-8,
+        "cautious_wd": False,
+        "weight_decay": 0.0,
+        "accelerated_ns": False,
+        "ns_steps": 5,
+        "low_rank_ortho": False,
+        "ortho_rank": 128,
+        "rms_rescaling": True,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "fused_back_pass": False,
+        "MuonWithAuxAdam": True,
+        "muon_hidden_layers": None,
+        "muon_adam_regex": False,
+        "muon_adam_lr": 1e-6,
+        "muon_te1_adam_lr": None,
+        "muon_te2_adam_lr": None,
+        "nesterov": False,
+        "use_atan2": False,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
+        "normuon_variant": True,
+        "orthogonal_gradient": False,
+        "approx_mars": False,
+        "muon_adam_config": None,
     },
     Optimizer.ADABELIEF: {
         "beta1": 0.9,

@@ -32,7 +32,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
         alphas_cumprod = torch.cumprod(alphas, dim=0)
 
         # From paper footnote 4: "we introduce α_0 = 1 for convenience".
-        alphas_with_zero = torch.cat([torch.tensor([1.0], device=betas.device, dtype=betas.dtype), alphas])
+        alphas_cumprod_prev = torch.cat([torch.tensor([1.0], device=betas.device, dtype=betas.dtype), alphas_cumprod[:-1]])
 
         # --- Start of Algorithm 1 ---
         gammas = torch.zeros(T, device=betas.device, dtype=betas.dtype)
@@ -40,23 +40,23 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
         # Step 1: Set gamma_1 = 1
         gammas[0] = 1.0
 
-        # This sum is `Σ_{i=1 to t-1} γ_i/√α_{i-1}` which we build iteratively.
-        cumulative_sum_term = gammas[0] / torch.sqrt(alphas_with_zero[0])
+        # This sum is `Σ_{i=1 to t-1} γ_i/√¯αᵢ₋₁` which we build iteratively.
+        cumulative_sum_term = gammas[0] / torch.sqrt(alphas_cumprod_prev[0])
 
         # Step 2-4: Loop for t = 2 to T (in code: t = 1 to T-1)
         for t in range(1, T):
             alpha_t = alphas[t]
-            alpha_tm1 = alphas[t - 1]
+            alpha_cumprod_tm1 = alphas_cumprod_prev[t]
 
             # Denominator from the paper's formula for C_t.
-            c_t_denominator = alpha_t * (1 - alpha_tm1)
-            c_t = (1 - alpha_t) * torch.sqrt(alpha_tm1) / c_t_denominator
+            c_t_denominator = alpha_t * (1 - alpha_cumprod_tm1)
+            c_t = (1 - alpha_t) * torch.sqrt(alpha_cumprod_tm1) / c_t_denominator
 
             # Paper's recursive formula uses the full cumulative sum.
             gammas[t] = c_t * cumulative_sum_term
 
             # Update the sum for the next iteration.
-            cumulative_sum_term += gammas[t] / torch.sqrt(alphas_with_zero[t])
+            cumulative_sum_term += gammas[t] / torch.sqrt(alphas_cumprod_prev[t])
 
         # Step 5: Calculate normalization factor psi_T
         psi_T_denominator = torch.sqrt(1 - alphas_cumprod[-1])
@@ -67,7 +67,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
         # --- End of Algorithm 1 ---
 
         # Finally, calculate the psi schedule for all timesteps t using Equation (22)
-        terms = gammas_normalized / torch.sqrt(alphas_with_zero[:-1])
+        terms = gammas_normalized / torch.sqrt(alphas_cumprod_prev)
         s_cumulative = torch.cumsum(terms, dim=0)
         psi_schedule = s_cumulative / torch.sqrt(1 - alphas_cumprod)
 

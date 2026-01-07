@@ -27,6 +27,7 @@ from torch import Tensor
 PRESETS = {
     "attn-mlp": ["attn1", "attn2", "ff."],
     "attn-only": ["attn1", "attn2"],
+    "blocks": ["transformer_block"],
     "full": [],
 }
 
@@ -64,7 +65,7 @@ class BaseSanaSetup(
                 apply_circular_padding_to_conv2d(model.transformer_lora)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().prior,
+            config.weight_dtypes().transformer,
             config.weight_dtypes().text_encoder,
             config.weight_dtypes().vae,
             config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
@@ -93,9 +94,9 @@ class BaseSanaSetup(
             config.enable_autocast_cache,
         )
 
-        quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype)
-        quantize_layers(model.vae, self.train_device, model.train_dtype)
-        quantize_layers(model.transformer, self.train_device, model.train_dtype)
+        quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype, config)
+        quantize_layers(model.vae, self.train_device, model.train_dtype, config)
+        quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
 
     def _setup_embeddings(
             self,
@@ -313,5 +314,5 @@ class BaseSanaSetup(
             data=data,
             config=config,
             train_device=self.train_device,
-            betas=model.noise_scheduler.betas.to(device=self.train_device),
+            betas=model.noise_scheduler.betas,
         ).mean()

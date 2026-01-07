@@ -68,9 +68,9 @@ class BaseStableDiffusionSetup(
             config.weight_dtypes().embedding if config.train_any_embedding() else None,
         ], config.enable_autocast_cache)
 
-        quantize_layers(model.text_encoder, self.train_device, model.train_dtype)
-        quantize_layers(model.vae, self.train_device, model.train_dtype)
-        quantize_layers(model.unet, self.train_device, model.train_dtype)
+        quantize_layers(model.text_encoder, self.train_device, model.train_dtype, config)
+        quantize_layers(model.vae, self.train_device, model.train_dtype, config)
+        quantize_layers(model.unet, self.train_device, model.train_dtype, config)
 
     def _setup_embeddings(
             self,
@@ -335,5 +335,5 @@ class BaseStableDiffusionSetup(
             data=data,
             config=config,
             train_device=self.train_device,
-            betas=model.noise_scheduler.betas.to(device=self.train_device),
+            betas=model.noise_scheduler.betas,
         ).mean()

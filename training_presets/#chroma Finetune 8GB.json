@@ -7,7 +7,7 @@
     "gradient_checkpointing": "CPU_OFFLOADED",
     "layer_offload_fraction": 0.85,
     "dataloader_threads": 1,
-    "prior": {
+    "transformer": {
         "train": true,
         "weight_dtype": "BFLOAT_16"
     },
@@ -43,6 +43,8 @@
             "weight_decay": 0.0
         }
     },
-    "layer_filter": "transformer_block",
-    "layer_filter_preset": "blocks"
+    "quantization": {
+        "layer_filter": "transformer_block",
+        "layer_filter_preset": "blocks"
+    }
 }

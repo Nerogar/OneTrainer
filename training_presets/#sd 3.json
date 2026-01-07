@@ -4,23 +4,25 @@
     "output_dtype": "FLOAT_16",
     "output_model_destination": "models/model.safetensors",
     "output_model_format": "SAFETENSORS",
-    "prior": {
+    "transformer": {
         "weight_dtype": "FLOAT_32"
     },
     "resolution": "1024",
     "text_encoder": {
-        "train": false
+        "train": false,
+        "weight_dtype": "FLOAT_16"
     },
     "text_encoder_2": {
-        "train": false
+        "train": false,
+        "weight_dtype": "FLOAT_16"
     },
     "text_encoder_3": {
-        "train": false
+        "train": false,
+        "weight_dtype": "FLOAT_16"
     },
     "training_method": "FINE_TUNE",
     "vae": {
         "weight_dtype": "FLOAT_32"
     },
-    "weight_dtype": "FLOAT_16",
     "timestep_distribution": "LOGIT_NORMAL"
 }

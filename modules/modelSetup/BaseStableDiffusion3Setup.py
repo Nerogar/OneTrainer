@@ -27,6 +27,7 @@ from torch import Tensor
 
 PRESETS = {
     "attn-only": ["attn"],
+    "blocks": ["transformer_block"],
     "full": [],
 }
 
@@ -63,7 +64,7 @@ class BaseStableDiffusion3Setup(
                 apply_circular_padding_to_conv2d(model.transformer_lora)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().prior,
+            config.weight_dtypes().transformer,
             config.weight_dtypes().text_encoder,
             config.weight_dtypes().text_encoder_2,
             config.weight_dtypes().text_encoder_3,
@@ -85,11 +86,11 @@ class BaseStableDiffusion3Setup(
                 config.enable_autocast_cache,
             )
 
-        quantize_layers(model.text_encoder_1, self.train_device, model.train_dtype)
-        quantize_layers(model.text_encoder_2, self.train_device, model.train_dtype)
-        quantize_layers(model.text_encoder_3, self.train_device, model.text_encoder_3_train_dtype)
-        quantize_layers(model.vae, self.train_device, model.train_dtype)
-        quantize_layers(model.transformer, self.train_device, model.train_dtype)
+        quantize_layers(model.text_encoder_1, self.train_device, model.train_dtype, config)
+        quantize_layers(model.text_encoder_2, self.train_device, model.train_dtype, config)
+        quantize_layers(model.text_encoder_3, self.train_device, model.text_encoder_3_train_dtype, config)
+        quantize_layers(model.vae, self.train_device, model.train_dtype, config)
+        quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
 
     def _setup_embeddings(
             self,
@@ -284,7 +285,7 @@ class BaseStableDiffusion3Setup(
                 text_encoder_1_dropout_probability=config.text_encoder.dropout_probability,
                 text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability,
                 text_encoder_3_dropout_probability=config.text_encoder_3.dropout_probability,
-                apply_attention_mask=config.prior.attention_mask,
+                apply_attention_mask=config.transformer.attention_mask,
             ))
 
             latent_image = batch['latent_image']
@@ -410,5 +411,5 @@ class BaseStableDiffusion3Setup(
             data=data,
             config=config,
             train_device=self.train_device,
-            sigmas=model.noise_scheduler.sigmas.to(device=self.train_device),
+            sigmas=model.noise_scheduler.sigmas,
         ).mean()

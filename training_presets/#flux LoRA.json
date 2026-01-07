@@ -7,12 +7,13 @@
     "output_model_destination": "models/lora.safetensors",
     "output_model_format": "SAFETENSORS",
     "resolution": "768",
-    "prior": {
+    "transformer": {
         "train": true,
         "weight_dtype": "NFLOAT_4"
     },
     "text_encoder": {
-        "train": false
+        "train": false,
+        "weight_dtype": "BFLOAT_16"
     },
     "text_encoder_2": {
         "train": false,
@@ -23,7 +24,6 @@
         "weight_dtype": "FLOAT_32"
     },
     "train_dtype": "BFLOAT_16",
-    "weight_dtype": "BFLOAT_16",
     "timestep_distribution": "LOGIT_NORMAL",
     "dynamic_timestep_shifting": false
 }

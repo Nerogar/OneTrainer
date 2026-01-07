@@ -59,7 +59,7 @@ class BaseQwenSetup(
                 apply_circular_padding_to_conv2d(model.transformer_lora)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().prior,
+            config.weight_dtypes().transformer,
             config.weight_dtypes().text_encoder,
             config.weight_dtypes().vae,
             config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
@@ -77,9 +77,9 @@ class BaseQwenSetup(
                 config.enable_autocast_cache,
             )
 
-        quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype)
-        quantize_layers(model.vae, self.train_device, model.train_dtype)
-        quantize_layers(model.transformer, self.train_device, model.train_dtype)
+        quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype, config)
+        quantize_layers(model.vae, self.train_device, model.train_dtype, config)
+        quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
 
     def predict(
             self,
@@ -132,10 +132,10 @@ class BaseQwenSetup(
             latent_input = scaled_noisy_latent_image
             packed_latent_input = model.pack_latents(latent_input)
 
-            txt_seq_lens = text_attention_mask.sum(dim=1).tolist()
             #FIXME this is the only case that the transformer accepts:
             #see https://github.com/huggingface/diffusers/issues/12344
-            assert max(txt_seq_lens) == text_encoder_output.shape[1]
+            #actual text sequence lengths can be shorter,but they might be padded and masked
+            txt_seq_lens = [text_encoder_output.shape[1]] * text_encoder_output.shape[0]
 
             #FIXME list of lists is not according to type hint, but according to diffusers code:
             #https://github.com/huggingface/diffusers/issues/12295
@@ -148,7 +148,7 @@ class BaseQwenSetup(
             #FIXME bug workaround for https://github.com/huggingface/diffusers/issues/12294
             image_attention_mask=torch.ones((packed_latent_input.shape[0], packed_latent_input.shape[1]), dtype=torch.bool, device=latent_image.device)
             attention_mask = torch.cat([text_attention_mask, image_attention_mask], dim=1)
-            attention_mask_2d = attention_mask[:, None, None, :] * attention_mask[:, None, :, None]
+            attention_mask_2d = attention_mask[:, None, None, :] if not torch.all(text_attention_mask) else None
 
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
@@ -251,5 +251,5 @@ class BaseQwenSetup(
             data=data,
             config=config,
             train_device=self.train_device,
-            sigmas=model.noise_scheduler.sigmas.to(device=self.train_device),
+            sigmas=model.noise_scheduler.sigmas,
         ).mean()

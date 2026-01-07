@@ -48,7 +48,7 @@ class ConceptImageConfig(BaseConfig):
 
         data.append(("enable_crop_jitter", True, bool, False))
 
-        data.append(("enable_random_flip", True, bool, False))
+        data.append(("enable_random_flip", False, bool, False))
         data.append(("enable_fixed_flip", False, bool, False))
 
         data.append(("enable_random_rotate", False, bool, False))

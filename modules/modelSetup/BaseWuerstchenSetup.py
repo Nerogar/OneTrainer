@@ -104,12 +104,12 @@ class BaseWuerstchenSetup(
         )
 
         if model.model_type.is_wuerstchen_v2():
-            quantize_layers(model.decoder_text_encoder, self.train_device, model.train_dtype)
-        quantize_layers(model.decoder_decoder, self.train_device, model.train_dtype)
-        quantize_layers(model.decoder_vqgan, self.train_device, model.train_dtype)
-        quantize_layers(model.effnet_encoder, self.train_device, model.effnet_encoder_train_dtype)
-        quantize_layers(model.prior_text_encoder, self.train_device, model.train_dtype)
-        quantize_layers(model.prior_prior, self.train_device, model.prior_train_dtype)
+            quantize_layers(model.decoder_text_encoder, self.train_device, model.train_dtype, config)
+        quantize_layers(model.decoder_decoder, self.train_device, model.train_dtype, config)
+        quantize_layers(model.decoder_vqgan, self.train_device, model.train_dtype, config)
+        quantize_layers(model.effnet_encoder, self.train_device, model.effnet_encoder_train_dtype, config)
+        quantize_layers(model.prior_text_encoder, self.train_device, model.train_dtype, config)
+        quantize_layers(model.prior_prior, self.train_device, model.prior_train_dtype, config)
 
     def _setup_embeddings(
             self,

@@ -50,7 +50,8 @@ class FluxSampler(BaseModelSampler):
             noise_scheduler: NoiseScheduler,
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
-            prior_attention_mask: bool = False,
+            text_encoder_2_sequence_length: int | None = None,
+            transformer_attention_mask: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
@@ -75,7 +76,8 @@ class FluxSampler(BaseModelSampler):
                 train_device=self.train_device,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-                apply_attention_mask=prior_attention_mask,
+                text_encoder_2_sequence_length=text_encoder_2_sequence_length,
+                apply_attention_mask=transformer_attention_mask,
             )
 
             self.model.text_encoder_to(self.temp_device)
@@ -129,8 +131,8 @@ class FluxSampler(BaseModelSampler):
                     guidance=guidance.to(dtype=self.model.train_dtype.torch_dtype()),
                     pooled_projections=pooled_prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
                     encoder_hidden_states=prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
-                    txt_ids=text_ids.to(dtype=self.model.train_dtype.torch_dtype()),
-                    img_ids=image_ids.to(dtype=self.model.train_dtype.torch_dtype()),
+                    txt_ids=text_ids,
+                    img_ids=image_ids,
                     joint_attention_kwargs=None,
                     return_dict=True
                 ).sample
@@ -199,7 +201,8 @@ class FluxSampler(BaseModelSampler):
             mask_image_path: str = "",
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
-            prior_attention_mask: bool = False,
+            text_encoder_2_sequence_length: int | None = None,
+            transformer_attention_mask: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
@@ -251,13 +254,7 @@ class FluxSampler(BaseModelSampler):
                 latent_conditioning_image = (latent_conditioning_image - vae.config.shift_factor) \
                                             * vae.config.scaling_factor
 
-                latent_conditioning_image = self.model.pack_latents(
-                    latent_conditioning_image,
-                    latent_conditioning_image.shape[0],
-                    latent_conditioning_image.shape[1],
-                    height // vae_scale_factor,
-                    width // vae_scale_factor,
-                )
+                latent_conditioning_image = self.model.pack_latents(latent_conditioning_image)
 
                 # batch_size, height, 8, width, 8
                 mask = mask.view(
@@ -277,13 +274,7 @@ class FluxSampler(BaseModelSampler):
                     width // vae_scale_factor,
                 )
 
-                latent_mask = self.model.pack_latents(
-                    mask,
-                    mask.shape[0],
-                    mask.shape[1],
-                    height // vae_scale_factor,
-                    width // vae_scale_factor,
-                )
+                latent_mask = self.model.pack_latents(mask)
             else:
                 conditioning_image = torch.zeros(
                     (1, 3, height, width),
@@ -293,13 +284,8 @@ class FluxSampler(BaseModelSampler):
                 latent_conditioning_image = vae.encode(conditioning_image).latent_dist.mode()
                 latent_conditioning_image = (latent_conditioning_image - vae.config.shift_factor) \
                                             * vae.config.scaling_factor
-                latent_conditioning_image = self.model.pack_latents(
-                    latent_conditioning_image,
-                    latent_conditioning_image.shape[0],
-                    latent_conditioning_image.shape[1],
-                    height // vae_scale_factor,
-                    width // vae_scale_factor,
-                )
+
+                latent_conditioning_image = self.model.pack_latents(latent_conditioning_image)
 
                 latent_mask = torch.ones(
                     size=(1, (height // vae_scale_factor // 2) * (width // vae_scale_factor // 2), 256),
@@ -315,7 +301,8 @@ class FluxSampler(BaseModelSampler):
                 train_device=self.train_device,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-                apply_attention_mask=prior_attention_mask,
+                text_encoder_2_sequence_length=text_encoder_2_sequence_length,
+                apply_attention_mask=transformer_attention_mask,
             )
 
             self.model.text_encoder_to(self.temp_device)
@@ -413,9 +400,9 @@ class FluxSampler(BaseModelSampler):
             self,
             sample_config: SampleConfig,
             destination: str,
-            image_format: ImageFormat,
-            video_format: VideoFormat,
-            audio_format: AudioFormat,
+            image_format: ImageFormat | None = None,
+            video_format: VideoFormat | None = None,
+            audio_format: AudioFormat | None = None,
             on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
@@ -435,7 +422,8 @@ class FluxSampler(BaseModelSampler):
                 mask_image_path=sample_config.mask_image_path,
                 text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
-                prior_attention_mask=sample_config.prior_attention_mask,
+                text_encoder_2_sequence_length=sample_config.text_encoder_2_sequence_length,
+                transformer_attention_mask=sample_config.transformer_attention_mask,
                 on_update_progress=on_update_progress,
             )
         else:
@@ -451,7 +439,8 @@ class FluxSampler(BaseModelSampler):
                 noise_scheduler=sample_config.noise_scheduler,
                 text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
-                prior_attention_mask=sample_config.prior_attention_mask,
+                text_encoder_2_sequence_length=sample_config.text_encoder_2_sequence_length,
+                transformer_attention_mask=sample_config.transformer_attention_mask,
                 on_update_progress=on_update_progress,
             )
 

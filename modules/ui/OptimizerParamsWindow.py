@@ -1,7 +1,8 @@
 import contextlib
 from tkinter import TclError
 
-from modules.util.config.TrainConfig import TrainConfig
+from modules.ui.MuonAdamWindow import MUON_AUX_ADAM_DEFAULTS, MuonAdamWindow
+from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.optimizer_util import (
     OPTIMIZER_DEFAULT_PARAMETERS,
@@ -11,6 +12,7 @@ from modules.util.optimizer_util import (
 )
 from modules.util.ui import components
 from modules.util.ui.ui_utils import set_window_icon
+from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
 
@@ -30,6 +32,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         self.ui_state = ui_state
         self.optimizer_ui_state = ui_state.get_var("optimizer")
         self.protocol("WM_DELETE_WINDOW", self.on_window_close)
+        self.muon_adam_button = None
 
         self.title("Optimizer Settings")
         self.geometry("800x500")
@@ -160,7 +163,6 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'use_cautious': {'title': 'use_cautious', 'tooltip': 'Use cautious method', 'type': 'bool'},
             'use_grams': {'title': 'use_grams', 'tooltip': 'Use grams method', 'type': 'bool'},
             'use_adopt': {'title': 'use_adopt', 'tooltip': 'Use adopt method', 'type': 'bool'},
-            'use_focus': {'title': 'use_focus', 'tooltip': 'Use focus method', 'type': 'bool'},
             'd_limiter': {'title': 'd_limiter', 'tooltip': 'Prevent over-estimated LRs when gradients and EMA are still stabilizing', 'type': 'bool'},
             'use_schedulefree': {'title': 'use_schedulefree', 'tooltip': 'Use Schedulefree method', 'type': 'bool'},
             'use_orthograd': {'title': 'use_orthograd', 'tooltip': 'Use orthograd method', 'type': 'bool'},
@@ -177,6 +179,25 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'alpha_grad': {'title': 'Grad α', 'tooltip': 'Controls the mixing coefficient between raw gradients and momentum gradients in Simplified AdEMAMix. Higher values (e.g., 10-100) emphasize recent gradients, suitable for small batch sizes to reduce noise. Lower values (e.g., 0-1) emphasize historical gradients, suitable for large batch sizes for stability. Setting to 0 uses only momentum gradients without raw gradient contribution.', 'type': 'float'},
             'kourkoutas_beta': {'title': 'Kourkoutas Beta', 'tooltip': 'Enables a layer-wise dynamic β₂ adaptation. This feature makes the optimizer more responsive to "spiky" gradients by lowering β₂ during periods of high variance, and more stable during calm periods by raising β₂ towards its maximum. It can significantly improve training stability and final loss.', 'type': 'bool'},
             'k_warmup_steps': {'title': 'K-β Warmup Steps ', 'tooltip': 'When using Kourkoutas Beta, the number of initial training steps during which the dynamic β₂ logic is held off. In this period, β₂ is set to its fixed value to allow for initial training stability before the adaptive mechanism activates.', 'type': 'int'},
+            'schedulefree_c': {'title': 'Schedule free averaging strength', 'tooltip': 'Larger values = more responsive (shorter averaging window); smaller values = smoother (longer window). Set to 0 to disable and use the original Schedule-Free rule. Short small batches (≈6-12); long/large-batch (≈50-200).', 'type': 'float'},
+            'ns_steps': {'title': 'Newton-Schulz Iterations', 'tooltip': 'Controls the number of iterations for update orthogonalization. Higher values improve the updates quality but make each step slower. Lower values are faster per step but may be less effective.', 'type': 'int'},
+            'MuonWithAuxAdam': {'title': 'MuonWithAuxAdam', 'tooltip': 'Whether to use the standard way of Muon. Non-hidden layers fallback to ADAMW, and MUON takes the rest. Note: The auxiliary Adam (ADAMW) is typically only relevant for training "full" LoRA (LoRA for all layers) or full finetune and is irrelevant for most common LoRA use cases.', 'type': 'bool'},
+            'muon_hidden_layers': {'title': 'Hidden Layers', 'tooltip': 'Comma-separated list of hidden layers to train using Muon. Regular expressions (if toggled) are supported. Any model layer with a matching name will be trained using Muon. If None is provided it will default to using automatic way of finding hidden layers.', 'type': 'str'},
+            'muon_adam_regex': {'title': 'Use Regex', 'tooltip': 'Whether to use regular expressions for hidden layers.', 'type': 'bool'},
+            'muon_adam_lr': {'title': 'Auxiliary Adam LR', 'tooltip': 'Learning rate for the auxiliary AdamW optimizer. If empty, it will use the main learning rate.', 'type': 'float'},
+            'muon_te1_adam_lr': {'title': 'AuxAdam TE1 LR', 'tooltip': 'Learning rate for the auxiliary AdamW optimizer for the first text encoder. If empty, it will use the Auxiliary Adam LR.', 'type': 'float'},
+            'muon_te2_adam_lr': {'title': 'AuxAdam TE2 LR', 'tooltip': 'Learning rate for the auxiliary AdamW optimizer for the second text encoder. If empty, it will use the Auxiliary Adam LR.', 'type': 'float'},
+            'rms_rescaling': {'title': 'RMS Rescaling', 'tooltip': 'Muon already scales its updates to approximate and use the same learning rate (LR) as Adam. This option integrates a more accurate method to match the Adam LR, but it is slower.', 'type': 'bool'},
+            'normuon_variant': {'title': 'NorMuon Variant', 'tooltip': 'Enables the NorMuon optimizer variant, which combines Muon orthogonalization with per-neuron adaptive learning rates for better convergence and balanced parameter updates. Costs only one scalar state buffer per parameter group, size few KBs, maintaining high memory efficiency.', 'type': 'bool'},
+            'beta2_normuon': {'title': 'NorMuon Beta2', 'tooltip': 'Exponential decay rate for the neuron-wise second-moment estimator in NorMuon (analogous to Adams beta2). Controls how past squared updates influence current normalization.', 'type': 'float'},
+            'normuon_eps': {'title': 'NorMuon EPS', 'tooltip': 'Epsilon for NorMuon normalization stability.', 'type': 'float'},
+            'low_rank_ortho': {'title': 'Low-rank Orthogonalization', 'tooltip': 'Use low-rank orthogonalization to accelerate Muon by orthogonalizing only in a low-dimensional subspace, improving speed and noise robustness.', 'type': 'bool'},
+            'ortho_rank': {'title': 'Ortho Rank', 'tooltip': 'Target rank for low-rank orthogonalization. Controls the dimensionality of the subspace used for efficient and noise-robust orthogonalization.', 'type': 'int'},
+            'accelerated_ns': {'title': 'Accelerated Newton-Schulz', 'tooltip': 'Applies an enhanced Newton-Schulz variant that replaces heuristic coefficients with optimal coefficients derived at each step. This improves performance and convergence by reducing the number of required operations.', 'type': 'bool'},
+            'cautious_wd': {'title': 'Cautious Weight Decay', 'tooltip': 'Applies weight decay only to parameter coordinates whose signs align with the optimizer update direction. This preserves the original optimization objective while still benefiting from regularization effects, leading to improved convergence and better final performance.', 'type': 'bool'},
+            'approx_mars': {'title': 'Approx MARS-M', 'tooltip': 'Enables Approximated MARS-M, a variance reduction technique. It uses the previous step\'s gradient to correct the current update, leading to lower losses and improved convergence stability. This requires additional state to store the previous gradient.', 'type': 'bool'},
+            'kappa_p': {'title': 'Lion-K P-value', 'tooltip': 'Controls the Lp-norm geometry for the Lion update. 1.0 = Standard Lion (Sign update, coordinate-wise), best for Transformers. 2.0 = Spherical Lion (Normalized update, rotational invariant), best for Conv2d layers (in unet models). Values between 1.0 and 2.0 interpolate behavior between the two.', 'type': 'float'},
+            'auto_kappa_p': {'title': 'Auto Lion-K', 'tooltip': 'Automatically determines the optimal P-value based on layer dimensions. Uses p=2.0 (Spherical) for 4D (Conv) tensors for stability and rotational invariance, and p=1.0 (Sign) for 2D (Linear) tensors for sparsity. Overrides the manual P-value. Recommend for unet models.', 'type': 'bool'},
         }
         # @formatter:on
 
@@ -187,6 +208,8 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
         # Extract the keys for the selected optimizer
         for index, key in enumerate(OPTIMIZER_DEFAULT_PARAMETERS[selected_optimizer].keys()):
+            if key not in KEY_DETAIL_MAP:
+                continue
             arg_info = KEY_DETAIL_MAP[key]
 
             title = arg_info['title']
@@ -198,7 +221,20 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
             components.label(master, row, col, title, tooltip=tooltip)
 
-            if type != 'bool':
+            if key == 'MuonWithAuxAdam':
+                frame = ctk.CTkFrame(master, fg_color="transparent")
+                frame.grid(row=row, column=col + 1, columnspan=2, sticky="ew", padx=0, pady=0)
+                frame.grid_columnconfigure(0, weight=0)
+                frame.grid_columnconfigure(1, weight=0)
+
+                components.switch(frame, 0, 0, self.optimizer_ui_state, key, command=self.update_user_pref)
+
+                self.muon_adam_button = components.button(
+                    frame, 0, 1, "...", self.open_muon_adam_window,
+                    tooltip="Configure the auxiliary AdamW_adv optimizer",
+                    width=20, padx=5                )
+                self.toggle_muon_adam_button()
+            elif type != 'bool':
                 components.entry(master, row, col + 1, self.optimizer_ui_state, key,
                                  command=self.update_user_pref)
             else:
@@ -207,6 +243,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
     def update_user_pref(self, *args):
         update_optimizer_config(self.train_config)
+        self.toggle_muon_adam_button()
 
     def on_optimizer_change(self, *args):
         optimizer_config = change_optimizer(self.train_config)
@@ -221,3 +258,35 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
 
     def on_window_close(self):
         self.destroy()
+
+    def toggle_muon_adam_button(self):
+        if self.muon_adam_button and self.muon_adam_button.winfo_exists():
+            muon_with_adam = self.optimizer_ui_state.get_var("MuonWithAuxAdam").get()
+            self.muon_adam_button.configure(state="normal" if muon_with_adam else "disabled")
+
+    def open_muon_adam_window(self):
+        current_optimizer = self.train_config.optimizer.optimizer
+
+        adam_config = TrainOptimizerConfig.default_values()
+        current_state = self.train_config.optimizer.muon_adam_config
+
+        if current_optimizer == Optimizer.MUON:
+            defaults = MUON_AUX_ADAM_DEFAULTS
+        else:
+            defaults = OPTIMIZER_DEFAULT_PARAMETERS[Optimizer.ADAMW_ADV]
+
+        if current_state is None:
+            adam_config.from_dict(defaults)
+            if current_optimizer != Optimizer.MUON:
+                adam_config.optimizer = Optimizer.ADAMW_ADV
+        elif isinstance(current_state, dict):
+            adam_config.from_dict(current_state)
+        else:
+            # Should not happen if TrainConfig defines it as dict, but for safety
+            adam_config = current_state
+
+        temp_adam_ui_state = UIState(self, adam_config)
+        window = MuonAdamWindow(self, self.train_config, temp_adam_ui_state, current_optimizer)
+        self.wait_window(window)
+
+        self.train_config.optimizer.muon_adam_config = adam_config.to_dict()

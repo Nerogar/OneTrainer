@@ -107,7 +107,6 @@ class TrainOptimizerConfig(BaseConfig):
     use_cautious: False
     use_grams: False
     use_adopt: False
-    use_focus: False
     d_limiter: True
     use_schedulefree: True
     use_orthograd: False
@@ -124,6 +123,26 @@ class TrainOptimizerConfig(BaseConfig):
     grams_moment: False
     kourkoutas_beta: False
     k_warmup_steps: int
+    schedulefree_c: float
+    ns_steps: int
+    MuonWithAuxAdam: False
+    muon_hidden_layers: str
+    muon_adam_regex: False
+    muon_adam_lr: float
+    muon_te1_adam_lr: float
+    muon_te2_adam_lr: float
+    muon_adam_config: dict
+    rms_rescaling: True
+    normuon_variant: False
+    beta2_normuon: float
+    normuon_eps: float
+    low_rank_ortho: False
+    ortho_rank: int
+    accelerated_ns: False
+    cautious_wd: False
+    approx_mars: False
+    kappa_p: float
+    auto_kappa_p: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -206,7 +225,6 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("use_cautious", False, bool, False))
         data.append(("use_grams", False, bool, False))
         data.append(("use_adopt", False, bool, False))
-        data.append(("use_focus", False, bool, False))
         data.append(("d_limiter", True, bool, True))
         data.append(("use_schedulefree", True, bool, True))
         data.append(("use_orthograd", False, bool, False))
@@ -223,6 +241,26 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("grams_moment", False, bool, False))
         data.append(("kourkoutas_beta", False, bool, False))
         data.append(("k_warmup_steps", None, int, True))
+        data.append(("schedulefree_c", None, float, True))
+        data.append(("ns_steps", None, int, True))
+        data.append(("MuonWithAuxAdam", False, bool, False))
+        data.append(("muon_hidden_layers", None, str, True))
+        data.append(("muon_adam_regex", False, bool, False))
+        data.append(("muon_adam_lr", None, float, True))
+        data.append(("muon_te1_adam_lr", None, float, True))
+        data.append(("muon_te2_adam_lr", None, float, True))
+        data.append(("muon_adam_config", None, dict, True))
+        data.append(("rms_rescaling", True, bool, True))
+        data.append(("normuon_variant", False, bool, False))
+        data.append(("beta2_normuon", None, float, True))
+        data.append(("normuon_eps", None, float, True))
+        data.append(("low_rank_ortho", False, bool, False))
+        data.append(("ortho_rank", None, int, True))
+        data.append(("accelerated_ns", False, bool, False))
+        data.append(("cautious_wd", False, bool, False))
+        data.append(("approx_mars", False, bool, False))
+        data.append(("kappa_p", None, float, True))
+        data.append(("auto_kappa_p", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
@@ -254,7 +292,7 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("stop_training_after", None, int, True))
         data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
         data.append(("learning_rate", None, float, True))
-        data.append(("weight_dtype", DataType.NONE, DataType, False))
+        data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("dropout_probability", 0.0, float, False))
         data.append(("train_embedding", True, bool, False))
         data.append(("attention_mask", False, bool, False))
@@ -294,6 +332,26 @@ class TrainEmbeddingConfig(BaseConfig):
 
         return TrainEmbeddingConfig(data)
 
+class QuantizationConfig(BaseConfig):
+    layer_filter: str
+    layer_filter_preset: str
+    layer_filter_regex: bool
+    svd_dtype: DataType
+    svd_rank: int
+    cache_dir: str
+
+    @staticmethod
+    def default_values():
+        data = []
+
+        # name, default value, data type, nullable
+        data.append(("layer_filter", "", str, False))
+        data.append(("layer_filter_preset", "full", str, False))
+        data.append(("layer_filter_regex", False, bool, False))
+        data.append(("svd_dtype", DataType.NONE, DataType, False))
+        data.append(("svd_rank", 16, int, False))
+        data.append(("cache_dir", None, str, True))
+        return QuantizationConfig(data)
 
 class TrainConfig(BaseConfig):
     training_method: TrainingMethod
@@ -315,7 +373,6 @@ class TrainConfig(BaseConfig):
     # multi-GPU
     multi_gpu: bool
     device_indexes: str
-    sequential_model_setup: bool
     gradient_reduce_prevision: GradientReducePrecision
     fused_gradient_reduce: bool
     async_gradient_reduce: bool
@@ -323,7 +380,6 @@ class TrainConfig(BaseConfig):
 
     # model settings
     base_model_name: str
-    weight_dtype: DataType
     output_dtype: DataType
     output_model_format: ModelFormat
     output_model_destination: str
@@ -332,6 +388,7 @@ class TrainConfig(BaseConfig):
     enable_activation_offloading: bool
     layer_offload_fraction: float
     force_circular_padding: bool
+    compile: bool
 
     # data settings
     concept_file_name: str
@@ -368,6 +425,8 @@ class TrainConfig(BaseConfig):
     mse_strength: float
     mae_strength: float
     log_cosh_strength: float
+    huber_strength: float
+    huber_delta: float
     vb_loss_strength: float
     loss_weight_fn: LossWeight
     loss_weight_strength: float
@@ -404,6 +463,10 @@ class TrainConfig(BaseConfig):
     # prior
     prior: TrainModelPartConfig
 
+    # transformer
+    transformer: TrainModelPartConfig
+    quantization: QuantizationConfig
+
     # text encoder
     text_encoder: TrainModelPartConfig
     text_encoder_layer_skip: int
@@ -411,6 +474,7 @@ class TrainConfig(BaseConfig):
     # text encoder 2
     text_encoder_2: TrainModelPartConfig
     text_encoder_2_layer_skip: int
+    text_encoder_2_sequence_length: int
 
     # text encoder 3
     text_encoder_3: TrainModelPartConfig
@@ -463,6 +527,12 @@ class TrainConfig(BaseConfig):
     lora_weight_dtype: DataType
     bundle_additional_embeddings: bool
 
+    # oft
+    oft_block_size: int
+    oft_coft: bool
+    coft_eps: float
+    oft_block_share: bool
+
     # optimizer
     optimizer: TrainOptimizerConfig
     optimizer_defaults: dict[str, TrainOptimizerConfig]
@@ -499,7 +569,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=8,
+            config_version=10,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -509,6 +579,8 @@ class TrainConfig(BaseConfig):
                 5: self.__migration_5,
                 6: self.__migration_6,
                 7: self.__migration_7,
+                8: self.__migration_8,
+                9: self.__migration_9,
             }
         )
 
@@ -698,29 +770,61 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_8(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        if migrated_data["model_type"] != "STABLE_CASCADE_1" and migrated_data["model_type"] != "WUERSTCHEN_2":
+            migrated_data["transformer"] = migrated_data["prior"]
+
+        return migrated_data
+
+    def __migration_9(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        def replace_dtype(part: str):
+            if part in migrated_data and migrated_data[part]["weight_dtype"] == "NONE":
+                migrated_data[part]["weight_dtype"] = migrated_data["weight_dtype"]
+        replace_dtype("unet")
+        replace_dtype("prior")
+        replace_dtype("transformer")
+        replace_dtype("text_encoder")
+        replace_dtype("text_encoder_2")
+        replace_dtype("text_encoder_3")
+        replace_dtype("text_encoder_4")
+        replace_dtype("vae")
+        replace_dtype("effnet_encoder")
+        replace_dtype("decoder")
+        replace_dtype("decoder_text_encoder")
+        replace_dtype("decoder_vqgan")
+        migrated_data.pop("weight_dtype")
+
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
             self.fallback_train_dtype,
-            self.weight_dtype if self.unet.weight_dtype == DataType.NONE else self.unet.weight_dtype,
-            self.weight_dtype if self.prior.weight_dtype == DataType.NONE else self.prior.weight_dtype,
-            self.weight_dtype if self.text_encoder.weight_dtype == DataType.NONE else self.text_encoder.weight_dtype,
-            self.weight_dtype if self.text_encoder_2.weight_dtype == DataType.NONE else self.text_encoder_2.weight_dtype,
-            self.weight_dtype if self.text_encoder_3.weight_dtype == DataType.NONE else self.text_encoder_3.weight_dtype,
-            self.weight_dtype if self.text_encoder_4.weight_dtype == DataType.NONE else self.text_encoder_4.weight_dtype,
-            self.weight_dtype if self.vae.weight_dtype == DataType.NONE else self.vae.weight_dtype,
-            self.weight_dtype if self.effnet_encoder.weight_dtype == DataType.NONE else self.effnet_encoder.weight_dtype,
-            self.weight_dtype if self.decoder.weight_dtype == DataType.NONE else self.decoder.weight_dtype,
-            self.weight_dtype if self.decoder_text_encoder.weight_dtype == DataType.NONE else self.decoder_text_encoder.weight_dtype,
-            self.weight_dtype if self.decoder_vqgan.weight_dtype == DataType.NONE else self.decoder_vqgan.weight_dtype,
-            self.weight_dtype if self.lora_weight_dtype == DataType.NONE else self.lora_weight_dtype,
-            self.weight_dtype if self.embedding_weight_dtype == DataType.NONE else self.embedding_weight_dtype,
+            self.unet.weight_dtype,
+            self.prior.weight_dtype,
+            self.transformer.weight_dtype,
+            self.text_encoder.weight_dtype,
+            self.text_encoder_2.weight_dtype,
+            self.text_encoder_3.weight_dtype,
+            self.text_encoder_4.weight_dtype,
+            self.vae.weight_dtype,
+            self.effnet_encoder.weight_dtype,
+            self.decoder.weight_dtype,
+            self.decoder_text_encoder.weight_dtype,
+            self.decoder_vqgan.weight_dtype,
+            self.lora_weight_dtype,
+            self.embedding_weight_dtype,
         )
 
     def model_names(self) -> ModelNames:
         return ModelNames(
             base_model=self.base_model_name,
             prior_model=self.prior.model_name,
+            transformer_model=self.transformer.model_name,
             effnet_encoder_model=self.effnet_encoder.model_name,
             decoder_model=self.decoder.model_name,
             text_encoder_4=self.text_encoder_4.model_name,
@@ -854,7 +958,6 @@ class TrainConfig(BaseConfig):
         #multi-GPU
         data.append(("multi_gpu", False, bool, False))
         data.append(("device_indexes", "", str, False))
-        data.append(("sequential_model_setup", False, bool, False))
         data.append(("gradient_reduce_precision", GradientReducePrecision.FLOAT_32_STOCHASTIC, GradientReducePrecision, False))
         data.append(("fused_gradient_reduce", True, bool, False))
         data.append(("async_gradient_reduce", True, bool, False))
@@ -862,7 +965,6 @@ class TrainConfig(BaseConfig):
 
         # model settings
         data.append(("base_model_name", "stable-diffusion-v1-5/stable-diffusion-v1-5", str, False))
-        data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("output_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
         data.append(("output_model_destination", "models/model.safetensors", str, False))
@@ -871,6 +973,7 @@ class TrainConfig(BaseConfig):
         data.append(("enable_activation_offloading", True, bool, False))
         data.append(("layer_offload_fraction", 0.0, float, False))
         data.append(("force_circular_padding", False, bool, False))
+        data.append(("compile", False, bool, False))
 
         # data settings
         data.append(("concept_file_name", "training_concepts/concepts.json", str, False))
@@ -905,6 +1008,8 @@ class TrainConfig(BaseConfig):
         data.append(("mse_strength", 1.0, float, False))
         data.append(("mae_strength", 0.0, float, False))
         data.append(("log_cosh_strength", 0.0, float, False))
+        data.append(("huber_strength", 0.0, float, False))
+        data.append(("huber_delta", 1.0, float, False))
         data.append(("vb_loss_strength", 1.0, float, False))
         data.append(("loss_weight_fn", LossWeight.CONSTANT, LossWeight, False))
         data.append(("loss_weight_strength", 5.0, float, False))
@@ -934,7 +1039,6 @@ class TrainConfig(BaseConfig):
         unet.train = True
         unet.stop_training_after = 0
         unet.learning_rate = None
-        unet.weight_dtype = DataType.NONE
         data.append(("unet", unet, TrainModelPartConfig, False))
 
         # prior
@@ -943,8 +1047,19 @@ class TrainConfig(BaseConfig):
         prior.train = True
         prior.stop_training_after = 0
         prior.learning_rate = None
-        prior.weight_dtype = DataType.NONE
         data.append(("prior", prior, TrainModelPartConfig, False))
+
+        # transformer
+        transformer = TrainModelPartConfig.default_values()
+        transformer.model_name = ""
+        transformer.train = True
+        transformer.stop_training_after = 0
+        transformer.learning_rate = None
+        data.append(("transformer", transformer, TrainModelPartConfig, False))
+
+        #quantization layer filter
+        quantization = QuantizationConfig.default_values()
+        data.append(("quantization", quantization, QuantizationConfig, False))
 
         # text encoder
         text_encoder = TrainModelPartConfig.default_values()
@@ -952,7 +1067,6 @@ class TrainConfig(BaseConfig):
         text_encoder.stop_training_after = 30
         text_encoder.stop_training_after_unit = TimeUnit.EPOCH
         text_encoder.learning_rate = None
-        text_encoder.weight_dtype = DataType.NONE
         data.append(("text_encoder", text_encoder, TrainModelPartConfig, False))
         data.append(("text_encoder_layer_skip", 0, int, False))
 
@@ -962,9 +1076,9 @@ class TrainConfig(BaseConfig):
         text_encoder_2.stop_training_after = 30
         text_encoder_2.stop_training_after_unit = TimeUnit.EPOCH
         text_encoder_2.learning_rate = None
-        text_encoder_2.weight_dtype = DataType.NONE
         data.append(("text_encoder_2", text_encoder_2, TrainModelPartConfig, False))
         data.append(("text_encoder_2_layer_skip", 0, int, False))
+        data.append(("text_encoder_2_sequence_length", 77, int, True))
 
         # text encoder 3
         text_encoder_3 = TrainModelPartConfig.default_values()
@@ -972,7 +1086,6 @@ class TrainConfig(BaseConfig):
         text_encoder_3.stop_training_after = 30
         text_encoder_3.stop_training_after_unit = TimeUnit.EPOCH
         text_encoder_3.learning_rate = None
-        text_encoder_3.weight_dtype = DataType.NONE
         data.append(("text_encoder_3", text_encoder_3, TrainModelPartConfig, False))
         data.append(("text_encoder_3_layer_skip", 0, int, False))
 
@@ -982,36 +1095,30 @@ class TrainConfig(BaseConfig):
         text_encoder_4.stop_training_after = 30
         text_encoder_4.stop_training_after_unit = TimeUnit.EPOCH
         text_encoder_4.learning_rate = None
-        text_encoder_4.weight_dtype = DataType.NONE
         data.append(("text_encoder_4", text_encoder_4, TrainModelPartConfig, False))
         data.append(("text_encoder_4_layer_skip", 0, int, False))
 
         # vae
         vae = TrainModelPartConfig.default_values()
         vae.model_name = ""
-        vae.weight_dtype = DataType.FLOAT_32
         data.append(("vae", vae, TrainModelPartConfig, False))
 
         # effnet encoder
         effnet_encoder = TrainModelPartConfig.default_values()
         effnet_encoder.model_name = ""
-        effnet_encoder.weight_dtype = DataType.NONE
         data.append(("effnet_encoder", effnet_encoder, TrainModelPartConfig, False))
 
         # decoder
         decoder = TrainModelPartConfig.default_values()
         decoder.model_name = ""
-        decoder.weight_dtype = DataType.NONE
         data.append(("decoder", decoder, TrainModelPartConfig, False))
 
         # decoder text encoder
         decoder_text_encoder = TrainModelPartConfig.default_values()
-        decoder_text_encoder.weight_dtype = DataType.NONE
         data.append(("decoder_text_encoder", decoder_text_encoder, TrainModelPartConfig, False))
 
         # decoder vqgan
         decoder_vqgan = TrainModelPartConfig.default_values()
-        decoder_vqgan.weight_dtype = DataType.NONE
         data.append(("decoder_vqgan", decoder_vqgan, TrainModelPartConfig, False))
 
         # masked training
@@ -1047,6 +1154,12 @@ class TrainConfig(BaseConfig):
         data.append(("lora_decompose_output_axis", False, bool, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("bundle_additional_embeddings", True, bool, False))
+
+        # oft
+        data.append(("oft_block_size", 32, int, False))
+        data.append(("oft_coft", False, bool, False))
+        data.append(("coft_eps", 1e-4, float, False))
+        data.append(("oft_block_share", False, bool, False))
 
         # optimizer
         data.append(("optimizer", TrainOptimizerConfig.default_values(), TrainOptimizerConfig, False))
