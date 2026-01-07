@@ -146,7 +146,7 @@ class GenericTrainer(BaseTrainer):
         self.callbacks.on_update_status("creating the data loader/caching")
 
         self.data_loader = self.create_data_loader(
-            self.model, self.model.train_progress
+            self.model, self.model_setup, self.model.train_progress
         )
         self.model_saver = self.create_model_saver()
 
