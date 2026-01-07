@@ -143,7 +143,7 @@ class TrainOptimizerConfig(BaseConfig):
     approx_mars: False
     kappa_p: float
     auto_kappa_p: False
-    compiled_optimizer: False
+    compile: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -262,7 +262,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("approx_mars", False, bool, False))
         data.append(("kappa_p", None, float, True))
         data.append(("auto_kappa_p", False, bool, False))
-        data.append(("compiled_optimizer", False, bool, False))
+        data.append(("compile", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
