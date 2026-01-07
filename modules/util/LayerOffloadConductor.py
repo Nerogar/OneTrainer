@@ -248,7 +248,7 @@ class StaticActivationAllocator:
 
     def reserve_cache(self, tensors: list[torch.Tensor]):
         num_bytes = sum(tensor.element_size() * tensor.numel() for tensor in tensors) \
-                    + len(tensors) * 4  # add enough padding for alignment
+                    + len(tensors) * 16  # add enough padding for alignment
 
         if num_bytes == 0:
             return
