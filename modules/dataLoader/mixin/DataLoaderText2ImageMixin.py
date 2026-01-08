@@ -317,7 +317,8 @@ class DataLoaderText2ImageMixin:
         override_keys = [*ConceptOverridesConfig.default_values().types]
 
         def prepare_batch_config(overrides: dict):
-            # Return overridden values if they exist, otherwise default to the current value from TrainConfig.
+            # Return overridden values if they exist, otherwise default to the current global value from TrainConfig.
+            # The 'overrides' dict may contain None values, which specifically mean "use global default".
             # The settings in TrainConfig can change during training, so always get the current value from the instance.
             return {
                 k: v if (v := overrides.get(k)) is not None else getattr(config, k)

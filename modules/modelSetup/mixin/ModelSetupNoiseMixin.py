@@ -140,11 +140,10 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             batch_config: dict[str, Tensor],
             shift: float = None,
     ) -> Tensor:
-        shift: Tensor
         if shift is not None and config.dynamic_timestep_shifting:
-            shift = torch.tensor(shift).expand(batch_config["timestep_shift"].shape)
+            batch_shift = torch.tensor(shift).expand(batch_config["timestep_shift"].shape)
         else:
-            shift = batch_config["timestep_shift"]
+            batch_shift = batch_config["timestep_shift"]
 
         if deterministic:
             # -1 is for zero-based indexing
@@ -157,7 +156,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
         self._timestep_probability_cache.maintenance_step(config.timestep_distribution)
 
         # check number of different settings
-        cache_keys = TimestepProbabilityCache.get_keys(batch_config, shift)
+        cache_keys = TimestepProbabilityCache.get_keys(batch_config, batch_shift)
         if len(set(cache_keys)) == 1:
             cache_keys = cache_keys[:1]
 
@@ -170,7 +169,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                     num_train_timesteps,
                     config.timestep_distribution,
                     batch_config,
-                    shift,
+                    batch_shift,
                     i,
                 ).to(generator.device)
 
@@ -201,12 +200,18 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
         scale = float(batch_config["noising_weight"][index])
         shift = max(float(batch_shift[index]), 1e-10)
 
+        if min_strength < 0 or min_strength > 1:
+            print(f"Warning: min noising strength ({min_strength:.3f}) must be between 0 and 1, value will be clamped")
+        if max_strength < 0 or max_strength > 1:
+            print(f"Warning: max noising strength ({max_strength:.3f}) must be between 0 and 1, value will be clamped")
+
         min_timestep = int(num_train_timesteps * min_strength.clamp(0, 1))
         max_timestep = int(num_train_timesteps * max_strength.clamp(0, 1))
 
         if min_timestep > max_timestep:
             min_timestep = max_timestep
-            print(f"Warning: min noising strength ({min_strength:.3f}) > max noising strength ({max_strength:.3f})")
+            print(f"Warning: min noising strength ({min_strength:.3f}) > max noising strength ({max_strength:.3f}), "
+                   "setting minimum = maximum")
 
         if min_timestep == max_timestep:
             if min_timestep > 0:
@@ -235,7 +240,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
 
         # Plot: https://www.desmos.com/calculator/q88f7b9wda
         if timestep_distribution == TimestepDistribution.UNIFORM:
-            weights = torch.full_like(linspace, 1)
+            weights = torch.ones_like(linspace)
         elif timestep_distribution == TimestepDistribution.LOGIT_NORMAL:
             scale = max(scale + 1.0, 0.001)
             weights = (1.0 / (scale * math.sqrt(2.0 * math.pi)))  \
@@ -251,7 +256,9 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             bias += 0.5
             weights = torch.clamp(-scale * ((linspace - bias) ** 2) + 2, min=0.0)
         elif timestep_distribution == TimestepDistribution.HEAVY_TAIL:
-            scale = min(scale, 1.735)  # The approximation breaks when the quantile function becomes non-monotonic
+            # The approximation breaks when the quantile function is about to become non-monotonic,
+            # that is when derivative(0.5) approaches 0. Plot: https://www.desmos.com/calculator/jelm6bte8n
+            scale = min(scale, 1.735)
 
             def quantile(x):
                 return 1 - x - scale * (torch.cos(math.pi / 2 * x) ** 2 - 1 + x)
@@ -323,6 +330,9 @@ class TimestepProbabilityCache:
     When the timestep distribution function itself is changed, the cache is cleared.
     """
 
+    TTL = 100
+    CHECK_INTERVAL = 20
+
     class Entry:
         def __init__(self):
             self.cumprobs: Tensor | None = None
@@ -340,11 +350,11 @@ class TimestepProbabilityCache:
             self.step = 1
         else:
             self.step += 1
-            if not (self.step % 20):
+            if not (self.step % self.CHECK_INTERVAL):
                 self.evict_stale_entries()
 
     def evict_stale_entries(self):
-        step_limit = self.step - 100
+        step_limit = self.step - self.TTL
         remove_keys = [
             k for k, entry in self.cache.items()
             if entry.last_use_step < step_limit
