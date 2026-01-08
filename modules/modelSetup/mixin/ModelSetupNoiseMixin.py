@@ -1,5 +1,6 @@
 import math
 from abc import ABCMeta
+from collections import defaultdict
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TimestepDistribution import TimestepDistribution
@@ -13,7 +14,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
     def __init__(self):
         super().__init__()
 
-        self.__weights = None
+        self._timestep_probability_cache = TimestepProbabilityCache()
         self._offset_noise_psi_schedule: Tensor | None = None
 
     def _compute_and_cache_offset_noise_psi_schedule(self, betas: Tensor) -> Tensor:
@@ -78,6 +79,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             self,
             source_tensor: Tensor,
             config: TrainConfig,
+            batch_config: dict[str, Tensor],
             generator: Generator,
             timestep: Tensor | None = None,
             betas: Tensor | None = None,
@@ -89,34 +91,44 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             dtype=source_tensor.dtype
         )
 
-        if config.offset_noise_weight > 0:
+        offset_noise_weight = batch_config["offset_noise_weight"]
+        if torch.any(offset_noise_weight != 0):
             offset_noise = torch.randn(
-                (source_tensor.shape[0], source_tensor.shape[1], *[1 for _ in range(source_tensor.ndim - 2)]),
+                (*source_tensor.shape[:2], *[1]*(source_tensor.ndim - 2)),
                 generator=generator,
                 device=config.train_device,
                 dtype=source_tensor.dtype
             )
+
+            offset_noise_weight = offset_noise_weight.view(-1, *[1]*(offset_noise.ndim - 1)).to(config.train_device)
+
             # Use the time-dependent generalized method if enabled.
             # This will only be true for Diffusion models (which uses betas)
             if config.generalized_offset_noise and timestep is not None and betas is not None:
                 psi_schedule = self._compute_and_cache_offset_noise_psi_schedule(betas).to(timestep.device)
                 psi_t = psi_schedule[timestep]
-                psi_t = psi_t.view(psi_t.shape[0], *[1 for _ in range(source_tensor.ndim - 1)])
+                psi_t = psi_t.view(psi_t.shape[0], *[1]*(source_tensor.ndim - 1))
                 # Scale by the time-dependent psi_t factor
-                noise = noise + (psi_t * config.offset_noise_weight * offset_noise)
+                noise += psi_t * offset_noise_weight * offset_noise
             else: # Otherwise, use the normal offset noise.
-                noise = noise + (config.offset_noise_weight * offset_noise)
+                noise += offset_noise_weight * offset_noise
 
-        if config.perturbation_noise_weight > 0:
+        perturbation_noise_weight = batch_config["perturbation_noise_weight"]
+        if torch.any(perturbation_noise_weight != 0):
             perturbation_noise = torch.randn(
                 source_tensor.shape,
                 generator=generator,
                 device=config.train_device,
                 dtype=source_tensor.dtype
             )
-            noise = noise + (config.perturbation_noise_weight * perturbation_noise)
+
+            perturbation_noise_weight = perturbation_noise_weight \
+                .view(-1, *[1]*(perturbation_noise.ndim - 1)).to(config.train_device)
+
+            noise += perturbation_noise_weight * perturbation_noise
 
         return noise
+
 
     def _get_timestep_discrete(
             self,
@@ -125,10 +137,13 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             generator: Generator,
             batch_size: int,
             config: TrainConfig,
+            batch_config: dict[str, Tensor],
             shift: float = None,
     ) -> Tensor:
-        if shift is None:
-            shift = config.timestep_shift
+        if shift is not None and config.dynamic_timestep_shifting:
+            batch_shift = torch.tensor(shift).expand(batch_config["timestep_shift"].shape)
+        else:
+            batch_shift = batch_config["timestep_shift"]
 
         if deterministic:
             # -1 is for zero-based indexing
@@ -137,79 +152,143 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                 dtype=torch.long,
                 device=generator.device,
             ).unsqueeze(0)
+
+        self._timestep_probability_cache.maintenance_step(config.timestep_distribution)
+
+        # check number of different settings
+        cache_keys = TimestepProbabilityCache.get_keys(batch_config, batch_shift)
+        if len(set(cache_keys)) == 1:
+            cache_keys = cache_keys[:1]
+
+        # gather cumulative probabilities for each sample from cache, or regenerate
+        batch_cumprobs = []
+        for i, cache_key in enumerate(cache_keys):
+            cache_entry = self._timestep_probability_cache[cache_key]
+            if cache_entry.cumprobs is None:
+                cache_entry.cumprobs = self.__prepare_timestep_cumprobs(
+                    num_train_timesteps,
+                    config.timestep_distribution,
+                    batch_config,
+                    batch_shift,
+                    i,
+                ).to(generator.device)
+
+            batch_cumprobs.append(cache_entry.cumprobs)
+
+        # sample timesteps with binary search over normalized cumulative probabilities
+        u = torch.rand(batch_size, generator=generator, device=generator.device)
+        if len(batch_cumprobs) == 1:
+            cumprobs = batch_cumprobs[0]
         else:
-            min_timestep = int(num_train_timesteps * config.min_noising_strength)
-            max_timestep = int(num_train_timesteps * config.max_noising_strength)
-            num_timestep = max_timestep - min_timestep
+            cumprobs = torch.stack(batch_cumprobs)
+            u = u.unsqueeze(1)
 
-            if config.timestep_distribution in [
-                TimestepDistribution.UNIFORM,
-                TimestepDistribution.LOGIT_NORMAL,
-                TimestepDistribution.HEAVY_TAIL
-            ]:
-                # continuous implementations
-                if config.timestep_distribution == TimestepDistribution.UNIFORM:
-                    timestep = min_timestep + (max_timestep - min_timestep) \
-                               * torch.rand(batch_size, generator=generator, device=generator.device)
-                elif config.timestep_distribution == TimestepDistribution.LOGIT_NORMAL:
-                    bias = config.noising_bias
-                    scale = config.noising_weight + 1.0
+        timestep = torch.searchsorted(cumprobs, u, out_int32=True, right=True).view(-1)
+        return timestep
 
-                    normal = torch.normal(bias, scale, size=(batch_size,), generator=generator, device=generator.device)
-                    logit_normal = normal.sigmoid()
-                    timestep = logit_normal * num_timestep + min_timestep
-                elif config.timestep_distribution == TimestepDistribution.HEAVY_TAIL:
-                    scale = config.noising_weight
+    def __prepare_timestep_cumprobs(
+            self,
+            num_train_timesteps: int,
+            timestep_distribution: TimestepDistribution,
+            batch_config: dict[str, Tensor],
+            batch_shift: Tensor,
+            index: int,
+    ) -> Tensor:
+        min_strength = batch_config["min_noising_strength"][index]
+        max_strength = batch_config["max_noising_strength"][index]
+        bias  = float(batch_config["noising_bias"][index])
+        scale = float(batch_config["noising_weight"][index])
+        shift = max(float(batch_shift[index]), 1e-10)
 
-                    u = torch.rand(
-                        size=(batch_size,),
-                        generator=generator,
-                        device=generator.device,
-                    )
-                    u = 1.0 - u - scale * (torch.cos(math.pi / 2.0 * u) ** 2.0 - 1.0 + u)
-                    timestep = u * num_timestep + min_timestep
+        if min_strength < 0 or min_strength > 1:
+            print(f"Warning: min noising strength ({min_strength:.3f}) must be between 0 and 1, value will be clamped")
+        if max_strength < 0 or max_strength > 1:
+            print(f"Warning: max noising strength ({max_strength:.3f}) must be between 0 and 1, value will be clamped")
 
-                timestep = num_train_timesteps * shift * timestep / ((shift - 1) * timestep + num_train_timesteps)
+        min_timestep = int(num_train_timesteps * min_strength.clamp(0, 1))
+        max_timestep = int(num_train_timesteps * max_strength.clamp(0, 1))
+
+        if min_timestep > max_timestep:
+            min_timestep = max_timestep
+            print(f"Warning: min noising strength ({min_strength:.3f}) > max noising strength ({max_strength:.3f}), "
+                   "setting minimum = maximum")
+
+        if min_timestep == max_timestep:
+            if min_timestep > 0:
+                min_timestep -= 1
             else:
-                # Shifting a discrete distribution is done in two steps:
-                # 1. Apply the inverse shift to the linspace.
-                #    This moves the sample points of the function to their shifted place.
-                # 2. Multiply the result with the derivative of the inverse shift function.
-                #    The derivative is an approximation of the distance between sample points.
-                #    Or in other words, the size of a shifted bucket in the original function.
-                linspace = torch.linspace(0, 1, num_timestep)
-                linspace = linspace / (shift - shift * linspace + linspace)
+                max_timestep += 1
 
-                linspace_derivative = torch.linspace(0, 1, num_timestep)
-                linspace_derivative = shift / (shift + linspace_derivative - (linspace_derivative * shift)).pow(2)
+        num_timestep = max_timestep - min_timestep
 
-                # continuous implementations
-                if config.timestep_distribution == TimestepDistribution.COS_MAP:
-                    if self.__weights is None:
-                        weights = 2.0 / (math.pi - 2.0 * math.pi * linspace + 2.0 * math.pi * linspace ** 2.0)
-                        weights *= linspace_derivative
-                        self.__weights = weights.to(device=generator.device)
-                elif config.timestep_distribution == TimestepDistribution.SIGMOID:
-                    if self.__weights is None:
-                        bias = config.noising_bias + 0.5
-                        weight = config.noising_weight
+        # Shifting a discrete distribution is done in two steps:
+        # 1. Apply the inverse shift to the linspace.
+        #    This moves the sample points of the function to their shifted place.
+        # 2. Multiply the result with the derivative of the inverse shift function.
+        #    The derivative is an approximation of the distance between sample points.
+        #    Or in other words, the size of a shifted bucket in the original function.
 
-                        weights = linspace / (shift - shift * linspace + linspace)
-                        weights = 1 / (1 + torch.exp(-weight * (weights - bias)))  # Sigmoid
-                        weights *= linspace_derivative
-                        self.__weights = weights.to(device=generator.device)
-                elif config.timestep_distribution == TimestepDistribution.INVERTED_PARABOLA:
-                    if self.__weights is None:
-                        bias = config.noising_bias + 0.5
-                        weight = config.noising_weight
+        half_bucket = 0.5 / num_timestep  # Sample at the center of buckets
 
-                        weights = torch.clamp(-weight * ((linspace - bias) ** 2) + 2, min=0.0)
-                        weights *= linspace_derivative
-                        self.__weights = weights.to(device=generator.device)
-                samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True, generator=generator) + min_timestep
-                timestep = samples.to(dtype=torch.long, device=generator.device)
+        # Use double precision to avoid zeroing-out small trailing weights in cumsum below
+        # due to insufficient accuracy when small values are added to a large running sum.
+        linspace = torch.linspace(half_bucket, 1-half_bucket, num_timestep, dtype=torch.float64)
+        linspace = linspace / (shift - shift * linspace + linspace)
 
-            return timestep.int()
+        linspace_derivative = torch.linspace(half_bucket, 1-half_bucket, num_timestep, dtype=torch.float64)
+        linspace_derivative = shift / (shift + linspace_derivative - (linspace_derivative * shift)).pow(2)
+
+        # Plot: https://www.desmos.com/calculator/q88f7b9wda
+        if timestep_distribution == TimestepDistribution.UNIFORM:
+            weights = torch.ones_like(linspace)
+        elif timestep_distribution == TimestepDistribution.LOGIT_NORMAL:
+            scale = max(scale + 1.0, 0.001)
+            weights = (1.0 / (scale * math.sqrt(2.0 * math.pi)))  \
+                    * (1.0 / (linspace * (1.0 - linspace)))       \
+                    * torch.exp( -((torch.logit(linspace) - bias) ** 2.0) / (2.0 * scale ** 2.0) )
+            weights.nan_to_num_(0)
+        elif timestep_distribution == TimestepDistribution.COS_MAP:
+            weights = 2.0 / (math.pi - (2.0 * math.pi * linspace) + (2.0 * math.pi * linspace ** 2.0))
+        elif timestep_distribution == TimestepDistribution.SIGMOID:
+            bias += 0.5
+            weights = 1 / (1 + torch.exp(-scale * (linspace - bias)))
+        elif timestep_distribution == TimestepDistribution.INVERTED_PARABOLA:
+            bias += 0.5
+            weights = torch.clamp(-scale * ((linspace - bias) ** 2) + 2, min=0.0)
+        elif timestep_distribution == TimestepDistribution.HEAVY_TAIL:
+            # The approximation breaks when the quantile function is about to become non-monotonic,
+            # that is when derivative(0.5) approaches 0. Plot: https://www.desmos.com/calculator/jelm6bte8n
+            scale = min(scale, 1.735)
+
+            def quantile(x):
+                return 1 - x - scale * (torch.cos(math.pi / 2 * x) ** 2 - 1 + x)
+            def derivative(x):
+                return -(1 + scale) + scale * (math.pi / 2) * torch.sin(math.pi * x)
+
+            # Use Newton's method to approximate the quantile function and evaluate the probability density
+            x = 1.0 - linspace  # Initial guess matches quantile() for scale=0
+            for _ in range(20):
+                delta = (quantile(x) - linspace) / derivative(x)
+                x -= delta
+                if delta.abs().max() < 1e-10:
+                    break
+
+            weights = 1 / derivative(x).abs()
+        else:
+            raise ValueError(f"Unknown timestep distribution: {timestep_distribution}")
+
+        weights *= linspace_derivative
+
+        if num_timestep != num_train_timesteps:
+            weights_padded = torch.zeros(num_train_timesteps, dtype=torch.float64)
+            weights_padded[min_timestep:max_timestep] = weights
+            weights = weights_padded
+
+        cumprobs = weights.cumsum_(0)
+        cumprobs /= cumprobs[-1].item() # normalize
+        cumprobs[-1] = 1 # avoid sampling out of range when all weights are 0
+        return cumprobs.float()
+
 
     def _get_timestep_continuous(
             self,
@@ -217,6 +296,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             generator: Generator,
             batch_size: int,
             config: TrainConfig,
+            batch_config: dict,
     ) -> Tensor:
         if deterministic:
             return torch.full(
@@ -232,7 +312,68 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                 generator=generator,
                 batch_size=batch_size,
                 config=config,
+                batch_config=batch_config
             ) + 1
 
             continuous = (discrete.float() / discrete_timesteps)
             return continuous
+
+
+class TimestepProbabilityCache:
+    """
+    Caches the cumulative probabilities of timesteps.
+
+    The cache key consists of all relevant settings for calculating the timestep probabilities.
+    A user can change these settings through the UI during training, causing new cache entries to be generated.
+    Therefore, old cache entries are removed when unused for 100 training steps. This check happens every 20 steps.
+
+    When the timestep distribution function itself is changed, the cache is cleared.
+    """
+
+    TTL = 100
+    CHECK_INTERVAL = 20
+
+    class Entry:
+        def __init__(self):
+            self.cumprobs: Tensor | None = None
+            self.last_use_step = 0
+
+    def __init__(self):
+        self.cache = defaultdict(self.Entry)
+        self.timestep_distribution: TimestepDistribution | None = None
+        self.step = 0
+
+    def maintenance_step(self, timestep_distribution: TimestepDistribution):
+        if timestep_distribution != self.timestep_distribution:
+            self.timestep_distribution = timestep_distribution
+            self.cache.clear()
+            self.step = 1
+        else:
+            self.step += 1
+            if not (self.step % self.CHECK_INTERVAL):
+                self.evict_stale_entries()
+
+    def evict_stale_entries(self):
+        step_limit = self.step - self.TTL
+        remove_keys = [
+            k for k, entry in self.cache.items()
+            if entry.last_use_step < step_limit
+        ]
+        for k in remove_keys:
+            self.cache.pop(k, None)
+
+    def __getitem__(self, key: tuple) -> 'TimestepProbabilityCache.Entry':
+        entry = self.cache[key]
+        entry.last_use_step = self.step
+        return entry
+
+    @staticmethod
+    def get_keys(batch_config: dict[str, Tensor], shift: Tensor) -> list[tuple]:
+        columns = (
+            batch_config["min_noising_strength"].tolist(),
+            batch_config["max_noising_strength"].tolist(),
+            batch_config["noising_bias"].tolist(),
+            batch_config["noising_weight"].tolist(),
+            shift.tolist(),
+        )
+        return [*zip(*columns, strict=True)] # rows

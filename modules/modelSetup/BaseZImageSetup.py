@@ -108,7 +108,7 @@ class BaseZImageSetup(
             )
             scaled_latent_image = model.scale_latents(batch['latent_image'])
 
-            latent_noise = self._create_noise(scaled_latent_image, config, generator)
+            latent_noise = self._create_noise(scaled_latent_image, config, batch['config'], generator)
 
             shift = model.calculate_timestep_shift(scaled_latent_image.shape[-2], scaled_latent_image.shape[-1])
             timestep = self._get_timestep_discrete(
@@ -117,7 +117,8 @@ class BaseZImageSetup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
-                shift = shift if config.dynamic_timestep_shifting else config.timestep_shift,
+                batch['config'],
+                shift,
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(

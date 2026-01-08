@@ -193,7 +193,7 @@ class BaseChromaSetup(
             latent_image = batch['latent_image']
             scaled_latent_image = (latent_image - vae_shift_factor) * vae_scaling_factor
 
-            latent_noise = self._create_noise(scaled_latent_image, config, generator)
+            latent_noise = self._create_noise(scaled_latent_image, config, batch['config'], generator)
 
             timestep = self._get_timestep_discrete(
                 model.noise_scheduler.config['num_train_timesteps'],
@@ -201,6 +201,7 @@ class BaseChromaSetup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+                batch['config'],
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(
