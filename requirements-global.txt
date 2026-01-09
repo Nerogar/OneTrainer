@@ -10,7 +10,7 @@ scipy==1.15.3
 matplotlib==3.10.3
 av==14.4.0
 yt-dlp  #no pinned version, frequently updated for compatibility with sites
-scenedetect==0.6.6
+scenedetect==0.6.7.1
 
 # pytorch
 accelerate==1.7.0
