@@ -9,7 +9,7 @@ from modules.util import path_util
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.path_util import write_json_atomic
-from modules.util.ui import components, dialogs
+from modules.util.ui import components, dialogs, ui_utils
 from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
@@ -53,6 +53,7 @@ class ConfigList(metaclass=ABCMeta):
         self.show_toggle_button = show_toggle_button
         self.is_opening_window = False
         self._is_current_item_enabled = False
+        self._deferred_init_done = False
 
         self.master.grid_rowconfigure(0, weight=0)
         self.master.grid_rowconfigure(1, weight=1)
@@ -66,29 +67,41 @@ class ConfigList(metaclass=ABCMeta):
             self.element_list = None
 
             self.configs = []
-            self.__load_available_config_names()
-
+            # defer heavy operations to avoid blocking startup
             self.current_config = getattr(self.train_config, self.attr_name)
             self.widgets = []
-            self.__load_current_config(getattr(self.train_config, self.attr_name))
 
             self.__create_configs_dropdown()
             components.button(self.top_frame, 0, 1, "Add Config", self.__add_config, tooltip="Adds a new config, which are containers for concepts, which themselves contain your dataset", width=20, padx=5)
             components.button(self.top_frame, 0, 2, add_button_text, self.__add_element, tooltip=add_button_tooltip, width=30, padx=5)
+
+            # defer loading config names and creating widgets
+            self.master.after(150, self.__deferred_initialization)
         else:
             self.top_frame = ctk.CTkFrame(self.master, fg_color="transparent")
             self.top_frame.grid(row=0, column=0, sticky="nsew")
             components.button(self.top_frame, 0, 2, add_button_text, self.__add_element, width=20, padx=5)
 
             self.current_config = getattr(self.train_config, self.attr_name)
+            self.widgets = []
 
             self.element_list = None
-            self._create_element_list()
+            # defer widget creation for non-external file configs too
+            self.master.after(100, self._create_element_list)
 
         if show_toggle_button:
             # tooltips break if you initialize with an empty string, default to a single space
             self.toggle_button = components.button(self.top_frame, 0, 3, " ", self._toggle, tooltip="Disables/Enables all visible items in the current view", width=30, padx=5)
             self._update_toggle_button_text()
+
+    def __deferred_initialization(self):
+        if self._deferred_init_done:
+            return
+        self._deferred_init_done = True
+
+        self.__load_available_config_names()
+        self.__load_current_config(getattr(self.train_config, self.attr_name))
+        self.__create_configs_dropdown()  # refresh with loaded configs
 
 
 
@@ -123,6 +136,10 @@ class ConfigList(metaclass=ABCMeta):
 
     def _update_item_enabled_state(self):
         # Only count items that match current filters
+        if not self.widgets:
+            self._is_current_item_enabled = False
+            return
+
         self._is_current_item_enabled = any(
             item.ui_state.get_var(self.enable_key).get()
             for i, item in enumerate(self.widgets)
@@ -159,6 +176,14 @@ class ConfigList(metaclass=ABCMeta):
         )
         self._update_toggle_button_text()
 
+    def _create_placeholder(self):
+        placeholder = ctk.CTkLabel(
+            self.element_list,
+            text="Either click the 'Add Concept/Embedding' button or drag and drop a directory here to add a new concept/embeddings",
+            text_color="gray50"
+        )
+        placeholder.grid(row=0, column=0, padx=20, pady=20)
+
     def _create_element_list(self, **filters):
         if not self.from_external_file:
             self.current_config = getattr(self.train_config, self.attr_name)
@@ -182,6 +207,9 @@ class ConfigList(metaclass=ABCMeta):
 
         if self.is_full_width:
             self.element_list.grid_columnconfigure(0, weight=1)
+
+        if len(self.current_config) == 0:
+            self._create_placeholder()
 
         for i, element in enumerate(self.current_config):
             widget = self.create_widget(
@@ -207,6 +235,21 @@ class ConfigList(metaclass=ABCMeta):
                 else:
                     widget.grid_remove()
 
+        ui_utils.register_concept_drop_target(self.master, self.__handle_dir_drop)
+
+    def __handle_dir_drop(self, dir_path: str):
+        if any(hasattr(el, 'path') and el.path == dir_path for el in self.current_config):
+            return
+
+        new_element = self.create_new_element()
+
+        if hasattr(new_element, 'path'):
+            new_element.path = dir_path
+
+        self.__add_element_to_list(new_element)
+
+        ui_utils.register_concept_drop_target(self.master, self.__handle_dir_drop)
+
     def __load_available_config_names(self):
         if os.path.isdir(self.config_dir):
             for path in os.listdir(self.config_dir):
@@ -214,6 +257,7 @@ class ConfigList(metaclass=ABCMeta):
                 if path.endswith(".json") and os.path.isfile(path):
                     name = os.path.basename(path)
                     name = os.path.splitext(name)[0]
+                    name = path_util.safe_filename(name)
                     self.configs.append((name, path))
 
         if len(self.configs) == 0:
@@ -230,9 +274,14 @@ class ConfigList(metaclass=ABCMeta):
     def __add_config(self):
         dialogs.StringInputDialog(self.master, "name", "Name", self.__create_config)
 
-    def __add_element(self):
-        new_element = self.create_new_element()
+    def __add_element_to_list(self, new_element):
+        # placeholder removal
+        if len(self.current_config) == 0:
+            for child in self.element_list.winfo_children():
+                child.destroy()
+
         self.current_config.append(new_element)
+
         # incremental insertion if widgets already initialized, else fall back to full rebuild
         if self.widgets_initialized and self.element_list is not None:
             i = len(self.current_config) - 1
@@ -249,6 +298,10 @@ class ConfigList(metaclass=ABCMeta):
             self.widgets_initialized = False
             self._create_element_list()
         self.save_current_config()
+
+    def __add_element(self):
+        new_element = self.create_new_element()
+        self.__add_element_to_list(new_element)
 
     def __clone_element(self, clone_i, modify_element_fun=None):
         new_element = copy.deepcopy(self.current_config[clone_i])
@@ -274,17 +327,24 @@ class ConfigList(metaclass=ABCMeta):
 
     def __remove_element(self, remove_i):
         self.current_config.pop(remove_i)
+
         if self.widgets_initialized and 0 <= remove_i < len(self.widgets):
             removed = self.widgets.pop(remove_i)
             with contextlib.suppress(tk.TclError, AttributeError):
                 removed.destroy()
-            # Reindex remaining widgets
-            for idx, widget in enumerate(self.widgets):
-                widget.i = idx
-            self._update_widget_visibility()
+
+            # Create placeholder if config is empty
+            if len(self.current_config) == 0:
+                self._create_placeholder()
+            else:
+                # Reindex remaining widgets
+                for idx, widget in enumerate(self.widgets):
+                    widget.i = idx
+                self._update_widget_visibility()
         else:
             self.widgets_initialized = False
             self._create_element_list()
+
         self.save_current_config()
 
     def __load_current_config(self, filename):

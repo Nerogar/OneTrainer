@@ -1,4 +1,5 @@
 import contextlib
+import os
 import platform
 import sys
 import tkinter as tk
@@ -8,6 +9,7 @@ from tkinter import EventType
 from typing import Any
 
 from customtkinter import CTk, CTkToplevel
+from tkinterdnd2 import DND_FILES
 
 
 def bind_mousewheel(
@@ -100,6 +102,96 @@ def set_window_icon(window: tk.Tk | tk.Toplevel | CTk | CTkToplevel) -> None:
 
     except Exception as e:
         print(f"Failed to set window icon: {e}")
+
+def _drop_enter(event):
+    event.widget.focus_force()
+    return event.action
+
+def _drop_leave(event):
+    return event.action
+
+def _create_drop_handler(entry_widget, ui_state, var_name, command=None, drop_validator=None, on_reject=None):
+    def drop(event):
+        if event.data:
+            paths = _parse_dropped_paths(event.data)
+            if paths:
+                dropped_path = paths[0]
+
+                if drop_validator and not drop_validator(dropped_path):
+                    if on_reject:
+                        on_reject(dropped_path)
+                    return event.action
+
+                ui_state.get_var(var_name).set(dropped_path)
+
+                entry_widget.focus_force()
+                entry_widget.event_generate('<FocusIn>')
+                entry_widget.event_generate('<Key>')
+                entry_widget.event_generate('<FocusOut>')
+
+                if command:
+                    command(dropped_path)
+        return event.action
+    return drop
+
+def _parse_dropped_paths(event_data: str) -> list[str]:
+    paths = []
+    current_path = ""
+    in_braces = False
+
+    for char in event_data:
+        if char == '{':
+            in_braces = True
+        elif char == '}':
+            in_braces = False
+        elif char == ' ' and not in_braces:
+            pass  # Will append below
+        else:
+            current_path += char
+            continue
+
+        # Common path appending logic for '}' and ' '
+        if current_path:
+            paths.append(current_path)
+            current_path = ""
+
+    if current_path:
+        paths.append(current_path)
+
+    return [p.strip() for p in paths if p.strip()]
+
+def register_drop_target(entry_widget, ui_state, var_name, command=None, drop_validator=None, on_reject=None):
+    try:
+        entry_widget.drop_target_register(DND_FILES)
+        for event, handler in [('<<DropEnter>>', _drop_enter), ('<<DropLeave>>', _drop_leave),
+                               ('<<Drop>>', _create_drop_handler(entry_widget, ui_state, var_name, command, drop_validator, on_reject))]:
+            entry_widget.dnd_bind(event, handler)
+    except Exception:
+        pass
+
+def register_concept_drop_target(widget, drop_callback: Callable[[str], None], allow_multiple: bool = True):
+    def drop_handler(event):
+        if not event.data:
+            return event.action
+
+        paths = _parse_dropped_paths(event.data)
+
+        for path in paths:
+            path = os.path.dirname(path) if os.path.isfile(path) else path
+            if os.path.isdir(path):
+                drop_callback(path)
+                if not allow_multiple:
+                    break
+
+        return event.action
+
+    try:
+        widget.drop_target_register(DND_FILES)
+        widget.dnd_bind('<<DropEnter>>', _drop_enter)
+        widget.dnd_bind('<<DropLeave>>', _drop_leave)
+        widget.dnd_bind('<<Drop>>', drop_handler)
+    except Exception:
+        pass
 
 class DebounceTimer:
     def __init__(self, widget, delay_ms: int, callback: Callable[..., Any]):

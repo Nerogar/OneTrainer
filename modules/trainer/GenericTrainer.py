@@ -30,6 +30,7 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.profiling_util import TorchMemoryRecorder, TorchProfiler
+from modules.util.tensorboard_util import get_tensorboard_manager
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
@@ -70,9 +71,9 @@ class GenericTrainer(BaseTrainer):
         if multi.is_master():
             tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
             os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
-            self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, f"{config.save_filename_prefix}{get_string_timestamp()}"))
-            if config.tensorboard and not config.tensorboard_always_on:
-                super()._start_tensorboard()
+            self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, f"{config.get_run_name()}_{get_string_timestamp()}"))
+
+            get_tensorboard_manager().handle_training_start(config)
 
         self.model = None
         self.one_step_trained = False
@@ -164,7 +165,7 @@ class GenericTrainer(BaseTrainer):
     def __save_config_to_workspace(self):
         path = path_util.canonical_join(self.config.workspace_dir, "config")
         os.makedirs(Path(path).absolute(), exist_ok=True)
-        path = path_util.canonical_join(path, f"{self.config.save_filename_prefix}{get_string_timestamp()}.json")
+        path = path_util.canonical_join(path, f"{self.config.get_run_name()}_{get_string_timestamp()}.json")
         with open(path, "w") as f:
             json.dump(self.config.to_pack_dict(secrets=False), f, indent=4)
 
@@ -234,7 +235,7 @@ class GenericTrainer(BaseTrainer):
 
                     sample_path = os.path.join(
                         sample_dir,
-                        f"{self.config.save_filename_prefix}{get_string_timestamp()}-training-sample-{train_progress.filename_string()}"
+                        f"{self.config.get_run_name()}_{get_string_timestamp()}-training-sample-{train_progress.filename_string()}"
                     )
 
                     def on_sample_default(sampler_output: ModelSamplerOutput):
@@ -431,7 +432,7 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("Creating backup")
 
-        backup_name = f"{get_string_timestamp()}-backup-{train_progress.filename_string()}"
+        backup_name = f"{get_string_timestamp()}-{self.config.get_run_name()}-backup-{train_progress.filename_string()}"
         backup_path = os.path.join(self.config.workspace_dir, "backup", backup_name)
 
         # Special case for schedule-free optimizers.
@@ -481,7 +482,7 @@ class GenericTrainer(BaseTrainer):
         save_path = os.path.join(
             self.config.workspace_dir,
             "save",
-            f"{self.config.save_filename_prefix}{get_string_timestamp()}-save-{train_progress.filename_string()}{self.config.output_model_format.file_extension()}"
+            f"{self.config.save_filename_prefix}{get_string_timestamp()}-{self.config.get_run_name()}-save-{train_progress.filename_string()}{self.config.output_model_format.file_extension()}"
         )
         if print_msg:
             print_cb("Saving " + save_path)
@@ -851,7 +852,7 @@ class GenericTrainer(BaseTrainer):
                 if os.path.isdir(self.config.output_model_destination) and self.config.output_model_format.is_single_file():
                     save_path = os.path.join(
                         self.config.output_model_destination,
-                        f"{self.config.save_filename_prefix}{get_string_timestamp()}{self.config.output_model_format.file_extension()}"
+                        f"{self.config.get_run_name()}_{get_string_timestamp()}{self.config.output_model_format.file_extension()}"
                     )
                 else:
                     save_path = self.config.output_model_destination
@@ -870,9 +871,7 @@ class GenericTrainer(BaseTrainer):
 
         if multi.is_master():
             self.tensorboard.close()
-
-            if self.config.tensorboard and not self.config.tensorboard_always_on:
-                super()._stop_tensorboard()
+            get_tensorboard_manager().handle_training_end(self.config)
 
         for handle in self.grad_hook_handles:
             handle.remove()
