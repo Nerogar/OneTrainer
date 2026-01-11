@@ -147,7 +147,7 @@ class VideoToolUI(ctk.CTkToplevel):
                          tooltip="FPS to convert output videos to, set to 0 to keep original rate.")
         self.clip_fps_entry = ctk.CTkEntry(frame, width=220)
         self.clip_fps_entry.grid(row=7, column=1, sticky="w", padx=5, pady=5)
-        self.clip_fps_entry.insert(0, "24")
+        self.clip_fps_entry.insert(0, "24.0")
 
         # Remove borders
         self.clip_bordercrop = ctk.BooleanVar(self, False)
@@ -448,7 +448,7 @@ class VideoToolUI(ctk.CTkToplevel):
         try:
             max_length = float(self.clip_length_entry.get())
             crop_variation = float(self.clip_crop_entry.get())
-            target_fps = int(self.clip_fps_entry.get())
+            target_fps = float(self.clip_fps_entry.get())
             input_single_entry = self.clip_single_entry.get()
             input_multiple_entry = self.clip_list_entry.get()
             output_entry = self.clip_output_entry.get()
@@ -459,7 +459,7 @@ class VideoToolUI(ctk.CTkToplevel):
             self.__update_status("Max Length of clips must be > 0.25 seconds.")
             return
         if target_fps < 0:
-            self.__update_status("Target FPS must be a positive integer (or 0 to skip fps re-encoding).")
+            self.__update_status("Target FPS must be a positive number (or 0 to skip fps re-encoding).")
             return
         if not (0.0 <= crop_variation < 1.0):
             self.__update_status("Crop Variation must be between 0.0 and 1.0.")
@@ -497,12 +497,12 @@ class VideoToolUI(ctk.CTkToplevel):
             self.__update_status(f'Clip extraction from "{input_single_entry}" complete')
 
     def __extract_clips(self, video_path: str, timestamp_min: str, timestamp_max: str, max_length: float,
-                        split_at_cuts: bool, remove_borders : bool, crop_variation: float, target_fps: int, output_dir: str):
+                        split_at_cuts: bool, remove_borders : bool, crop_variation: float, target_fps: float, output_dir: str):
         video = cv2.VideoCapture(video_path)
         vid_fps = video.get(cv2.CAP_PROP_FPS) or 0
         if vid_fps <= 0:
             self.__update_status(f'Warning: Could not read FPS for "{os.path.basename(video_path)}". Falling back to 30 FPS.')
-            vid_fps = 30
+            vid_fps = 30.0
         max_length_frames = int(max_length * vid_fps)   #convert max length from seconds to frames
         min_length_frames = max(int(0.25*vid_fps), 1)   #minimum clip length of 1/4 second or 1 frame
         total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
@@ -521,9 +521,9 @@ class VideoToolUI(ctk.CTkToplevel):
                 end_time=int(timestamp_max_frame))
             scene_list = [(x[0].get_frames(), x[1].get_frames()) for x in timecode_list]
             if len(scene_list) == 0:
-                scene_list = [(timestamp_min_frame, timestamp_max_frame)]    # use start/end frames if no scenes detected
+                scene_list = [(timestamp_min_frame, timestamp_max_frame)]    #use start/end frames if no scenes detected
         else:
-            scene_list = [(timestamp_min_frame, timestamp_max_frame)]  # default if not using cuts, start and end of time range
+            scene_list = [(timestamp_min_frame, timestamp_max_frame)]  #default if not using cuts, start and end of time range
 
         scene_list_split = []
         for scene in scene_list:
@@ -548,13 +548,13 @@ class VideoToolUI(ctk.CTkToplevel):
 
         video.release()
 
-    def __save_clip(self, scene : tuple[int, int], video_path : str, target_fps : int, remove_borders : bool, crop_variation : float, output_dir : str):
+    def __save_clip(self, scene : tuple[int, int], video_path : str, target_fps : float, remove_borders : bool, crop_variation : float, output_dir : str):
         basename, ext = os.path.splitext(os.path.basename(video_path))
         video = cv2.VideoCapture(str(video_path))
         fps = video.get(cv2.CAP_PROP_FPS) or 0.0
         if fps <= 0:
             self.__update_status(f'Warning: Could not read FPS for "{os.path.basename(video_path)}". Falling back to 30 FPS.')
-            fps = 30
+            fps = 30.0
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         output_name = f'{output_dir}{os.sep}{basename}_{scene[0]}-{scene[1]}'
@@ -684,19 +684,19 @@ class VideoToolUI(ctk.CTkToplevel):
     def __save_frames(self, video_path: str, timestamp_min: str, timestamp_max: str, capture_rate: float,
                       blur_threshold: float, remove_borders : bool, crop_variation: float, output_dir: str):
         video = cv2.VideoCapture(video_path)
-        fps = video.get(cv2.CAP_PROP_FPS) or 0
-        if fps <= 0:
+        vid_fps = video.get(cv2.CAP_PROP_FPS) or 0
+        if vid_fps <= 0:
             self.__update_status(f'Warning: Could not read FPS for "{os.path.basename(video_path)}". Falling back to 30 FPS.')
-            fps = 30
+            vid_fps = 30.0
         if capture_rate <= 0:
             self.__update_status("Images/sec must be > 0.")
             video.release()
             return
-        image_rate = max(int(fps / capture_rate), 1)   #frames between captures (min 1)
+        image_rate = max(int(vid_fps / capture_rate), 1)   #frames between captures (min 1)
         total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
-        timestamp_max_frame = int(sum(int(x) * 60 ** i for i, x in enumerate(reversed(timestamp_max.split(':')))) * fps)
+        timestamp_max_frame = int(sum(int(x) * 60 ** i for i, x in enumerate(reversed(timestamp_max.split(':')))) * vid_fps)
         timestamp_max_frame = min(timestamp_max_frame, max(total_frames - 1, 0))
-        timestamp_min_frame = int(sum(int(x) * 60 ** i for i, x in enumerate(reversed(timestamp_min.split(':')))) * fps)
+        timestamp_min_frame = int(sum(int(x) * 60 ** i for i, x in enumerate(reversed(timestamp_min.split(':')))) * vid_fps)
         timestamp_min_frame = min(timestamp_min_frame, timestamp_max_frame)
         frame_range = range(timestamp_min_frame, timestamp_max_frame, image_rate)
         frame_list = []
