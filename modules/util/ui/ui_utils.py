@@ -3,6 +3,7 @@ import os
 import platform
 import sys
 import tkinter as tk
+import urllib.parse
 from collections.abc import Callable
 from pathlib import Path
 from tkinter import EventType
@@ -11,6 +12,21 @@ from typing import Any
 from customtkinter import CTk, CTkToplevel
 from tkinterdnd2 import DND_FILES
 
+# Temp debug
+print(f"[DnD Debug] Platform: {sys.platform}")
+print(f"[DnD Debug] XDG_SESSION_TYPE: {os.environ.get('XDG_SESSION_TYPE', 'not set')}")
+print(f"[DnD Debug] WAYLAND_DISPLAY: {os.environ.get('WAYLAND_DISPLAY', 'not set')}")
+print(f"[DnD Debug] DISPLAY: {os.environ.get('DISPLAY', 'not set')}")
+try:
+    from tkinterdnd2 import TkinterDnD
+    _test_root = tk.Tk()
+    _test_root.withdraw()
+    _tkdnd_version = TkinterDnD._require(_test_root)
+    print(f"Debug: tkdnd ver: {_tkdnd_version}")
+    _test_root.destroy()
+except Exception as e:
+    print(f"Debug: tkdnd load error: {e}")
+print("=" * 50)
 
 def bind_mousewheel(
     widget: Any,
@@ -135,6 +151,12 @@ def _create_drop_handler(entry_widget, ui_state, var_name, command=None, drop_va
     return drop
 
 def _parse_dropped_paths(event_data: str) -> list[str]:
+    """Parse dropped path data from drag-and-drop events:
+
+    - Brace-wrapped paths with spaces: {/path/with spaces/file.txt}
+    - file:// URI format: file:///home/user/file.txt
+    - URL-encoded characters: %20 for spaces
+    """
     paths = []
     current_path = ""
     in_braces = False
@@ -150,7 +172,6 @@ def _parse_dropped_paths(event_data: str) -> list[str]:
             current_path += char
             continue
 
-        # Common path appending logic for '}' and ' '
         if current_path:
             paths.append(current_path)
             current_path = ""
@@ -158,7 +179,22 @@ def _parse_dropped_paths(event_data: str) -> list[str]:
     if current_path:
         paths.append(current_path)
 
-    return [p.strip() for p in paths if p.strip()]
+
+    cleaned_paths = []
+    for p in paths:
+        p = p.strip()
+        if not p:
+            continue
+
+        if p.startswith('file://'):
+            p = urllib.parse.unquote(p[7:])  # remove 'file://' and decode %xx
+            if p.startswith('//'):
+                p = p[2:]  # file:///path -> /path
+
+        cleaned_paths.append(p)
+
+    return cleaned_paths
+
 
 def register_drop_target(entry_widget, ui_state, var_name, command=None, drop_validator=None, on_reject=None):
     try:
@@ -166,8 +202,8 @@ def register_drop_target(entry_widget, ui_state, var_name, command=None, drop_va
         for event, handler in [('<<DropEnter>>', _drop_enter), ('<<DropLeave>>', _drop_leave),
                                ('<<Drop>>', _create_drop_handler(entry_widget, ui_state, var_name, command, drop_validator, on_reject))]:
             entry_widget.dnd_bind(event, handler)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Failed to register drop target: {e}")
 
 def register_concept_drop_target(widget, drop_callback: Callable[[str], None], allow_multiple: bool = True):
     def drop_handler(event):
@@ -190,8 +226,8 @@ def register_concept_drop_target(widget, drop_callback: Callable[[str], None], a
         widget.dnd_bind('<<DropEnter>>', _drop_enter)
         widget.dnd_bind('<<DropLeave>>', _drop_leave)
         widget.dnd_bind('<<Drop>>', drop_handler)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"Failed to register concept drop target: {e}")
 
 class DebounceTimer:
     def __init__(self, widget, delay_ms: int, callback: Callable[..., Any]):
