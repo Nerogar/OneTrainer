@@ -35,7 +35,8 @@ class ConceptTab(ConfigList):
             add_button_text="Add Concept",
             add_button_tooltip="Adds a new concept to the current config.",
             is_full_width=False,
-            show_toggle_button=True
+            show_toggle_button=True,
+            placeholder_text="You have no concepts defined. Either click the 'Add Concept' button or drag and drop a directory here to add a new concept."
         )
         self._toolbar = None
         self._toolbar_is_wrapped = False

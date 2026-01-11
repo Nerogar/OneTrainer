@@ -31,6 +31,7 @@ class ConfigList(metaclass=ABCMeta):
             add_button_tooltip: str = "",
             is_full_width: bool = "",
             show_toggle_button: bool = False,
+            placeholder_text: str = "",
     ):
         self.master = master
         self.train_config = train_config
@@ -43,6 +44,7 @@ class ConfigList(metaclass=ABCMeta):
         self.default_config_name = default_config_name
 
         self.is_full_width = is_full_width
+        self.placeholder_text = placeholder_text
 
         # From search-concepts
         self.filters = {"search": "", "type": "ALL", "show_disabled": True}
@@ -177,9 +179,11 @@ class ConfigList(metaclass=ABCMeta):
         self._update_toggle_button_text()
 
     def _create_placeholder(self):
+        if not self.placeholder_text:
+            return
         placeholder = ctk.CTkLabel(
             self.element_list,
-            text="Either click the 'Add Concept/Embedding' button or drag and drop a directory here to add a new concept/embeddings",
+            text=self.placeholder_text,
             text_color="gray50"
         )
         placeholder.grid(row=0, column=0, padx=20, pady=20)
