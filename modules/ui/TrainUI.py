@@ -345,21 +345,35 @@ class TrainUI(ctk.CTk):
         frame.grid_columnconfigure(3, weight=0)
         frame.grid_columnconfigure(4, weight=1)
 
+        # keep image size
+        def _on_keep_image_size_toggle():
+            if self.train_config.keep_image_size:
+                self.__aspect_ratio_bucketing.deselect()
+
+        components.label(frame, 0, 0, "Keep Image Size",
+                         tooltip="Don't modify the image size and train on the original resolution. When enabled, aspect ratio bucketing and resolution overrides are not available.")
+        self.__keep_image_size = components.switch(frame, 0, 1, self.ui_state, "keep_image_size", _on_keep_image_size_toggle)
+
         # aspect ratio bucketing
-        components.label(frame, 0, 0, "Aspect Ratio Bucketing",
+        def _on_aspect_ratio_bucketing_toggle():
+            if self.train_config.aspect_ratio_bucketing:
+                self.__keep_image_size.deselect()
+
+        components.label(frame, 1, 0, "Aspect Ratio Bucketing",
                          tooltip="Aspect ratio bucketing enables training on images with different aspect ratios")
-        components.switch(frame, 0, 1, self.ui_state, "aspect_ratio_bucketing")
+        self.__aspect_ratio_bucketing = components.switch(frame, 1, 1, self.ui_state, "aspect_ratio_bucketing", _on_aspect_ratio_bucketing_toggle)
 
         # latent caching
-        components.label(frame, 1, 0, "Latent Caching",
+        components.label(frame, 0, 3, "Latent Caching",
                          tooltip="Caching of intermediate training data that can be re-used between epochs")
-        components.switch(frame, 1, 1, self.ui_state, "latent_caching")
+        components.switch(frame, 0, 4, self.ui_state, "latent_caching")
 
         # clear cache before training
-        components.label(frame, 2, 0, "Clear cache before training",
+        components.label(frame, 1, 3, "Clear cache before training",
                          tooltip="Clears the cache directory before starting to train. Only disable this if you want to continue using the same cached data. Disabling this can lead to errors, if other settings are changed during a restart")
-        components.switch(frame, 2, 1, self.ui_state, "clear_cache_before_training")
+        components.switch(frame, 1, 4, self.ui_state, "clear_cache_before_training")
 
+        _on_keep_image_size_toggle()
         frame.pack(fill="both", expand=1)
         return frame
 
