@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Note: AMD requirements might be outdated. If you can provide information about running OneTrainer on AMD,
 # please open an issue or pull request on github
 
@@ -9,3 +10,6 @@ onnxruntime==1.23.2
 
 # optimizers
 # TODO
+=======
+-r .[rocm]
+>>>>>>> b1a8334 (Make everything `pip`-installable.)

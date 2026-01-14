@@ -1,12 +1,17 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "OneTrainer"
 requires-python = ">=3.10,<3.14"
 version = "0.1.0"
 
 dependencies = [
+    # base requirements
     "numpy==2.2.6",
     "opencv-python==4.11.0.86",
-    "pillow==11.3.0",
+    "pillow==12.1.1",
     "imagesize==1.4.1",
     "tqdm==4.67.1",
     "pyyaml==6.0.2",
@@ -15,58 +20,81 @@ dependencies = [
     "matplotlib==3.10.3",
     "av==16.1.0",
     "yt-dlp",
-    "scenedetect==0.6.6",
-    "accelerate==1.7.0",
-    "safetensors==0.5.3",
-    "tensorboard==2.19.0",
-    "pytorch-lightning==2.5.1.post0",
-    "diffusers @ git+https://github.com/huggingface/diffusers.git@256e0106749363fce06c28000698edeaf56a874d",
+    "scenedetect==0.6.7.1",
+    "parse==1.20.2",
+    "setuptools==81.0.0",
+
+    # pytorch
+    "accelerate==1.12.0",
+    "safetensors==0.7.0",
+    "tensorboard==2.20.0",
+    "pytorch-lightning==2.6.1",
+
+    # diffusion models
+    "diffusers @ git+https://github.com/huggingface/diffusers.git@99daaa802da01ef4cff5141f4f3c0329a57fb591",
     "gguf==0.17.1",
-    "transformers==4.56.2",
-    "sentencepiece==0.2.1",
-    "omegaconf==2.3.0",
-    "invisible-watermark==0.2.0",
+    "transformers==4.57.6",
+    "sentencepiece==0.2.1",  # transitive dependency of transformers for tokenizer loading
+    "omegaconf==2.3.0", # needed to load stable diffusion from single ckpt files
+    "invisible-watermark==0.2.0", # needed for the SDXL pipeline
+
+    # other models
     "pooch==1.8.2",
     "open-clip-torch==2.32.0",
-    "mgds @ git+https://github.com/Nerogar/mgds.git@385578f8c9e7861bd98c85d8855a23cb6b48661d",
+
+    # data loader
+    "mgds @ git+https://github.com/Nerogar/mgds.git@5bbafa54386da925f769ca3a767f8bb337637b7d",
+
+    # optimizers
     "dadaptation==3.2",
     "lion-pytorch==0.2.3",
     "prodigyopt==1.1.2",
     "schedulefree==1.4.1",
     "pytorch-optimizer==3.6.0",
     "prodigy-plus-schedule-free==2.0.1",
-    "adv-optm==2.1.0",
+    "adv-optm==2.2.3",
     "muon-optimizer @ git+https://github.com/KellerJordan/Muon.git@f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd",
+
+    # profiling
     "scalene==2.0.1",
+
+    # ui
     "customtkinter==5.2.2",
+
+    # cloud
     "runpod==1.7.10",
     "fabric==3.2.2",
+
+    # debug
     "psutil==7.0.0",
     "requests==2.32.5",
-    "deepdiff==8.6.1",
+    "deepdiff==8.6.1", # output easy to read diff for troublshooting
 ]
 
 [project.optional-dependencies]
 cpu = [
-  "torch==2.8.0",
-  "torchvision==0.23.0",
-  "onnxruntime==1.22.1",
+  "torch==2.9.1",
+  "torchvision==0.24.1",
+  "onnxruntime==1.23.2",
 ]
 
 cuda = [
-  "torch==2.8.0",
-  "torchvision==0.23.0",
-  "onnxruntime-gpu==1.22.0",
-  "bitsandbytes==0.46.0",
-  "nvidia-nccl-cu12==2.27.3; sys_platform == 'linux'",
-  "triton-windows==3.4.0.post20; sys_platform == 'win32'",
+  "torch==2.9.1",
+  "torchvision==0.24.1",
+  "onnxruntime-gpu==1.23.2",
+  "bitsandbytes==0.49.1",
+  "nvidia-nccl-cu12==2.27.5; sys_platform == 'linux'",
+  "triton-windows==3.5.1.post24; sys_platform == 'win32'",
 ]
 
 rocm = [
-    "torch==2.7.1",
-    "torchvision==0.22.1",
-    "onnxruntime==1.22.1",
+    "torch==2.9.1",
+    "torchvision==0.24.1",
+    "onnxruntime==1.23.2",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
 
 [tool.ruff]
 extend-exclude = [

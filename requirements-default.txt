@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # pytorch
 torch==2.9.1
 torchvision==0.24.1
@@ -5,3 +6,6 @@ onnxruntime==1.23.2
 
 # optimizers
 # TODO
+=======
+-r .[cpu]
+>>>>>>> b1a8334 (Make everything `pip`-installable.)
