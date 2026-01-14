@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "OneTrainer"
 requires-python = ">=3.10,<3.14"
@@ -67,6 +71,9 @@ rocm = [
     "torchvision==0.22.1",
     "onnxruntime==1.22.1",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
 
 [tool.ruff]
 extend-exclude = [
