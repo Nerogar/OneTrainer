@@ -1,5 +1,6 @@
 import torch
 
+
 def immiscible_oversampling(self, source_tensor, noise_candidates):
     """
     Implements the noise oversampling method proposed in the paper:
@@ -9,7 +10,7 @@ def immiscible_oversampling(self, source_tensor, noise_candidates):
     https://github.com/yhli123/Immiscible-Diffusion/blob/65feadc66c7653b2644d06246fe8a424a5d76794/KNN-stable_diffusion/conditional_ft_train_sd.py#L940
     """
     # Using float16 for distance calculation to save memory/compute as per reference implementation
-    latents_points = source_tensor.flatten(start_dim=1).to(torch.float16) 
+    latents_points = source_tensor.flatten(start_dim=1).to(torch.float16)
     noise_points = noise_candidates.flatten(start_dim=2).to(torch.float16)
 
     # Calculate L2 distance between latents and the corresponding k noises
