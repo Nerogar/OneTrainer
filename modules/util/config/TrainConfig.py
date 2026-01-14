@@ -444,6 +444,7 @@ class TrainConfig(BaseConfig):
     timestep_distribution: TimestepDistribution
     min_noising_strength: float
     max_noising_strength: float
+    k_noise_sampling: int
 
     noising_weight: float
     noising_bias: float
@@ -1026,6 +1027,7 @@ class TrainConfig(BaseConfig):
         data.append(("noising_bias", 0.0, float, False))
         data.append(("timestep_shift", 1.0, float, False))
         data.append(("dynamic_timestep_shifting", False, bool, False))
+        data.append(("k_noise_sampling", 1.0, int, False))
 
 
         # unet

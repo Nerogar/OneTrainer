@@ -646,12 +646,20 @@ class TrainingTab:
                          tooltip="Shift the timestep distribution. Use the preview to see more details.")
         components.entry(frame, 8, 1, self.ui_state, "timestep_shift")
 
+        row = 9
+
         if supports_dynamic_timestep_shifting:
             # dynamic timestep shifting
-            components.label(frame, 9, 0, "Dynamic Timestep Shifting",
+            components.label(frame, row, 0, "Dynamic Timestep Shifting",
                              tooltip="Dynamically shift the timestep distribution based on resolution.")
-            components.switch(frame, 9, 1, self.ui_state, "dynamic_timestep_shifting")
+            components.switch(frame, row, 1, self.ui_state, "dynamic_timestep_shifting")
+            row += 1
 
+        # Immiscible Diffusion
+        components.label(frame, row, 0, "Noise Oversampling",
+                         tooltip="Instead of simply assigning a random piece of noise to a data point (the standard way diffusion models work), this parameter allows the model to 'pick' the noise that is mathematically closest to the input data. value 1 is the default. Immiscible Diffusion (Value >1) This applies oversampling noise assignment for each image in the batch size. The goal of Immiscible Diffusion is to reduce the 'mixing' or 'entanglement' of paths during the diffusion process. By pairing an image with noise that is already somewhat similar to it, leading to improved and accelerated training. Start with 64, 128, 256...")
+        components.entry(frame, row, 1, self.ui_state, "k_noise_sampling")
+        row += 1
 
 
     def __create_masked_frame(self, master, row):
