@@ -151,11 +151,6 @@ requires-pixi = "0.63.0"
 train = { cmd = "python scripts/train.py", cwd = "." }
 ui = { cmd = "python scripts/train_ui.py", cwd = "." }
 
-[tool.pixi.feature.cpu.pypi-dependencies]
-torch = "==2.8.0"
-torchvision = "==0.23.0"
-onnxruntime = "==1.22.1"
-
 [tool.pixi.feature.cuda]
 platforms = ["linux-64", "win-64"]
 
