@@ -8,6 +8,7 @@ import threading
 import time
 import traceback
 
+from modules.ui.TimestepDistributionWindow import TimestepDistributionPlot
 from modules.util import concept_stats, path_util
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.TrainConfig import TrainConfig
@@ -79,6 +80,7 @@ class ConceptWindow(ctk.CTkToplevel):
             ui_state: UIState,
             image_ui_state: UIState,
             text_ui_state: UIState,
+            overrides_ui_state: UIState,
             *args, **kwargs,
     ):
         super().__init__(parent, *args, **kwargs)
@@ -89,6 +91,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.ui_state = ui_state
         self.image_ui_state = image_ui_state
         self.text_ui_state = text_ui_state
+        self.overrides_ui_state = overrides_ui_state
         self.image_preview_file_index = 0
         self.preview_augmentations = ctk.BooleanVar(self, True)
 
@@ -105,6 +108,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.general_tab = self.__general_tab(tabview.add("general"), concept)
         self.image_augmentation_tab = self.__image_augmentation_tab(tabview.add("image augmentation"))
         self.text_augmentation_tab = self.__text_augmentation_tab(tabview.add("text augmentation"))
+        self.overrides_tab = self.__overrides_tab(tabview.add("overrides"))
         self.concept_stats_tab = self.__concept_stats_tab(tabview.add("statistics"))
 
         #automatic concept scan
@@ -372,6 +376,84 @@ class ConceptWindow(ctk.CTkToplevel):
         components.label(frame, 8, 2, "Probability",
                          tooltip="Probability to randomize capitialization of each tag, from 0 to 1.")
         components.entry(frame, 8, 3, self.text_ui_state, "caps_randomize_probability")
+
+        frame.pack(fill="both", expand=1)
+        return frame
+
+    def __overrides_tab(self, master):
+        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
+        frame.grid_columnconfigure(0, weight=0)
+        frame.grid_columnconfigure(1, weight=0)
+        frame.grid_columnconfigure(2, weight=0)
+        frame.grid_columnconfigure(3, weight=1)
+
+        components.label(frame, 0, 1, "Global",
+                         tooltip="This column shows the global settings.")
+        components.label(frame, 0, 2, "Override",
+                         tooltip="Override settings for this concept,\nor leave the fields empty to use global settings.",
+                         wide_tooltip=True)
+
+        # offset noise weight
+        components.label(frame, 1, 0, "Offset Noise Weight",
+                         tooltip="The weight of offset noise added to each training step.\nLeave empty to use global settings.")
+        components.label(frame, 1, 1, str(self.train_config.offset_noise_weight))
+        components.entry(frame, 1, 2, self.overrides_ui_state, "offset_noise_weight")
+
+        # perturbation noise weight
+        components.label(frame, 2, 0, "Perturbation Noise Weight",
+                         tooltip="The weight of perturbation noise added to each training step.\nLeave empty to use global settings.")
+        components.label(frame, 2, 1, str(self.train_config.perturbation_noise_weight))
+        components.entry(frame, 2, 2, self.overrides_ui_state, "perturbation_noise_weight")
+
+        frame.grid_rowconfigure(3, minsize=24) # spacing
+
+        # timestep distribution
+        components.label(frame, 4, 0, "Timestep Distribution",
+                         tooltip="Will always use global setting for the timestep distribution function.")
+        timestep_distribution_label = components.label(frame, 4, 1, str(self.train_config.timestep_distribution))
+        timestep_distribution_label.grid(columnspan=2)
+
+        # min noising strength
+        components.label(frame, 5, 0, "Min Noising Strength",
+                         tooltip="Specifies the minimum noising strength used during training. This can help to improve composition, but prevents finer details from being trained.\nLeave empty to use global settings.")
+        components.label(frame, 5, 1, str(self.train_config.min_noising_strength))
+        components.entry(frame, 5, 2, self.overrides_ui_state, "min_noising_strength")
+
+        # max noising strength
+        components.label(frame, 6, 0, "Max Noising Strength",
+                         tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition.\nLeave empty to use global settings.")
+        components.label(frame, 6, 1, str(self.train_config.max_noising_strength))
+        components.entry(frame, 6, 2, self.overrides_ui_state, "max_noising_strength")
+
+        # noising weight
+        components.label(frame, 7, 0, "Noising Weight",
+                         tooltip="Controls the weight parameter of the timestep distribution function. Use the preview to see more details.\nLeave empty to use global settings.")
+        components.label(frame, 7, 1, str(self.train_config.noising_weight))
+        components.entry(frame, 7, 2, self.overrides_ui_state, "noising_weight")
+
+        # noising bias
+        components.label(frame, 8, 0, "Noising Bias",
+                         tooltip="Controls the bias parameter of the timestep distribution function. Use the preview to see more details.\nLeave empty to use global settings.")
+        components.label(frame, 8, 1, str(self.train_config.noising_bias))
+        components.entry(frame, 8, 2, self.overrides_ui_state, "noising_bias")
+
+        # timestep shift
+        global_timestep_shift = "dynamic" if self.train_config.dynamic_timestep_shifting \
+            else str(self.train_config.timestep_shift)
+
+        components.label(frame, 9, 0, "Timestep Shift",
+                         tooltip="Shift the timestep distribution. Use the preview to see more details.\nThe value has no effect when dynamic timestep shifting is enabled (and the model supports dynamic shifting).\nLeave empty to use global settings.")
+        components.label(frame, 9, 1, global_timestep_shift)
+        components.entry(frame, 9, 2, self.overrides_ui_state, "timestep_shift")
+
+        # timestep distribution plot
+        plot = TimestepDistributionPlot(frame, self.train_config, self.concept.overrides)
+        plot.get_tk_widget().grid(row=0, column=3, rowspan=11)
+        frame.grid_rowconfigure(10, weight=1)
+
+        # plot update button
+        update_button = components.button(frame, 10, 0, "Update Preview", command=plot.update_preview)
+        update_button.grid(columnspan=3)
 
         frame.pack(fill="both", expand=1)
         return frame

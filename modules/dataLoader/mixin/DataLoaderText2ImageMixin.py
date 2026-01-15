@@ -3,6 +3,7 @@ from collections.abc import Callable
 
 import modules.util.multi_gpu_util as multi
 from modules.util import path_util
+from modules.util.config.ConceptConfig import ConceptOverridesConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 
@@ -24,6 +25,7 @@ from mgds.pipelineModules.InlineDistributedSampler import InlineDistributedSampl
 from mgds.pipelineModules.LoadImage import LoadImage
 from mgds.pipelineModules.LoadMultipleTexts import LoadMultipleTexts
 from mgds.pipelineModules.LoadVideo import LoadVideo
+from mgds.pipelineModules.MapData import MapData
 from mgds.pipelineModules.ModifyPath import ModifyPath
 from mgds.pipelineModules.RandomBrightness import RandomBrightness
 from mgds.pipelineModules.RandomCircularMaskShrink import RandomCircularMaskShrink
@@ -269,6 +271,7 @@ class DataLoaderText2ImageMixin:
         output_names = output_names + [
             ('concept.loss_weight', 'loss_weight'),
             ('concept.type', 'concept_type'),
+            'config',
         ]
 
         if config.validation:
@@ -292,6 +295,8 @@ class DataLoaderText2ImageMixin:
             batch_sorting = InlineAspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size * world_size)
             distributed_sampler = InlineDistributedSampler(names=sort_names, world_size=world_size, rank=multi.rank())
 
+        prepare_batch_config = MapData(in_name='concept.overrides', out_name='config', map_fn=self.__create_prepare_batch_config(config))
+
         output = OutputPipelineModule(names=output_names)
 
         modules = []
@@ -303,6 +308,21 @@ class DataLoaderText2ImageMixin:
         if world_size > 1:
             modules.append(distributed_sampler)
 
-        modules.append(output)
+        modules.extend([prepare_batch_config, output])
 
         return modules
+
+    @staticmethod
+    def __create_prepare_batch_config(config: TrainConfig):
+        override_keys = [*ConceptOverridesConfig.default_values().types]
+
+        def prepare_batch_config(overrides: dict):
+            # Return overridden values if they exist, otherwise default to the current global value from TrainConfig.
+            # The 'overrides' dict may contain None values, which specifically mean "use global default".
+            # The settings in TrainConfig can change during training, so always get the current value from the instance.
+            return {
+                k: v if (v := overrides.get(k)) is not None else getattr(config, k)
+                for k in override_keys
+            }
+
+        return prepare_batch_config
