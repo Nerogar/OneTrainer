@@ -142,7 +142,7 @@ extra-index-urls = ["https://download.pytorch.org/whl/rocm6.3"]
 python = "3.13.*"
 
 [tool.pixi.target.linux-64.dependencies]
-tk = "*"
+tk = { version = "*", build = "xft_*" }
 libgl = "*"
 
 [tool.pixi.system-requirements]
