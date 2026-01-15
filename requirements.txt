@@ -1,2 +1,2 @@
---extra-index-url https://download.pytorch.org/whl/cu128
--r .[cuda]
+-r requirements-global.txt
+-r requirements-cuda.txt
