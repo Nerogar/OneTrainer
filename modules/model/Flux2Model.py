@@ -15,14 +15,22 @@ from diffusers import (
     AutoencoderKLFlux2,
     DiffusionPipeline,
     FlowMatchEulerDiscreteScheduler,
+    Flux2KleinPipeline,
     Flux2Pipeline,
     Flux2Transformer2DModel,
 )
-from diffusers.pipelines.flux2.pipeline_flux2 import format_input
-from transformers import AutoProcessor, Mistral3ForConditionalGeneration
+from diffusers.pipelines.flux2.pipeline_flux2 import format_input as mistral_format_input
+from transformers import Mistral3ForConditionalGeneration, PixtralProcessor, Qwen2Tokenizer, Qwen3ForCausalLM
 
-SYSTEM_MESSAGE = "You are an AI that reasons about image descriptions. You give structured responses focusing on object relationships, object attribution and actions without speculation."
-HIDDEN_STATES_LAYERS = [10, 20, 30]
+MISTRAL_SYSTEM_MESSAGE = "You are an AI that reasons about image descriptions. You give structured responses focusing on object relationships, object attribution and actions without speculation."
+MISTRAL_HIDDEN_STATES_LAYERS = [10, 20, 30]
+QWEN3_HIDDEN_STATES_LAYERS = [9, 18, 27]
+
+def qwen3_format_input(text: str):
+    return [
+        {"role": "user", "content": text},
+    ]
+
 
 def diffusers_to_original(qkv_fusion):
     return [
@@ -70,9 +78,9 @@ diffusers_lora_to_comfy = [remove_prefix("transformer"), diffusers_to_original(l
 
 class Flux2Model(BaseModel):
     # base model data
-    tokenizer: AutoProcessor | None
+    tokenizer: PixtralProcessor | Qwen2Tokenizer | None
     noise_scheduler: FlowMatchEulerDiscreteScheduler | None
-    text_encoder: Mistral3ForConditionalGeneration | None
+    text_encoder: Mistral3ForConditionalGeneration | Qwen3ForCausalLM | None
     vae: AutoencoderKLFlux2 | None
     transformer: Flux2Transformer2DModel | None
 
@@ -145,7 +153,8 @@ class Flux2Model(BaseModel):
         self.transformer.eval()
 
     def create_pipeline(self) -> DiffusionPipeline:
-        return Flux2Pipeline(
+        klass = Flux2Pipeline if self.is_dev() else Flux2KleinPipeline
+        return klass(
             transformer=self.transformer,
             scheduler=self.noise_scheduler,
             vae=self.vae,
@@ -156,7 +165,7 @@ class Flux2Model(BaseModel):
     def encode_text(
             self,
             train_device: torch.device,
-            batch_size: int = 1,
+            batch_size: int = 1, #TODO unused
             rand: Random | None = None,
             text: str = None,
             tokens: Tensor = None,
@@ -165,24 +174,45 @@ class Flux2Model(BaseModel):
             text_encoder_dropout_probability: float | None = None,
             text_encoder_output: Tensor = None,
     ) -> tuple[Tensor, Tensor]:
+
         if tokens is None and text is not None:
             if isinstance(text, str):
                 text = [text]
 
-            messages = format_input(prompts=text, system_message=SYSTEM_MESSAGE)
-            text = self.tokenizer.apply_chat_template(
-                messages,
-                tokenize=False,
-                add_generation_prompt=False,
-            )
+            if self.is_dev():
+                messages = mistral_format_input(prompts=text, system_message=MISTRAL_SYSTEM_MESSAGE)
+                text = self.tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=False,
+                )
 
-            tokenizer_output = self.tokenizer(
-                text,
-                max_length=text_encoder_sequence_length, #max length is including system message
-                padding='max_length',
-                truncation=True,
-                return_tensors="pt"
-            )
+                tokenizer_output = self.tokenizer(
+                    text,
+                    max_length=text_encoder_sequence_length, #max length is including system message
+                    padding='max_length',
+                    truncation=True,
+                    return_tensors="pt"
+                )
+            else: #Flux2.Klein
+                for i, prompt_item in enumerate(text):
+                    messages = qwen3_format_input(prompt_item)
+                    prompt_item = self.tokenizer.apply_chat_template(
+                        messages,
+                        tokenize=False,
+                        add_generation_prompt=True,
+                        enable_thinking=False,
+                    )
+                    text[i] = prompt_item
+
+                tokenizer_output = self.tokenizer(
+                    text,
+                    max_length=text_encoder_sequence_length,
+                    padding='max_length',
+                    truncation=True,
+                    return_tensors="pt"
+                )
+
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
             tokens_mask = tokenizer_output.attention_mask.to(self.text_encoder.device)
 
@@ -194,17 +224,19 @@ class Flux2Model(BaseModel):
                     output_hidden_states=True,
                     use_cache=False,
                 )
-
-                text_encoder_output = torch.stack([text_encoder_output.hidden_states[k] for k in HIDDEN_STATES_LAYERS], dim=1)
-                batch_size, num_channels, seq_len, hidden_dim = text_encoder_output.shape
-                assert seq_len == text_encoder_sequence_length
-                text_encoder_output = text_encoder_output.permute(0, 2, 1, 3).reshape(batch_size, seq_len, num_channels * hidden_dim)
+                text_encoder_output = torch.cat([text_encoder_output.hidden_states[k]
+                                                   for k in (MISTRAL_HIDDEN_STATES_LAYERS if self.is_dev() else QWEN3_HIDDEN_STATES_LAYERS)], dim=2)
 
         if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
             raise NotImplementedError #https://github.com/Nerogar/OneTrainer/issues/957
 
         return text_encoder_output
 
+    def is_dev(self) -> bool:
+        return isinstance(self.tokenizer, PixtralProcessor)
+
+    def is_klein(self) -> bool:
+        return not self.is_dev()
 
     #code adapted from https://github.com/huggingface/diffusers/blob/c8656ed73c638e51fc2e777a5fd355d69fa5220f/src/diffusers/pipelines/flux2/pipeline_flux2.py
     @staticmethod
@@ -232,7 +264,7 @@ class Flux2Model(BaseModel):
         batch_size, seq_len, num_channels = latents.shape
         return latents.reshape(batch_size, height, width, num_channels).permute(0, 3, 1, 2)
 
-    #TODO inference code uses empirical mu. But that code cannot be used for inference because it depends on num of inference steps
+    #TODO inference code uses empirical mu. But that code cannot be used for training because it depends on num of inference steps
     #     is dynamic timestep shifting during training still applicable?
     #unpatchified width and height
     def calculate_timestep_shift(self, latent_height: int, latent_width: int) -> float:

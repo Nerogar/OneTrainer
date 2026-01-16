@@ -85,4 +85,4 @@ class Flux2FineTuneSetup(
     ):
         self.__setup_requires_grad(model, config)
 
-factory.register(BaseModelSetup, Flux2FineTuneSetup, ModelType.FLUX_DEV_2, TrainingMethod.FINE_TUNE)
+factory.register(BaseModelSetup, Flux2FineTuneSetup, ModelType.FLUX_2, TrainingMethod.FINE_TUNE)

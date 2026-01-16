@@ -8,8 +8,6 @@ from modules.modelLoader.GenericLoRAModelLoader import make_lora_model_loader
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.modelLoader.mixin.LoRALoaderMixin import LoRALoaderMixin
 from modules.util.config.TrainConfig import QuantizationConfig
-
-#from omi_model_standards.convert.lora.convert_flux_lora import convert_flux_lora_key_sets #TODO
 from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
@@ -26,6 +24,8 @@ from diffusers import (
 from transformers import (
     Mistral3ForConditionalGeneration,
     PixtralProcessor,
+    Qwen2Tokenizer,
+    Qwen3ForCausalLM,
 )
 
 
@@ -75,40 +75,6 @@ class Flux2ModelLoader(
             transformers_modules=transformers_sub,
         )
 
-        tokenizer = PixtralProcessor.from_pretrained(
-            base_model_name,
-            subfolder="tokenizer",
-        ).tokenizer
-
-        noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
-            base_model_name,
-            subfolder="scheduler",
-        )
-
-        text_encoder = self._load_transformers_sub_module(
-            Mistral3ForConditionalGeneration,
-            weight_dtypes.text_encoder,
-            weight_dtypes.fallback_train_dtype,
-            base_model_name,
-            "text_encoder",
-        )
-
-        if vae_model_name:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKLFlux2,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                vae_model_name,
-            )
-        else:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKLFlux2,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                base_model_name,
-                "vae",
-            )
-
         if transformer_model_name:
             transformer = Flux2Transformer2DModel.from_single_file(
                 transformer_model_name,
@@ -127,6 +93,53 @@ class Flux2ModelLoader(
                 base_model_name,
                 "transformer",
                 quantization,
+            )
+
+        if transformer.config.num_attention_heads == 48: #Flux2.Dev
+            tokenizer = PixtralProcessor.from_pretrained(
+                base_model_name,
+                subfolder="tokenizer",
+            ).tokenizer
+
+            text_encoder = self._load_transformers_sub_module(
+                Mistral3ForConditionalGeneration,
+                weight_dtypes.text_encoder,
+                weight_dtypes.fallback_train_dtype,
+                base_model_name,
+                "text_encoder",
+            )
+        else: #Flux2.Klein
+            tokenizer = Qwen2Tokenizer.from_pretrained(
+                base_model_name,
+                subfolder="tokenizer",
+            )
+            text_encoder = self._load_transformers_sub_module(
+                Qwen3ForCausalLM,
+                weight_dtypes.text_encoder,
+                weight_dtypes.fallback_train_dtype,
+                base_model_name,
+                "text_encoder",
+            )
+
+        noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
+            base_model_name,
+            subfolder="scheduler",
+        )
+
+        if vae_model_name:
+            vae = self._load_diffusers_sub_module(
+                AutoencoderKLFlux2,
+                weight_dtypes.vae,
+                weight_dtypes.train_dtype,
+                vae_model_name,
+            )
+        else:
+            vae = self._load_diffusers_sub_module(
+                AutoencoderKLFlux2,
+                weight_dtypes.vae,
+                weight_dtypes.train_dtype,
+                base_model_name,
+                "vae",
             )
 
         model.model_type = model_type
@@ -209,7 +222,7 @@ class Flux2LoRALoader(
 
 Flux2LoRAModelLoader = make_lora_model_loader(
     model_spec_map={
-        ModelType.FLUX_DEV_2: "resources/sd_model_spec/flux_dev_2.0-lora.json",
+        ModelType.FLUX_2: "resources/sd_model_spec/flux_2.0-lora.json",
     },
     model_class=Flux2Model,
     model_loader_class=Flux2ModelLoader,
@@ -219,7 +232,7 @@ Flux2LoRAModelLoader = make_lora_model_loader(
 
 Flux2FineTuneModelLoader = make_fine_tune_model_loader(
     model_spec_map={
-        ModelType.FLUX_DEV_2: "resources/sd_model_spec/flux_dev_2.0.json",
+        ModelType.FLUX_2: "resources/sd_model_spec/flux_2.0.json",
     },
     model_class=Flux2Model,
     model_loader_class=Flux2ModelLoader,

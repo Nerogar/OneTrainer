@@ -13,6 +13,7 @@ from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.util.checkpointing_util import (
     enable_checkpointing_for_flux2_transformer,
     enable_checkpointing_for_mistral_encoder_layers,
+    enable_checkpointing_for_qwen3_encoder_layers,
 )
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
@@ -48,8 +49,12 @@ class BaseFlux2Setup(
             model.transformer_offload_conductor = \
                 enable_checkpointing_for_flux2_transformer(model.transformer, config)
             if model.text_encoder is not None:
-                model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_mistral_encoder_layers(model.text_encoder, config)
+                if model.is_dev():
+                    model.text_encoder_offload_conductor = \
+                        enable_checkpointing_for_mistral_encoder_layers(model.text_encoder, config)
+                else:
+                    model.text_encoder_offload_conductor = \
+                        enable_checkpointing_for_qwen3_encoder_layers(model.text_encoder, config)
 
         if config.force_circular_padding:
             raise NotImplementedError #TODO applies to Flux2?
@@ -131,8 +136,11 @@ class BaseFlux2Setup(
             )
             latent_input = scaled_noisy_latent_image
 
-            guidance = torch.tensor([config.transformer.guidance_scale], device=self.train_device)
-            guidance = guidance.expand(latent_input.shape[0])
+            if model.transformer.config.guidance_embeds:
+                guidance = torch.tensor([config.transformer.guidance_scale], device=self.train_device, dtype=model.train_dtype.torch_dtype())
+                guidance = guidance.expand(latent_input.shape[0])
+            else:
+                guidance = None
 
             text_ids = model.prepare_text_ids(text_encoder_output)
             image_ids = model.prepare_latent_image_ids(latent_input)
@@ -141,7 +149,7 @@ class BaseFlux2Setup(
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
                 timestep=timestep / 1000,
-                guidance=guidance.to(dtype=model.train_dtype.torch_dtype()),
+                guidance=guidance,
                 encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                 txt_ids=text_ids,
                 img_ids=image_ids,

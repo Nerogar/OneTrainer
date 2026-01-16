@@ -2,7 +2,14 @@ import os
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
-from modules.model.Flux2Model import HIDDEN_STATES_LAYERS, SYSTEM_MESSAGE, Flux2Model
+from modules.model.Flux2Model import (
+    MISTRAL_HIDDEN_STATES_LAYERS,
+    MISTRAL_SYSTEM_MESSAGE,
+    QWEN3_HIDDEN_STATES_LAYERS,
+    Flux2Model,
+    mistral_format_input,
+    qwen3_format_input,
+)
 from modules.modelSetup.BaseFlux2Setup import BaseFlux2Setup
 from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
@@ -12,6 +19,7 @@ from modules.util.TrainProgress import TrainProgress
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
 from mgds.pipelineModules.EncodeMistralText import EncodeMistralText
+from mgds.pipelineModules.EncodeQwenText import EncodeQwenText
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
 from mgds.pipelineModules.RescaleImageChannels import RescaleImageChannels
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
@@ -20,10 +28,8 @@ from mgds.pipelineModules.SaveText import SaveText
 from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
-from diffusers.pipelines.flux2.pipeline_flux2 import format_input
 
-
-class Flux2BaseDataLoader( #TODO share code
+class Flux2BaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
 ):
@@ -32,13 +38,24 @@ class Flux2BaseDataLoader( #TODO share code
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
-        tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=config.text_encoder_sequence_length,
-                                    apply_chat_template = lambda caption: format_input([caption], SYSTEM_MESSAGE), apply_chat_template_kwargs = {'add_generation_prompt': False},
-                                  )
-        encode_prompt = EncodeMistralText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask',
-                                          text_encoder=model.text_encoder, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(),
-                                          hidden_state_output_index=HIDDEN_STATES_LAYERS,
-                                         )
+        if model.is_dev():
+            tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=config.text_encoder_sequence_length,
+                                        apply_chat_template = lambda caption: mistral_format_input([caption], MISTRAL_SYSTEM_MESSAGE), apply_chat_template_kwargs = {'add_generation_prompt': False},
+                                      )
+            encode_prompt = EncodeMistralText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask',
+                                              text_encoder=model.text_encoder, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(),
+                                              hidden_state_output_index=MISTRAL_HIDDEN_STATES_LAYERS,
+                                             )
+        else: #klein
+            tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=config.text_encoder_sequence_length,
+                                        apply_chat_template = lambda caption: qwen3_format_input(caption), apply_chat_template_kwargs = {'add_generation_prompt': True, 'enable_thinking': False}
+                                      )
+            if config.dataloader_threads > 1:
+                #TODO this code is copied from Z-Image, which also uses Qwen3ForCausalLM. The leak issue probably also applies for Flux2.Klein:
+                raise NotImplementedError("Multiple data loader threads are not supported due to an issue with the transformers library: https://github.com/huggingface/transformers/issues/42673")
+            encode_prompt = EncodeQwenText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask',
+                                           text_encoder=model.text_encoder, hidden_state_output_index=QWEN3_HIDDEN_STATES_LAYERS, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+
 
         modules = [rescale_image, encode_image, image_sample]
         if config.masked_training or config.model_type.has_mask_input():
@@ -144,4 +161,4 @@ class Flux2BaseDataLoader( #TODO share code
         )
 
 
-factory.register(BaseDataLoader, Flux2BaseDataLoader, ModelType.FLUX_DEV_2)
+factory.register(BaseDataLoader, Flux2BaseDataLoader, ModelType.FLUX_2)

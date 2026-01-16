@@ -1,6 +1,6 @@
 {
     "modelspec.sai_model_spec": "1.0.0",
-    "modelspec.architecture": "Flux.2-dev/lora",
+    "modelspec.architecture": "Flux.2",
     "modelspec.implementation": "https://github.com/huggingface/diffusers",
-    "modelspec.title": "FluxDev 2.0 LoRA"
+    "modelspec.title": "Flux 2.0"
 }

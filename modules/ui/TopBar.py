@@ -94,7 +94,7 @@ class TopBar:
                 ("PixArt Sigma", ModelType.PIXART_SIGMA),
                 ("Flux Dev.1", ModelType.FLUX_DEV_1),
                 ("Flux Fill Dev", ModelType.FLUX_FILL_DEV_1),
-                ("Flux Dev.2", ModelType.FLUX_DEV_2),
+                ("Flux 2 [Dev, Klein]", ModelType.FLUX_2),
                 ("Sana", ModelType.SANA),
                 ("Hunyuan Video", ModelType.HUNYUAN_VIDEO),
                 ("HiDream Full", ModelType.HI_DREAM_FULL),

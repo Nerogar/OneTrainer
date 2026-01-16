@@ -98,4 +98,4 @@ class Flux2LoRASetup(
     ):
         self.__setup_requires_grad(model, config)
 
-factory.register(BaseModelSetup, Flux2LoRASetup, ModelType.FLUX_DEV_2, TrainingMethod.LORA)
+factory.register(BaseModelSetup, Flux2LoRASetup, ModelType.FLUX_2, TrainingMethod.LORA)

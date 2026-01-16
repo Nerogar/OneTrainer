@@ -40,6 +40,7 @@ class Flux2Sampler(BaseModelSampler):
     def __sample_base(
             self,
             prompt: str,
+            negative_prompt: str,
             height: int,
             width: int,
             seed: int,
@@ -69,8 +70,9 @@ class Flux2Sampler(BaseModelSampler):
             # prepare prompt
             self.model.text_encoder_to(self.train_device)
 
+            batch_size = 2 if cfg_scale > 1.0 and not transformer.config.guidance_embeds else 1
             prompt_embedding = self.model.encode_text(
-                text=prompt,
+                text=[prompt, negative_prompt] if batch_size == 2 else prompt,
                 train_device=self.train_device,
                 text_encoder_sequence_length=text_encoder_sequence_length,
             )
@@ -112,22 +114,27 @@ class Flux2Sampler(BaseModelSampler):
 
 
             self.model.transformer_to(self.train_device)
+            guidance = (torch.tensor([cfg_scale], device=self.train_device, dtype=self.model.train_dtype.torch_dtype())
+                        if transformer.config.guidance_embeds else None)
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
-                latent_model_input = torch.cat([latent_image])
+                latent_model_input = torch.cat([latent_image] * batch_size)
                 expanded_timestep = timestep.expand(latent_model_input.shape[0])
 
-                guidance = torch.tensor([cfg_scale], device=self.train_device)
 
                 noise_pred = transformer(
                     hidden_states=latent_model_input.to(dtype=self.model.train_dtype.torch_dtype()),
                     timestep=expanded_timestep / 1000,
-                    guidance=guidance.to(dtype=self.model.train_dtype.torch_dtype()),
+                    guidance=guidance,
                     encoder_hidden_states=prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
                     txt_ids=text_ids,
                     img_ids=image_ids,
                     joint_attention_kwargs=None,
                     return_dict=True
                 ).sample
+
+                if batch_size == 2:
+                    noise_pred_positive, noise_pred_negative = noise_pred.chunk(2)
+                    noise_pred = noise_pred_negative + cfg_scale * (noise_pred_positive - noise_pred_negative)
 
                 latent_image = noise_scheduler.step(noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs)[0]
 
@@ -169,6 +176,7 @@ class Flux2Sampler(BaseModelSampler):
     ):
         sampler_output = self.__sample_base(
             prompt=sample_config.prompt,
+            negative_prompt=sample_config.negative_prompt,
             height=self.quantize_resolution(sample_config.height, 64),
             width=self.quantize_resolution(sample_config.width, 64),
             seed=sample_config.seed,
@@ -187,4 +195,4 @@ class Flux2Sampler(BaseModelSampler):
 
         on_sample(sampler_output)
 
-factory.register(BaseModelSampler, Flux2Sampler, ModelType.FLUX_DEV_2)
+factory.register(BaseModelSampler, Flux2Sampler, ModelType.FLUX_2)

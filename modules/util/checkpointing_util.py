@@ -315,7 +315,7 @@ def enable_checkpointing_for_mistral_encoder_layers(
 
 
 
-def enable_checkpointing_for_qwen_encoder_layers(
+def enable_checkpointing_for_qwen25vl_encoder_layers(
         model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
@@ -323,12 +323,12 @@ def enable_checkpointing_for_qwen_encoder_layers(
         (Qwen2_5_VLDecoderLayer, []),  # TODO No activation offloading for other encoders, see above. But clip skip is not implemented for QwenVL. Then do activation offloading?
     ])
 
-def enable_checkpointing_for_z_image_encoder_layers(
+def enable_checkpointing_for_qwen3_encoder_layers(
         model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, False, [
-        (Qwen3DecoderLayer, []),  # TODO No activation offloading for other encoders, see above. But clip skip is not implemented for QwenVL. Then do activation offloading?
+        (Qwen3DecoderLayer, []),  # No activation offloading, because hidden states are taken from the middle of the network by Flux2
     ])
 
 def enable_checkpointing_for_stable_diffusion_3_transformer(

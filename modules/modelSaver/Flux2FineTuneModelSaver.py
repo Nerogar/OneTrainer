@@ -4,7 +4,7 @@ from modules.modelSaver.GenericFineTuneModelSaver import make_fine_tune_model_sa
 from modules.util.enum.ModelType import ModelType
 
 Flux2FineTuneModelSaver = make_fine_tune_model_saver(
-    ModelType.FLUX_DEV_2,
+    ModelType.FLUX_2,
     model_class=Flux2Model,
     model_saver_class=Flux2ModelSaver,
     embedding_saver_class=None,

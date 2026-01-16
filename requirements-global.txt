@@ -22,6 +22,7 @@ pytorch-lightning==2.5.1.post0
 # diffusion models
 #Note: check whether Qwen bugs in diffusers have been fixed before upgrading diffusers (see BaseQwenSetup):
 #-e git+https://github.com/huggingface/diffusers.git@256e010#egg=diffusers
+#FIXME in this release, Qwen bugs have been fixed by diffusers. Remove workarounds in OneTrainer
 -e git+https://github.com/dxqb/diffusers.git@flux2_tuples#egg=diffusers
 gguf==0.17.1
 transformers==4.56.2

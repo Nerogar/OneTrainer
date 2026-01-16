@@ -25,7 +25,7 @@ class ModelType(Enum):
 
     FLUX_DEV_1 = 'FLUX_DEV_1'
     FLUX_FILL_DEV_1 = 'FLUX_FILL_DEV_1'
-    FLUX_DEV_2 = 'FLUX_DEV_2'
+    FLUX_2 = 'FLUX_2'
 
     SANA = 'SANA'
 
@@ -80,14 +80,14 @@ class ModelType(Enum):
     def is_flux(self):
         return self == ModelType.FLUX_DEV_1 \
             or self == ModelType.FLUX_FILL_DEV_1 \
-            or self == ModelType.FLUX_DEV_2
+            or self == ModelType.FLUX_2
 
     def is_flux_1(self):
         return self == ModelType.FLUX_DEV_1 \
             or self == ModelType.FLUX_FILL_DEV_1
 
     def is_flux_2(self):
-        return self == ModelType.FLUX_DEV_2
+        return self == ModelType.FLUX_2
 
     def is_chroma(self):
         return self == ModelType.CHROMA_1
