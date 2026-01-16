@@ -135,6 +135,11 @@ class LoraTab:
                              tooltip="Share the OFT parameters between blocks. A single rotation matrix is shared across all blocks within a layer, drastically cutting the number of trainable parameters and yielding very compact adapter files, potentially improving generalization but at the cost of significant expressiveness, which can lead to underfitting on more complex or diverse tasks.")
             components.switch(master, 3, 4, self.ui_state, "oft_block_share")
 
+            # SQRT Scaling
+            components.label(master, 4, 3, "Linear Scaling",
+                             tooltip="Automatically scales the weights of OFT layers that have different block sizes using a linear strategy. Ensures that layers with different blocks maintain similar 'energy' and learning rate, preventing them from exploding or becoming negligible during training due to dimension mismatches.")
+            components.switch(master, 4, 4, self.ui_state, "oft_linear_scaling")
+
             # Dropout Percentage
             components.label(master, 2, 0, "Dropout Probability",
                             tooltip="Dropout probability. This percentage of the rotated adapter nodes that will be randomly restored to the base model initial statue. Helps with overfitting. 0 disables, 1 maximum.")
