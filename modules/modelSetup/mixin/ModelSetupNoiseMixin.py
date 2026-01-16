@@ -3,6 +3,7 @@ from abc import ABCMeta
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TimestepDistribution import TimestepDistribution
+from modules.util.immiscible_diffusion import immiscible_oversampling
 
 import torch
 from torch import Generator, Tensor
@@ -82,12 +83,30 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             timestep: Tensor | None = None,
             betas: Tensor | None = None,
     ) -> Tensor:
-        noise = torch.randn(
-            source_tensor.shape,
-            generator=generator,
-            device=config.train_device,
-            dtype=source_tensor.dtype
-        )
+        if config.k_noise_sampling > 1:
+            # Immiscible Diffusion (Oversampling Strategy)
+            with torch.no_grad():
+                batch_size = source_tensor.shape[0]
+
+                # Generate k noises for each data point
+                noise_shape = (batch_size, config.k_noise_sampling, *source_tensor.shape[1:])
+
+                noise_candidates = torch.randn(
+                    noise_shape,
+                    generator=generator,
+                    device=config.train_device,
+                    dtype=source_tensor.dtype
+                )
+
+                noise = immiscible_oversampling(self, source_tensor, noise_candidates)
+        else:
+            # Standard Gaussian Noise
+            noise = torch.randn(
+                source_tensor.shape,
+                generator=generator,
+                device=config.train_device,
+                dtype=source_tensor.dtype
+            )
 
         if config.offset_noise_weight > 0:
             offset_noise = torch.randn(
