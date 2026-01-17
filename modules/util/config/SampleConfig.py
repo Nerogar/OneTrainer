@@ -19,6 +19,7 @@ class SampleConfig(BaseConfig):
     noise_scheduler: NoiseScheduler
 
     text_encoder_1_layer_skip: int
+    text_encoder_1_sequence_length: int | None
     text_encoder_2_layer_skip: int
     text_encoder_2_sequence_length: int | None
     text_encoder_3_layer_skip: int
@@ -35,6 +36,7 @@ class SampleConfig(BaseConfig):
 
     def from_train_config(self, train_config):
         self.text_encoder_1_layer_skip = train_config.text_encoder_layer_skip
+        self.text_encoder_1_sequence_length = train_config.text_encoder_sequence_length
         self.text_encoder_2_layer_skip = train_config.text_encoder_2_layer_skip
         self.text_encoder_2_sequence_length = train_config.text_encoder_2_sequence_length
         self.text_encoder_3_layer_skip = train_config.text_encoder_3_layer_skip
@@ -60,6 +62,7 @@ class SampleConfig(BaseConfig):
         data.append(("noise_scheduler", NoiseScheduler.DDIM, NoiseScheduler, False))
 
         data.append(("text_encoder_1_layer_skip", 0, int, False))
+        data.append(("text_encoder_1_sequence_length", None, int, True))
         data.append(("text_encoder_2_layer_skip", 0, int, False))
         data.append(("text_encoder_2_sequence_length", None, int, True))
         data.append(("text_encoder_3_layer_skip", 0, int, False))

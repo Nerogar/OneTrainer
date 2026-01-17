@@ -143,6 +143,7 @@ class TrainOptimizerConfig(BaseConfig):
     approx_mars: False
     kappa_p: float
     auto_kappa_p: False
+    compile: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -261,6 +262,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("approx_mars", False, bool, False))
         data.append(("kappa_p", None, float, True))
         data.append(("auto_kappa_p", False, bool, False))
+        data.append(("compile", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
@@ -273,7 +275,7 @@ class TrainModelPartConfig(BaseConfig):
     stop_training_after_unit: TimeUnit
     learning_rate: float
     weight_dtype: DataType
-    dropout_probability: float
+    dropout_probability: float #this is text encoder caption dropout!
     train_embedding: bool
     attention_mask: bool
     guidance_scale: float
@@ -430,7 +432,7 @@ class TrainConfig(BaseConfig):
     vb_loss_strength: float
     loss_weight_fn: LossWeight
     loss_weight_strength: float
-    dropout_probability: float
+    dropout_probability: float #this is LoRA dropout!
     loss_scaler: LossScaler
     learning_rate_scaler: LearningRateScaler
     clip_grad_norm: float
@@ -872,6 +874,12 @@ class TrainConfig(BaseConfig):
             or ((self.text_encoder_4.train_embedding or not self.model_type.has_multiple_text_encoders())
                 and self.train_any_embedding())
 
+    def train_any_text_encoder_or_embedding(self) -> bool:
+        return (self.train_text_encoder_or_embedding()
+                or self.train_text_encoder_2_or_embedding()
+                or self.train_text_encoder_3_or_embedding()
+                or self.train_text_encoder_4_or_embedding())
+
     def all_embedding_configs(self):
         if self.training_method == TrainingMethod.EMBEDDING:
             return self.additional_embeddings + [self.embedding]
@@ -1069,6 +1077,7 @@ class TrainConfig(BaseConfig):
         text_encoder.learning_rate = None
         data.append(("text_encoder", text_encoder, TrainModelPartConfig, False))
         data.append(("text_encoder_layer_skip", 0, int, False))
+        data.append(("text_encoder_sequence_length", 512, int, True))
 
         # text encoder 2
         text_encoder_2 = TrainModelPartConfig.default_values()

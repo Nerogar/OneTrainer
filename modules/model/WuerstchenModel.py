@@ -170,6 +170,9 @@ class WuerstchenModel(BaseModel):
         self.prior_text_encoder_to(device)
         self.prior_prior_to(device)
 
+    def vae_to(self, device: torch.device):
+        raise NotImplementedError
+
     def eval(self):
         if self.model_type.is_wuerstchen_v2():
             self.decoder_text_encoder.eval()
