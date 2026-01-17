@@ -158,7 +158,7 @@ class GenericTrainer(BaseTrainer):
 
         if self.config.validation:
             self.validation_data_loader = self.create_data_loader(
-                self.model, self.model.train_progress, is_validation=True
+                self.model, self.model_setup, self.model.train_progress, is_validation=True
             )
 
     def __save_config_to_workspace(self):
