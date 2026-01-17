@@ -120,6 +120,10 @@ class Flux2ModelLoader(
                 base_model_name,
                 "text_encoder",
             )
+            #TODO this is a tied weight. The dtype conversion code in _load_transformers_sub_module
+            #currently does not support tied weights. Reconstruct but clone, because the quantization code
+            #doesn't support tied weights either:
+            text_encoder.lm_head.weight = type(text_encoder.lm_head.weight)(text_encoder.model.embed_tokens.weight)
 
         noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
             base_model_name,
