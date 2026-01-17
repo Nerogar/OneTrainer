@@ -22,7 +22,8 @@ class SamplingTab(ConfigList):
             add_button_text="Add Sample",
             add_button_tooltip="Add a new sample configuration.",
             is_full_width=True,
-            show_toggle_button=True
+            show_toggle_button=True,
+            placeholder_text="You have no samples defined. Click 'Add Sample' to add a new sample to your current config."
         )
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):

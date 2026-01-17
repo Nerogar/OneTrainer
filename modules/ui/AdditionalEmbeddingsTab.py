@@ -20,7 +20,8 @@ class AdditionalEmbeddingsTab(ConfigList):
             from_external_file=False,
             add_button_text="add embedding",
             is_full_width=True,
-            show_toggle_button=True
+            show_toggle_button=True,
+            placeholder_text="No additional embeddings defined. Click 'add embedding' to add one."
         )
 
     def refresh_ui(self):
@@ -89,7 +90,7 @@ class EmbeddingWidget(ctk.CTkFrame):
         # embedding model names
         components.label(top_frame, 0, 2, "base embedding:",
                          tooltip="The base embedding to train on. Leave empty to create a new embedding")
-        components.file_entry(
+        components.path_entry(
             top_frame, 0, 3, self.ui_state, "model_name",
             path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )

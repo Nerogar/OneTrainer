@@ -41,7 +41,7 @@ if sys.version_info < min_ver:
     exit_wrong_version("too low", min_ver, too_high_ver)
 
 if sys.version_info < deprecated_ver:
-    sys.stderr.write("Warning: Deprecated Python version found. Update to %s or newer\n" % (tuple_to_str(deprecated_ver)))
+    sys.stderr.write("Warning: Deprecated Python version found. Its strongly recommended to update to %s or newer\n" % (tuple_to_str(deprecated_ver)))
     sys.stderr.flush()
 
 if sys.version_info >= too_high_ver:
