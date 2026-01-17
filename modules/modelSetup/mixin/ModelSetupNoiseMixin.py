@@ -98,7 +98,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                     dtype=source_tensor.dtype
                 )
 
-                noise = immiscible_oversampling(self, source_tensor, noise_candidates)
+                noise = immiscible_oversampling(source_tensor, noise_candidates)
         else:
             # Standard Gaussian Noise
             noise = torch.randn(

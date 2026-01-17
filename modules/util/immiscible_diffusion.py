@@ -1,7 +1,7 @@
 import torch
 
 
-def immiscible_oversampling(self, source_tensor, noise_candidates):
+def immiscible_oversampling(source_tensor, noise_candidates):
     """
     Implements the noise oversampling method proposed in the paper:
     "Improved Immiscible Diffusion: Accelerate Diffusion Training by Reducing Its Miscibility"
@@ -14,10 +14,7 @@ def immiscible_oversampling(self, source_tensor, noise_candidates):
     noise_points = noise_candidates.flatten(start_dim=2).to(torch.float16)
 
     # Calculate L2 distance between latents and the corresponding k noises
-    distance_points = latents_points.unsqueeze(1) - noise_points
-
-    # Euclidean norm
-    distance = torch.linalg.vector_norm(distance_points, dim=2) # [B, k]
+    distance = torch.cdist(latents_points.unsqueeze(1), noise_points, p=2).squeeze(1)
 
     # Pick the nearest noise index for each data point
     _, min_index = torch.min(distance, dim=1)
