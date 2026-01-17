@@ -2,18 +2,20 @@ from abc import ABCMeta
 from random import Random
 
 import modules.util.multi_gpu_util as multi
-from modules.model.QwenModel import QwenModel
+from modules.model.Flux2Model import Flux2Model
+from modules.model.FluxModel import FluxModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
+from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowMatchingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.util.checkpointing_util import (
-    enable_checkpointing_for_qwen25vl_encoder_layers,
-    enable_checkpointing_for_qwen_transformer,
+    enable_checkpointing_for_flux2_transformer,
+    enable_checkpointing_for_mistral_encoder_layers,
+    enable_checkpointing_for_qwen3_encoder_layers,
 )
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.quantization_util import quantize_layers
@@ -24,39 +26,42 @@ import torch
 from torch import Tensor
 
 
-#TODO share more code with other models
-class BaseQwenSetup(
+class BaseFlux2Setup(
     BaseModelSetup,
     ModelSetupDiffusionLossMixin,
     ModelSetupDebugMixin,
     ModelSetupNoiseMixin,
     ModelSetupFlowMatchingMixin,
+    ModelSetupEmbeddingMixin,
     metaclass=ABCMeta
 ):
     LAYER_PRESETS = {
-        "attn-mlp": ["attn", "img_mlp", "txt_mlp"],
-        "attn-only": ["attn"],
         "blocks": ["transformer_block"],
         "full": [],
     }
 
     def setup_optimizations(
             self,
-            model: QwenModel,
+            model: Flux2Model,
             config: TrainConfig,
     ):
         if config.gradient_checkpointing.enabled():
             model.transformer_offload_conductor = \
-                enable_checkpointing_for_qwen_transformer(model.transformer, config)
+                enable_checkpointing_for_flux2_transformer(model.transformer, config)
             if model.text_encoder is not None:
-                model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_qwen25vl_encoder_layers(model.text_encoder, config)
+                if model.is_dev():
+                    model.text_encoder_offload_conductor = \
+                        enable_checkpointing_for_mistral_encoder_layers(model.text_encoder, config)
+                else:
+                    model.text_encoder_offload_conductor = \
+                        enable_checkpointing_for_qwen3_encoder_layers(model.text_encoder, config)
 
-        if config.force_circular_padding: #TODO useful for Qwen?
-            apply_circular_padding_to_conv2d(model.vae)
-            apply_circular_padding_to_conv2d(model.transformer)
-            if model.transformer_lora is not None:
-                apply_circular_padding_to_conv2d(model.transformer_lora)
+        if config.force_circular_padding:
+            raise NotImplementedError #TODO applies to Flux2?
+#            apply_circular_padding_to_conv2d(model.vae)
+#            apply_circular_padding_to_conv2d(model.transformer)
+#            if model.transformer_lora is not None:
+#                apply_circular_padding_to_conv2d(model.transformer_lora)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
@@ -83,7 +88,7 @@ class BaseQwenSetup(
 
     def predict(
             self,
-            model: QwenModel,
+            model: Flux2Model,
             batch: dict,
             config: TrainConfig,
             train_progress: TrainProgress,
@@ -96,22 +101,24 @@ class BaseQwenSetup(
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
 
-            text_encoder_output, text_attention_mask = model.encode_text(
+            text_encoder_output = model.encode_text(
                 train_device=self.train_device,
                 batch_size=batch['latent_image'].shape[0],
                 rand=rand,
                 tokens=batch.get("tokens"),
                 tokens_mask=batch.get("tokens_mask"),
-                text_encoder_output=batch['text_encoder_hidden_state'] \
-                    if 'text_encoder_hidden_state' in batch and not config.train_text_encoder_or_embedding() else None,
+                text_encoder_sequence_length=config.text_encoder_sequence_length,
+                text_encoder_output=batch.get('text_encoder_hidden_state'),
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability,
             )
-
-            latent_image = batch['latent_image']
+            latent_image = model.patchify_latents(batch['latent_image'].float())
+            latent_height = latent_image.shape[-2]
+            latent_width = latent_image.shape[-1]
             scaled_latent_image = model.scale_latents(latent_image)
+
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
-            shift = model.calculate_timestep_shift(scaled_latent_image.shape[-2], scaled_latent_image.shape[-1])
+            shift = model.calculate_timestep_shift(latent_height, latent_width)
             timestep = self._get_timestep_discrete(
                 model.noise_scheduler.config['num_train_timesteps'],
                 deterministic,
@@ -127,45 +134,33 @@ class BaseQwenSetup(
                 timestep,
                 model.noise_scheduler.timesteps,
             )
-
             latent_input = scaled_noisy_latent_image
+
+            if model.transformer.config.guidance_embeds:
+                guidance = torch.tensor([config.transformer.guidance_scale], device=self.train_device, dtype=model.train_dtype.torch_dtype())
+                guidance = guidance.expand(latent_input.shape[0])
+            else:
+                guidance = None
+
+            text_ids = model.prepare_text_ids(text_encoder_output)
+            image_ids = model.prepare_latent_image_ids(latent_input)
             packed_latent_input = model.pack_latents(latent_input)
-
-            #FIXME this is the only case that the transformer accepts:
-            #see https://github.com/huggingface/diffusers/issues/12344
-            #actual text sequence lengths can be shorter,but they might be padded and masked
-            txt_seq_lens = [text_encoder_output.shape[1]] * text_encoder_output.shape[0]
-
-            #FIXME list of lists is not according to type hint, but according to diffusers code:
-            #https://github.com/huggingface/diffusers/issues/12295
-            img_shapes = [[(
-                1, #frame for future video model - not batch size
-                latent_input.shape[-2] // 2,
-                latent_input.shape[-1] // 2)
-            ]] * latent_input.shape[0]
-
-            #FIXME bug workaround for https://github.com/huggingface/diffusers/issues/12294
-            image_attention_mask=torch.ones((packed_latent_input.shape[0], packed_latent_input.shape[1]), dtype=torch.bool, device=latent_image.device)
-            attention_mask = torch.cat([text_attention_mask, image_attention_mask], dim=1)
-            attention_mask_2d = attention_mask[:, None, None, :] if not torch.all(text_attention_mask) else None
 
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
                 timestep=timestep / 1000,
+                guidance=guidance,
                 encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                encoder_hidden_states_mask=text_attention_mask,
-                txt_seq_lens=txt_seq_lens,
-                img_shapes=img_shapes,
-                attention_kwargs = {
-                    "attention_mask": attention_mask_2d,
-                },
-                return_dict=True,
+                txt_ids=text_ids,
+                img_ids=image_ids,
+                joint_attention_kwargs=None,
+                return_dict=True
             ).sample
 
             predicted_flow = model.unpack_latents(
                 packed_predicted_flow,
-                height=latent_input.shape[-2],
-                width=latent_input.shape[-1],
+                latent_input.shape[2],
+                latent_input.shape[3],
             )
 
             flow = latent_noise - scaled_latent_image
@@ -191,7 +186,7 @@ class BaseQwenSetup(
 
     def calculate_loss(
             self,
-            model: QwenModel,
+            model: Flux2Model,
             batch: dict,
             data: dict,
             config: TrainConfig,
@@ -204,11 +199,8 @@ class BaseQwenSetup(
             sigmas=model.noise_scheduler.sigmas,
         ).mean()
 
-    def prepare_text_caching(self, model: QwenModel, config: TrainConfig):
+    def prepare_text_caching(self, model: FluxModel, config: TrainConfig):
         model.to(self.temp_device)
-
-        if not config.train_text_encoder_or_embedding():
-            model.text_encoder_to(self.train_device)
-
+        model.text_encoder_to(self.train_device)
         model.eval()
         torch_gc()
