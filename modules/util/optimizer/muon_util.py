@@ -1,3 +1,4 @@
+import re
 from collections.abc import Callable
 
 from modules.model.BaseModel import BaseModel, TrainConfig
@@ -6,6 +7,80 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.ModuleFilter import ModuleFilter
 
 import torch
+
+
+def calculate_muon_n_layers(model: BaseModel) -> dict[str, int]:
+    """
+    Calculates the number of residual layers (the depth) in each component of the model.
+    Used for Muon optimizer spectral normalization scaling.
+    """
+    match model.model_type:
+        case (ModelType.STABLE_DIFFUSION_15 | ModelType.STABLE_DIFFUSION_15_INPAINTING |
+              ModelType.STABLE_DIFFUSION_20_BASE | ModelType.STABLE_DIFFUSION_20_INPAINTING |
+              ModelType.STABLE_DIFFUSION_20 | ModelType.STABLE_DIFFUSION_21 |
+              ModelType.STABLE_DIFFUSION_21_BASE | ModelType.STABLE_DIFFUSION_XL_10_BASE |
+              ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING | ModelType.STABLE_CASCADE_1 |
+              ModelType.WUERSTCHEN_2):
+            default_patterns = ['transformer_blocks', 'resnets', 'layers']
+        case (ModelType.STABLE_DIFFUSION_3 | ModelType.STABLE_DIFFUSION_35 | ModelType.SANA |
+              ModelType.FLUX_DEV_1 | ModelType.CHROMA_1 | ModelType.QWEN |
+              ModelType.PIXART_ALPHA | ModelType.PIXART_SIGMA):
+            default_patterns = ['transformer_blocks', 'encoder.block']
+        case ModelType.HI_DREAM_FULL:
+            default_patterns = ['double_stream_blocks', 'single_stream_blocks']
+        case ModelType.Z_IMAGE:
+            default_patterns = [
+                'layers',
+                'refiner',
+            ]
+        case _:
+            raise NotImplementedError(f"Muon optimizer spectral normalization is not implemented for model type: {model.model_type}")
+
+    # Build the regex pattern dynamically
+    joined_patterns = "|".join([re.escape(p) for p in default_patterns])
+    pattern = re.compile(rf'(?:^|\.)(?:{joined_patterns})\.\d+$')
+
+    layer_counts = {}
+
+    # Iterate over model components (e.g., 'unet', 'text_encoder', 'transformer')
+    for attr_name, module in vars(model).items():
+
+        # Identify the 'Ground Truth' blocks in this component.
+        target_module = module
+        if isinstance(module, LoRAModuleWrapper):
+            target_module = module.orig_module
+
+        valid_component_blocks = set()
+        if isinstance(target_module, torch.nn.Module):
+            for name, _ in target_module.named_modules():
+                if pattern.search(name):
+                    valid_component_blocks.add(name)
+
+        if not valid_component_blocks:
+            continue
+
+        active_component_blocks = set()
+
+        # Filter: Only count blocks that are actually being trained.
+        if isinstance(module, LoRAModuleWrapper):
+            # For LoRA, we check if the active leaves reside inside a valid block.
+            for layer_name in module.lora_modules:
+                parts = layer_name.split('.')
+                for i in range(len(parts), 0, -1):
+                    candidate = ".".join(parts[:i])
+                    if candidate in valid_component_blocks:
+                        active_component_blocks.add(candidate)
+
+        elif isinstance(module, torch.nn.Module):
+            # For standard full-finetuning, all valid blocks are active.
+            active_component_blocks = valid_component_blocks
+
+        count = len(active_component_blocks)
+        if count > 0:
+            print(f"[MuonUtil] Component '{attr_name}': detected {count} residual layers.")
+            layer_counts[attr_name] = count
+
+    return layer_counts
 
 
 def build_muon_adam_key_fn(
@@ -105,8 +180,8 @@ def build_muon_adam_key_fn(
     return param_map
 
 def split_parameters_for_muon(
+    model: BaseModel,
     parameters: list[dict],
-    layer_key_fn: dict[int, str],
     config: TrainConfig,
 ) -> tuple[list[dict], bool]:
     """
@@ -116,6 +191,8 @@ def split_parameters_for_muon(
     optimizer_config = config.optimizer
 
     has_adam_params = False
+    layer_key_fn = build_muon_adam_key_fn(model, config)
+
     if layer_key_fn:
         for group in parameters:
             for p in group['params']:

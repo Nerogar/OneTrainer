@@ -159,7 +159,7 @@ from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer.adafactor_extensions import patch_adafactor
 from modules.util.optimizer.adam_extensions import patch_adam
 from modules.util.optimizer.adamw_extensions import patch_adamw
-from modules.util.optimizer.muon_util import split_parameters_for_muon
+from modules.util.optimizer.muon_util import calculate_muon_n_layers, split_parameters_for_muon
 from modules.util.TrainProgress import TrainProgress
 from modules.zluda import ZLUDA
 
@@ -520,7 +520,7 @@ def create_optimizer(
         parameter_group_collection: NamedParameterGroupCollection,
         state_dict: dict | None,
         config: TrainConfig,
-        layer_key_fn: dict[int, str] | None = None,
+        model: BaseModel | None = None,
 ) -> torch.optim.Optimizer | None:
     optimizer = None
     optimizer_config = config.optimizer
@@ -1237,7 +1237,18 @@ def create_optimizer(
 
             from adv_optm import Muon_adv
 
-            params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(parameters, layer_key_fn, config)
+            params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(model, parameters, config)
+
+            if optimizer_config.spectral_normalization:
+                # Calculate n_layers for spectral normalization
+                n_layers_map = calculate_muon_n_layers(model)
+
+                for group in params_for_optimizer:
+                    group_name = group.get('name')
+                    if group_name in n_layers_map:
+                        group['n_layers'] = n_layers_map[group_name]
+                    else:
+                        group['n_layers'] = n_layers_map.get('default', 1)
 
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}
@@ -1278,6 +1289,7 @@ def create_optimizer(
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 approx_mars=optimizer_config.approx_mars if optimizer_config.approx_mars is not None else False,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
                 **adam_kwargs
             )
 
@@ -1287,7 +1299,18 @@ def create_optimizer(
 
             from adv_optm import AdaMuon_adv
 
-            params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(parameters, layer_key_fn, config)
+            params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(model, parameters, config)
+
+            if optimizer_config.spectral_normalization:
+                # Calculate n_layers for spectral normalization
+                n_layers_map = calculate_muon_n_layers(model)
+
+                for group in params_for_optimizer:
+                    group_name = group.get('name')
+                    if group_name in n_layers_map:
+                        group['n_layers'] = n_layers_map[group_name]
+                    else:
+                        group['n_layers'] = n_layers_map.get('default', 1)
 
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}
@@ -1332,6 +1355,7 @@ def create_optimizer(
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 approx_mars=optimizer_config.approx_mars if optimizer_config.approx_mars is not None else False,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
                 **adam_kwargs
             )
 
@@ -1340,7 +1364,7 @@ def create_optimizer(
 
             from muon import MuonWithAuxAdam, SingleDeviceMuonWithAuxAdam
 
-            params_for_optimizer, ___ = split_parameters_for_muon(parameters, layer_key_fn, config)
+            params_for_optimizer, ___ = split_parameters_for_muon(model, parameters, config)
 
             final_param_groups  = []
             for group in params_for_optimizer:
