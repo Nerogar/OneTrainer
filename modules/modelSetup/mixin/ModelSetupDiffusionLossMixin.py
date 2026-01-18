@@ -289,6 +289,7 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
         # Apply timestep based loss weighting.
         if 'timestep' in data:
+
             v_pred = data.get('prediction_type', '') == 'v_prediction'
             match config.loss_weight_fn:
                 case LossWeight.CONSTANT:
