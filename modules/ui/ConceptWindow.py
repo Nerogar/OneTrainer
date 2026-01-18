@@ -1,4 +1,5 @@
 import fractions
+import io
 import math
 import os
 import pathlib
@@ -45,7 +46,6 @@ import customtkinter as ctk
 import huggingface_hub
 from customtkinter import AppearanceModeTracker, ThemeManager
 from matplotlib import pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from PIL import Image
 
 
@@ -92,7 +92,9 @@ class ConceptWindow(ctk.CTkToplevel):
         self.image_preview_file_index = 0
         self.preview_augmentations = ctk.BooleanVar(self, True)
         self.bucket_fig = None
-        self.canvas = None
+        self._destroyed = False
+        self._last_bucket_data = None
+        self._last_chart_update = 0
 
         self.title("Concept")
         self.geometry("800x700")
@@ -521,10 +523,11 @@ class ConceptWindow(ctk.CTkToplevel):
         prev_bucket_fig = self.bucket_fig
 
         self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7,3))
-        self.canvas = FigureCanvasTkAgg(self.bucket_fig, master=frame)
-        self.canvas.get_tk_widget().grid(row=19, column=0, columnspan=4, rowspan=2)
+        self.bucket_image = ctk.CTkImage(light_image=Image.new('RGB', (700, 300)), size=(700, 300))
+        self.bucket_label = ctk.CTkLabel(frame, text="", image=self.bucket_image)
+        self.bucket_label.grid(row=19, column=0, columnspan=4, rowspan=2)
         self.bucket_fig.tight_layout()
-        self.bucket_fig.subplots_adjust(bottom=0.15)
+        self.bucket_fig.subplots_adjust(bottom=0.18, left=0.1)
 
         self.bucket_fig.set_facecolor(background_color)
         self.bucket_ax.set_facecolor(background_color)
@@ -536,6 +539,8 @@ class ConceptWindow(ctk.CTkToplevel):
         self.bucket_ax.tick_params(axis='y', colors=self.text_color, which="both")
         self.bucket_ax.xaxis.label.set_color(self.text_color)
         self.bucket_ax.yaxis.label.set_color(self.text_color)
+
+        self.__draw_empty_bucket_chart()
 
         # close previous figure if any
         if prev_bucket_fig is not None:
@@ -756,6 +761,9 @@ class ConceptWindow(ctk.CTkToplevel):
         return image, filename_output, prompt_output
 
     def __update_concept_stats(self):
+        if self._destroyed:
+            return
+
         #file size
         self.file_size_preview.configure(text=str(int(self.concept.concept_stats["file_size"]/1048576)) + " MB")
         self.processing_time.configure(text=str(round(self.concept.concept_stats["processing_time"], 2)) + " s")
@@ -841,36 +849,71 @@ class ConceptWindow(ctk.CTkToplevel):
 
         #aspect bucketing
         aspect_buckets = self.concept.concept_stats["aspect_buckets"]
-        if len(aspect_buckets) != 0 and max(val for val in aspect_buckets.values()) > 0:    #check aspect_bucket data exists and is not all zero
-            min_val = min(val for val in aspect_buckets.values() if val > 0)                #smallest nonzero values
-            if max(val for val in aspect_buckets.values()) > min_val:                       #check if any buckets larger than min_val exist - if all images are same aspect then there won't be
-                min_val2 = min(val for val in aspect_buckets.values() if (val > 0 and val != min_val))  #second smallest bucket
-            else:
-                min_val2 = min_val  #if no second smallest bucket exists set to min_val
-            min_aspect_buckets = {key: val for key,val in aspect_buckets.items() if val in (min_val, min_val2)}
-            min_bucket_str = ""
-            for key, val in min_aspect_buckets.items():
-                min_bucket_str += f'aspect {self.decimal_to_aspect_ratio(key)} : {val} img\n'
-            min_bucket_str.strip()
-            self.small_bucket_preview.configure(text=min_bucket_str)
+        if len(aspect_buckets) == 0 or max(aspect_buckets.values()) == 0:
+            self.small_bucket_preview.configure(text="-")
+            self.__draw_empty_bucket_chart()
+            return
+
+        min_val = min(val for val in aspect_buckets.values() if val > 0)                #smallest nonzero values
+        if max(aspect_buckets.values()) > min_val:                       #check if any buckets larger than min_val exist - if all images are same aspect then there won't be
+            min_val2 = min(val for val in aspect_buckets.values() if (val > 0 and val != min_val))  #second smallest bucket
+        else:
+            min_val2 = min_val  #if no second smallest bucket exists set to min_val
+        min_aspect_buckets = {key: val for key, val in aspect_buckets.items() if val in (min_val, min_val2)}
+        min_bucket_str = ""
+        for key, val in min_aspect_buckets.items():
+            min_bucket_str += f'aspect {self.decimal_to_aspect_ratio(key)} : {val} img\n'
+        self.small_bucket_preview.configure(text=min_bucket_str.strip())
+
+        current_time = time.perf_counter()
+        bucket_tuple = tuple(sorted(aspect_buckets.items()))
+        if (current_time - self._last_chart_update < 3.0 and
+            self._last_bucket_data == bucket_tuple):
+            return
+
+        self._last_bucket_data = bucket_tuple
+        self._last_chart_update = current_time
 
         self.bucket_ax.cla()
-        aspects = [str(x) for x in list(aspect_buckets.keys())]
-        aspect_ratios = [self.decimal_to_aspect_ratio(x) for x in list(aspect_buckets.keys())]
+        aspect_ratios = [self.decimal_to_aspect_ratio(x) for x in aspect_buckets]
         counts = list(aspect_buckets.values())
         b = self.bucket_ax.bar(aspect_ratios, counts)
         self.bucket_ax.bar_label(b, color=self.text_color)
-        sec = self.bucket_ax.secondary_xaxis(location=-0.1)
-        sec.spines["bottom"].set_linewidth(0)
-        sec.set_xticks([0, (len(aspects)-1)/2, len(aspects)-1], labels=["Wide", "Square", "Tall"])
-        sec.tick_params('x', length=0)
-        self.canvas.draw()
+        self.bucket_ax.set_xlabel("Aspect Ratio (width:height)", color=self.text_color)
+        self.bucket_ax.set_ylabel("Image Count", color=self.text_color)
 
-    def decimal_to_aspect_ratio(self, value : float):
+        if len(aspect_ratios) > 1:
+            sec = self.bucket_ax.secondary_xaxis(location=-0.1)
+            sec.spines["bottom"].set_linewidth(0)
+            sec.set_xticks([0, (len(aspect_ratios)-1)/2, len(aspect_ratios)-1], labels=["Wide", "Square", "Tall"])
+            sec.tick_params('x', length=0)
+
+        self.__render_bucket_chart()
+
+    def decimal_to_aspect_ratio(self, value: float):
         #find closest fraction to decimal aspect value and convert to a:b format
         aspect_fraction = fractions.Fraction(value).limit_denominator(16)
         aspect_string = f'{aspect_fraction.denominator}:{aspect_fraction.numerator}'
         return aspect_string
+
+    def __draw_empty_bucket_chart(self):
+        self.bucket_ax.cla()
+        self.bucket_ax.set_xlabel("Aspect Ratio (width:height)", color=self.text_color)
+        self.bucket_ax.set_ylabel("Image Count", color=self.text_color)
+        self.bucket_ax.set_xlim(-0.5, 4.5)
+        self.bucket_ax.set_ylim(0, 10)
+        self.bucket_ax.text(2, 5, "Run Advanced Scan\nto view aspect buckets",
+                           ha='center', va='center', color=self.text_color,
+                           fontsize=10, style='italic')
+        self.__render_bucket_chart()
+
+    def __render_bucket_chart(self):
+        buf = io.BytesIO()
+        self.bucket_fig.savefig(buf, format='png', facecolor=self.bucket_fig.get_facecolor())
+        buf.seek(0)
+        img = Image.open(buf)
+        self.bucket_image.configure(light_image=img, size=(img.width, img.height))
+        buf.close()
 
     def __get_concept_stats(self, advanced_checks: bool, wait_time: float):
         if not os.path.isdir(self.concept.path):
@@ -890,30 +933,35 @@ class ConceptWindow(ctk.CTkToplevel):
 
         stats_dict = concept_stats.init_concept_stats(advanced_checks)
         for path in subfolders:
-            if self.cancel_scan_flag.is_set() or time.perf_counter() - start_time > wait_time:
+            if self._destroyed or self.cancel_scan_flag.is_set() or time.perf_counter() - start_time > wait_time:
                 break
             stats_dict = concept_stats.folder_scan(path, stats_dict, advanced_checks, self.concept, start_time, wait_time, self.cancel_scan_flag)
-            if self.concept.include_subdirectories and not self.cancel_scan_flag.is_set():     #add all subfolders of current directory to for loop
+            if self.concept.include_subdirectories and not self.cancel_scan_flag.is_set() and not self._destroyed:     #add all subfolders of current directory to for loop
                 subfolders.extend([f for f in os.scandir(path) if f.is_dir()])
             self.concept.concept_stats = stats_dict
-            #update GUI approx every half second
-            if time.perf_counter() > (last_update + 0.5):
+            #update GUI approx every second
+            if time.perf_counter() > (last_update + 1):
                 last_update = time.perf_counter()
                 self.concept_stats_tab.after(0, self.__update_concept_stats)
 
         self.cancel_scan_flag.clear()
-        self.concept_stats_tab.after(0, self.__enable_scan_buttons)
-        self.concept_stats_tab.after(0, self.__update_concept_stats)
+        if not self._destroyed:
+            self.concept_stats_tab.after(0, self.__enable_scan_buttons)
+            self.concept_stats_tab.after(0, self.__update_concept_stats)
 
     def __get_concept_stats_threaded(self, advanced_checks : bool, waittime : float):
         self.scan_thread = threading.Thread(target=self.__get_concept_stats, args=[advanced_checks, waittime], daemon=True)
         self.scan_thread.start()
 
     def __disable_scan_buttons(self):
+        if self._destroyed:
+            return
         self.refresh_basic_stats_button.configure(state="disabled")
         self.refresh_advanced_stats_button.configure(state="disabled")
 
     def __enable_scan_buttons(self):
+        if self._destroyed:
+            return
         self.refresh_basic_stats_button.configure(state="normal")
         self.refresh_advanced_stats_button.configure(state="normal")
 
@@ -921,21 +969,22 @@ class ConceptWindow(ctk.CTkToplevel):
         self.cancel_scan_flag.set()
 
     def __auto_update_concept_stats(self):
+        if self._destroyed:
+            return
         try:
-            self.__update_concept_stats()      #load stats from config if available, else raises KeyError
+            self.after(0, self.__update_concept_stats)      #load stats from config if available, else raises KeyError
             if self.concept.concept_stats["file_size"] == 0:  #force rescan if empty
                 raise KeyError
         except KeyError:
             concept_path = self.get_concept_path(self.concept.path)
-            if concept_path:
-                self.__get_concept_stats(False, 2)    #force rescan if config is empty, timeout of 2 sec
-                if self.concept.concept_stats["processing_time"] < 0.1:
-                    self.__get_concept_stats(True, 2)    #do advanced scan automatically if basic took <0.1s
+            if concept_path and not self._destroyed:
+                # Run advanced scan directly with short timeout - avoids scanning twice
+                # since we'd do advanced anyway if basic was fast
+                self.__get_concept_stats(True, 2)
 
     def destroy(self):
-        if self.canvas is not None:
-            self.canvas.get_tk_widget().destroy()
-            self.canvas = None
+        self._destroyed = True
+        self.cancel_scan_flag.set()
 
         if self.bucket_fig is not None:
             plt.close(self.bucket_fig)
