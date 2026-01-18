@@ -93,7 +93,7 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
     file_list = [f for f in os.scandir(dir) if f.is_file()]     #this may take time on large directories
     if advanced_checks:
         aspect_ratio_list = list(stats_dict["aspect_buckets"].keys())
-        file_list_str = [x.path for x in file_list]     #seems faster to check list of strings for matching files than list of path objects
+        file_list_set = {x.path for x in file_list}     #use set for O(1) lookup instead of O(n) list search
     stats_dict["directory_count"] += 1
 
     for path in file_list:
@@ -107,10 +107,10 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
             stats_dict["file_size"] += path.stat().st_size
             if advanced_checks:
                 #check if image has a corresponding mask/caption in the same directory
-                if (basename + "-masklabel.png") in file_list_str:
+                if (basename + "-masklabel.png") in file_list_set:
                     stats_dict["paired_masks"] += 1
                     stats_dict["image_with_mask_count"] += 1
-                if (basename + ".txt") in file_list_str:
+                if (basename + ".txt") in file_list_set:
                     stats_dict["paired_captions"] += 1
                     stats_dict["image_with_caption_count"] += 1
                     with open(basename + ".txt", "r") as captionfile:
@@ -155,7 +155,7 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                 # if (basename + "-masklabel.png") in file_list_str:
                 #     stats_dict["paired_masks"] += 1
                 #     stats_dict["video_with_mask_count"] += 1
-                if (basename + ".txt") in file_list_str:
+                if (basename + ".txt") in file_list_set:
                     stats_dict["paired_captions"] += 1
                     stats_dict["video_with_caption_count"] += 1
                     with open(basename + ".txt", "r") as captionfile:
