@@ -1,5 +1,4 @@
 import fractions
-import io
 import math
 import os
 import pathlib
@@ -44,11 +43,9 @@ from torchvision.transforms import functional
 
 import customtkinter as ctk
 import huggingface_hub
-import matplotlib as mpl
 from customtkinter import AppearanceModeTracker, ThemeManager
-
-mpl.use('Agg')  # Use non-interactive backend to avoid Linux DnD issues
 from matplotlib import pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from PIL import Image
 
 
@@ -94,6 +91,8 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_ui_state = text_ui_state
         self.image_preview_file_index = 0
         self.preview_augmentations = ctk.BooleanVar(self, True)
+        self.bucket_fig = None
+        self.canvas = None
 
         self.title("Concept")
         self.geometry("800x700")
@@ -509,19 +508,39 @@ class ConceptWindow(ctk.CTkToplevel):
         self.small_bucket_label.configure(font=ctk.CTkFont(underline=True))
         self.small_bucket_preview = components.label(frame, 18, 1, pad=0, text="-")
 
-        #aspect bucketing plot - using Agg backend to render to image (avoids Linux DnD issues)
+        #aspect bucketing plot, mostly copied from timestep preview graph
         appearance_mode = AppearanceModeTracker.get_mode()
         background_color = self.winfo_rgb(ThemeManager.theme["CTkToplevel"]["fg_color"][appearance_mode])
         text_color = self.winfo_rgb(ThemeManager.theme["CTkLabel"]["text_color"][appearance_mode])
-        self.chart_background_color = f"#{int(background_color[0]/256):x}{int(background_color[1]/256):x}{int(background_color[2]/256):x}"
+        background_color = f"#{int(background_color[0]/256):x}{int(background_color[1]/256):x}{int(background_color[2]/256):x}"
         self.text_color = f"#{int(text_color[0]/256):x}{int(text_color[1]/256):x}{int(text_color[2]/256):x}"
 
         plt.set_loglevel('WARNING')     #suppress errors about data type in bar chart
 
-        # Create a placeholder image for the chart
-        self.chart_ctk_image = ctk.CTkImage(light_image=Image.new('RGB', (700, 300), self.chart_background_color), size=(700, 300))
-        self.chart_label = ctk.CTkLabel(frame, image=self.chart_ctk_image, text="")
-        self.chart_label.grid(row=19, column=0, columnspan=4, rowspan=2)
+        # Store previous figure to release once we're no longer using it
+        prev_bucket_fig = self.bucket_fig
+
+        self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7,3))
+        self.canvas = FigureCanvasTkAgg(self.bucket_fig, master=frame)
+        self.canvas.get_tk_widget().grid(row=19, column=0, columnspan=4, rowspan=2)
+        self.bucket_fig.tight_layout()
+        self.bucket_fig.subplots_adjust(bottom=0.15)
+
+        self.bucket_fig.set_facecolor(background_color)
+        self.bucket_ax.set_facecolor(background_color)
+        self.bucket_ax.spines['bottom'].set_color(self.text_color)
+        self.bucket_ax.spines['left'].set_color(self.text_color)
+        self.bucket_ax.spines['top'].set_visible(False)
+        self.bucket_ax.spines['right'].set_color(self.text_color)
+        self.bucket_ax.tick_params(axis='x', colors=self.text_color, which="both")
+        self.bucket_ax.tick_params(axis='y', colors=self.text_color, which="both")
+        self.bucket_ax.xaxis.label.set_color(self.text_color)
+        self.bucket_ax.yaxis.label.set_color(self.text_color)
+
+        # close previous figure if any
+        if prev_bucket_fig is not None:
+            plt.close(prev_bucket_fig)
+            prev_bucket_fig = None
 
         #refresh stats - must be after all labels are defined or will give error
         self.refresh_basic_stats_button = components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: self.__get_concept_stats_threaded(False, 9999),
@@ -835,48 +854,17 @@ class ConceptWindow(ctk.CTkToplevel):
             min_bucket_str.strip()
             self.small_bucket_preview.configure(text=min_bucket_str)
 
-        self.__update_bucket_chart(aspect_buckets)
-
-    def __update_bucket_chart(self, aspect_buckets: dict):
-        """Render the aspect bucket chart using Agg backend and update CTkImage."""
-        fig, ax = plt.subplots(figsize=(7, 3))
-        try:
-            fig.set_facecolor(self.chart_background_color)
-            ax.set_facecolor(self.chart_background_color)
-            ax.spines['bottom'].set_color(self.text_color)
-            ax.spines['left'].set_color(self.text_color)
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_color(self.text_color)
-            ax.tick_params(axis='x', colors=self.text_color, which="both")
-            ax.tick_params(axis='y', colors=self.text_color, which="both")
-            ax.xaxis.label.set_color(self.text_color)
-            ax.yaxis.label.set_color(self.text_color)
-
-            aspects = [str(x) for x in list(aspect_buckets.keys())]
-            aspect_ratios = [self.decimal_to_aspect_ratio(x) for x in list(aspect_buckets.keys())]
-            counts = list(aspect_buckets.values())
-            b = ax.bar(aspect_ratios, counts)
-            ax.bar_label(b, color=self.text_color)
-            if len(aspects) > 0:
-                sec = ax.secondary_xaxis(location=-0.1)
-                sec.spines["bottom"].set_linewidth(0)
-                sec.set_xticks([0, (len(aspects)-1)/2, len(aspects)-1], labels=["Wide", "Square", "Tall"])
-                sec.tick_params('x', length=0)
-
-            fig.tight_layout()
-            fig.subplots_adjust(bottom=0.15)
-
-            # Render to PIL Image via buffer
-            buf = io.BytesIO()
-            fig.savefig(buf, format='png', facecolor=fig.get_facecolor(), edgecolor='none')
-            buf.seek(0)
-            pil_image = Image.open(buf).copy()
-            buf.close()
-
-            # Update the CTkImage
-            self.chart_ctk_image.configure(light_image=pil_image, size=pil_image.size)
-        finally:
-            plt.close(fig)
+        self.bucket_ax.cla()
+        aspects = [str(x) for x in list(aspect_buckets.keys())]
+        aspect_ratios = [self.decimal_to_aspect_ratio(x) for x in list(aspect_buckets.keys())]
+        counts = list(aspect_buckets.values())
+        b = self.bucket_ax.bar(aspect_ratios, counts)
+        self.bucket_ax.bar_label(b, color=self.text_color)
+        sec = self.bucket_ax.secondary_xaxis(location=-0.1)
+        sec.spines["bottom"].set_linewidth(0)
+        sec.set_xticks([0, (len(aspects)-1)/2, len(aspects)-1], labels=["Wide", "Square", "Tall"])
+        sec.tick_params('x', length=0)
+        self.canvas.draw()
 
     def decimal_to_aspect_ratio(self, value : float):
         #find closest fraction to decimal aspect value and convert to a:b format
@@ -945,6 +933,15 @@ class ConceptWindow(ctk.CTkToplevel):
                     self.__get_concept_stats(True, 2)    #do advanced scan automatically if basic took <0.1s
 
     def destroy(self):
+        if self.canvas is not None:
+            self.canvas.get_tk_widget().destroy()
+            self.canvas = None
+
+        if self.bucket_fig is not None:
+            plt.close(self.bucket_fig)
+            self.bucket_fig = None
+            self.bucket_ax = None
+
         super().destroy()
 
     def __ok(self):
