@@ -70,6 +70,9 @@ def _is_huggingface_repo(value: str) -> bool:
     """Check if valid HF repo after trimming whitespace"""
     trimmed = value.strip()
 
+    if re.match(r"^https://huggingface\.[a-zA-Z]+/", trimmed):
+        return True
+
     if trimmed.__len__() > 96:
         return False
 
