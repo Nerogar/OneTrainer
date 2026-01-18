@@ -764,6 +764,10 @@ class ConceptWindow(ctk.CTkToplevel):
         if self._destroyed:
             return
 
+        # Check if concept_stats is properly initialized
+        if not self.concept.concept_stats.get("file_size"):
+            return
+
         #file size
         self.file_size_preview.configure(text=str(int(self.concept.concept_stats["file_size"]/1048576)) + " MB")
         self.processing_time.configure(text=str(round(self.concept.concept_stats["processing_time"], 2)) + " s")
@@ -971,11 +975,16 @@ class ConceptWindow(ctk.CTkToplevel):
     def __auto_update_concept_stats(self):
         if self._destroyed:
             return
+
+        # Skip scanning for empty/invalid concept paths
+        if not self.concept.path or not self.concept.path.strip():
+            return
+
         try:
             self.after(0, self.__update_concept_stats)      #load stats from config if available, else raises KeyError
             if self.concept.concept_stats["file_size"] == 0:  #force rescan if empty
                 raise KeyError
-        except KeyError:
+        except (KeyError, AttributeError, TypeError):
             concept_path = self.get_concept_path(self.concept.path)
             if concept_path and not self._destroyed:
                 # Run advanced scan directly with short timeout - avoids scanning twice
