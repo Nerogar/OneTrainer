@@ -70,7 +70,13 @@ def _is_huggingface_repo(value: str) -> bool:
     """Check if valid HF repo after trimming whitespace"""
     trimmed = value.strip()
 
+    if trimmed.__len__() > 96:
+        return False
+
     if " " in trimmed or "\t" in trimmed:
+        return False
+
+    if "—" in trimmed or ".." in trimmed:
         return False
 
     if trimmed.startswith(("\\\\", "//")):
