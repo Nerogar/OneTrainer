@@ -12,21 +12,6 @@ from typing import Any
 from customtkinter import CTk, CTkToplevel
 from tkinterdnd2 import DND_FILES
 
-# Temp debug
-print(f"[DnD Debug] Platform: {sys.platform}")
-print(f"[DnD Debug] XDG_SESSION_TYPE: {os.environ.get('XDG_SESSION_TYPE', 'not set')}")
-print(f"[DnD Debug] WAYLAND_DISPLAY: {os.environ.get('WAYLAND_DISPLAY', 'not set')}")
-print(f"[DnD Debug] DISPLAY: {os.environ.get('DISPLAY', 'not set')}")
-try:
-    from tkinterdnd2 import TkinterDnD
-    _test_root = tk.Tk()
-    _test_root.withdraw()
-    _tkdnd_version = TkinterDnD._require(_test_root)
-    print(f"Debug: tkdnd ver: {_tkdnd_version}")
-    _test_root.destroy()
-except Exception as e:
-    print(f"Debug: tkdnd load error: {e}")
-print("=" * 50)
 
 def bind_mousewheel(
     widget: Any,
@@ -151,12 +136,6 @@ def _create_drop_handler(entry_widget, ui_state, var_name, command=None, drop_va
     return drop
 
 def _parse_dropped_paths(event_data: str) -> list[str]:
-    """Parse dropped path data from drag-and-drop events:
-
-    - Brace-wrapped paths with spaces: {/path/with spaces/file.txt}
-    - file:// URI format: file:///home/user/file.txt
-    - URL-encoded characters: %20 for spaces
-    """
     paths = []
     current_path = ""
     in_braces = False
