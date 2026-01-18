@@ -27,6 +27,9 @@ ENDS_WITH_EXT = re.compile(r"\.[A-Za-z0-9]+$")
 INVALID_NAMES = {"", "."}
 GENERIC_MODEL_NAMES = {"lora", "embedding", "embeddings", "model", "finetune"}
 
+# org/repo-name (alphanumeric, hyphens, underscores, dots allowed)
+HUGGINGFACE_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$")
+
 INVALID_CHARS_WIN = set('<>:"|?*')
 INVALID_NAMES = {"", "."}
 
@@ -62,6 +65,29 @@ def _has_invalid_chars(path: str) -> bool:
         start_idx = 2 if has_drive else 0
         return any(c in INVALID_CHARS_WIN for c in path[start_idx:])
     return "\x00" in path
+
+def _is_huggingface_repo(value: str) -> bool:
+    """Check if valid HF repo after trimming whitespace"""
+    trimmed = value.strip()
+
+    if " " in trimmed or "\t" in trimmed:
+        return False
+
+    if trimmed.startswith(("\\\\", "//")):
+        return False
+
+    if trimmed.startswith("/"):
+        return False
+
+    if len(trimmed) >= 2 and trimmed[1] == ":" and trimmed[0].isalpha():
+        return False
+
+    # HF repos have exactly one slash (owner/repo)
+    if trimmed.count("/") != 1:
+        return False
+
+    return bool(HUGGINGFACE_REPO_RE.match(trimmed))
+
 
 def _safe_exists(path: Path, check_dir: bool = True) -> bool:
     try:
@@ -394,6 +420,10 @@ def validate_file_path(
 ) -> ValidationResult:
     """Validate a file or directory path."""
     if not value:
+        return _result(True, None, "")
+
+    # For input paths (not output), accept HuggingFace repo format
+    if not is_output and _is_huggingface_repo(value):
         return _result(True, None, "")
 
     # Check for invalid characters
