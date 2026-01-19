@@ -167,8 +167,9 @@ class BaseFlux2Setup(
             model_output_data = {
                 'loss_type': 'target',
                 'timestep': timestep,
-                'predicted': predicted_flow,
-                'target': flow,
+                #unpatchify, to make the shape match the mask shape of masked training:
+                'predicted': model.unpatchify_latents(predicted_flow),
+                'target': model.unpatchify_latents(flow),
             }
 
             if config.debug_mode:
