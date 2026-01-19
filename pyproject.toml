@@ -93,8 +93,8 @@ rocm = [
     "onnxruntime==1.23.2",
 ]
 
-[tool.setuptools.packages.find]
-where = ["."]
+[tool.setuptools]
+packages = []
 
 [tool.ruff]
 extend-exclude = [
