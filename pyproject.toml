@@ -22,7 +22,7 @@ dependencies = [
     "scenedetect==0.6.6",
     "accelerate==1.7.0",
     "safetensors==0.5.3",
-    "tensorboard==2.19.0",
+    "tensorboard==2.20.0",
     "pytorch-lightning==2.5.1.post0",
     "diffusers @ git+https://github.com/huggingface/diffusers.git@256e0106749363fce06c28000698edeaf56a874d",
     "gguf==0.17.1",

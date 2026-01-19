@@ -22,7 +22,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libglvnd-1.7.0-ha4b6fd6_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libglx-1.7.0-ha4b6fd6_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libgomp-15.2.0-he0feb66_16.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/liblzma-5.8.1-hb9d3cd8_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/liblzma-5.8.2-hb03c661_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libmpdec-4.0.0-hb9d3cd8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libsqlite-3.51.2-hf4e2dac_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libstdcxx-15.2.0-h934c35e_16.conda
@@ -58,8 +58,8 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/df/73/b6e24bd22e6720ca8ee9a85a0c4a2971af8497d8f3193fa05390cbd46e09/backoff-2.2.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/82/a2/ac67e79e137eb98aead66c7162bafe3cffcb82ef9cdeb6367ec18d88fbce/backports_zstd-1.3.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/24/b4/11f8a31d8b67cca3371e046db49baa7c0594d71eb40ac8121e2fc0888db0/bcrypt-5.0.0-cp39-abi3-manylinux_2_28_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/69/35/5d95169ed145f0c49ebfeb6a5228ab63d54e95a2c7a43f0f0eb893540660/boto3-1.42.28-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8a/ff/72470b92ba96868be1936b8b3c7a70f902b60d36268bdeddb732317bef7a/botocore-1.42.28-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/52/b3/2c0d828c9f668292e277ca5232e6160dd5b4b660a3f076f20dd5378baa1e/boto3-1.42.30-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/3d/8d/6d7b016383b1f74dd93611b1c5078bbaddaca901553ab886dcda87cae365/botocore-1.42.30-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5f/16/a1b22cbea436642e071adcaf8d4b350a2ad02f5e0ad0da879a1be16188a0/brotli-1.2.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/e6/ad/3cc14f097111b4de0040c83a525973216457bbeeb63739ef1ed275c1c021/certifi-2026.1.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/98/df/0a1755e750013a2081e863e7cd37e0cdd02664372c754e5560099eb7aa44/cffi-2.0.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
@@ -83,7 +83,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d6/1f/e99e23ee01847147fa194e8d41cfcf2535a2dbfcb51414c541cadb15c5d7/fabric-3.2.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5c/05/5cbb59154b093548acd0f4c7c474a118eda06da25aa75c616b72d8fcd92a/fastapi-0.128.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/08/89/5c4eef60524d0fd704eb0706885b82cd5623a43396b94e4a5b17d3a3f516/fastapi_cli-0.0.20-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8c/8d/a70583d311f79ea1d13cb3230d3537fe02e6e848d209ddabb25f30cf845b/fastapi_cloud_cli-0.10.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/1a/07/60f79270a3320780be7e2ae8a1740cb98a692920b569ba420b97bcc6e175/fastapi_cloud_cli-0.11.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0c/e9/058615b63a7fd27965e8c5966f393ed0c169f7ff5012e1674f21684de3ba/fastar-0.8.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/b5/36/7fb70f04bf00bc646cd5bb45aa9eddb15e19437a28b8fb2b4a5249fac770/filelock-3.20.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl
@@ -193,7 +193,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d9/52/1064f510b141bd54025f9b55105e26d1fa970b9be67ad766380a3c9b74b0/starlette-0.50.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/5d/12/4f70e8e2ba0dbe72ea978429d8530b0333f0ed2140cc571a48802878ef99/tensorboard-2.19.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/9c/d9/a5db55f88f258ac669a92858b70a714bbbd5acd993820b41ec4a96a4d77f/tensorboard-2.20.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7a/13/e503968fefabd4c6b2650af21e110aa8466fe21432cd7c43a84577a89438/tensorboard_data_server-0.7.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/92/dd/c1f5b0890f7b5db661bde0864b41cb0275be76851047e5f7e085fe0b455a/timm-1.0.24-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2e/76/932be4b50ef6ccedf9d3c6639b056a967a86258c6d9200643f01269211ca/tokenizers-0.22.2-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
@@ -228,7 +228,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/icu-78.2-h38cb7af_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libexpat-2.7.3-haf25636_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libffi-3.5.2-he5f378a_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/liblzma-5.8.1-h39f12f2_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/liblzma-5.8.2-h8088a28_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libmpdec-4.0.0-h5505292_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libsqlite-3.51.2-h1ae2325_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libzlib-1.3.1-h8359307_2.conda
@@ -256,8 +256,8 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/df/73/b6e24bd22e6720ca8ee9a85a0c4a2971af8497d8f3193fa05390cbd46e09/backoff-2.2.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/da/78/f98e53870f7404071a41e3d04f2ff514302eeeb3279d931d02b220f437aa/backports_zstd-1.3.0-cp313-cp313-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/5d/ba/2af136406e1c3839aea9ecadc2f6be2bcd1eff255bd451dd39bcf302c47a/bcrypt-5.0.0-cp39-abi3-macosx_10_12_universal2.whl
-      - pypi: https://files.pythonhosted.org/packages/69/35/5d95169ed145f0c49ebfeb6a5228ab63d54e95a2c7a43f0f0eb893540660/boto3-1.42.28-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8a/ff/72470b92ba96868be1936b8b3c7a70f902b60d36268bdeddb732317bef7a/botocore-1.42.28-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/52/b3/2c0d828c9f668292e277ca5232e6160dd5b4b660a3f076f20dd5378baa1e/boto3-1.42.30-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/3d/8d/6d7b016383b1f74dd93611b1c5078bbaddaca901553ab886dcda87cae365/botocore-1.42.30-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/6c/d4/4ad5432ac98c73096159d9ce7ffeb82d151c2ac84adcc6168e476bb54674/brotli-1.2.0-cp313-cp313-macosx_10_13_universal2.whl
       - pypi: https://files.pythonhosted.org/packages/e6/ad/3cc14f097111b4de0040c83a525973216457bbeeb63739ef1ed275c1c021/certifi-2026.1.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/4a/d2/a6c0296814556c68ee32009d9c2ad4f85f2707cdecfd7727951ec228005d/cffi-2.0.0-cp313-cp313-macosx_11_0_arm64.whl
@@ -281,7 +281,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d6/1f/e99e23ee01847147fa194e8d41cfcf2535a2dbfcb51414c541cadb15c5d7/fabric-3.2.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5c/05/5cbb59154b093548acd0f4c7c474a118eda06da25aa75c616b72d8fcd92a/fastapi-0.128.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/08/89/5c4eef60524d0fd704eb0706885b82cd5623a43396b94e4a5b17d3a3f516/fastapi_cli-0.0.20-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8c/8d/a70583d311f79ea1d13cb3230d3537fe02e6e848d209ddabb25f30cf845b/fastapi_cloud_cli-0.10.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/1a/07/60f79270a3320780be7e2ae8a1740cb98a692920b569ba420b97bcc6e175/fastapi_cloud_cli-0.11.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0a/03/4f883bce878218a8676c2d7ca09b50c856a5470bb3b7f63baf9521ea6995/fastar-0.8.0-cp313-cp313-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/b5/36/7fb70f04bf00bc646cd5bb45aa9eddb15e19437a28b8fb2b4a5249fac770/filelock-3.20.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl
@@ -376,7 +376,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d9/52/1064f510b141bd54025f9b55105e26d1fa970b9be67ad766380a3c9b74b0/starlette-0.50.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/5d/12/4f70e8e2ba0dbe72ea978429d8530b0333f0ed2140cc571a48802878ef99/tensorboard-2.19.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/9c/d9/a5db55f88f258ac669a92858b70a714bbbd5acd993820b41ec4a96a4d77f/tensorboard-2.20.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7a/13/e503968fefabd4c6b2650af21e110aa8466fe21432cd7c43a84577a89438/tensorboard_data_server-0.7.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/92/dd/c1f5b0890f7b5db661bde0864b41cb0275be76851047e5f7e085fe0b455a/timm-1.0.24-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2e/47/174dca0502ef88b28f1c9e06b73ce33500eedfac7a7692108aec220464e7/tokenizers-0.22.2-cp39-abi3-macosx_11_0_arm64.whl
@@ -409,7 +409,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.1.4-h4c7d964_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libexpat-2.7.3-hac47afa_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libffi-3.5.2-h52bdfb6_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.1-h2466b09_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.2-hfd05255_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libmpdec-4.0.0-h2466b09_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libsqlite-3.51.2-hf5d6505_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libzlib-1.3.1-h2466b09_2.conda
@@ -439,8 +439,8 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/df/73/b6e24bd22e6720ca8ee9a85a0c4a2971af8497d8f3193fa05390cbd46e09/backoff-2.2.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a2/82/b1df1bbbe4e6d3ffd364d0bcffdeb6c4361115c1eccd91238dbdd0c07fec/backports_zstd-1.3.0-cp313-cp313-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/9f/b9/9d9a641194a730bda138b3dfe53f584d61c58cd5230e37566e83ec2ffa0d/bcrypt-5.0.0-cp39-abi3-win_amd64.whl
-      - pypi: https://files.pythonhosted.org/packages/69/35/5d95169ed145f0c49ebfeb6a5228ab63d54e95a2c7a43f0f0eb893540660/boto3-1.42.28-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8a/ff/72470b92ba96868be1936b8b3c7a70f902b60d36268bdeddb732317bef7a/botocore-1.42.28-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/52/b3/2c0d828c9f668292e277ca5232e6160dd5b4b660a3f076f20dd5378baa1e/boto3-1.42.30-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/3d/8d/6d7b016383b1f74dd93611b1c5078bbaddaca901553ab886dcda87cae365/botocore-1.42.30-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ff/91/e739587be970a113b37b821eae8097aac5a48e5f0eca438c22e4c7dd8648/brotli-1.2.0-cp313-cp313-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/e6/ad/3cc14f097111b4de0040c83a525973216457bbeeb63739ef1ed275c1c021/certifi-2026.1.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/37/18/6519e1ee6f5a1e579e04b9ddb6f1676c17368a7aba48299c3759bbc3c8b3/cffi-2.0.0-cp313-cp313-win_amd64.whl
@@ -464,7 +464,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d6/1f/e99e23ee01847147fa194e8d41cfcf2535a2dbfcb51414c541cadb15c5d7/fabric-3.2.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5c/05/5cbb59154b093548acd0f4c7c474a118eda06da25aa75c616b72d8fcd92a/fastapi-0.128.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/08/89/5c4eef60524d0fd704eb0706885b82cd5623a43396b94e4a5b17d3a3f516/fastapi_cli-0.0.20-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8c/8d/a70583d311f79ea1d13cb3230d3537fe02e6e848d209ddabb25f30cf845b/fastapi_cloud_cli-0.10.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/1a/07/60f79270a3320780be7e2ae8a1740cb98a692920b569ba420b97bcc6e175/fastapi_cloud_cli-0.11.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e1/01/e965740bd36e60ef4c5aa2cbe42b6c4eb1dc3551009238a97c2e5e96bd23/fastar-0.8.0-cp313-cp313-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/b5/36/7fb70f04bf00bc646cd5bb45aa9eddb15e19437a28b8fb2b4a5249fac770/filelock-3.20.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl
@@ -560,7 +560,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d9/52/1064f510b141bd54025f9b55105e26d1fa970b9be67ad766380a3c9b74b0/starlette-0.50.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/5d/12/4f70e8e2ba0dbe72ea978429d8530b0333f0ed2140cc571a48802878ef99/tensorboard-2.19.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/9c/d9/a5db55f88f258ac669a92858b70a714bbbd5acd993820b41ec4a96a4d77f/tensorboard-2.20.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7a/13/e503968fefabd4c6b2650af21e110aa8466fe21432cd7c43a84577a89438/tensorboard_data_server-0.7.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/92/dd/c1f5b0890f7b5db661bde0864b41cb0275be76851047e5f7e085fe0b455a/timm-1.0.24-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/65/71/0670843133a43d43070abeb1949abfdef12a86d490bea9cd9e18e37c5ff7/tokenizers-0.22.2-cp39-abi3-win_amd64.whl
@@ -610,7 +610,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libglvnd-1.7.0-ha4b6fd6_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libglx-1.7.0-ha4b6fd6_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libgomp-15.2.0-he0feb66_16.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/liblzma-5.8.1-hb9d3cd8_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/liblzma-5.8.2-hb03c661_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libmpdec-4.0.0-hb9d3cd8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libsqlite-3.51.2-hf4e2dac_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libstdcxx-15.2.0-h934c35e_16.conda
@@ -647,8 +647,8 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/82/a2/ac67e79e137eb98aead66c7162bafe3cffcb82ef9cdeb6367ec18d88fbce/backports_zstd-1.3.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/24/b4/11f8a31d8b67cca3371e046db49baa7c0594d71eb40ac8121e2fc0888db0/bcrypt-5.0.0-cp39-abi3-manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/72/27/ec6ee3408e09e01ab05db07af5a97dc76db7bc18824cf5f5dbc98e1e08a4/bitsandbytes-0.46.0-py3-none-manylinux_2_24_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/69/35/5d95169ed145f0c49ebfeb6a5228ab63d54e95a2c7a43f0f0eb893540660/boto3-1.42.28-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8a/ff/72470b92ba96868be1936b8b3c7a70f902b60d36268bdeddb732317bef7a/botocore-1.42.28-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/52/b3/2c0d828c9f668292e277ca5232e6160dd5b4b660a3f076f20dd5378baa1e/boto3-1.42.30-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/3d/8d/6d7b016383b1f74dd93611b1c5078bbaddaca901553ab886dcda87cae365/botocore-1.42.30-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5f/16/a1b22cbea436642e071adcaf8d4b350a2ad02f5e0ad0da879a1be16188a0/brotli-1.2.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/e6/ad/3cc14f097111b4de0040c83a525973216457bbeeb63739ef1ed275c1c021/certifi-2026.1.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/98/df/0a1755e750013a2081e863e7cd37e0cdd02664372c754e5560099eb7aa44/cffi-2.0.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
@@ -672,7 +672,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d6/1f/e99e23ee01847147fa194e8d41cfcf2535a2dbfcb51414c541cadb15c5d7/fabric-3.2.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5c/05/5cbb59154b093548acd0f4c7c474a118eda06da25aa75c616b72d8fcd92a/fastapi-0.128.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/08/89/5c4eef60524d0fd704eb0706885b82cd5623a43396b94e4a5b17d3a3f516/fastapi_cli-0.0.20-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8c/8d/a70583d311f79ea1d13cb3230d3537fe02e6e848d209ddabb25f30cf845b/fastapi_cloud_cli-0.10.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/1a/07/60f79270a3320780be7e2ae8a1740cb98a692920b569ba420b97bcc6e175/fastapi_cloud_cli-0.11.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0c/e9/058615b63a7fd27965e8c5966f393ed0c169f7ff5012e1674f21684de3ba/fastar-0.8.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/b5/36/7fb70f04bf00bc646cd5bb45aa9eddb15e19437a28b8fb2b4a5249fac770/filelock-3.20.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl
@@ -782,7 +782,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d9/52/1064f510b141bd54025f9b55105e26d1fa970b9be67ad766380a3c9b74b0/starlette-0.50.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/5d/12/4f70e8e2ba0dbe72ea978429d8530b0333f0ed2140cc571a48802878ef99/tensorboard-2.19.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/9c/d9/a5db55f88f258ac669a92858b70a714bbbd5acd993820b41ec4a96a4d77f/tensorboard-2.20.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7a/13/e503968fefabd4c6b2650af21e110aa8466fe21432cd7c43a84577a89438/tensorboard_data_server-0.7.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/92/dd/c1f5b0890f7b5db661bde0864b41cb0275be76851047e5f7e085fe0b455a/timm-1.0.24-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2e/76/932be4b50ef6ccedf9d3c6639b056a967a86258c6d9200643f01269211ca/tokenizers-0.22.2-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
@@ -816,7 +816,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.1.4-h4c7d964_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libexpat-2.7.3-hac47afa_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libffi-3.5.2-h52bdfb6_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.1-h2466b09_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.2-hfd05255_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libmpdec-4.0.0-h2466b09_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libsqlite-3.51.2-hf5d6505_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libzlib-1.3.1-h2466b09_2.conda
@@ -847,8 +847,8 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/a2/82/b1df1bbbe4e6d3ffd364d0bcffdeb6c4361115c1eccd91238dbdd0c07fec/backports_zstd-1.3.0-cp313-cp313-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/9f/b9/9d9a641194a730bda138b3dfe53f584d61c58cd5230e37566e83ec2ffa0d/bcrypt-5.0.0-cp39-abi3-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/f3/06/2ef5f6b28d8fa442c670b5acc1eb09dd57d4edb00b435b35529c3f09936c/bitsandbytes-0.46.0-py3-none-win_amd64.whl
-      - pypi: https://files.pythonhosted.org/packages/69/35/5d95169ed145f0c49ebfeb6a5228ab63d54e95a2c7a43f0f0eb893540660/boto3-1.42.28-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8a/ff/72470b92ba96868be1936b8b3c7a70f902b60d36268bdeddb732317bef7a/botocore-1.42.28-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/52/b3/2c0d828c9f668292e277ca5232e6160dd5b4b660a3f076f20dd5378baa1e/boto3-1.42.30-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/3d/8d/6d7b016383b1f74dd93611b1c5078bbaddaca901553ab886dcda87cae365/botocore-1.42.30-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ff/91/e739587be970a113b37b821eae8097aac5a48e5f0eca438c22e4c7dd8648/brotli-1.2.0-cp313-cp313-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/e6/ad/3cc14f097111b4de0040c83a525973216457bbeeb63739ef1ed275c1c021/certifi-2026.1.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/37/18/6519e1ee6f5a1e579e04b9ddb6f1676c17368a7aba48299c3759bbc3c8b3/cffi-2.0.0-cp313-cp313-win_amd64.whl
@@ -872,7 +872,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d6/1f/e99e23ee01847147fa194e8d41cfcf2535a2dbfcb51414c541cadb15c5d7/fabric-3.2.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5c/05/5cbb59154b093548acd0f4c7c474a118eda06da25aa75c616b72d8fcd92a/fastapi-0.128.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/08/89/5c4eef60524d0fd704eb0706885b82cd5623a43396b94e4a5b17d3a3f516/fastapi_cli-0.0.20-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8c/8d/a70583d311f79ea1d13cb3230d3537fe02e6e848d209ddabb25f30cf845b/fastapi_cloud_cli-0.10.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/1a/07/60f79270a3320780be7e2ae8a1740cb98a692920b569ba420b97bcc6e175/fastapi_cloud_cli-0.11.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e1/01/e965740bd36e60ef4c5aa2cbe42b6c4eb1dc3551009238a97c2e5e96bd23/fastar-0.8.0-cp313-cp313-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/b5/36/7fb70f04bf00bc646cd5bb45aa9eddb15e19437a28b8fb2b4a5249fac770/filelock-3.20.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl
@@ -968,7 +968,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d9/52/1064f510b141bd54025f9b55105e26d1fa970b9be67ad766380a3c9b74b0/starlette-0.50.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/5d/12/4f70e8e2ba0dbe72ea978429d8530b0333f0ed2140cc571a48802878ef99/tensorboard-2.19.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/9c/d9/a5db55f88f258ac669a92858b70a714bbbd5acd993820b41ec4a96a4d77f/tensorboard-2.20.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7a/13/e503968fefabd4c6b2650af21e110aa8466fe21432cd7c43a84577a89438/tensorboard_data_server-0.7.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/92/dd/c1f5b0890f7b5db661bde0864b41cb0275be76851047e5f7e085fe0b455a/timm-1.0.24-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/65/71/0670843133a43d43070abeb1949abfdef12a86d490bea9cd9e18e37c5ff7/tokenizers-0.22.2-cp39-abi3-win_amd64.whl
@@ -1018,7 +1018,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libglvnd-1.7.0-ha4b6fd6_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libglx-1.7.0-ha4b6fd6_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libgomp-15.2.0-he0feb66_16.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/liblzma-5.8.1-hb9d3cd8_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/liblzma-5.8.2-hb03c661_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libmpdec-4.0.0-hb9d3cd8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libsqlite-3.51.2-hf4e2dac_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libstdcxx-15.2.0-h934c35e_16.conda
@@ -1054,8 +1054,8 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/df/73/b6e24bd22e6720ca8ee9a85a0c4a2971af8497d8f3193fa05390cbd46e09/backoff-2.2.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/82/a2/ac67e79e137eb98aead66c7162bafe3cffcb82ef9cdeb6367ec18d88fbce/backports_zstd-1.3.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/24/b4/11f8a31d8b67cca3371e046db49baa7c0594d71eb40ac8121e2fc0888db0/bcrypt-5.0.0-cp39-abi3-manylinux_2_28_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/69/35/5d95169ed145f0c49ebfeb6a5228ab63d54e95a2c7a43f0f0eb893540660/boto3-1.42.28-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8a/ff/72470b92ba96868be1936b8b3c7a70f902b60d36268bdeddb732317bef7a/botocore-1.42.28-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/52/b3/2c0d828c9f668292e277ca5232e6160dd5b4b660a3f076f20dd5378baa1e/boto3-1.42.30-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/3d/8d/6d7b016383b1f74dd93611b1c5078bbaddaca901553ab886dcda87cae365/botocore-1.42.30-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5f/16/a1b22cbea436642e071adcaf8d4b350a2ad02f5e0ad0da879a1be16188a0/brotli-1.2.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/e6/ad/3cc14f097111b4de0040c83a525973216457bbeeb63739ef1ed275c1c021/certifi-2026.1.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/98/df/0a1755e750013a2081e863e7cd37e0cdd02664372c754e5560099eb7aa44/cffi-2.0.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
@@ -1078,7 +1078,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d6/1f/e99e23ee01847147fa194e8d41cfcf2535a2dbfcb51414c541cadb15c5d7/fabric-3.2.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5c/05/5cbb59154b093548acd0f4c7c474a118eda06da25aa75c616b72d8fcd92a/fastapi-0.128.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/08/89/5c4eef60524d0fd704eb0706885b82cd5623a43396b94e4a5b17d3a3f516/fastapi_cli-0.0.20-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8c/8d/a70583d311f79ea1d13cb3230d3537fe02e6e848d209ddabb25f30cf845b/fastapi_cloud_cli-0.10.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/1a/07/60f79270a3320780be7e2ae8a1740cb98a692920b569ba420b97bcc6e175/fastapi_cloud_cli-0.11.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0c/e9/058615b63a7fd27965e8c5966f393ed0c169f7ff5012e1674f21684de3ba/fastar-0.8.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/b5/36/7fb70f04bf00bc646cd5bb45aa9eddb15e19437a28b8fb2b4a5249fac770/filelock-3.20.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a3/4b/d67eedaed19def5967fade3297fed8161b25ba94699efc124b14fb68cdbc/fonttools-4.61.1-cp313-cp313-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl
@@ -1186,7 +1186,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d9/52/1064f510b141bd54025f9b55105e26d1fa970b9be67ad766380a3c9b74b0/starlette-0.50.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/5d/12/4f70e8e2ba0dbe72ea978429d8530b0333f0ed2140cc571a48802878ef99/tensorboard-2.19.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/9c/d9/a5db55f88f258ac669a92858b70a714bbbd5acd993820b41ec4a96a4d77f/tensorboard-2.20.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7a/13/e503968fefabd4c6b2650af21e110aa8466fe21432cd7c43a84577a89438/tensorboard_data_server-0.7.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/92/dd/c1f5b0890f7b5db661bde0864b41cb0275be76851047e5f7e085fe0b455a/timm-1.0.24-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2e/76/932be4b50ef6ccedf9d3c6639b056a967a86258c6d9200643f01269211ca/tokenizers-0.22.2-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
@@ -1221,7 +1221,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/icu-78.2-h38cb7af_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libexpat-2.7.3-haf25636_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libffi-3.5.2-he5f378a_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/liblzma-5.8.1-h39f12f2_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/liblzma-5.8.2-h8088a28_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libmpdec-4.0.0-h5505292_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libsqlite-3.51.2-h1ae2325_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libzlib-1.3.1-h8359307_2.conda
@@ -1249,8 +1249,8 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/df/73/b6e24bd22e6720ca8ee9a85a0c4a2971af8497d8f3193fa05390cbd46e09/backoff-2.2.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/da/78/f98e53870f7404071a41e3d04f2ff514302eeeb3279d931d02b220f437aa/backports_zstd-1.3.0-cp313-cp313-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/5d/ba/2af136406e1c3839aea9ecadc2f6be2bcd1eff255bd451dd39bcf302c47a/bcrypt-5.0.0-cp39-abi3-macosx_10_12_universal2.whl
-      - pypi: https://files.pythonhosted.org/packages/69/35/5d95169ed145f0c49ebfeb6a5228ab63d54e95a2c7a43f0f0eb893540660/boto3-1.42.28-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8a/ff/72470b92ba96868be1936b8b3c7a70f902b60d36268bdeddb732317bef7a/botocore-1.42.28-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/52/b3/2c0d828c9f668292e277ca5232e6160dd5b4b660a3f076f20dd5378baa1e/boto3-1.42.30-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/3d/8d/6d7b016383b1f74dd93611b1c5078bbaddaca901553ab886dcda87cae365/botocore-1.42.30-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/6c/d4/4ad5432ac98c73096159d9ce7ffeb82d151c2ac84adcc6168e476bb54674/brotli-1.2.0-cp313-cp313-macosx_10_13_universal2.whl
       - pypi: https://files.pythonhosted.org/packages/e6/ad/3cc14f097111b4de0040c83a525973216457bbeeb63739ef1ed275c1c021/certifi-2026.1.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/4a/d2/a6c0296814556c68ee32009d9c2ad4f85f2707cdecfd7727951ec228005d/cffi-2.0.0-cp313-cp313-macosx_11_0_arm64.whl
@@ -1273,7 +1273,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d6/1f/e99e23ee01847147fa194e8d41cfcf2535a2dbfcb51414c541cadb15c5d7/fabric-3.2.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5c/05/5cbb59154b093548acd0f4c7c474a118eda06da25aa75c616b72d8fcd92a/fastapi-0.128.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/08/89/5c4eef60524d0fd704eb0706885b82cd5623a43396b94e4a5b17d3a3f516/fastapi_cli-0.0.20-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8c/8d/a70583d311f79ea1d13cb3230d3537fe02e6e848d209ddabb25f30cf845b/fastapi_cloud_cli-0.10.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/1a/07/60f79270a3320780be7e2ae8a1740cb98a692920b569ba420b97bcc6e175/fastapi_cloud_cli-0.11.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0a/03/4f883bce878218a8676c2d7ca09b50c856a5470bb3b7f63baf9521ea6995/fastar-0.8.0-cp313-cp313-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/b5/36/7fb70f04bf00bc646cd5bb45aa9eddb15e19437a28b8fb2b4a5249fac770/filelock-3.20.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/4b/cf/00ba28b0990982530addb8dc3e9e6f2fa9cb5c20df2abdda7baa755e8fe1/fonttools-4.61.1-cp313-cp313-macosx_10_13_universal2.whl
@@ -1365,7 +1365,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d9/52/1064f510b141bd54025f9b55105e26d1fa970b9be67ad766380a3c9b74b0/starlette-0.50.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/5d/12/4f70e8e2ba0dbe72ea978429d8530b0333f0ed2140cc571a48802878ef99/tensorboard-2.19.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/9c/d9/a5db55f88f258ac669a92858b70a714bbbd5acd993820b41ec4a96a4d77f/tensorboard-2.20.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7a/13/e503968fefabd4c6b2650af21e110aa8466fe21432cd7c43a84577a89438/tensorboard_data_server-0.7.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/92/dd/c1f5b0890f7b5db661bde0864b41cb0275be76851047e5f7e085fe0b455a/timm-1.0.24-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2e/47/174dca0502ef88b28f1c9e06b73ce33500eedfac7a7692108aec220464e7/tokenizers-0.22.2-cp39-abi3-macosx_11_0_arm64.whl
@@ -1398,7 +1398,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.1.4-h4c7d964_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libexpat-2.7.3-hac47afa_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libffi-3.5.2-h52bdfb6_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.1-h2466b09_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.2-hfd05255_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libmpdec-4.0.0-h2466b09_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libsqlite-3.51.2-hf5d6505_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libzlib-1.3.1-h2466b09_2.conda
@@ -1428,8 +1428,8 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/df/73/b6e24bd22e6720ca8ee9a85a0c4a2971af8497d8f3193fa05390cbd46e09/backoff-2.2.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a2/82/b1df1bbbe4e6d3ffd364d0bcffdeb6c4361115c1eccd91238dbdd0c07fec/backports_zstd-1.3.0-cp313-cp313-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/9f/b9/9d9a641194a730bda138b3dfe53f584d61c58cd5230e37566e83ec2ffa0d/bcrypt-5.0.0-cp39-abi3-win_amd64.whl
-      - pypi: https://files.pythonhosted.org/packages/69/35/5d95169ed145f0c49ebfeb6a5228ab63d54e95a2c7a43f0f0eb893540660/boto3-1.42.28-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8a/ff/72470b92ba96868be1936b8b3c7a70f902b60d36268bdeddb732317bef7a/botocore-1.42.28-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/52/b3/2c0d828c9f668292e277ca5232e6160dd5b4b660a3f076f20dd5378baa1e/boto3-1.42.30-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/3d/8d/6d7b016383b1f74dd93611b1c5078bbaddaca901553ab886dcda87cae365/botocore-1.42.30-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ff/91/e739587be970a113b37b821eae8097aac5a48e5f0eca438c22e4c7dd8648/brotli-1.2.0-cp313-cp313-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/e6/ad/3cc14f097111b4de0040c83a525973216457bbeeb63739ef1ed275c1c021/certifi-2026.1.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/37/18/6519e1ee6f5a1e579e04b9ddb6f1676c17368a7aba48299c3759bbc3c8b3/cffi-2.0.0-cp313-cp313-win_amd64.whl
@@ -1452,7 +1452,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d6/1f/e99e23ee01847147fa194e8d41cfcf2535a2dbfcb51414c541cadb15c5d7/fabric-3.2.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5c/05/5cbb59154b093548acd0f4c7c474a118eda06da25aa75c616b72d8fcd92a/fastapi-0.128.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/08/89/5c4eef60524d0fd704eb0706885b82cd5623a43396b94e4a5b17d3a3f516/fastapi_cli-0.0.20-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8c/8d/a70583d311f79ea1d13cb3230d3537fe02e6e848d209ddabb25f30cf845b/fastapi_cloud_cli-0.10.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/1a/07/60f79270a3320780be7e2ae8a1740cb98a692920b569ba420b97bcc6e175/fastapi_cloud_cli-0.11.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e1/01/e965740bd36e60ef4c5aa2cbe42b6c4eb1dc3551009238a97c2e5e96bd23/fastar-0.8.0-cp313-cp313-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/b5/36/7fb70f04bf00bc646cd5bb45aa9eddb15e19437a28b8fb2b4a5249fac770/filelock-3.20.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/1a/59/453c06d1d83dc0951b69ef692d6b9f1846680342927df54e9a1ca91c6f90/fonttools-4.61.1-cp313-cp313-win_amd64.whl
@@ -1544,7 +1544,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d9/52/1064f510b141bd54025f9b55105e26d1fa970b9be67ad766380a3c9b74b0/starlette-0.50.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/5d/12/4f70e8e2ba0dbe72ea978429d8530b0333f0ed2140cc571a48802878ef99/tensorboard-2.19.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/9c/d9/a5db55f88f258ac669a92858b70a714bbbd5acd993820b41ec4a96a4d77f/tensorboard-2.20.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7a/13/e503968fefabd4c6b2650af21e110aa8466fe21432cd7c43a84577a89438/tensorboard_data_server-0.7.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/92/dd/c1f5b0890f7b5db661bde0864b41cb0275be76851047e5f7e085fe0b455a/timm-1.0.24-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/65/71/0670843133a43d43070abeb1949abfdef12a86d490bea9cd9e18e37c5ff7/tokenizers-0.22.2-cp39-abi3-win_amd64.whl
@@ -1594,7 +1594,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libglvnd-1.7.0-ha4b6fd6_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libglx-1.7.0-ha4b6fd6_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libgomp-15.2.0-he0feb66_16.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/liblzma-5.8.1-hb9d3cd8_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/liblzma-5.8.2-hb03c661_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libmpdec-4.0.0-hb9d3cd8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libsqlite-3.51.2-hf4e2dac_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libstdcxx-15.2.0-h934c35e_16.conda
@@ -1630,8 +1630,8 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/df/73/b6e24bd22e6720ca8ee9a85a0c4a2971af8497d8f3193fa05390cbd46e09/backoff-2.2.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/82/a2/ac67e79e137eb98aead66c7162bafe3cffcb82ef9cdeb6367ec18d88fbce/backports_zstd-1.3.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/24/b4/11f8a31d8b67cca3371e046db49baa7c0594d71eb40ac8121e2fc0888db0/bcrypt-5.0.0-cp39-abi3-manylinux_2_28_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/69/35/5d95169ed145f0c49ebfeb6a5228ab63d54e95a2c7a43f0f0eb893540660/boto3-1.42.28-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8a/ff/72470b92ba96868be1936b8b3c7a70f902b60d36268bdeddb732317bef7a/botocore-1.42.28-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/52/b3/2c0d828c9f668292e277ca5232e6160dd5b4b660a3f076f20dd5378baa1e/boto3-1.42.30-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/3d/8d/6d7b016383b1f74dd93611b1c5078bbaddaca901553ab886dcda87cae365/botocore-1.42.30-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5f/16/a1b22cbea436642e071adcaf8d4b350a2ad02f5e0ad0da879a1be16188a0/brotli-1.2.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/e6/ad/3cc14f097111b4de0040c83a525973216457bbeeb63739ef1ed275c1c021/certifi-2026.1.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/98/df/0a1755e750013a2081e863e7cd37e0cdd02664372c754e5560099eb7aa44/cffi-2.0.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
@@ -1655,7 +1655,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/d6/1f/e99e23ee01847147fa194e8d41cfcf2535a2dbfcb51414c541cadb15c5d7/fabric-3.2.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5c/05/5cbb59154b093548acd0f4c7c474a118eda06da25aa75c616b72d8fcd92a/fastapi-0.128.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/08/89/5c4eef60524d0fd704eb0706885b82cd5623a43396b94e4a5b17d3a3f516/fastapi_cli-0.0.20-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/8c/8d/a70583d311f79ea1d13cb3230d3537fe02e6e848d209ddabb25f30cf845b/fastapi_cloud_cli-0.10.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/1a/07/60f79270a3320780be7e2ae8a1740cb98a692920b569ba420b97bcc6e175/fastapi_cloud_cli-0.11.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/0c/e9/058615b63a7fd27965e8c5966f393ed0c169f7ff5012e1674f21684de3ba/fastar-0.8.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/b5/36/7fb70f04bf00bc646cd5bb45aa9eddb15e19437a28b8fb2b4a5249fac770/filelock-3.20.3-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl
@@ -1752,7 +1752,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d9/52/1064f510b141bd54025f9b55105e26d1fa970b9be67ad766380a3c9b74b0/starlette-0.50.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl
-      - pypi: https://files.pythonhosted.org/packages/5d/12/4f70e8e2ba0dbe72ea978429d8530b0333f0ed2140cc571a48802878ef99/tensorboard-2.19.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/9c/d9/a5db55f88f258ac669a92858b70a714bbbd5acd993820b41ec4a96a4d77f/tensorboard-2.20.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7a/13/e503968fefabd4c6b2650af21e110aa8466fe21432cd7c43a84577a89438/tensorboard_data_server-0.7.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/92/dd/c1f5b0890f7b5db661bde0864b41cb0275be76851047e5f7e085fe0b455a/timm-1.0.24-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2e/76/932be4b50ef6ccedf9d3c6639b056a967a86258c6d9200643f01269211ca/tokenizers-0.22.2-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
@@ -2108,20 +2108,20 @@ packages:
   - scipy>=1.11.4,<2 ; python_full_version >= '3.9' and extra == 'test'
   - transformers>=4.30.1,<5 ; extra == 'test'
   requires_python: '>=3.9'
-- pypi: https://files.pythonhosted.org/packages/69/35/5d95169ed145f0c49ebfeb6a5228ab63d54e95a2c7a43f0f0eb893540660/boto3-1.42.28-py3-none-any.whl
+- pypi: https://files.pythonhosted.org/packages/52/b3/2c0d828c9f668292e277ca5232e6160dd5b4b660a3f076f20dd5378baa1e/boto3-1.42.30-py3-none-any.whl
   name: boto3
-  version: 1.42.28
-  sha256: 7994bc2a094c1894f6a4221a1696c5d18af6c9c888191051866f1d05c4fba431
+  version: 1.42.30
+  sha256: d7e548bea65e0ae2c465c77de937bc686b591aee6a352d5a19a16bc751e591c1
   requires_dist:
-  - botocore>=1.42.28,<1.43.0
+  - botocore>=1.42.30,<1.43.0
   - jmespath>=0.7.1,<2.0.0
   - s3transfer>=0.16.0,<0.17.0
   - botocore[crt]>=1.21.0,<2.0a0 ; extra == 'crt'
   requires_python: '>=3.9'
-- pypi: https://files.pythonhosted.org/packages/8a/ff/72470b92ba96868be1936b8b3c7a70f902b60d36268bdeddb732317bef7a/botocore-1.42.28-py3-none-any.whl
+- pypi: https://files.pythonhosted.org/packages/3d/8d/6d7b016383b1f74dd93611b1c5078bbaddaca901553ab886dcda87cae365/botocore-1.42.30-py3-none-any.whl
   name: botocore
-  version: 1.42.28
-  sha256: d26c7a0851489ce1a18279f9802fe434bd736ea861d4888cc2c7d83fb1f6af8f
+  version: 1.42.30
+  sha256: 97070a438cac92430bb7b65f8ebd7075224f4a289719da4ee293d22d1e98db02
   requires_dist:
   - jmespath>=0.7.1,<2.0.0
   - python-dateutil>=2.1,<3.0.0
@@ -2703,10 +2703,10 @@ packages:
   - uvicorn[standard]>=0.15.0 ; extra == 'standard-no-fastapi-cloud-cli'
   - fastapi-new>=0.0.2 ; python_full_version >= '3.10' and extra == 'new'
   requires_python: '>=3.9'
-- pypi: https://files.pythonhosted.org/packages/8c/8d/a70583d311f79ea1d13cb3230d3537fe02e6e848d209ddabb25f30cf845b/fastapi_cloud_cli-0.10.1-py3-none-any.whl
+- pypi: https://files.pythonhosted.org/packages/1a/07/60f79270a3320780be7e2ae8a1740cb98a692920b569ba420b97bcc6e175/fastapi_cloud_cli-0.11.0-py3-none-any.whl
   name: fastapi-cloud-cli
-  version: 0.10.1
-  sha256: 0feeb2aabfb0558298d60bc19d2afb4782adfa262c23ecf5bda657db42f46df0
+  version: 0.11.0
+  sha256: 76857b0f09d918acfcb50ade34682ba3b2079ca0c43fda10215de301f185a7f8
   requires_dist:
   - typer>=0.12.3
   - uvicorn[standard]>=0.15.0
@@ -3483,42 +3483,42 @@ packages:
   purls: []
   size: 603284
   timestamp: 1765256703881
-- conda: https://conda.anaconda.org/conda-forge/linux-64/liblzma-5.8.1-hb9d3cd8_2.conda
-  sha256: f2591c0069447bbe28d4d696b7fcb0c5bd0b4ac582769b89addbcf26fb3430d8
-  md5: 1a580f7796c7bf6393fddb8bbbde58dc
+- conda: https://conda.anaconda.org/conda-forge/linux-64/liblzma-5.8.2-hb03c661_0.conda
+  sha256: 755c55ebab181d678c12e49cced893598f2bab22d582fbbf4d8b83c18be207eb
+  md5: c7c83eecbb72d88b940c249af56c8b17
   depends:
   - __glibc >=2.17,<3.0.a0
-  - libgcc >=13
+  - libgcc >=14
   constrains:
-  - xz 5.8.1.*
+  - xz 5.8.2.*
   license: 0BSD
   purls: []
-  size: 112894
-  timestamp: 1749230047870
-- conda: https://conda.anaconda.org/conda-forge/osx-arm64/liblzma-5.8.1-h39f12f2_2.conda
-  sha256: 0cb92a9e026e7bd4842f410a5c5c665c89b2eb97794ffddba519a626b8ce7285
-  md5: d6df911d4564d77c4374b02552cb17d1
+  size: 113207
+  timestamp: 1768752626120
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/liblzma-5.8.2-h8088a28_0.conda
+  sha256: 7bfc7ffb2d6a9629357a70d4eadeadb6f88fa26ebc28f606b1c1e5e5ed99dc7e
+  md5: 009f0d956d7bfb00de86901d16e486c7
   depends:
   - __osx >=11.0
   constrains:
-  - xz 5.8.1.*
+  - xz 5.8.2.*
   license: 0BSD
   purls: []
-  size: 92286
-  timestamp: 1749230283517
-- conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.1-h2466b09_2.conda
-  sha256: 55764956eb9179b98de7cc0e55696f2eff8f7b83fc3ebff5e696ca358bca28cc
-  md5: c15148b2e18da456f5108ccb5e411446
+  size: 92242
+  timestamp: 1768752982486
+- conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.2-hfd05255_0.conda
+  sha256: f25bf293f550c8ed2e0c7145eb404324611cfccff37660869d97abf526eb957c
+  md5: ba0bfd4c3cf73f299ffe46ff0eaeb8e3
   depends:
   - ucrt >=10.0.20348.0
-  - vc >=14.2,<15
-  - vc14_runtime >=14.29.30139
+  - vc >=14.3,<15
+  - vc14_runtime >=14.44.35208
   constrains:
-  - xz 5.8.1.*
+  - xz 5.8.2.*
   license: 0BSD
   purls: []
-  size: 104935
-  timestamp: 1749230611612
+  size: 106169
+  timestamp: 1768752763559
 - conda: https://conda.anaconda.org/conda-forge/linux-64/libmpdec-4.0.0-hb9d3cd8_0.conda
   sha256: 3aa92d4074d4063f2a162cd8ecb45dccac93e543e565c01a787e16a43501f7ee
   md5: c7e925f37e3b40d893459e625f6a53f1
@@ -5680,19 +5680,19 @@ packages:
   - pytest>=7.1.0 ; extra == 'dev'
   - hypothesis>=6.70.0 ; extra == 'dev'
   requires_python: '>=3.9'
-- pypi: https://files.pythonhosted.org/packages/5d/12/4f70e8e2ba0dbe72ea978429d8530b0333f0ed2140cc571a48802878ef99/tensorboard-2.19.0-py3-none-any.whl
+- pypi: https://files.pythonhosted.org/packages/9c/d9/a5db55f88f258ac669a92858b70a714bbbd5acd993820b41ec4a96a4d77f/tensorboard-2.20.0-py3-none-any.whl
   name: tensorboard
-  version: 2.19.0
-  sha256: 5e71b98663a641a7ce8a6e70b0be8e1a4c0c45d48760b076383ac4755c35b9a0
+  version: 2.20.0
+  sha256: 9dc9f978cb84c0723acf9a345d96c184f0293d18f166bb8d59ee098e6cfaaba6
   requires_dist:
   - absl-py>=0.4
   - grpcio>=1.48.2
   - markdown>=2.6.8
   - numpy>=1.12.0
   - packaging
+  - pillow
   - protobuf>=3.19.6,!=4.24.0
   - setuptools>=41.0.0
-  - six>1.9
   - tensorboard-data-server>=0.7.0,<0.8.0
   - werkzeug>=1.0.1
   requires_python: '>=3.9'
