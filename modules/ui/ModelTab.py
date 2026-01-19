@@ -5,7 +5,6 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
-from modules.util.enum.ModelType import PeftType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -151,7 +150,7 @@ class ModelTab:
             allow_safetensors=True,
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
             allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
-            allow_comfy=self.train_config.training_method == TrainingMethod.LORA and self.train_config.peft_type == PeftType.LORA,
+            allow_comfy=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_z_image_ui(self, frame):
@@ -642,7 +641,7 @@ class ModelTab:
         # if allow_legacy_safetensors:
         #     formats.append(("Legacy Safetensors", ModelFormat.LEGACY_SAFETENSORS))
         if allow_comfy:
-            formats.append(("Comfy", ModelFormat.COMFY_LORA))
+            formats.append(("Comfy LoRA", ModelFormat.COMFY_LORA))
 
         components.label(frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
