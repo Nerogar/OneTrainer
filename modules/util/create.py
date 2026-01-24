@@ -104,6 +104,7 @@ def create_data_loader(
         temp_device: torch.device,
         model: BaseModel,
         model_type: ModelType,
+        model_setup: BaseModelSetup,
         training_method: TrainingMethod = TrainingMethod.FINE_TUNE,
         config: TrainConfig = None,
         train_progress: TrainProgress | None = None,
@@ -118,7 +119,7 @@ def create_data_loader(
     cls = factory.get(BaseDataLoader, model_type, training_method)
     if cls is None:
         cls = factory.get(BaseDataLoader, model_type)
-    return cls(train_device, temp_device, config, model, train_progress, is_validation) if cls is not None else None
+    return cls(train_device, temp_device, config, model, model_setup, train_progress, is_validation) if cls is not None else None
 
 def create_optimizer(
         parameter_group_collection: NamedParameterGroupCollection,
