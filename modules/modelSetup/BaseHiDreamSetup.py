@@ -24,13 +24,6 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
-PRESETS = {
-    "attn-mlp": ["attn1", "ff_i"],
-    "attn-only": ["attn1"],
-    "blocks": ["stream_block"],
-    "full": [],
-}
-
 
 class BaseHiDreamSetup(
     BaseModelSetup,
@@ -41,6 +34,12 @@ class BaseHiDreamSetup(
     ModelSetupEmbeddingMixin,
     metaclass=ABCMeta
 ):
+    LAYER_PRESETS = {
+        "attn-mlp": ["attn1", "ff_i"],
+        "attn-only": ["attn1"],
+        "blocks": ["stream_block"],
+        "full": [],
+    }
 
     def setup_optimizations(
             self,

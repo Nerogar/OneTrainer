@@ -25,11 +25,6 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
-PRESETS = {
-    "attn-only": ["attn"],
-    "blocks": ["transformer_block"],
-    "full": [],
-}
 
 class BaseStableDiffusion3Setup(
     BaseModelSetup,
@@ -40,6 +35,11 @@ class BaseStableDiffusion3Setup(
     ModelSetupEmbeddingMixin,
     metaclass=ABCMeta
 ):
+    LAYER_PRESETS = {
+        "attn-only": ["attn"],
+        "blocks": ["transformer_block"],
+        "full": [],
+    }
 
     def setup_optimizations(
             self,

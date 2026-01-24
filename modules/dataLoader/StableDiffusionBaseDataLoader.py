@@ -4,7 +4,9 @@ import os
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
 from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
@@ -267,3 +269,12 @@ class StableDiffusionBaseDataLoader(
             train_progress,
             is_validation,
         )
+
+factory.register(BaseDataLoader, StableDiffusionBaseDataLoader, ModelType.STABLE_DIFFUSION_15)
+factory.register(BaseDataLoader, StableDiffusionBaseDataLoader, ModelType.STABLE_DIFFUSION_15_INPAINTING)
+factory.register(BaseDataLoader, StableDiffusionBaseDataLoader, ModelType.STABLE_DIFFUSION_20)
+factory.register(BaseDataLoader, StableDiffusionBaseDataLoader, ModelType.STABLE_DIFFUSION_20_BASE)
+factory.register(BaseDataLoader, StableDiffusionBaseDataLoader, ModelType.STABLE_DIFFUSION_20_INPAINTING)
+factory.register(BaseDataLoader, StableDiffusionBaseDataLoader, ModelType.STABLE_DIFFUSION_20_DEPTH)
+factory.register(BaseDataLoader, StableDiffusionBaseDataLoader, ModelType.STABLE_DIFFUSION_21)
+factory.register(BaseDataLoader, StableDiffusionBaseDataLoader, ModelType.STABLE_DIFFUSION_21_BASE)

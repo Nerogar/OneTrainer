@@ -1,7 +1,11 @@
 from modules.model.ZImageModel import ZImageModel
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseZImageSetup import BaseZImageSetup
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
@@ -93,3 +97,5 @@ class ZImageLoRASetup(
             train_progress: TrainProgress
     ):
         self.__setup_requires_grad(model, config)
+
+factory.register(BaseModelSetup, ZImageLoRASetup, ModelType.Z_IMAGE, TrainingMethod.LORA)
