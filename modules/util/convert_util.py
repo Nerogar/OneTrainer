@@ -191,12 +191,12 @@ def fuse_qkv_mlp(q, k, v, mlp):
     return torch.cat([q, k, v, mlp], dim=0)
 
 
-def remove_prefix(prefix: str | None = None):
+def remove_prefix(prefix: str | None = None, separator: str='.'):
     if prefix is None:
-        prefix = "prefix__"
-    return [("{" + prefix + "}.{key}", "{key}")]
+        prefix = "{prefix__}"
+    return [(prefix + separator + "{key}", "{key}")]
 
-def add_prefix(prefix: str, separator='.'):
+def add_prefix(prefix: str, separator: str='.'):
     return [("{}", prefix + separator + "{}")]
 
 def lora_fuse_qkv(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha):
