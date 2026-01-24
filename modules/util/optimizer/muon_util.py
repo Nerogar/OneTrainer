@@ -46,6 +46,11 @@ def build_muon_adam_key_fn(
                     'double_stream_blocks',
                     'single_stream_blocks',
                 ]
+            case ModelType.Z_IMAGE:
+                default_patterns = [
+                    'layers',
+                    'refiner',
+                ]
             case _: # Unmatched cases
                 raise NotImplementedError(f"Default hidden layer patterns are not defined for model type: {model.model_type}")
         filters = [ModuleFilter(p, use_regex=False) for p in default_patterns]

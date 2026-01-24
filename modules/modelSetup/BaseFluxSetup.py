@@ -288,15 +288,14 @@ class BaseFluxSetup(
             )
 
             packed_latent_input = model.pack_latents(latent_input)
-
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
                 timestep=timestep / 1000,
                 guidance=guidance.to(dtype=model.train_dtype.torch_dtype()),
                 pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                 encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                txt_ids=text_ids.to(dtype=model.train_dtype.torch_dtype()),
-                img_ids=image_ids.to(dtype=model.train_dtype.torch_dtype()),
+                txt_ids=text_ids,
+                img_ids=image_ids,
                 joint_attention_kwargs=None,
                 return_dict=True
             ).sample
@@ -317,63 +316,14 @@ class BaseFluxSetup(
 
             if config.debug_mode:
                 with torch.no_grad():
-                    self._save_text(
-                        self._decode_tokens(batch['tokens_1'], model.tokenizer_1),
-                        config.debug_dir + "/training_batches",
-                        "7-prompt",
-                        train_progress.global_step,
-                    )
-
-                    # noise
-                    self._save_image(
-                        self._project_latent_to_image(latent_noise),
-                        config.debug_dir + "/training_batches",
-                        "1-noise",
-                        train_progress.global_step,
-                    )
-
-                    # noisy image
-                    self._save_image(
-                        self._project_latent_to_image(scaled_noisy_latent_image),
-                        config.debug_dir + "/training_batches",
-                        "2-noisy_image",
-                        train_progress.global_step,
-                    )
-
-                    # predicted flow
-                    self._save_image(
-                        self._project_latent_to_image(predicted_flow),
-                        config.debug_dir + "/training_batches",
-                        "3-predicted_flow",
-                        train_progress.global_step,
-                    )
-
-                    # flow
-                    flow = latent_noise - scaled_latent_image
-                    self._save_image(
-                        self._project_latent_to_image(flow),
-                        config.debug_dir + "/training_batches",
-                        "4-flow",
-                        train_progress.global_step,
-                    )
-
                     predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
-
-                    # predicted image
-                    self._save_image(
-                        self._project_latent_to_image(predicted_scaled_latent_image),
-                        config.debug_dir + "/training_batches",
-                        "5-predicted_image",
-                        train_progress.global_step,
-                    )
-
-                    # image
-                    self._save_image(
-                        self._project_latent_to_image(scaled_latent_image),
-                        config.debug_dir + "/training_batches",
-                        "6-image",
-                        model.train_progress.global_step,
-                    )
+                    self._save_tokens("7-prompt", batch['tokens_1'], model.tokenizer_1, config, train_progress)
+                    self._save_latent("1-noise", latent_noise, config, train_progress)
+                    self._save_latent("2-noisy_image", scaled_noisy_latent_image, config, train_progress)
+                    self._save_latent("3-predicted_flow", predicted_flow, config, train_progress)
+                    self._save_latent("4-flow", flow, config, train_progress)
+                    self._save_latent("5-predicted_image", predicted_scaled_latent_image, config, train_progress)
+                    self._save_latent("6-image", scaled_latent_image, config, train_progress)
 
         return model_output_data
 

@@ -684,6 +684,7 @@ def create_optimizer(
                 alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
                 k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
+                compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
             )
 
         # ADOPT_ADV Optimizer
@@ -710,6 +711,7 @@ def create_optimizer(
                 alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
                 k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
+                compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
             )
 
         # PRODIGY_ADV Optimizer
@@ -743,6 +745,7 @@ def create_optimizer(
                 alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
                 k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
+                compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
             )
 
         # SIMPLIFIED_AdEMAMix Optimizer
@@ -765,6 +768,24 @@ def create_optimizer(
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
                 k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
+                compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+            )
+
+        # SignSGD_ADV Optimizer
+        case Optimizer.SIGNSGD_ADV:
+            from adv_optm import SignSGD_adv
+            optimizer = SignSGD_adv(
+                params=parameters,
+                lr=config.learning_rate,
+                momentum=optimizer_config.momentum if optimizer_config.momentum is not None else 0,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
+                cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
+                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
             )
 
         # LION_ADV Optimizer
@@ -784,6 +805,7 @@ def create_optimizer(
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 kappa_p=optimizer_config.kappa_p if optimizer_config.kappa_p is not None else 1.0,
                 auto_kappa_p=optimizer_config.auto_kappa_p if optimizer_config.auto_kappa_p is not None else False,
+                compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
             )
 
         # LION_PRODIGY_ADV Optimizer
@@ -810,6 +832,7 @@ def create_optimizer(
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 kappa_p=optimizer_config.kappa_p if optimizer_config.kappa_p is not None else 1.0,
                 auto_kappa_p=optimizer_config.auto_kappa_p if optimizer_config.auto_kappa_p is not None else False,
+                compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
             )
 
         # MUON_ADV Optimizer
@@ -858,6 +881,7 @@ def create_optimizer(
                 accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 approx_mars=optimizer_config.approx_mars if optimizer_config.approx_mars is not None else False,
+                compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
                 **adam_kwargs
             )
 
@@ -911,6 +935,7 @@ def create_optimizer(
                 accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 approx_mars=optimizer_config.approx_mars if optimizer_config.approx_mars is not None else False,
+                compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
                 **adam_kwargs
             )
 

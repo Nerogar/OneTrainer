@@ -1,12 +1,11 @@
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
+from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
+from modules.util.convert.lora.convert_sdxl_lora import convert_sdxl_lora_key_sets
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
 from torch import Tensor
-
-from omi_model_standards.convert.lora.convert_lora_util import LoraConversionKeySet
-from omi_model_standards.convert.lora.convert_sdxl_lora import convert_sdxl_lora_key_sets
 
 
 class StableDiffusionXLLoRASaver(
