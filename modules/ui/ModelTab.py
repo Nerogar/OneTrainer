@@ -55,8 +55,10 @@ class ModelTab:
             self.__setup_wuerstchen_ui(base_frame)
         elif self.train_config.model_type.is_pixart():
             self.__setup_pixart_alpha_ui(base_frame)
-        elif self.train_config.model_type.is_flux():
+        elif self.train_config.model_type.is_flux_1():
             self.__setup_flux_ui(base_frame)
+        elif self.train_config.model_type.is_flux_2():
+            self.__setup_flux_2_ui(base_frame)
         elif self.train_config.model_type.is_z_image():
             self.__setup_z_image_ui(base_frame)
         elif self.train_config.model_type.is_chroma():
@@ -121,6 +123,25 @@ class ModelTab:
             allow_override_transformer=True,
             has_text_encoder_1=True,
             has_text_encoder_2=True,
+            has_vae=True,
+        )
+        row = self.__create_output_components(
+            frame,
+            row,
+            allow_safetensors=True,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
+        )
+
+    def __setup_flux_2_ui(self, frame):
+        row = 0
+        row = self.__create_base_dtype_components(frame, row)
+        row = self.__create_base_components(
+            frame,
+            row,
+            has_transformer=True,
+            allow_override_transformer=True,
+            has_text_encoder_1=True,
             has_vae=True,
         )
         row = self.__create_output_components(
@@ -590,6 +611,7 @@ class ModelTab:
             allow_safetensors: bool = False,
             allow_diffusers: bool = False,
             allow_legacy_safetensors: bool = False,
+            allow_comfy: bool = False,
     ) -> int:
         # output model destination
         components.label(frame, row, 0, "Model Output Destination",
@@ -617,6 +639,8 @@ class ModelTab:
             formats.append(("Diffusers", ModelFormat.DIFFUSERS))
         # if allow_legacy_safetensors:
         #     formats.append(("Legacy Safetensors", ModelFormat.LEGACY_SAFETENSORS))
+        if allow_comfy:
+            formats.append(("Comfy LoRA", ModelFormat.COMFY_LORA))
 
         components.label(frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
