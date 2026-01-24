@@ -110,7 +110,7 @@ def convert(input_orig: dict, conversion_input: list[ConversionPattern] | list, 
             input_keys, output_items = _convert_item(in_key, input, conversions, in_separator=in_separator, out_separator=out_separator)
             if output_items is None:
                 if strict:
-                    raise RuntimeError("No conversion found for key ", + in_key)
+                    raise RuntimeError("No conversion found for key " + in_key)
                 if in_key in output and not output[in_key].equal(input[in_key]):
                     raise RuntimeError(f"key {in_key} was generated twice during conversion and is not equal")
                 output[in_key] = input[in_key]
