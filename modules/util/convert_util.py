@@ -110,7 +110,7 @@ def convert(input_orig: dict, conversion_input: list[ConversionPattern] | list, 
             input_keys, output_items = _convert_item(in_key, input, conversions, in_separator=in_separator, out_separator=out_separator)
             if output_items is None:
                 if strict:
-                    raise RuntimeError("No conversion found for key ", + in_key)
+                    raise RuntimeError("No conversion found for key " + in_key)
                 if in_key in output and not output[in_key].equal(input[in_key]):
                     raise RuntimeError(f"key {in_key} was generated twice during conversion and is not equal")
                 output[in_key] = input[in_key]
@@ -191,12 +191,12 @@ def fuse_qkv_mlp(q, k, v, mlp):
     return torch.cat([q, k, v, mlp], dim=0)
 
 
-def remove_prefix(prefix: str | None = None):
+def remove_prefix(prefix: str | None = None, separator: str='.'):
     if prefix is None:
-        prefix = "prefix__"
-    return [("{" + prefix + "}.{key}", "{key}")]
+        prefix = "{prefix__}"
+    return [(prefix + separator + "{key}", "{key}")]
 
-def add_prefix(prefix: str, separator='.'):
+def add_prefix(prefix: str, separator: str='.'):
     return [("{}", prefix + separator + "{}")]
 
 def lora_fuse_qkv(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha):
