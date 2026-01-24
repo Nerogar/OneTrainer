@@ -91,7 +91,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             self,
             config: TrainConfig,
             train_dtype: DataType,
-            allow_video: bool = False,
+            vae_frame_dim: bool = False,
     ) -> list:
         load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=0, range_max=1, supported_extensions=path_util.supported_image_extensions(), dtype=train_dtype.torch_dtype())
         load_video = LoadVideo(path_in_name='image_path', target_frame_count_in_name='settings.target_frames', video_out_name='image', range_min=0, range_max=1, target_frame_rate=24, supported_extensions=path_util.supported_video_extensions(), dtype=train_dtype.torch_dtype())
@@ -115,7 +115,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
 
         modules = [load_image, load_video]
 
-        if allow_video:
+        if vae_frame_dim:
             modules.append(image_to_video)
 
         modules.extend([load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text])
@@ -129,7 +129,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
         if config.custom_conditioning_image:
             modules.append(load_cond_image)
 
-        if allow_video:
+        if vae_frame_dim:
             modules.append(mask_to_video)
 
         return modules
@@ -387,11 +387,11 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             aspect_bucketing_quantization: int,
             frame_dim_enabled: bool=False,
             allow_video_files: bool=False,
-            allow_video: bool=False, #TODO workaround for Qwen - is it the same as frame_dim_enabled?
+            vae_frame_dim: bool=False,
             supports_inpainting: bool=True, #TODO many models probably don't support inpainting, but this has been enabled in most dataloaders before refactoring, too
     ):
         enumerate_input = self._enumerate_input_modules(config, allow_videos=allow_video_files)
-        load_input = self._load_input_modules(config, model.train_dtype, allow_video=allow_video)
+        load_input = self._load_input_modules(config, model.train_dtype, vae_frame_dim=vae_frame_dim)
         mask_augmentation = self._mask_augmentation_modules(config)
         aspect_bucketing_in = self._aspect_bucketing_in(config, aspect_bucketing_quantization, frame_dim_enabled)
         crop_modules = self._crop_modules(config)

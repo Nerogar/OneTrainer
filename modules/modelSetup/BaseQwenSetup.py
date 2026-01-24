@@ -8,6 +8,7 @@ from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowMatchingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
+from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.util.checkpointing_util import (
     enable_checkpointing_for_qwen25vl_encoder_layers,
     enable_checkpointing_for_qwen_transformer,
@@ -31,6 +32,7 @@ class BaseQwenSetup(
     ModelSetupDebugMixin,
     ModelSetupNoiseMixin,
     ModelSetupFlowMatchingMixin,
+    ModelSetupText2ImageMixin,
     metaclass=ABCMeta
 ):
     LAYER_PRESETS = {
