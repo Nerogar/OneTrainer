@@ -27,5 +27,4 @@
     },
     "timestep_distribution": "LOGIT_NORMAL",
     "dataloader_threads": 1,
-    "output_model_format": "COMFY_LORA"
 }

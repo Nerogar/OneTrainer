@@ -150,7 +150,6 @@ class ModelTab:
             allow_safetensors=True,
             allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
             allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
-            allow_comfy=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_z_image_ui(self, frame):

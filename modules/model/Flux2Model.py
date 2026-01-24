@@ -4,7 +4,7 @@ from random import Random
 
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.convert_util import add_prefix, lora_qkv_fusion, qkv_fusion, remove_prefix, swap_chunks
+from modules.util.convert_util import qkv_fusion, swap_chunks
 from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
@@ -71,10 +71,7 @@ def diffusers_to_original(qkv_fusion):
         ]),
     ]
 
-diffusers_lora_to_original = diffusers_to_original(lora_qkv_fusion)
 diffusers_checkpoint_to_original = diffusers_to_original(qkv_fusion)
-diffusers_lora_to_comfy = [remove_prefix("transformer"), diffusers_to_original(lora_qkv_fusion), add_prefix("diffusion_model")]
-
 
 class Flux2Model(BaseModel):
     # base model data
