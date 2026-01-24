@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 from modules.model.FluxModel import FluxModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
@@ -131,8 +132,8 @@ class FluxSampler(BaseModelSampler):
                     guidance=guidance.to(dtype=self.model.train_dtype.torch_dtype()),
                     pooled_projections=pooled_prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
                     encoder_hidden_states=prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
-                    txt_ids=text_ids.to(dtype=self.model.train_dtype.torch_dtype()),
-                    img_ids=image_ids.to(dtype=self.model.train_dtype.torch_dtype()),
+                    txt_ids=text_ids,
+                    img_ids=image_ids,
                     joint_attention_kwargs=None,
                     return_dict=True
                 ).sample
@@ -450,3 +451,6 @@ class FluxSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
+
+factory.register(BaseModelSampler, FluxSampler, ModelType.FLUX_DEV_1)
+factory.register(BaseModelSampler, FluxSampler, ModelType.FLUX_FILL_DEV_1)

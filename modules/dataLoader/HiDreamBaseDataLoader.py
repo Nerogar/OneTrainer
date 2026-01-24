@@ -7,7 +7,9 @@ from modules.model.BaseModel import BaseModel
 from modules.model.HiDreamModel import HiDreamModel
 from modules.modelSetup.BaseHiDreamSetup import BaseHiDreamSetup
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
@@ -217,3 +219,5 @@ class HiDreamBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
         )
+
+factory.register(BaseDataLoader, HiDreamBaseDataLoader, ModelType.HI_DREAM_FULL)

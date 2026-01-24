@@ -7,7 +7,9 @@ from modules.model.BaseModel import BaseModel
 from modules.model.FluxModel import FluxModel
 from modules.modelSetup.BaseFluxSetup import BaseFluxSetup
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
@@ -179,3 +181,6 @@ class FluxBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
         )
+
+factory.register(BaseDataLoader, FluxBaseDataLoader, ModelType.FLUX_DEV_1)
+factory.register(BaseDataLoader, FluxBaseDataLoader, ModelType.FLUX_FILL_DEV_1)

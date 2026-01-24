@@ -4,8 +4,10 @@ import re
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
-from modules.util import path_util
+from modules.util import factory, path_util
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
@@ -291,3 +293,12 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             train_progress,
             is_validation,
         )
+
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE_VAE)

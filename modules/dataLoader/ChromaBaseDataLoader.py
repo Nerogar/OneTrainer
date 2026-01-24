@@ -6,7 +6,9 @@ from modules.model.BaseModel import BaseModel
 from modules.model.ChromaModel import ChromaModel
 from modules.modelSetup.BaseChromaSetup import BaseChromaSetup
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
@@ -139,3 +141,5 @@ class ChromaBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
         )
+
+factory.register(BaseDataLoader, ChromaBaseDataLoader, ModelType.CHROMA_1)

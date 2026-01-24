@@ -10,7 +10,9 @@ from modules.model.HunyuanVideoModel import (
 )
 from modules.modelSetup.BaseHunyuanVideoSetup import BaseHunyuanVideoSetup
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
@@ -181,3 +183,5 @@ class HunyuanVideoBaseDataLoader(
             allow_video_files=True,
             allow_video=True,
         )
+
+factory.register(BaseDataLoader, HunyuanVideoBaseDataLoader, ModelType.HUNYUAN_VIDEO)

@@ -11,7 +11,9 @@ from modules.model.QwenModel import (
 )
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseQwenSetup import BaseQwenSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
@@ -152,3 +154,5 @@ class QwenBaseDataLoader(
             allow_video_files=False, #don't allow video files, but...
             allow_video=True,  #...Qwen has a video-capable VAE: convert images to video dimensions #TODO the same as frame_dim_enabled?
         )
+
+factory.register(BaseDataLoader, QwenBaseDataLoader, ModelType.QWEN)

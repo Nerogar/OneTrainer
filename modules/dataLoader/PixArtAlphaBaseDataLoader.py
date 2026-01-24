@@ -6,7 +6,9 @@ from modules.model.BaseModel import BaseModel
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BasePixArtAlphaSetup import BasePixArtAlphaSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
@@ -157,3 +159,6 @@ class PixArtAlphaBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=16,
         )
+
+factory.register(BaseDataLoader, PixArtAlphaBaseDataLoader, ModelType.PIXART_ALPHA)
+factory.register(BaseDataLoader, PixArtAlphaBaseDataLoader, ModelType.PIXART_SIGMA)

@@ -6,7 +6,9 @@ from modules.model.BaseModel import BaseModel
 from modules.model.SanaModel import SanaModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseSanaSetup import BaseSanaSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
@@ -150,3 +152,5 @@ class SanaBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=32,
         )
+
+factory.register(BaseDataLoader, SanaBaseDataLoader, ModelType.SANA)

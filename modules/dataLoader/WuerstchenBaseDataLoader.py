@@ -7,7 +7,9 @@ from modules.model.BaseModel import BaseModel
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
@@ -154,3 +156,6 @@ class WuerstchenBaseDataLoader(
             aspect_bucketing_quantization=128,
             supports_inpainting=False,
         )
+
+factory.register(BaseDataLoader, WuerstchenBaseDataLoader, ModelType.WUERSTCHEN_2)
+factory.register(BaseDataLoader, WuerstchenBaseDataLoader, ModelType.STABLE_CASCADE_1)

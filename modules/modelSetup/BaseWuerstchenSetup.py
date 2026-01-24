@@ -29,16 +29,6 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 from torch import Tensor
 
-# This is correct for the latest cascade, but other Wuerstchen models may have
-# different names. I honestly don't know what makes a good preset here so I'm
-# just guessing.
-PRESETS = {
-    "attn-only": ["attention"],
-    "full": [],
-    "down-blocks": ["down_blocks"],
-    "up-blocks": ["up_blocks"],
-    "mapper-only": ["mapper"],
-}
 
 class BaseWuerstchenSetup(
     BaseModelSetup,
@@ -49,6 +39,16 @@ class BaseWuerstchenSetup(
     ModelSetupEmbeddingMixin,
     metaclass=ABCMeta,
 ):
+    # This is correct for the latest cascade, but other Wuerstchen models may have
+    # different names. I honestly don't know what makes a good preset here so I'm
+    # just guessing.
+    LAYER_PRESETS = {
+        "attn-only": ["attention"],
+        "full": [],
+        "down-blocks": ["down_blocks"],
+        "up-blocks": ["up_blocks"],
+        "mapper-only": ["mapper"],
+    }
 
     def setup_optimizations(
             self,
