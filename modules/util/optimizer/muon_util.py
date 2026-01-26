@@ -25,7 +25,7 @@ def calculate_muon_n_layers(model: BaseModel) -> dict[str, int]:
         case (ModelType.STABLE_DIFFUSION_3 | ModelType.STABLE_DIFFUSION_35 | ModelType.SANA |
               ModelType.FLUX_DEV_1 | ModelType.CHROMA_1 | ModelType.QWEN |
               ModelType.PIXART_ALPHA | ModelType.PIXART_SIGMA):
-            default_patterns = ['transformer_blocks', 'encoder.block']
+            default_patterns = ['transformer_blocks', 'single_transformer_blocks', 'encoder.block']
         case ModelType.HI_DREAM_FULL:
             default_patterns = ['double_stream_blocks', 'single_stream_blocks']
         case ModelType.Z_IMAGE:
