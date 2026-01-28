@@ -662,12 +662,20 @@ class TrainingTab:
                          tooltip="Shift the timestep distribution. Use the preview to see more details.")
         components.entry(frame, 8, 1, self.ui_state, "timestep_shift")
 
+        row = 9
+
         if supports_dynamic_timestep_shifting:
             # dynamic timestep shifting
-            components.label(frame, 9, 0, "Dynamic Timestep Shifting",
+            components.label(frame, row, 0, "Dynamic Timestep Shifting",
                              tooltip="Dynamically shift the timestep distribution based on resolution.")
-            components.switch(frame, 9, 1, self.ui_state, "dynamic_timestep_shifting")
+            components.switch(frame, row, 1, self.ui_state, "dynamic_timestep_shifting")
+            row += 1
 
+        # Immiscible Diffusion
+        components.label(frame, row, 0, "Noise Oversampling",
+                         tooltip="Implements Immiscible Diffusion. Generates 'k' noise candidates for each image and selects the one mathematically closest to the original. This 'straightens' the diffusion path, leading to faster convergence and cleaner images. Recommended: 64 (higher is better but slower). Set to 1 to disable.")
+        components.entry(frame, row, 1, self.ui_state, "k_noise_sampling")
+        row += 1
 
 
     def __create_masked_frame(self, master, row):
