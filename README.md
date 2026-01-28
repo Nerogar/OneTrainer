@@ -63,7 +63,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 > sudo apt-get install libgl1
 > ```
 >
-> Additionally it's been reported Alpine, Arch and Xubuntuu Linux may be missing `tkinter`. Install it via `apk add py3-tk` for Alpine and `sudo pacman -S tk` for Arch.
+> Additionally it's been reported Alpine, Arch and Xubuntu Linux may be missing `tkinter`. Install it via `apk add py3-tk` for Alpine and `sudo pacman -S tk` for Arch.
 
 ## Updating
 
