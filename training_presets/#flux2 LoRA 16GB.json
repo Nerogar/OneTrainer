@@ -26,5 +26,5 @@
         "layer_filter_preset": "blocks"
     },
     "timestep_distribution": "LOGIT_NORMAL",
-    "dataloader_threads": 1,
+    "dataloader_threads": 1
 }
