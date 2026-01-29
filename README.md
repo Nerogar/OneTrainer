@@ -45,15 +45,15 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
     - Windows: Double click or execute `install.bat`
     - Linux and Mac: Execute `install.sh`
 
-    #### Manual installation
+#### Manual installation
 
-    1. Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
-    2. Navigate into the cloned directory `cd OneTrainer`
-    3. Set up a virtual environment `python -m venv venv`
-    4. Activate the new venv:
-        - Windows: `venv\scripts\activate`
-        - Linux and Mac: Depends on your shell, activate the venv accordingly
-    5. Install the requirements `pip install -r requirements.txt`
+1. Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
+2. Navigate into the cloned directory `cd OneTrainer`
+3. Set up a virtual environment `python -m venv venv`
+4. Activate the new venv:
+    - Windows: `venv\scripts\activate`
+    - Linux and Mac: Depends on your shell, activate the venv accordingly
+5. Install the requirements `pip install -r requirements.txt`
 
 > [!Tip]
 > Some Linux distributions are missing required packages for instance: On Ubuntu you must install `libGL`:
@@ -63,7 +63,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 > sudo apt-get install libgl1
 > ```
 >
-> Additionally it's been reported Alpine, Arch and Xubuntuu Linux may be missing `tkinter`. Install it via `apk add py3-tk` for Alpine and `sudo pacman -S tk` for Arch.
+> Additionally it's been reported Alpine, Arch and Xubuntu Linux may be missing `tkinter`. Install it via `apk add py3-tk` for Alpine and `sudo pacman -S tk` for Arch.
 
 ## Updating
 
