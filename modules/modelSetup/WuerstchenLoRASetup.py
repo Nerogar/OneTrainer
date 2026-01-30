@@ -1,7 +1,11 @@
 from modules.model.WuerstchenModel import WuerstchenModel
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
@@ -148,3 +152,6 @@ class WuerstchenLoRASetup(
             self._normalize_output_embeddings(model.all_prior_text_encoder_embeddings())
             model.prior_embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
+
+factory.register(BaseModelSetup, WuerstchenLoRASetup, ModelType.WUERSTCHEN_2, TrainingMethod.LORA)
+factory.register(BaseModelSetup, WuerstchenLoRASetup, ModelType.STABLE_CASCADE_1, TrainingMethod.LORA)

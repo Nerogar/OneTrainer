@@ -1,7 +1,11 @@
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseStableDiffusion3Setup import BaseStableDiffusion3Setup
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
@@ -219,3 +223,6 @@ class StableDiffusion3LoRASetup(
             if model.embedding_wrapper_3 is not None:
                 model.embedding_wrapper_3.normalize_embeddings()
         self.__setup_requires_grad(model, config)
+
+factory.register(BaseModelSetup, StableDiffusion3LoRASetup, ModelType.STABLE_DIFFUSION_3, TrainingMethod.LORA)
+factory.register(BaseModelSetup, StableDiffusion3LoRASetup, ModelType.STABLE_DIFFUSION_35, TrainingMethod.LORA)

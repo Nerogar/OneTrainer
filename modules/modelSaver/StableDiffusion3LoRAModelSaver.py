@@ -1,35 +1,12 @@
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
-from modules.modelSaver.BaseModelSaver import BaseModelSaver
-from modules.modelSaver.mixin.InternalModelSaverMixin import InternalModelSaverMixin
+from modules.modelSaver.GenericLoRAModelSaver import make_lora_model_saver
 from modules.modelSaver.stableDiffusion3.StableDiffusion3EmbeddingSaver import StableDiffusion3EmbeddingSaver
 from modules.modelSaver.stableDiffusion3.StableDiffusion3LoRASaver import StableDiffusion3LoRASaver
-from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
-import torch
-
-
-class StableDiffusion3LoRAModelSaver(
-    BaseModelSaver,
-    InternalModelSaverMixin,
-):
-    def __init__(self):
-        super().__init__()
-
-    def save(
-            self,
-            model: StableDiffusion3Model,
-            model_type: ModelType,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
-    ):
-        lora_model_saver = StableDiffusion3LoRASaver()
-        embedding_model_saver = StableDiffusion3EmbeddingSaver()
-
-        lora_model_saver.save(model, output_model_format, output_model_destination, dtype)
-        if not model.train_config.bundle_additional_embeddings or output_model_format == ModelFormat.INTERNAL:
-            embedding_model_saver.save_multiple(model, output_model_format, output_model_destination, dtype)
-
-        if output_model_format == ModelFormat.INTERNAL:
-            self._save_internal_data(model, output_model_destination)
+StableDiffusion3LoRAModelSaver = make_lora_model_saver(
+    [ModelType.STABLE_DIFFUSION_3, ModelType.STABLE_DIFFUSION_35],
+    model_class=StableDiffusion3Model,
+    lora_saver_class=StableDiffusion3LoRASaver,
+    embedding_saver_class=StableDiffusion3EmbeddingSaver,
+)

@@ -57,12 +57,13 @@ class BaseTrainer(
             self.config.debug_mode,
         )
 
-    def create_data_loader(self, model: BaseModel, train_progress: TrainProgress, is_validation=False):
+    def create_data_loader(self, model: BaseModel, model_setup: BaseModelSetup, train_progress: TrainProgress, is_validation=False):
         return create.create_data_loader(
             self.train_device,
             self.temp_device,
             model,
             self.config.model_type,
+            model_setup,
             self.config.training_method,
             self.config,
             train_progress,
