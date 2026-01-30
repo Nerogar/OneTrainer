@@ -11,6 +11,7 @@ matplotlib==3.10.3
 av==16.1.0
 yt-dlp  #no pinned version, frequently updated for compatibility with sites
 scenedetect==0.6.6
+parse==1.20.2
 
 # pytorch
 accelerate==1.7.0
