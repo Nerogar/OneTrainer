@@ -25,6 +25,7 @@ from diffusers.models.unets.unet_stable_cascade import SDCascadeAttnBlock, SDCas
 from transformers.models.clip.modeling_clip import CLIPEncoderLayer
 from transformers.models.gemma2.modeling_gemma2 import Gemma2DecoderLayer
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
+from transformers.models.mistral.modeling_mistral import MistralDecoderLayer
 from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import Qwen2_5_VLDecoderLayer
 from transformers.models.qwen3.modeling_qwen3 import Qwen3DecoderLayer
 from transformers.models.t5.modeling_t5 import T5Block
@@ -111,7 +112,6 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
         self.layer_index = layer_index
 
     def __checkpointing_forward(self, dummy: torch.Tensor, call_id: int, *args):
-
         if self.layer_index == 0 and not torch.is_grad_enabled():
             self.conductor.start_forward(True)
 
@@ -131,7 +131,6 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
     def forward(self, *args, **kwargs):
         call_id = _generate_call_index()
         args = _kwargs_to_args(self.orig_forward if self.checkpoint is None else self.checkpoint.forward, args, kwargs)
-
         if torch.is_grad_enabled():
             return torch.utils.checkpoint.checkpoint(
                 self.__checkpointing_forward,
@@ -306,7 +305,17 @@ def enable_checkpointing_for_llama_encoder_layers(
         (LlamaDecoderLayer, []),
     ])
 
-def enable_checkpointing_for_qwen_encoder_layers(
+def enable_checkpointing_for_mistral_encoder_layers(
+        model: nn.Module,
+        config: TrainConfig,
+) -> LayerOffloadConductor:
+    return enable_checkpointing(model, config, False, [
+        (MistralDecoderLayer, []),
+    ])
+
+
+
+def enable_checkpointing_for_qwen25vl_encoder_layers(
         model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
@@ -314,12 +323,12 @@ def enable_checkpointing_for_qwen_encoder_layers(
         (Qwen2_5_VLDecoderLayer, []),  # TODO No activation offloading for other encoders, see above. But clip skip is not implemented for QwenVL. Then do activation offloading?
     ])
 
-def enable_checkpointing_for_z_image_encoder_layers(
+def enable_checkpointing_for_qwen3_encoder_layers(
         model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, False, [
-        (Qwen3DecoderLayer, []),  # TODO No activation offloading for other encoders, see above. But clip skip is not implemented for QwenVL. Then do activation offloading?
+        (Qwen3DecoderLayer, []),  # No activation offloading, because hidden states are taken from the middle of the network by Flux2
     ])
 
 def enable_checkpointing_for_stable_diffusion_3_transformer(
@@ -331,6 +340,15 @@ def enable_checkpointing_for_stable_diffusion_3_transformer(
     ])
 
 def enable_checkpointing_for_flux_transformer(
+        model: nn.Module,
+        config: TrainConfig,
+) -> LayerOffloadConductor:
+    return enable_checkpointing(model, config, config.compile, [
+        (model.transformer_blocks,        ["hidden_states", "encoder_hidden_states"]),
+        (model.single_transformer_blocks, ["hidden_states"                         ]),
+    ])
+
+def enable_checkpointing_for_flux2_transformer(
         model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
