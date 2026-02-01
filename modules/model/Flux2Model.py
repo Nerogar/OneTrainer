@@ -311,7 +311,6 @@ class Flux2Model(BaseModel):
 
     #scaling on patchified latents
     def scale_latents(self, latents: Tensor) -> Tensor:
-        #TODO moves to device - necessary? save in model?
         latents_bn_mean = self.vae.bn.running_mean.view(1, -1, 1, 1).to(latents.device, latents.dtype)
         latents_bn_std = torch.sqrt(self.vae.bn.running_var.view(1, -1, 1, 1) + self.vae.config.batch_norm_eps).to(
             latents.device, latents.dtype
