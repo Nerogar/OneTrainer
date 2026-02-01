@@ -124,7 +124,7 @@ class TopBar:
                 or self.train_config.model_type.is_stable_diffusion_xl() \
                 or self.train_config.model_type.is_wuerstchen() \
                 or self.train_config.model_type.is_pixart() \
-                or self.train_config.model_type.is_flux() \
+                or self.train_config.model_type.is_flux_1() \
                 or self.train_config.model_type.is_sana() \
                 or self.train_config.model_type.is_hunyuan_video() \
                 or self.train_config.model_type.is_hi_dream() \
@@ -135,7 +135,8 @@ class TopBar:
                 ("Embedding", TrainingMethod.EMBEDDING),
             ]
         elif self.train_config.model_type.is_qwen() \
-             or self.train_config.model_type.is_z_image():
+             or self.train_config.model_type.is_z_image() \
+             or self.train_config.model_type.is_flux_2():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),
