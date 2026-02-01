@@ -46,7 +46,7 @@ adv_optm==2.1.0 # advanced optimizers
 -e git+https://github.com/KellerJordan/Muon.git@f90a42b#egg=muon-optimizer
 
 # Profiling
-#scalene==1.5.51
+scalene==1.5.51
 
 # ui
 customtkinter==5.2.2
