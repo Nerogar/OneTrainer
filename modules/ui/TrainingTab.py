@@ -674,7 +674,7 @@ class TrainingTab:
         if supports_dynamic_timestep_shifting:
             # dynamic timestep shifting
             components.label(frame, 9, 0, "Dynamic Timestep Shifting",
-                             tooltip="Dynamically shift the timestep distribution based on resolution.")
+                             tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. Note: For Z-Image and Flux2, the dynamic shifting parameters are likely wrong and unknown. Use with care or set your own, fixed shift.", wide_tooltip=True)
             components.switch(frame, 9, 1, self.ui_state, "dynamic_timestep_shifting")
 
 

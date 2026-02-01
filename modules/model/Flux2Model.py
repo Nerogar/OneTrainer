@@ -261,8 +261,8 @@ class Flux2Model(BaseModel):
         batch_size, seq_len, num_channels = latents.shape
         return latents.reshape(batch_size, height, width, num_channels).permute(0, 3, 1, 2)
 
-    #TODO inference code uses empirical mu. But that code cannot be used for training because it depends on num of inference steps
-    #     is dynamic timestep shifting during training still applicable?
+    #inference code uses empirical mu. But that code cannot be used for training because it depends on num of inference steps, and is likely too high for training
+    #the dynamic shifting parameters of the noise schedulers are probably just the default values (taken from Flux1) and not applicable - but the best values we have:
     #unpatchified width and height
     def calculate_timestep_shift(self, latent_height: int, latent_width: int) -> float:
         base_seq_len = self.noise_scheduler.config.base_image_seq_len
