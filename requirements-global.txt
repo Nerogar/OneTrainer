@@ -20,7 +20,8 @@ tensorboard==2.19.0
 pytorch-lightning==2.5.1.post0
 
 # diffusion models
--e git+https://github.com/huggingface/diffusers.git@6a1904e#egg=diffusers
+#-e git+https://github.com/huggingface/diffusers.git@6a1904e#egg=diffusers
+-e git+https://github.com/dxqb/diffusers.git@flux2_tuples#egg=diffusers
 gguf==0.17.1
 transformers==4.56.2
 sentencepiece==0.2.1 # transitive dependency of transformers for tokenizer loading
