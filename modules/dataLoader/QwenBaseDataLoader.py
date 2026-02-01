@@ -27,6 +27,7 @@ from mgds.pipelineModules.SaveText import SaveText
 from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
+
 class QwenBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
