@@ -133,11 +133,6 @@ class BaseQwenSetup(
             latent_input = scaled_noisy_latent_image
             packed_latent_input = model.pack_latents(latent_input)
 
-            #FIXME this is the only case that the transformer accepts:
-            #see https://github.com/huggingface/diffusers/issues/12344
-            #actual text sequence lengths can be shorter,but they might be padded and masked
-            txt_seq_lens = [text_encoder_output.shape[1]] * text_encoder_output.shape[0]
-
             #FIXME list of lists is not according to type hint, but according to diffusers code:
             #https://github.com/huggingface/diffusers/issues/12295
             img_shapes = [[(
@@ -146,21 +141,15 @@ class BaseQwenSetup(
                 latent_input.shape[-1] // 2)
             ]] * latent_input.shape[0]
 
-            #FIXME bug workaround for https://github.com/huggingface/diffusers/issues/12294
-            image_attention_mask=torch.ones((packed_latent_input.shape[0], packed_latent_input.shape[1]), dtype=torch.bool, device=latent_image.device)
-            attention_mask = torch.cat([text_attention_mask, image_attention_mask], dim=1)
-            attention_mask_2d = attention_mask[:, None, None, :] if not torch.all(text_attention_mask) else None
+            if torch.all(text_attention_mask):
+                text_attention_mask = None
 
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
                 timestep=timestep / 1000,
                 encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                 encoder_hidden_states_mask=text_attention_mask,
-                txt_seq_lens=txt_seq_lens,
                 img_shapes=img_shapes,
-                attention_kwargs = {
-                    "attention_mask": attention_mask_2d,
-                },
                 return_dict=True,
             ).sample
 
