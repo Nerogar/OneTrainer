@@ -17,6 +17,7 @@ accelerate==1.7.0
 safetensors==0.5.3
 tensorboard==2.19.0
 pytorch-lightning==2.5.1.post0
+ramtorch==0.2.2
 
 # diffusion models
 #Note: check whether Qwen bugs in diffusers have been fixed before upgrading diffusers (see BaseQwenSetup):
@@ -45,7 +46,7 @@ adv_optm==2.1.0 # advanced optimizers
 -e git+https://github.com/KellerJordan/Muon.git@f90a42b#egg=muon-optimizer
 
 # Profiling
-scalene==1.5.51
+#scalene==1.5.51
 
 # ui
 customtkinter==5.2.2

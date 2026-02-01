@@ -23,6 +23,7 @@ from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor
+from ramtorch.helpers import replace_linear_with_ramtorch
 
 PRESETS = {
     "attn-mlp": ["attn1", "ff_i"],
@@ -60,6 +61,20 @@ class BaseHiDreamSetup(
             if model.text_encoder_4 is not None:
                 model.text_encoder_4_offload_conductor = \
                     enable_checkpointing_for_llama_encoder_layers(model.text_encoder_4, config)
+
+        if not config.gradient_checkpointing.offload():
+            if config.transformer.ram_offload:
+                model.transformer = replace_linear_with_ramtorch(model.transformer, config.train_device)
+            if model.text_encoder_1 is not None and config.text_encoder.ram_offload:
+                model.text_encoder_1 = replace_linear_with_ramtorch(model.text_encoder_1, config.train_device)
+            if model.text_encoder_2 is not None and config.text_encoder_2.ram_offload:
+                model.text_encoder_2 = replace_linear_with_ramtorch(model.text_encoder_2, config.train_device)
+            if model.text_encoder_3 is not None and config.text_encoder_3.ram_offload:
+                model.text_encoder_3 = replace_linear_with_ramtorch(model.text_encoder_3, config.train_device)
+            if model.text_encoder_4 is not None and config.text_encoder_4.ram_offload:
+                model.text_encoder_4 = replace_linear_with_ramtorch(model.text_encoder_4, config.train_device)
+            if config.vae.ram_offload:
+                model.vae = replace_linear_with_ramtorch(model.vae, config.train_device)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,

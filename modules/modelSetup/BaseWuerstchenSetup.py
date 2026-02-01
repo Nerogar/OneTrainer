@@ -27,6 +27,7 @@ from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor
+from ramtorch.helpers import replace_linear_with_ramtorch
 
 # This is correct for the latest cascade, but other Wuerstchen models may have
 # different names. I honestly don't know what makes a good preset here so I'm
@@ -61,6 +62,20 @@ class BaseWuerstchenSetup(
             elif model.model_type.is_stable_cascade():
                 enable_checkpointing_for_stable_cascade_blocks(model.prior_prior, config)
                 enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, config)
+
+        if not config.gradient_checkpointing.offload():
+            if model.model_type.is_wuerstchen_v2() and config.decoder_text_encoder.ram_offload:
+                model.decoder_text_encoder = replace_linear_with_ramtorch(model.decoder_text_encoder, config.train_device)
+            if config.decoder.ram_offload:
+                model.decoder_decoder = replace_linear_with_ramtorch(model.decoder_decoder, config.train_device)
+            if config.decoder_vqgan.ram_offload:
+                model.decoder_vqgan = replace_linear_with_ramtorch(model.decoder_vqgan, config.train_device)
+            if config.effnet_encoder.ram_offload:
+                model.effnet_encoder = replace_linear_with_ramtorch(model.effnet_encoder, config.train_device)
+            if config.text_encoder.ram_offload:
+                model.prior_text_encoder = replace_linear_with_ramtorch(model.prior_text_encoder, config.train_device)
+            if config.prior.ram_offload:
+                model.prior_prior = replace_linear_with_ramtorch(model.prior_prior, config.train_device)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.decoder_vqgan)

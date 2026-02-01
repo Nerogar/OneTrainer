@@ -23,6 +23,7 @@ from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor
+from ramtorch.helpers import replace_linear_with_ramtorch
 
 PRESETS = {
     "attn-mlp": ["attn1", "attn2", "ff.net"],
@@ -55,6 +56,14 @@ class BasePixArtAlphaSetup(
                 enable_checkpointing_for_basic_transformer_blocks(model.transformer, config, offload_enabled=True)
             model.text_encoder_offload_conductor = \
                 enable_checkpointing_for_t5_encoder_layers(model.text_encoder, config)
+
+        if not config.gradient_checkpointing.offload():
+            if config.transformer.ram_offload:
+                model.transformer = replace_linear_with_ramtorch(model.transformer, config.train_device)
+            if model.text_encoder is not None and config.text_encoder.ram_offload:
+                model.text_encoder = replace_linear_with_ramtorch(model.text_encoder, config.train_device)
+            if config.vae.ram_offload:
+                model.vae = replace_linear_with_ramtorch(model.vae, config.train_device)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.vae)

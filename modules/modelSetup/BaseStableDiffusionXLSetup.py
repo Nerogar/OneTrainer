@@ -23,6 +23,7 @@ from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor
+from ramtorch.helpers import replace_linear_with_ramtorch
 
 PRESETS = {
     "attn-mlp": ["attentions"],
@@ -50,6 +51,16 @@ class BaseStableDiffusionXLSetup(
             enable_checkpointing_for_basic_transformer_blocks(model.unet, config, offload_enabled=False)
             enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config)
             enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config)
+
+        if not config.gradient_checkpointing.offload():
+            if config.unet.ram_offload:
+                model.unet = replace_linear_with_ramtorch(model.unet, config.train_device)
+            if model.text_encoder_1 is not None and config.text_encoder.ram_offload:
+                model.text_encoder_1 = replace_linear_with_ramtorch(model.text_encoder_1, config.train_device)
+            if model.text_encoder_2 is not None and config.text_encoder_2.ram_offload:
+                model.text_encoder_2 = replace_linear_with_ramtorch(model.text_encoder_2, config.train_device)
+            if config.vae.ram_offload:
+                model.vae = replace_linear_with_ramtorch(model.vae, config.train_device)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.vae)

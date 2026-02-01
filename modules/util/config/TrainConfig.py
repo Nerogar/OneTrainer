@@ -279,6 +279,7 @@ class TrainModelPartConfig(BaseConfig):
     train_embedding: bool
     attention_mask: bool
     guidance_scale: float
+    ram_offload: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -299,6 +300,7 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("train_embedding", True, bool, False))
         data.append(("attention_mask", False, bool, False))
         data.append(("guidance_scale", 1.0, float, False))
+        data.append(("ram_offload", False, bool, False))
 
         return TrainModelPartConfig(data)
 

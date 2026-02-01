@@ -103,7 +103,8 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_unet_frame(column_1, 1)
-        self.__create_noise_frame(column_1, 2, supports_generalized_offset_noise=True)
+        self.__create_vae_frame(column_1, 2)
+        self.__create_noise_frame(column_1, 3, supports_generalized_offset_noise=True)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
@@ -118,7 +119,8 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1)
-        self.__create_noise_frame(column_1, 2)
+        self.__create_vae_frame(column_1, 2)
+        self.__create_noise_frame(column_1, 3)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
@@ -132,20 +134,25 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_unet_frame(column_1, 1)
-        self.__create_noise_frame(column_1, 2, supports_generalized_offset_noise=True)
+        self.__create_vae_frame(column_1, 2)
+        self.__create_noise_frame(column_1, 3, supports_generalized_offset_noise=True)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
         self.__create_layer_frame(column_2, 3)
 
     def __setup_wuerstchen_ui(self, column_0, column_1, column_2):
+        has_text_encoder=self.train_config.model_type.is_wuerstchen_v2()
+
         self.__create_base_frame(column_0, 0)
         self.__create_text_encoder_frame(column_0, 1)
         self.__create_embedding_frame(column_0, 2)
 
         self.__create_base2_frame(column_1, 0)
         self.__create_prior_frame(column_1, 1)
-        self.__create_noise_frame(column_1, 2)
+        self.__create_effnet_encoder_frame(column_1, 2)
+        self.__create_decoder_frame(column_1, 3, has_text_encoder=has_text_encoder)
+        self.__create_noise_frame(column_1, 4)
 
         self.__create_masked_frame(column_2, 0)
         self.__create_loss_frame(column_2, 1)
@@ -158,7 +165,8 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1)
-        self.__create_noise_frame(column_1, 2)
+        self.__create_vae_frame(column_1, 2)
+        self.__create_noise_frame(column_1, 3)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2, supports_vb_loss=True)
@@ -172,7 +180,8 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True)
-        self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
+        self.__create_vae_frame(column_1, 2)
+        self.__create_noise_frame(column_1, 3, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
@@ -185,7 +194,8 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False, supports_force_attention_mask=False)
-        self.__create_noise_frame(column_1, 2)
+        self.__create_vae_frame(column_1, 2)
+        self.__create_noise_frame(column_1, 3)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
@@ -197,7 +207,8 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False, supports_force_attention_mask=False)
-        self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
+        self.__create_vae_frame(column_1, 2)
+        self.__create_noise_frame(column_1, 3, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
@@ -209,7 +220,8 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False, supports_force_attention_mask=False)
-        self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
+        self.__create_vae_frame(column_1, 2)
+        self.__create_noise_frame(column_1, 3, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
@@ -222,7 +234,8 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1)
-        self.__create_noise_frame(column_1, 2)
+        self.__create_vae_frame(column_1, 2)
+        self.__create_noise_frame(column_1, 3)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
@@ -236,7 +249,8 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0, video_training_enabled=True)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True)
-        self.__create_noise_frame(column_1, 2)
+        self.__create_vae_frame(column_1, 2)
+        self.__create_noise_frame(column_1, 3)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
@@ -252,7 +266,8 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0, video_training_enabled=True)
         self.__create_transformer_frame(column_1, 1)
-        self.__create_noise_frame(column_1, 2)
+        self.__create_vae_frame(column_1, 2)
+        self.__create_noise_frame(column_1, 3)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
@@ -415,35 +430,47 @@ class TrainingTab:
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
+        row = 0
 
         # train text encoder
         if supports_training:
-            components.label(frame, 0, 0, "Train Text Encoder",
+            components.label(frame, row, 0, "Train Text Encoder",
                              tooltip="Enables training the text encoder model")
-            components.switch(frame, 0, 1, self.ui_state, "text_encoder.train")
+            components.switch(frame, row, 1, self.ui_state, "text_encoder.train")
+            row+= 1
 
         # dropout
-        components.label(frame, 1, 0, "Caption Dropout Probability",
+        components.label(frame, row, 0, "Caption Dropout Probability",
                          tooltip="The Probability for dropping the text encoder conditioning")
-        components.entry(frame, 1, 1, self.ui_state, "text_encoder.dropout_probability")
+        components.entry(frame, row, 1, self.ui_state, "text_encoder.dropout_probability")
+        row += 1
 
         if supports_training:
             # train text encoder epochs
-            components.label(frame, 2, 0, "Stop Training After",
+            components.label(frame, row, 0, "Stop Training After",
                              tooltip="When to stop training the text encoder")
-            components.time_entry(frame, 2, 1, self.ui_state, "text_encoder.stop_training_after",
+            components.time_entry(frame, row, 1, self.ui_state, "text_encoder.stop_training_after",
                                   "text_encoder.stop_training_after_unit", supports_time_units=False)
+            row += 1
 
             # text encoder learning rate
-            components.label(frame, 3, 0, "Text Encoder Learning Rate",
+            components.label(frame, row, 0, "Text Encoder Learning Rate",
                              tooltip="The learning rate of the text encoder. Overrides the base learning rate")
-            components.entry(frame, 3, 1, self.ui_state, "text_encoder.learning_rate")
+            components.entry(frame, row, 1, self.ui_state, "text_encoder.learning_rate")
+            row += 1
 
         if supports_clip_skip:
             # text encoder layer skip (clip skip)
-            components.label(frame, 4, 0, "Clip Skip",
+            components.label(frame, row, 0, "Clip Skip",
                              tooltip="The number of additional clip layers to skip. 0 = the model default")
-            components.entry(frame, 4, 1, self.ui_state, "text_encoder_layer_skip")
+            components.entry(frame, row, 1, self.ui_state, "text_encoder_layer_skip")
+            row += 1
+
+        # RAM Offloading
+        components.label(frame, row, 0, "Text Encoder RAM Offload",
+                         tooltip="Offloads all layers of the text encoder model not currently in a forward/backwards pass. This will reduce training speed, but use less video memory")
+        components.switch(frame, row, 1, self.ui_state, "text_encoder.ram_offload")
+        row += 1
 
     def __create_text_encoder_n_frame(
             self,
@@ -513,6 +540,12 @@ class TrainingTab:
             components.entry(frame, row, 1, self.ui_state, f"text_encoder{suffix}_sequence_length")
             row += 1
 
+        # RAM Offloading
+        components.label(frame, row, 0, f"Text Encoder {i} RAM Offload",
+                         tooltip=f"Offloads all layers of text encoder {i} model not currently in a forward/backwards pass. This will reduce training speed, but use less video memory")
+        components.switch(frame, row, 1, self.ui_state, f"text_encoder{suffix}.ram_offload")
+        row += 1
+
     def __create_embedding_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
@@ -554,6 +587,11 @@ class TrainingTab:
         rescale_label.configure(wraplength=130, justify="left")
         components.switch(frame, 3, 1, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
 
+        # RAM Offloading
+        components.label(frame, 4, 0, "UNet RAM Offload",
+                         tooltip="Offloads all layers of the UNet not currently in a forward/backwards pass. This will reduce training speed, but use less video memory")
+        components.switch(frame, 4, 1, self.ui_state, "unet.ram_offload")
+
     def __create_prior_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
@@ -575,38 +613,98 @@ class TrainingTab:
                          tooltip="The learning rate of the Prior. Overrides the base learning rate")
         components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
 
-    def __create_transformer_frame(self, master, row, supports_guidance_scale: bool = False, supports_force_attention_mask: bool = True):
+        # RAM Offloading
+        components.label(frame, 3, 0, "Prior RAM Offload",
+                         tooltip="Offloads all layers of the Prior not currently in a forward/backwards pass. This will reduce training speed, but use less video memory")
+        components.switch(frame, 3, 1, self.ui_state, "prior.ram_offload")
+
+    def __create_effnet_encoder_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
 
+        # RAM Offloading
+        components.label(frame, 0, 0, "Effnet Encoder RAM Offload",
+                         tooltip="Offloads all layers of the effnet encoder not currently in a forward/backwards pass. This will reduce training speed, but use less video memory")
+        components.switch(frame, 0, 1, self.ui_state, "effnet_encoder.ram_offload")
+
+    def __create_decoder_frame(self, master, row, has_text_encoder: bool = False):
+        frame = ctk.CTkFrame(master=master, corner_radius=5)
+        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
+
+        # Decoder RAM Offloading
+        components.label(frame, 0, 0, "Decoder Model RAM Offload",
+                         tooltip="Offloads all layers of the decoder model not currently in a forward/backwards pass. This will reduce training speed, but use less video memory")
+        components.switch(frame, 0, 1, self.ui_state, "decoder.ram_offload")
+
+        # VQGAN RAM Offloading
+        components.label(frame, 1, 0, "Decoder VQGAN RAM Offload",
+                         tooltip="Offloads all layers of the decoder VQGAN not currently in a forward/backwards pass. This will reduce training speed, but use less video memory")
+        components.switch(frame, 1, 1, self.ui_state, "decoder_vqgan.ram_offload")
+
+        if has_text_encoder:
+            # VQGAN RAM Offloading
+            components.label(frame, 2, 0, f"Decoder Text Encoder RAM Offload",
+                            tooltip="Offloads all layers of the decoder VQGAN not currently in a forward/backwards pass. This will reduce training speed, but use less video memory")
+            components.switch(frame, 2, 1, self.ui_state, "decoder_text_encoder.ram_offload")
+
+    def __create_transformer_frame(self, master, row, supports_guidance_scale: bool = False, supports_force_attention_mask: bool = True):
+        frame = ctk.CTkFrame(master=master, corner_radius=5)
+        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
+        row = 0
+
         # train transformer
-        components.label(frame, 0, 0, "Train Transformer",
+        components.label(frame, row, 0, "Train Transformer",
                          tooltip="Enables training the Transformer model")
-        components.switch(frame, 0, 1, self.ui_state, "transformer.train")
+        components.switch(frame, row, 1, self.ui_state, "transformer.train")
+        row += 1
 
         # train transformer epochs
-        components.label(frame, 1, 0, "Stop Training After",
+        components.label(frame, row, 0, "Stop Training After",
                          tooltip="When to stop training the Transformer")
-        components.time_entry(frame, 1, 1, self.ui_state, "transformer.stop_training_after", "transformer.stop_training_after_unit",
+        components.time_entry(frame, row, 1, self.ui_state, "transformer.stop_training_after", "transformer.stop_training_after_unit",
                               supports_time_units=False)
+        row += 1
 
         # transformer learning rate
-        components.label(frame, 2, 0, "Transformer Learning Rate",
+        components.label(frame, row, 0, "Transformer Learning Rate",
                          tooltip="The learning rate of the Transformer. Overrides the base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "transformer.learning_rate")
+        components.entry(frame, row, 1, self.ui_state, "transformer.learning_rate")
+        row += 1
 
         if supports_force_attention_mask:
             # transformer learning rate
-            components.label(frame, 3, 0, "Force Attention Mask",
+            components.label(frame, row, 0, "Force Attention Mask",
                              tooltip="Force enables passing of a text embedding attention mask to the transformer. This can improve training on shorter captions.")
-            components.switch(frame, 3, 1, self.ui_state, "transformer.attention_mask")
+            components.switch(frame, row, 1, self.ui_state, "transformer.attention_mask")
+            row += 1
 
         if supports_guidance_scale:
             # guidance scale
-            components.label(frame, 4, 0, "Guidance Scale",
+            components.label(frame, row, 0, "Guidance Scale",
                              tooltip="The guidance scale of guidance distilled models passed to the transformer during training.")
-            components.entry(frame, 4, 1, self.ui_state, "transformer.guidance_scale")
+            components.entry(frame, row, 1, self.ui_state, "transformer.guidance_scale")
+            row += 1
+
+        # RAM Offloading
+        components.label(frame, row, 0, f"Transformer RAM Offload",
+                         tooltip="Offloads all layers of the transformer not currently in a forward/backwards pass. This will reduce training speed, but use less video memory")
+        components.switch(frame, row, 1, self.ui_state, "transformer.ram_offload")
+        row += 1
+
+    def __create_vae_frame(self, master, row):
+        frame = ctk.CTkFrame(master=master, corner_radius=5)
+        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
+        row = 0
+
+        # RAM Offloading
+        components.label(frame, row, 0, f"VAE RAM Offload",
+                         tooltip="Offloads all layers of the VAE not currently in a forward/backwards pass. This will reduce training speed, but use less video memory")
+        components.switch(frame, row, 1, self.ui_state, "vae.ram_offload")
+        row += 1
 
     def __create_noise_frame(self, master, row, supports_generalized_offset_noise: bool = False, supports_dynamic_timestep_shifting: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
