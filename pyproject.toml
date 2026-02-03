@@ -1,5 +1,79 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
 [project]
-requires-python = ">=3.10"
+name = "OneTrainer"
+requires-python = ">=3.10,<3.14"
+version = "0.1.0"
+
+dependencies = [
+    "numpy==2.2.6",
+    "opencv-python==4.11.0.86",
+    "pillow==11.3.0",
+    "imagesize==1.4.1",
+    "tqdm==4.67.1",
+    "pyyaml==6.0.2",
+    "huggingface-hub==0.34.4",
+    "scipy==1.15.3",
+    "matplotlib==3.10.3",
+    "av==16.1.0",
+    "yt-dlp",
+    "scenedetect==0.6.6",
+    "accelerate==1.7.0",
+    "safetensors==0.5.3",
+    "tensorboard==2.20.0",
+    "pytorch-lightning==2.5.1.post0",
+    "diffusers @ git+https://github.com/huggingface/diffusers.git@256e0106749363fce06c28000698edeaf56a874d",
+    "gguf==0.17.1",
+    "transformers==4.56.2",
+    "sentencepiece==0.2.1",
+    "omegaconf==2.3.0",
+    "invisible-watermark==0.2.0",
+    "pooch==1.8.2",
+    "open-clip-torch==2.32.0",
+    "mgds @ git+https://github.com/Nerogar/mgds.git@385578f8c9e7861bd98c85d8855a23cb6b48661d",
+    "dadaptation==3.2",
+    "lion-pytorch==0.2.3",
+    "prodigyopt==1.1.2",
+    "schedulefree==1.4.1",
+    "pytorch-optimizer==3.6.0",
+    "prodigy-plus-schedule-free==2.0.1",
+    "adv-optm==2.1.0",
+    "muon-optimizer @ git+https://github.com/KellerJordan/Muon.git@f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd",
+    "scalene==2.0.1",
+    "customtkinter==5.2.2",
+    "runpod==1.7.10",
+    "fabric==3.2.2",
+    "psutil==7.0.0",
+    "requests==2.32.5",
+    "deepdiff==8.6.1",
+]
+
+[project.optional-dependencies]
+cpu = [
+  "torch==2.8.0",
+  "torchvision==0.23.0",
+  "onnxruntime==1.22.1",
+]
+
+cuda = [
+  "torch==2.8.0+cu128",
+  "torchvision==0.23.0+cu128",
+  "onnxruntime-gpu==1.22.0",
+  "bitsandbytes==0.46.0",
+  "nvidia-nccl-cu12==2.27.3; sys_platform == 'linux'",
+  "triton-windows==3.4.0.post20; sys_platform == 'win32'",
+]
+
+rocm = [
+    "torch==2.7.1+rocm6.3",
+    "torchvision==0.22.1+rocm6.3",
+    "onnxruntime==1.22.1",
+]
+
+[tool.setuptools]
+packages = []
 
 [tool.ruff]
 extend-exclude = [
@@ -39,3 +113,47 @@ section-order = [
     "third-party",
     "local-folder",
 ]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64", "win-64"]
+requires-pixi = ">=0.63.0"
+
+[tool.pixi.tasks]
+train = { cmd = "python scripts/train.py", cwd = "." }
+ui = { cmd = "python scripts/train_ui.py", cwd = "." }
+
+[tool.pixi.feature.cuda]
+platforms = ["linux-64", "win-64"]
+
+[tool.pixi.feature.cuda.pypi-options]
+extra-index-urls = ["https://download.pytorch.org/whl/cu128"]
+
+[tool.pixi.feature.cuda.system-requirements]
+cuda = "12.8"
+
+[tool.pixi.feature.rocm]
+platforms = ["linux-64"]
+
+[tool.pixi.feature.rocm.pypi-options]
+extra-index-urls = ["https://download.pytorch.org/whl/rocm6.3"]
+
+[tool.pixi.dependencies]
+python = "3.13.*"
+
+[tool.pixi.target.linux-64.dependencies]
+tk = { version = "*", build = "xft_*" }
+libgl = "*"
+
+[tool.pixi.system-requirements]
+linux = "5.17"
+libc = { family="glibc", version="2.28" }
+macos  = "15.0"
+
+[tool.pixi.pypi-options]
+index-strategy = "unsafe-best-match"
+
+[tool.pixi.environments]
+cpu = ["cpu"]
+cuda = ["cuda"]
+rocm = ["rocm"]

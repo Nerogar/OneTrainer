@@ -27,13 +27,12 @@ secrets.json
 .python-version
 *.egg-info
 
-# pixi environments
-.pixi
-pixi.lock
-pixi.toml
-
 # misc files
 /src
 train.bat
 debug_report.log
 config_diff.txt
+
+# pixi environments
+.pixi/*
+!.pixi/config.toml
