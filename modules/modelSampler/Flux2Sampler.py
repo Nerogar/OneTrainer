@@ -91,10 +91,6 @@ class Flux2Sampler(BaseModelSampler):
             latent_image = self.model.patchify_latents(latent_image)
             image_ids = self.model.prepare_latent_image_ids(latent_image)
 
-            #TODO test dynamic timestep shifting instead of empirical
-            #shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
-            #mu = math.log(shift)
-
             latent_image = self.model.pack_latents(latent_image)
             image_seq_len = latent_image.shape[1]
             mu = compute_empirical_mu(image_seq_len, diffusion_steps)

@@ -78,8 +78,10 @@ class Flux2ModelLoader(
         if transformer_model_name:
             transformer = Flux2Transformer2DModel.from_single_file(
                 transformer_model_name,
+                config=base_model_name,
+                subfolder="transformer",
                 #avoid loading the transformer in float32:
-                torch_dtype = torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype(),
+                torch_dtype=torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype(),
                 quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16) if weight_dtypes.transformer.is_gguf() else None,
             )
             transformer = self._convert_diffusers_sub_module_to_dtype(

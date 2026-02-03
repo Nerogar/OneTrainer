@@ -9,6 +9,7 @@ from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiff
 from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowMatchingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
+from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.util.checkpointing_util import (
     enable_checkpointing_for_qwen25vl_encoder_layers,
     enable_checkpointing_for_z_image_transformer,
@@ -31,6 +32,7 @@ class BaseZImageSetup(
     ModelSetupNoiseMixin,
     ModelSetupFlowMatchingMixin,
     ModelSetupEmbeddingMixin,
+    ModelSetupText2ImageMixin,
     metaclass=ABCMeta
 ):
     LAYER_PRESETS = {

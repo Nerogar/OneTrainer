@@ -28,7 +28,6 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
-#TODO share more code with other models
 class QwenBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -152,7 +151,7 @@ class QwenBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
             allow_video_files=False, #don't allow video files, but...
-            allow_video=True,  #...Qwen has a video-capable VAE: convert images to video dimensions #TODO the same as frame_dim_enabled?
+            vae_frame_dim=True,  #...Qwen has a video-capable VAE. convert images to video dimensions
         )
 
 factory.register(BaseDataLoader, QwenBaseDataLoader, ModelType.QWEN)
