@@ -1,0 +1,32 @@
+{
+    "base_model_name": "black-forest-labs/FLUX.2-klein-base-9B",
+    "batch_size": 2,
+    "learning_rate": 0.0003,
+    "model_type": "FLUX_2",
+    "resolution": "512",
+    "compile": true,
+    "transformer": {
+        "train": true,
+        "weight_dtype": "INT_W8A8"
+    },
+    "text_encoder": {
+        "train": false,
+        "weight_dtype": "FLOAT_8"
+    },
+    "training_method": "LORA",
+    "vae": {
+        "weight_dtype": "FLOAT_32"
+    },
+    "train_dtype": "BFLOAT_16",
+    "output_dtype": "BFLOAT_16",
+    "layer_filter": "blocks",
+    "layer_filter_preset": "transformer_block",
+    "quantization": {
+        "layer_filter": "transformer_block",
+        "layer_filter_preset": "blocks"
+    },
+    "timestep_distribution": "LOGIT_NORMAL",
+    "dataloader_threads": 1,
+    "gradient_checkpointing": "CPU_OFFLOADED",
+    "layer_offload_fraction": 0.7
+}
