@@ -2,17 +2,18 @@ from abc import ABCMeta
 from random import Random
 
 import modules.util.multi_gpu_util as multi
-from modules.model.ZImageModel import ZImageModel
+from modules.model.Flux2Model import Flux2Model
+from modules.model.FluxModel import FluxModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowMatchingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
-from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.util.checkpointing_util import (
-    enable_checkpointing_for_qwen25vl_encoder_layers,
-    enable_checkpointing_for_z_image_transformer,
+    enable_checkpointing_for_flux2_transformer,
+    enable_checkpointing_for_mistral_encoder_layers,
+    enable_checkpointing_for_qwen3_encoder_layers,
 )
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
@@ -25,37 +26,38 @@ import torch
 from torch import Tensor
 
 
-class BaseZImageSetup(
+class BaseFlux2Setup(
     BaseModelSetup,
     ModelSetupDiffusionLossMixin,
     ModelSetupDebugMixin,
     ModelSetupNoiseMixin,
     ModelSetupFlowMatchingMixin,
     ModelSetupEmbeddingMixin,
-    ModelSetupText2ImageMixin,
     metaclass=ABCMeta
 ):
     LAYER_PRESETS = {
+        "blocks": ["transformer_block"],
         "full": [],
-        "blocks": ["layers"],
-        "attn-mlp": {'patterns': ["^(?=.*attention)(?!.*refiner).*", "^(?=.*feed_forward)(?!.*refiner).*"], 'regex': True},
-        "attn-only": {'patterns': ["^(?=.*attention)(?!.*refiner).*"], 'regex': True},
     }
 
     def setup_optimizations(
             self,
-            model: ZImageModel,
+            model: Flux2Model,
             config: TrainConfig,
     ):
         if config.gradient_checkpointing.enabled():
             model.transformer_offload_conductor = \
-                enable_checkpointing_for_z_image_transformer(model.transformer, config)
+                enable_checkpointing_for_flux2_transformer(model.transformer, config)
             if model.text_encoder is not None:
-                model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_qwen25vl_encoder_layers(model.text_encoder, config)
+                if model.is_dev():
+                    model.text_encoder_offload_conductor = \
+                        enable_checkpointing_for_mistral_encoder_layers(model.text_encoder, config)
+                else:
+                    model.text_encoder_offload_conductor = \
+                        enable_checkpointing_for_qwen3_encoder_layers(model.text_encoder, config)
 
         if config.force_circular_padding:
-            raise NotImplementedError #TODO applies to Z-Image?
+            raise NotImplementedError #TODO applies to Flux2?
 #            apply_circular_padding_to_conv2d(model.vae)
 #            apply_circular_padding_to_conv2d(model.transformer)
 #            if model.transformer_lora is not None:
@@ -68,7 +70,6 @@ class BaseZImageSetup(
             config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
         ], config.enable_autocast_cache)
 
-        #TODO necessary if we don't train it?
         model.text_encoder_autocast_context, model.text_encoder_train_dtype = \
             disable_fp16_autocast_context(
                 self.train_device,
@@ -87,7 +88,7 @@ class BaseZImageSetup(
 
     def predict(
             self,
-            model: ZImageModel,
+            model: Flux2Model,
             batch: dict,
             config: TrainConfig,
             train_progress: TrainProgress,
@@ -106,14 +107,18 @@ class BaseZImageSetup(
                 rand=rand,
                 tokens=batch.get("tokens"),
                 tokens_mask=batch.get("tokens_mask"),
+                text_encoder_sequence_length=config.text_encoder_sequence_length,
                 text_encoder_output=batch.get('text_encoder_hidden_state'),
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability,
             )
-            scaled_latent_image = model.scale_latents(batch['latent_image'])
+            latent_image = model.patchify_latents(batch['latent_image'].float())
+            latent_height = latent_image.shape[-2]
+            latent_width = latent_image.shape[-1]
+            scaled_latent_image = model.scale_latents(latent_image)
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
-            shift = model.calculate_timestep_shift(scaled_latent_image.shape[-2], scaled_latent_image.shape[-1])
+            shift = model.calculate_timestep_shift(latent_height, latent_width)
             timestep = self._get_timestep_discrete(
                 model.noise_scheduler.config['num_train_timesteps'],
                 deterministic,
@@ -129,25 +134,42 @@ class BaseZImageSetup(
                 timestep,
                 model.noise_scheduler.timesteps,
             )
-            latent_input = scaled_noisy_latent_image.unsqueeze(2).to(dtype=model.train_dtype.torch_dtype())
-            latent_input_list = list(latent_input.unbind(dim=0))
+            latent_input = scaled_noisy_latent_image
 
-            output_list = model.transformer(
-                latent_input_list,
-                (1000 - timestep) / 1000,
-                text_encoder_output,
+            if model.transformer.config.guidance_embeds:
+                guidance = torch.tensor([config.transformer.guidance_scale], device=self.train_device, dtype=model.train_dtype.torch_dtype())
+                guidance = guidance.expand(latent_input.shape[0])
+            else:
+                guidance = None
+
+            text_ids = model.prepare_text_ids(text_encoder_output)
+            image_ids = model.prepare_latent_image_ids(latent_input)
+            packed_latent_input = model.pack_latents(latent_input)
+
+            packed_predicted_flow = model.transformer(
+                hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
+                timestep=timestep / 1000,
+                guidance=guidance,
+                encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                txt_ids=text_ids,
+                img_ids=image_ids,
+                joint_attention_kwargs=None,
                 return_dict=True
             ).sample
 
-            predicted_flow = - torch.stack(output_list, dim=0).squeeze(dim=2)
-
+            predicted_flow = model.unpack_latents(
+                packed_predicted_flow,
+                latent_input.shape[2],
+                latent_input.shape[3],
+            )
 
             flow = latent_noise - scaled_latent_image
             model_output_data = {
                 'loss_type': 'target',
                 'timestep': timestep,
-                'predicted': predicted_flow,
-                'target': flow,
+                #unpatchify, to make the shape match the mask shape of masked training:
+                'predicted': model.unpatchify_latents(predicted_flow),
+                'target': model.unpatchify_latents(flow),
             }
 
             if config.debug_mode:
@@ -165,7 +187,7 @@ class BaseZImageSetup(
 
     def calculate_loss(
             self,
-            model: ZImageModel,
+            model: Flux2Model,
             batch: dict,
             data: dict,
             config: TrainConfig,
@@ -178,9 +200,8 @@ class BaseZImageSetup(
             sigmas=model.noise_scheduler.sigmas,
         ).mean()
 
-    def prepare_text_caching(self, model: ZImageModel, config: TrainConfig):
+    def prepare_text_caching(self, model: FluxModel, config: TrainConfig):
         model.to(self.temp_device)
         model.text_encoder_to(self.train_device)
-
         model.eval()
         torch_gc()

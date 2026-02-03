@@ -10,7 +10,7 @@ from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowM
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.util.checkpointing_util import (
-    enable_checkpointing_for_qwen_encoder_layers,
+    enable_checkpointing_for_qwen25vl_encoder_layers,
     enable_checkpointing_for_qwen_transformer,
 )
 from modules.util.config.TrainConfig import TrainConfig
@@ -52,7 +52,7 @@ class BaseQwenSetup(
                 enable_checkpointing_for_qwen_transformer(model.transformer, config)
             if model.text_encoder is not None:
                 model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_qwen_encoder_layers(model.text_encoder, config)
+                    enable_checkpointing_for_qwen25vl_encoder_layers(model.text_encoder, config)
 
         if config.force_circular_padding: #TODO useful for Qwen?
             apply_circular_padding_to_conv2d(model.vae)
