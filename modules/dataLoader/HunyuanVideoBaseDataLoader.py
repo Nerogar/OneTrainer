@@ -181,7 +181,7 @@ class HunyuanVideoBaseDataLoader(
             aspect_bucketing_quantization=64,
             frame_dim_enabled=True,
             allow_video_files=True,
-            allow_video=True,
+            vae_frame_dim=True,
         )
 
 factory.register(BaseDataLoader, HunyuanVideoBaseDataLoader, ModelType.HUNYUAN_VIDEO)
