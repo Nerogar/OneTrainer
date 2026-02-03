@@ -33,7 +33,7 @@ pooch==1.8.2
 open-clip-torch==2.32.0
 
 # data loader
--e git+https://github.com/dxqb/mgds.git@flux2_klein#egg=mgds
+-e git+https://github.com/OneTrainer/mgds.git@a0c84a3#egg=mgds
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers
