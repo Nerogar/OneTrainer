@@ -247,9 +247,9 @@ def lora_fuse_mlp_to_qkv_mlp(mlp_up, mlp_down, mlp_alpha):
     #TODO where to get output shape from, if there is no qkv dim?
     raise NotImplementedError
 
-def swap_chunks(input: torch.Tensor, chunks: int=2, dim: int=0) -> torch.Tensor:
-    chunks = input.chunk(chunks, dim=dim)
-    return torch.cat(chunks, dim=dim)
+def swap_chunks(input: torch.Tensor, dim: int=0) -> torch.Tensor:
+    chunks = input.chunk(2, dim=dim)
+    return torch.cat([chunks[1], chunks[0]], dim=dim)
 
 def lora_qkv_fusion(q: str, k: str, v: str, qkv: str):
     return [
