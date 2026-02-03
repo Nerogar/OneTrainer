@@ -11,6 +11,7 @@ matplotlib==3.10.3
 av==16.1.0
 yt-dlp  #no pinned version, frequently updated for compatibility with sites
 scenedetect==0.6.6
+parse==1.20.2
 
 # pytorch
 accelerate==1.7.0
@@ -19,8 +20,7 @@ tensorboard==2.19.0
 pytorch-lightning==2.5.1.post0
 
 # diffusion models
-#Note: check whether Qwen bugs in diffusers have been fixed before upgrading diffusers (see BaseQwenSetup):
--e git+https://github.com/huggingface/diffusers.git@256e010#egg=diffusers
+-e git+https://github.com/huggingface/diffusers.git@6a1904e#egg=diffusers
 gguf==0.17.1
 transformers==4.56.2
 sentencepiece==0.2.1 # transitive dependency of transformers for tokenizer loading
@@ -32,7 +32,7 @@ pooch==1.8.2
 open-clip-torch==2.32.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@385578f#egg=mgds
+-e git+https://github.com/Nerogar/mgds.git@a0c84a3#egg=mgds
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers

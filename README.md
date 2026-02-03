@@ -6,7 +6,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 
 ## Features
 
--   **Supported models**: Z-Image, Qwen Image, FLUX.1, Chroma, Stable Diffusion 1.5, 2.0, 2.1, 3.0, 3.5, SDXL, Würstchen-v2, Stable Cascade,
+-   **Supported models**: Z-Image, Qwen Image, FLUX.1, Flux.2 Dev and Klein, Chroma, Stable Diffusion 1.5, 2.0, 2.1, 3.0, 3.5, SDXL, Würstchen-v2, Stable Cascade,
     PixArt-Alpha, PixArt-Sigma, Sana, Hunyuan Video and inpainting models
 -   **Model formats**: diffusers and ckpt models
 -   **Training methods**: Full fine-tuning, LoRA, embeddings
