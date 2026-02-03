@@ -240,7 +240,7 @@ class BaseHunyuanVideoSetup(
             if scaled_latent_image.ndim == 4:
                 scaled_latent_image = scaled_latent_image.unsqueeze(2)
 
-            latent_noise = self._create_noise(scaled_latent_image, config, generator)
+            latent_noise = self._create_noise(scaled_latent_image, config, batch['config'], generator)
 
             timestep = self._get_timestep_discrete(
                 model.noise_scheduler.config['num_train_timesteps'],
@@ -248,6 +248,7 @@ class BaseHunyuanVideoSetup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+                batch['config'],
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(

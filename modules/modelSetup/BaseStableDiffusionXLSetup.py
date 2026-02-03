@@ -230,11 +230,13 @@ class BaseStableDiffusionXLSetup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+                batch['config'],
             )
 
             latent_noise = self._create_noise(
                 scaled_latent_image,
                 config,
+                batch['config'],
                 generator,
                 timestep,
                 model.noise_scheduler.betas,
