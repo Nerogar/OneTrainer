@@ -1,7 +1,7 @@
 # pytorch
---extra-index-url https://download.pytorch.org/whl/cu130
-torch==2.10.0+cu130
-torchvision==0.25.0+cu130
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.10.0+cu128
+torchvision==0.25.0+cu128
 onnxruntime-gpu==1.23.2
 nvidia-nccl-cu12==2.29.3; sys_platform == "linux"
 triton-windows==3.6.0.post24; sys_platform == "win32"
