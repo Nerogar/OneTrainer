@@ -176,6 +176,10 @@ def _parse_dropped_paths(event_data: str) -> list[str]:
 
 
 def register_drop_target(entry_widget, ui_state, var_name, command=None, drop_validator=None, on_reject=None):
+    # tkinterdnd2 is unstable on Linux https://github.com/Eliav2/tkinterdnd2/issues/12#issuecomment-3776598066
+    if sys.platform == "linux":
+        return
+
     try:
         entry_widget.drop_target_register(DND_FILES)
         for event, handler in [('<<DropEnter>>', _drop_enter), ('<<DropLeave>>', _drop_leave),
@@ -185,6 +189,9 @@ def register_drop_target(entry_widget, ui_state, var_name, command=None, drop_va
         print(f"Failed to register drop target: {e}")
 
 def register_concept_drop_target(widget, drop_callback: Callable[[str], None], allow_multiple: bool = True):
+    if sys.platform == "linux":
+        return
+
     def drop_handler(event):
         if not event.data:
             return event.action

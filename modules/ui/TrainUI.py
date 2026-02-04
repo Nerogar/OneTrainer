@@ -47,7 +47,16 @@ import torch
 
 import customtkinter as ctk
 from customtkinter import AppearanceModeTracker
-from tkinterdnd2 import TkinterDnD
+
+# tkinterdnd2 is unstable on Linux - conditionally import and provide no-op mixin
+# https://github.com/Eliav2/tkinterdnd2/issues/12#issuecomment-3776598066
+if platform.system() != "Linux":
+    from tkinterdnd2 import TkinterDnD
+    _DnDMixin = TkinterDnD.DnDWrapper
+else:
+    TkinterDnD = None
+    class _DnDMixin:
+        """No-op mixin when DnD is disabled on Linux"""
 
 # chunk for forcing Windows to ignore DPI scaling when moving between monitors
 # fixes the long standing transparency bug https://github.com/Nerogar/OneTrainer/issues/90
@@ -56,7 +65,7 @@ if platform.system() == "Windows":
         # https://learn.microsoft.com/en-us/windows/win32/hidpi/setting-the-default-dpi-awareness-for-a-process#setting-default-awareness-programmatically
         ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
 
-class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
+class TrainUI(ctk.CTk, _DnDMixin):
     set_step_progress: Callable[[int, int], None]
     set_epoch_progress: Callable[[int, int], None]
 
@@ -64,6 +73,8 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
     training_button: ctk.CTkButton | None
     training_callbacks: TrainCallbacks | None
     training_commands: TrainCommands | None
+
+    _DND_ENABLED = TkinterDnD is not None
 
     _TRAIN_BUTTON_STYLES = {
         "idle": {
@@ -93,7 +104,8 @@ class TrainUI(ctk.CTk, TkinterDnD.DnDWrapper):
 
     def __init__(self):
         super().__init__()
-        self.TkdndVersion = TkinterDnD._require(self)
+        if self._DND_ENABLED:
+            self.TkdndVersion = TkinterDnD._require(self)
 
         self.title("OneTrainer")
         self.geometry("1100x740")
