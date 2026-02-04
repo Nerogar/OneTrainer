@@ -346,6 +346,7 @@ class OFTModule(PeftBase):
     block_share: bool
     dropout_probability: float
     adjustment_info: tuple[int, int] | None # for reporting
+    oft_scale: float
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, coft: bool, coft_eps: float, block_share: bool, **kwargs):
         super().__init__(prefix, orig_module)
@@ -357,6 +358,7 @@ class OFTModule(PeftBase):
         self.dropout_probability = kwargs.pop('dropout_probability', 0.0)
         self.oft_R = None
         self.adjustment_info = None
+        self.oft_scale = 1.0
 
 
         if orig_module is not None:
@@ -433,12 +435,16 @@ class OFTModule(PeftBase):
 
         # For Linear layers, rotating the input is mathematically equivalent to rotating the weights.
         if isinstance(self.orig_module, nn.Linear):
-            rotated_x = self.oft_R(x)
+            rotated_x = self.oft_R(x, scale=self.oft_scale)
             return self.orig_forward(rotated_x, *args, **kwargs)
 
         # For Conv2d, we must rotate the weights, not the input, to preserve spatial information.
+
+        # Apply Scale
+        effective_weight = self.oft_R.weight * self.oft_scale if self.oft_scale != 1.0 else self.oft_R.weight
+
         orth_rotate = self.oft_R._cayley_batch(
-            self.oft_R.weight, self.oft_R.block_size, self.oft_R.use_cayley_neumann, self.oft_R.num_cayley_neumann_terms
+            effective_weight, self.oft_R.block_size, self.oft_R.use_cayley_neumann, self.oft_R.num_cayley_neumann_terms
         )
         orth_rotate = self.oft_R.dropout(orth_rotate)
 
@@ -654,9 +660,17 @@ class LoRAModuleWrapper:
                 prefixed_name = (self.prefix + "." + name) if self.prefix != "" else name
                 lora_module = self.klass(prefixed_name, child_module, *self.additional_args, **self.additional_kwargs)
                 lora_modules[name] = lora_module
-                if self.peft_type == PeftType.OFT_2 and lora_module.adjustment_info:
-                    old, new = lora_module.adjustment_info
-                    oft_adjustments.append({'old': old, 'new': new})
+                if self.peft_type == PeftType.OFT_2:
+                    if lora_module.adjustment_info:
+                        old, new = lora_module.adjustment_info
+                        oft_adjustments.append({'old': old, 'new': new})
+
+                    if config.oft_linear_scaling:
+                        # Normalize against the configured block size
+                        # If actual < config, scale > 1.0 (Boosting small blocks).
+                        # If actual > config, scale < 1.0 (Damping large blocks).
+                        lora_module.oft_scale = config.oft_block_size / lora_module.oft_block_size
+
                 selected.append(name)
             else:
                 deselected.append(name)
