@@ -40,6 +40,7 @@ from modules.util.tensorboard_util import get_tensorboard_manager
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ui import components
+from modules.util.ui.components import ValidationErrorDialog
 from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
 
@@ -931,6 +932,14 @@ class TrainUI(ctk.CTk, _DnDMixin):
 
     def start_training(self):
         if self.training_thread is None:
+            self.ui_state.flush_all_validations()
+
+            # Check for validation errors before starting
+            invalid_fields = self.ui_state.get_invalid_fields()
+            if invalid_fields:
+                ValidationErrorDialog(self, invalid_fields)
+                return
+
             self.save_default()
             self._set_training_button_running()
 

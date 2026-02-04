@@ -281,7 +281,7 @@ class VideoToolUI(ctk.CTkToplevel):
         components.label(frame, 3, 0, "Additional Args",
                          tooltip="Any additional arguments to pass to yt-dlp, for example '--restrict-filenames --force-overwrite'. \
                             Default args will hide most terminal outputs.")
-        self.download_args_entry = ctk.CTkTextbox(frame, width=220, height=90, border_width=2)
+        self.download_args_entry = ctk.CTkTextbox(frame, width=220, height=90, border_width=2, undo=True, autoseparators=True, maxundo=-1)
         self.download_args_entry.grid(row=3, column=1, rowspan=2, sticky="w", padx=5, pady=5)
         self.download_args_entry.insert(index="1.0", text="--quiet --no-warnings --progress")
         components.button(frame, 3, 2, "yt-dlp info",

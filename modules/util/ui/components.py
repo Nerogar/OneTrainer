@@ -3,7 +3,7 @@ import tkinter as tk
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from typing import Any, Literal
 
 from modules.util.enum.ModelFormat import ModelFormat
@@ -45,11 +45,96 @@ def _wrap_dropdown_destroy(component):
 @dataclass(frozen=True)
 class ComponentValidationSettings:
     debounce_stop_typing_ms: int = 1700
-    debounced_invalid_revert_ms: int = 1000
-    focusout_invalid_revert_ms: int = 1200
 
 
 COMPONENT_VALIDATION_SETTINGS = ComponentValidationSettings()
+
+
+class EntryUndoHandler:
+    """Provides undo/redo (Ctrl+Z / Ctrl+Shift+Z) for CTkEntry widgets."""
+
+    def __init__(self, component: ctk.CTkEntry, var: tk.Variable, debounce_ms: int = 500, maxundo: int = -1):
+        self.component = component
+        self.var = var
+        self._undo: list[str] = [var.get()]
+        self._redo: list[str] = []
+        self._last = self._undo[0]
+        self._in_undo = False
+        self._debounce_id = None
+        self._debounce_ms = debounce_ms
+        self._maxundo = maxundo
+
+        self._trace_id = var.trace_add("write", self._on_change)
+        for key in ("<Control-z>", "<Control-Z>"):
+            component.bind(key, self._do_undo)
+        for key in ("<Control-Shift-z>", "<Control-Shift-Z>", "<Control-y>", "<Control-Y>"):
+            component.bind(key, self._do_redo)
+
+    def _on_change(self, *_):
+        if self._in_undo:
+            return
+        current = self.var.get()
+        if current == self._last:
+            return
+
+        self._redo.clear()
+        self._last = current
+
+        # Debounce: cancel pending, schedule new snapshot
+        if self._debounce_id:
+            self.component.after_cancel(self._debounce_id)
+        self._debounce_id = self.component.after(self._debounce_ms, self._snapshot)
+
+    def _snapshot(self):
+        self._debounce_id = None
+        if self._undo[-1] != self._last:
+            self._undo.append(self._last)
+            # Enforce maxundo limit (-1 means unlimited)
+            if self._maxundo > 0 and len(self._undo) > self._maxundo + 1:
+                self._undo.pop(0)
+
+    def _do_undo(self, _=None):
+        if len(self._undo) <= 1:
+            return "break"
+        self._in_undo = True
+        if self._undo[-1] != self._last:
+            self._undo.append(self._last)
+        self._redo.append(self._undo.pop())
+        self._last = self._undo[-1]
+        self.var.set(self._last)
+        self._in_undo = False
+        return "break"
+
+    def _do_redo(self, _=None):
+        if not self._redo:
+            return "break"
+        self._in_undo = True
+        state = self._redo.pop()
+        self._undo.append(state)
+        self._last = state
+        self.var.set(state)
+        self._in_undo = False
+        return "break"
+
+    def cleanup(self):
+        if self._debounce_id:
+            with contextlib.suppress(Exception):
+                self.component.after_cancel(self._debounce_id)
+        with contextlib.suppress(Exception):
+            self.var.trace_remove("write", self._trace_id)
+
+
+class ValidationErrorDialog(ctk.CTkToplevel):
+    def __init__(self, parent, invalid_fields: list[tuple[str, str]], *args, **kwargs):
+
+        lines = ["Cannot start training. Please fix the following errors:\n"]
+        for field_name, message in invalid_fields:
+            display_name = field_name.replace("_", " ").title()
+            lines.append(f"• {display_name}: {message}")
+
+        error_text = "\n".join(lines)
+
+        messagebox.showerror("Validation Errors", error_text, parent=parent)
 
 @dataclass
 class ValidationState:
@@ -90,22 +175,13 @@ class EntryValidationHandler:
         self.debounce_timer = DebounceTimer(
             widget=component,
             delay_ms=COMPONENT_VALIDATION_SETTINGS.debounce_stop_typing_ms,
-            callback=lambda: self.validate_value(
-                self.var.get(),
-                COMPONENT_VALIDATION_SETTINGS.debounced_invalid_revert_ms
-            )
+            callback=lambda: self.validate_value(self.var.get())
         )
 
-        self.revert_after_id = None
         self.touched = False
-        self.last_valid_value = var.get()
 
         self.validation_tooltip = ToolTip(component, text="", hover_only=False, track_movement=True, wide=True)
         component._validation_tooltip = self.validation_tooltip
-
-    def _cancel_after(self, after_id):
-        with contextlib.suppress(Exception):
-            self.component.after_cancel(after_id)
 
     def _reset_border(self):
         self.component.configure(border_color=self.original_border_color)
@@ -127,8 +203,7 @@ class EntryValidationHandler:
         elif self.validation_state.status == 'warning':
             self.validation_tooltip.show_warning(self.validation_state.message, duration_ms=None)
 
-    def validate_value(self, value: str, revert_delay_ms: int | None) -> bool:
-        self._cancel_after(self.revert_after_id)
+    def validate_value(self, value: str) -> bool:
         meta = self.ui_state.get_field_metadata(self.var_name)
 
         basic_result = validate_basic_type(
@@ -139,7 +214,7 @@ class EntryValidationHandler:
         )
 
         if not basic_result.ok:
-            return self._fail(basic_result.message, revert_delay_ms)
+            return self._fail(basic_result.message)
 
         if self.custom_validator:
             result = self.custom_validator(value)
@@ -148,28 +223,28 @@ class EntryValidationHandler:
             if result.status == 'warning':
                 return self._warning(result.message, value)
             elif not result.ok:
-                return self._fail(result.message, revert_delay_ms)
+                return self._fail(result.message)
 
         return self._success(value)
 
     def _success(self, value: str) -> bool:
         self._reset_border()
         self.validation_tooltip.hide()
-        self.last_valid_value = value
+        if self.validation_state:
+            self.validation_state.clear()
         return True
 
     def _warning(self, reason: str, value: str) -> bool:
         self.component.configure(border_color="#ff9500")
         if self.should_show_tooltip():
             self.validation_tooltip.show_warning(reason)
-        self.last_valid_value = value
 
         if self.validation_state:
             self.validation_state.set_status('warning', reason)
 
         return True
 
-    def _fail(self, reason: str, revert_delay_ms: int | None) -> bool:
+    def _fail(self, reason: str) -> bool:
         self.component.configure(border_color="#dc3545")
         if self.should_show_tooltip():
             self.validation_tooltip.show_error(reason)
@@ -177,16 +252,7 @@ class EntryValidationHandler:
         if self.validation_state:
             self.validation_state.set_status('error', reason)
 
-        if revert_delay_ms is not None:
-            self.revert_after_id = self.component.after(revert_delay_ms, self._do_revert)
-        else:
-            self._do_revert()
         return False
-
-    def _do_revert(self):
-        self.var.set(self.last_valid_value)
-        self._reset_border()
-        self.validation_tooltip.hide()
 
     def debounced_validate(self, *_):
         if not self.touched:
@@ -195,9 +261,6 @@ class EntryValidationHandler:
         self.validation_tooltip.hide()
         self._reset_border()
 
-        self._cancel_after(self.revert_after_id)
-
-        # Use DebounceTimer instead of manual after() calls
         self.debounce_timer.call()
 
     def on_focus_in(self, _e=None):
@@ -211,14 +274,14 @@ class EntryValidationHandler:
         self.validation_tooltip.hide()
 
         if self.touched:
-            self.validate_value(
-                self.var.get(),
-                COMPONENT_VALIDATION_SETTINGS.focusout_invalid_revert_ms
-            )
+            self.validate_value(self.var.get())
 
     def cleanup(self):
-        self._cancel_after(self.revert_after_id)
-        # No need to cancel debounce_timer - it handles its own cleanup
+        self.debounce_timer.cancel()
+        with contextlib.suppress(Exception):
+            self.validation_tooltip.hide()
+        self.debounce_timer = None
+        self.validation_tooltip = None
 
 
 class ModelOutputValidator:
@@ -250,41 +313,56 @@ class ModelOutputValidator:
         self._tk_widget = None
         self._last_prefix = self.prefix_var.get() if self.prefix_var else ""
 
+        self._in_validation = False
+        self._applying_correction = False
+
     def _get_enum_value(self, var, default_enum):
         with contextlib.suppress(KeyError, ValueError):
             return type(default_enum)[var.get()]
         return default_enum
 
     def validate(self, value: str, skip_overwrite_protection: bool = False, readonly: bool = False) -> ValidationResult:
+        # Guard recursion
+        if self._in_validation or self._applying_correction:
+            return ValidationResult(ok=True, corrected=None, message="", status='success')
+
         value = value.strip()
         if not value:
             self.state.clear()
             return ValidationResult(ok=True, corrected=None, message="", status='success')
 
-        # Use validation logic from validation.py
-        result = validate_destination(
-            value,
-            output_format=self._get_enum_value(self.format_var, ModelFormat.SAFETENSORS),
-            training_method=self._get_enum_value(self.method_var, TrainingMethod.FINE_TUNE),
-            autocorrect=False if readonly else _safe_bool(self.autocorrect_var),
-            prefix=self.prefix_var.get() if self.prefix_var else "",
-            use_friendly_names=_safe_bool(self.friendly_names_var, default=False),
-            is_output=True,
-            prevent_overwrite=False if readonly else _safe_bool(self.prevent_overwrite_var, default=False),
-            auto_prefix=False if readonly else _safe_bool(self.auto_prefix_var, default=False),
-            skip_overwrite_protection=skip_overwrite_protection,
-        )
+        self._in_validation = True
+        try:
+            # Use validation logic from validation.py
+            result = validate_destination(
+                value,
+                output_format=self._get_enum_value(self.format_var, ModelFormat.SAFETENSORS),
+                training_method=self._get_enum_value(self.method_var, TrainingMethod.FINE_TUNE),
+                autocorrect=False if readonly else _safe_bool(self.autocorrect_var),
+                prefix=self.prefix_var.get() if self.prefix_var else "",
+                use_friendly_names=_safe_bool(self.friendly_names_var, default=False),
+                is_output=True,
+                prevent_overwrite=False if readonly else _safe_bool(self.prevent_overwrite_var, default=False),
+                auto_prefix=False if readonly else _safe_bool(self.auto_prefix_var, default=False),
+                skip_overwrite_protection=skip_overwrite_protection,
+            )
 
-        if result.status:
-            self.state.set_status(result.status, result.message)
-        else:
-            self.state.clear()
+            if result.status:
+                self.state.set_status(result.status, result.message)
+            else:
+                self.state.clear()
 
-        # Only apply corrections if not in readonly mode
-        if not readonly and result.corrected and result.corrected != value:
-            self.var.set(result.corrected)
+            # Only apply corrections if not in readonly mode
+            if not readonly and result.corrected and result.corrected != value:
+                self._applying_correction = True
+                try:
+                    self.var.set(result.corrected)
+                finally:
+                    self._applying_correction = False
 
-        return result
+            return result
+        finally:
+            self._in_validation = False
 
     def _remove_old_prefix_if_needed(self):
         current_value = self.var.get().strip()
@@ -342,11 +420,19 @@ class ModelOutputValidator:
         ]
 
         def make_callback(debounce: bool, skip_overwrite: bool, is_prefix: bool):
-            if is_prefix:
-                return lambda *_: self._schedule_prefix_change_validation()
-            elif debounce:
-                return lambda *_: self._schedule_validation(skip_overwrite)
-            return lambda *_: self.validate(self.var.get(), skip_overwrite_protection=skip_overwrite)
+            def callback(*_):
+                if self._applying_correction:
+                    return
+
+                if is_prefix:
+                    self._schedule_prefix_change_validation()
+                elif debounce:
+                    self._schedule_validation(skip_overwrite)
+                else:
+                    if self._debounce_timer:
+                        self._debounce_timer.cancel()
+                    self.validate(self.var.get(), skip_overwrite_protection=skip_overwrite)
+            return callback
 
         for key, var, debounce, skip_overwrite, is_prefix in trace_config:
             self._trace_ids[key] = var.trace_add("write", make_callback(debounce, skip_overwrite, is_prefix))
@@ -397,6 +483,7 @@ def entry(
         custom_validator: Callable[[str], ValidationResult] | None = None,
         validation_state: ValidationState = None,
         enable_hover_validation: bool = False,
+        undo: bool = True,
 ):
 
     var = ui_state.get_var(var_name)
@@ -407,6 +494,14 @@ def entry(
     component = ctk.CTkEntry(master, textvariable=var, width=width)
     component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky=sticky)
 
+    # set up undo/redo handler if enabled, its enabled by default
+    undo_handler = EntryUndoHandler(component, var) if undo else None
+
+    if validation_state is None:
+        validation_state = ValidationState()
+
+    ui_state.register_validation_state(var_name, validation_state) # register global state
+
     validation_handler = EntryValidationHandler(
         component=component,
         var=var,
@@ -415,6 +510,7 @@ def entry(
         custom_validator=custom_validator,
         validation_state=validation_state,
     )
+    ui_state.register_validation_handler(var_name, validation_handler)  # register for debounce flushing
     validation_trace_name = var.trace_add("write", validation_handler.debounced_validate)
 
     component.bind("<FocusIn>", validation_handler.on_focus_in)
@@ -453,8 +549,15 @@ def entry(
             component._textvariable.trace_remove("write", component._textvariable_callback_name)
             component._textvariable_callback_name = ""
 
+        if undo_handler:
+            undo_handler.cleanup()
+
         validation_handler.cleanup()
         var.trace_remove("write", validation_trace_name)
+
+        # Unregister validation state and handler
+        ui_state.unregister_validation_state(var_name)
+        ui_state.unregister_validation_handler(var_name)
 
         if command is not None and trace_id is not None:
             ui_state.remove_var_trace(var_name, trace_id)
@@ -508,7 +611,7 @@ def path_entry(
         custom_validator = validator.validate
     else:
         validator = None
-        validation_state = None
+        validation_state = ValidationState()  # Create state for simple path validation
 
         def simple_path_validator(value: str) -> ValidationResult:
             if value and path_type == "directory":
@@ -520,9 +623,17 @@ def path_entry(
                     trimmed_path = f"{parent_str}{sep}{trimmed_name}" if parent_str != '.' else trimmed_name
                     var.set(trimmed_path)
                     value = trimmed_path
-            return validate_file_path(value, is_output, valid_extensions, path_type)
+            result = validate_file_path(value, is_output, valid_extensions, path_type)
+
+            if result.ok:
+                validation_state.clear()
+            else:
+                validation_state.set_status('error', result.message)
+            return result
 
         custom_validator = simple_path_validator
+
+    ui_state.register_validation_state(var_name, validation_state)
 
     entry_widget = entry(
         frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
@@ -535,12 +646,15 @@ def path_entry(
     if validator:
         validator.set_widget(entry_widget)
         validator.setup_traces()
+        ui_state.register_validation_handler(f"{var_name}_model_validator", validator)  # register for debounce flushing
 
     original_destroy = entry_widget.destroy
 
     def new_destroy():
         if validator:
             validator.cleanup_traces()
+            ui_state.unregister_validation_handler(f"{var_name}_model_validator")
+        ui_state.unregister_validation_state(var_name)
         original_destroy()
 
     entry_widget.destroy = new_destroy

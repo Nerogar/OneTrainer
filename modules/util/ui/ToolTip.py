@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 
 import customtkinter as ctk
@@ -5,6 +7,7 @@ import customtkinter as ctk
 
 class ToolTip:
     MAX_TOOLTIP_LENGTH = 350
+    _active_tooltip: ToolTip | None = None # currently visible tooltip
 
     def __init__(self, widget, text='widget info', x_position=20, wide=False,
                  hover_only=True, track_movement=False):
@@ -53,8 +56,13 @@ class ToolTip:
         if text:
             self.text = text[:self.MAX_TOOLTIP_LENGTH] + ("..." if len(text) > self.MAX_TOOLTIP_LENGTH else "")
 
+        if ToolTip._active_tooltip is not None and ToolTip._active_tooltip is not self:
+            ToolTip._active_tooltip.hide()
+
         self._cancel_scheduled_hide()
         self.hide()
+
+        ToolTip._active_tooltip = self
 
         if self.track_movement and not self._bound:
             self._root = self.widget.winfo_toplevel()
@@ -133,6 +141,9 @@ class ToolTip:
         if self.tw and self.tw.winfo_exists():
             self.tw.destroy()
         self.tw = None
+
+        if ToolTip._active_tooltip is self:
+            ToolTip._active_tooltip = None
 
     def show_error(self, message: str, duration_ms: int | None = 7000):
         self.show(message, color="#ff6b6b", duration_ms=duration_ms)

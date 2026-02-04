@@ -233,3 +233,21 @@ class DebounceTimer:
 
         with contextlib.suppress(tk.TclError):
             self._after_id = self.widget.after(self.delay_ms, fire)
+
+    def cancel(self):
+        """Cancel any pending debounced callback."""
+        if self._after_id:
+            with contextlib.suppress(tk.TclError):
+                self.widget.after_cancel(self._after_id)
+            self._after_id = None
+
+    def flush(self):
+        """Execute any pending callback immediately and cancel the scheduled timer."""
+        if self._after_id:
+            with contextlib.suppress(tk.TclError):
+                self.widget.after_cancel(self._after_id)
+            after_id = self._after_id
+            self._after_id = None
+            # Only execute if pending callback
+            if after_id:
+                self.callback()

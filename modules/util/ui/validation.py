@@ -26,7 +26,7 @@ TRAILING_SLASH_RE = re.compile(r"[\\/]$")
 ENDS_WITH_EXT = re.compile(r"\.[A-Za-z0-9]+$")
 INVALID_NAMES = {"", "."}
 GENERIC_MODEL_NAMES = {"lora", "embedding", "embeddings", "model", "finetune"}
-
+TIMESTAMP_PATTERN = re.compile(r"[_-](\d{8}_\d{6}|\d{8})(?=[_.-]|$)")
 # org/repo-name (alphanumeric, hyphens, underscores, dots allowed)
 HUGGINGFACE_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$")
 
@@ -132,6 +132,14 @@ def _has_prefix(stem: str, prefix: str) -> bool:
     # Exact match or prefix followed by separator
     return (stem_lower == prefix_lower or
             stem_lower.startswith((f"{prefix_lower}-", f"{prefix_lower}_")))
+
+def _has_timestamp(stem: str) -> bool:
+    return bool(TIMESTAMP_PATTERN.search(stem))
+
+def _extension_is_substring(current_ext: str, required_ext: str) -> bool:
+    current_lower = current_ext.lower()
+    required_lower = required_ext.lower()
+    return current_lower != required_lower and required_lower.startswith(current_lower)
 
 def generate_default_filename(
     training_method: TrainingMethod,
@@ -305,6 +313,14 @@ def _validate_single_file_path(ctx: ValidationContext) -> ValidationResult:
         chars_after_dot = len(current_ext) - 1
         start_idx = ext_match.start()
 
+        # Check if current extension is a partial match of required (e.g., .safetensor vs .safetensors)
+        if _extension_is_substring(current_ext, required_ext):
+            if ctx.autocorrect:
+                new_base = base[:start_idx] + required_ext
+                new_path = _format_path(path.with_name(new_base), ctx.separator)
+                return _result(True, new_path, f"Completed {current_ext} -> {required_ext}")
+            return _result(False, None, f"Extension is incomplete; expected {required_ext}")
+
         if chars_after_dot >= 3:
             if _is_partial_match(current_ext, required_ext):
                 if ctx.autocorrect:
@@ -323,8 +339,10 @@ def _validate_single_file_path(ctx: ValidationContext) -> ValidationResult:
             return _result(False, None, f"Extension {current_ext} is too short; Type at least 3 characters for auto-correction to occur.")
 
         if ctx.autocorrect:
-            corrected = _format_path(Path(path.parent, base + required_ext), ctx.separator)
-            return _result(True, corrected, f"Appended {required_ext} extension.")
+            # Replace unrecognized extension with required
+            new_base = base[:start_idx] + required_ext
+            new_path = _format_path(path.with_name(new_base), ctx.separator)
+            return _result(True, new_path, f"Replaced {current_ext} with {required_ext}")
         return _result(False, None, f"Filename must end with {required_ext}")
 
     # No extension - append required extension

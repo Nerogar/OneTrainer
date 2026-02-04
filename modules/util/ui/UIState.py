@@ -13,6 +13,8 @@ class UIState:
     __vars: dict[str, Any]
     __var_traces: dict[str, dict[int, Callable[[], None]]]
     __latest_var_trace_id: int
+    __validation_states: dict[str, Any]  # Maps field names to ValidationState objects
+    __validation_handlers: dict[str, Any]  # Maps field names to validation handler objects with debounce timers
 
     def __init__(self, master, obj):
         self.master = master
@@ -21,6 +23,8 @@ class UIState:
         self.__var_types: dict[str, type] = {}
         self.__var_nullables: dict[str, bool] = {}
         self.__var_defaults: dict[str, Any] = {}
+        self.__validation_states = {}
+        self.__validation_handlers = {}
 
         self.__vars = self.__create_vars(obj)
         self.__var_traces = {name: {} for name in self.__vars}
@@ -311,3 +315,36 @@ class UIState:
             state.__var_nullables.get(leaf, False),
             state.__var_defaults.get(leaf, None),
         )
+
+    # validation state tracking
+    def register_validation_state(self, field_name: str, validation_state: Any) -> None:
+        if validation_state is not None:
+            self.__validation_states[field_name] = validation_state
+
+    def unregister_validation_state(self, field_name: str) -> None:
+        self.__validation_states.pop(field_name, None)
+
+    def get_invalid_fields(self) -> list[tuple[str, str]]:
+        return [
+            (name, getattr(s, 'message', 'Invalid value'))
+            for name, s in self.__validation_states.items()
+            if getattr(s, 'status', None) == 'error'
+        ]
+
+    # validation handler tracking (for flushing debounced validations)
+    def register_validation_handler(self, field_name: str, handler: Any) -> None:
+        if handler is not None:
+            self.__validation_handlers[field_name] = handler
+
+    def unregister_validation_handler(self, field_name: str) -> None:
+        self.__validation_handlers.pop(field_name, None)
+
+    def flush_all_validations(self) -> None:
+        """Flush all pending debounced validations to ensure validation state is current."""
+        for handler in self.__validation_handlers.values():
+            # Flush EntryValidationHandler debounce timers
+            if hasattr(handler, 'debounce_timer') and handler.debounce_timer:
+                handler.debounce_timer.flush()
+            # Flush ModelOutputValidator debounce timers
+            if hasattr(handler, '_debounce_timer') and handler._debounce_timer:
+                handler._debounce_timer.flush()
