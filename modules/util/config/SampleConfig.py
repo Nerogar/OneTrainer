@@ -4,6 +4,121 @@ from modules.util.config.BaseConfig import BaseConfig
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 
 
+def _get_model_defaults(model_type) -> dict:
+    """
+    Returns model-specific default values for sampling parameters.
+    Returns dict with keys: width, height, diffusion_steps, cfg_scale, noise_scheduler
+    """
+
+    defaults = {
+        "width": 512,
+        "height": 512,
+        "diffusion_steps": 30,
+        "cfg_scale": 7.0,
+        "noise_scheduler": NoiseScheduler.DDIM,
+    }
+
+    if model_type is None:
+        return defaults
+
+    if model_type.is_sd_v1():
+        defaults.update({
+            "width": 512,
+            "height": 512,
+            "diffusion_steps": 30,
+            "cfg_scale": 7.5,
+            "noise_scheduler": NoiseScheduler.EULER_A,
+        })
+    elif model_type.is_sd_v2():
+        defaults.update({
+            "width": 768,
+            "height": 768,
+            "diffusion_steps": 30,
+            "cfg_scale": 7.5,
+            "noise_scheduler": NoiseScheduler.DDIM,
+        })
+    elif model_type.is_stable_diffusion_xl():
+        defaults.update({
+            "width": 1024,
+            "height": 1024,
+            "diffusion_steps": 30,
+            "cfg_scale": 7.5,
+            "noise_scheduler": NoiseScheduler.EULER_A,
+        })
+    elif model_type.is_stable_diffusion_3():
+        defaults.update({
+            "width": 1024,
+            "height": 1024,
+            "diffusion_steps": 28,
+            "cfg_scale": 7.0,
+        })
+    elif model_type.is_flux_1() or model_type.is_chroma():
+        defaults.update({
+            "width": 1024,
+            "height": 1024,
+            "diffusion_steps": 30,
+            "cfg_scale": 3.5,
+        })
+    elif model_type.is_flux_2():
+        defaults.update({
+            "width": 1024,
+            "height": 1024,
+            "diffusion_steps": 30,
+            "cfg_scale": 4.0,
+        })
+    elif model_type.is_qwen():
+        defaults.update({
+            "width": 1024,
+            "height": 1024,
+            "diffusion_steps": 25,
+            "cfg_scale": 3.5,
+        })
+    elif model_type.is_z_image():
+        defaults.update({
+            "width": 1024,
+            "height": 1024,
+            "diffusion_steps": 28,
+            "cfg_scale": 4.0,
+        })
+    elif model_type.is_hunyuan_video():
+        defaults.update({
+            "width": 848,
+            "height": 480,
+            "diffusion_steps": 30,
+            "cfg_scale": 6.0,
+        })
+    elif model_type.is_sana():
+        defaults.update({
+            "width": 1024,
+            "height": 1024,
+            "diffusion_steps": 20,
+            "cfg_scale": 4.5,
+        })
+    elif model_type.is_hi_dream():
+        defaults.update({
+            "width": 1024,
+            "height": 1024,
+            "diffusion_steps": 28,
+            "cfg_scale": 5.0,
+        })
+    elif model_type.is_pixart():
+        defaults.update({
+            "width": 1024,
+            "height": 1024,
+            "diffusion_steps": 25,
+            "cfg_scale": 4.5,
+        })
+    elif model_type.is_wuerstchen():
+        defaults.update({
+            "width": 1024,
+            "height": 1024,
+            "diffusion_steps": 25,
+            "cfg_scale": 4.0,
+        })
+
+    return defaults
+
+
 class SampleConfig(BaseConfig):
     enabled: bool
     prompt: str
@@ -45,21 +160,22 @@ class SampleConfig(BaseConfig):
         self.force_last_timestep = train_config.rescale_noise_scheduler_to_zero_terminal_snr
 
     @staticmethod
-    def default_values():
+    def default_values(model_type=None):
+        defaults = _get_model_defaults(model_type)
         data = []
 
         data.append(("enabled", True, bool, False))
         data.append(("prompt", "", str, False))
         data.append(("negative_prompt", "", str, False))
-        data.append(("height", 512, int, False))
-        data.append(("width", 512, int, False))
+        data.append(("height", defaults["height"], int, False))
+        data.append(("width", defaults["width"], int, False))
         data.append(("frames", 1, int, False))
         data.append(("length", 10.0, float, False))
         data.append(("seed", 42, int, False))
         data.append(("random_seed", False, bool, False))
-        data.append(("diffusion_steps", 20, int, False))
-        data.append(("cfg_scale", 7.0, float, False))
-        data.append(("noise_scheduler", NoiseScheduler.DDIM, NoiseScheduler, False))
+        data.append(("diffusion_steps", defaults["diffusion_steps"], int, False))
+        data.append(("cfg_scale", defaults["cfg_scale"], float, False))
+        data.append(("noise_scheduler", defaults["noise_scheduler"], NoiseScheduler, False))
 
         data.append(("text_encoder_1_layer_skip", 0, int, False))
         data.append(("text_encoder_1_sequence_length", None, int, True))
