@@ -296,7 +296,7 @@ class GenericTrainer(BaseTrainer):
                 with open(self.config.sample_definition_file_name, 'r') as f:
                     samples = json.load(f)
                     for i in range(len(samples)):
-                        samples[i] = SampleConfig.default_values().from_dict(samples[i])
+                        samples[i] = SampleConfig.default_values(self.config.model_type).from_dict(samples[i])
                     sample_params_list = samples
             # We absolutely do not want to fail training just because the sample definition file becomes missing or broken right before sampling.
             except Exception:

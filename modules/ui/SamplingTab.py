@@ -29,10 +29,10 @@ class SamplingTab(ConfigList):
         return SampleWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 
     def create_new_element(self) -> dict:
-        return SampleConfig.default_values()
+        return SampleConfig.default_values(self.train_config.model_type)
 
     def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
-        return SampleParamsWindow(self.master, self.current_config[i], ui_state)
+        return SampleParamsWindow(self.master, self.current_config[i], ui_state, model_type=self.train_config.model_type)
 
 
 class SampleWidget(ctk.CTkFrame):
