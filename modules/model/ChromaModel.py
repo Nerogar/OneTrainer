@@ -268,8 +268,3 @@ class ChromaModel(BaseModel):
         latents = latents.reshape(batch_size, channels // (2 * 2), height * 2, width * 2)
 
         return latents
-
-
-from modules.util import factory
-
-factory.register(BaseModel, ChromaModel, ModelType.CHROMA_1)
