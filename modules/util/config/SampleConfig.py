@@ -16,6 +16,7 @@ def _get_model_defaults(model_type) -> dict:
         "diffusion_steps": 30,
         "cfg_scale": 7.0,
         "noise_scheduler": NoiseScheduler.DDIM,
+        "negative_prompt": "",
     }
 
     if model_type is None:
@@ -52,12 +53,24 @@ def _get_model_defaults(model_type) -> dict:
             "diffusion_steps": 28,
             "cfg_scale": 7.0,
         })
-    elif model_type.is_flux_1() or model_type.is_chroma():
+    elif model_type.is_flux_1():
         defaults.update({
             "width": 1024,
             "height": 1024,
             "diffusion_steps": 30,
             "cfg_scale": 3.5,
+        })
+    elif model_type.is_chroma():
+        defaults.update({
+            "width": 1024,
+            "height": 1024,
+            "diffusion_steps": 30,
+            "cfg_scale": 3.5,
+            "negative_prompt": (
+                "This low-quality, greyscale, unfinished sketch is inaccurate and flawed. "
+                "The image is very blurred and lacks detail, with excessive chromatic "
+                "aberrations and artifacts. The image is overly saturated with excessive bloom."
+            ),
         })
     elif model_type.is_flux_2():
         defaults.update({
@@ -166,7 +179,7 @@ class SampleConfig(BaseConfig):
 
         data.append(("enabled", True, bool, False))
         data.append(("prompt", "", str, False))
-        data.append(("negative_prompt", "", str, False))
+        data.append(("negative_prompt", defaults["negative_prompt"], str, False))
         data.append(("height", defaults["height"], int, False))
         data.append(("width", defaults["width"], int, False))
         data.append(("frames", 1, int, False))
