@@ -12,7 +12,7 @@ import webbrowser
 from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 
 import scripts.generate_debug_report
 from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
@@ -42,6 +42,7 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.ui import components
 from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
+from modules.util.ui.validation import flush_and_validate_all
 
 import torch
 
@@ -239,12 +240,12 @@ class TrainUI(ctk.CTk):
         # workspace dir
         components.label(frame, 0, 0, "Workspace Directory",
                          tooltip="The directory where all files of this training run are saved")
-        components.dir_entry(frame, 0, 1, self.ui_state, "workspace_dir", command=self._on_workspace_dir_change)
+        components.path_entry(frame, 0, 1, self.ui_state, "workspace_dir", mode="dir", command=self._on_workspace_dir_change)
 
         # cache dir
         components.label(frame, 0, 2, "Cache Directory",
                          tooltip="The directory where cached data is saved")
-        components.dir_entry(frame, 0, 3, self.ui_state, "cache_dir")
+        components.path_entry(frame, 0, 3, self.ui_state, "cache_dir", mode="dir")
 
         # continue from previous backup
         components.label(frame, 2, 0, "Continue from last backup",
@@ -256,6 +257,11 @@ class TrainUI(ctk.CTk):
                          tooltip="Only populate the cache, without any training")
         components.switch(frame, 2, 3, self.ui_state, "only_cache")
 
+        # prevent overwrites
+        components.label(frame, 3, 0, "Prevent Overwrites",
+                         tooltip="When enabled, output paths that already exist on disk will be flagged as invalid to avoid accidental overwrites")
+        components.switch(frame, 3, 1, self.ui_state, "prevent_overwrites")
+
         # debug
         components.label(frame, 4, 0, "Debug mode",
                          tooltip="Save debug information during the training into the debug directory")
@@ -263,7 +269,7 @@ class TrainUI(ctk.CTk):
 
         components.label(frame, 4, 2, "Debug Directory",
                          tooltip="The directory where debug data is saved")
-        components.dir_entry(frame, 4, 3, self.ui_state, "debug_dir")
+        components.path_entry(frame, 4, 3, self.ui_state, "debug_dir", mode="dir")
 
         # tensorboard
         components.label(frame, 6, 0, "Tensorboard",
@@ -479,9 +485,9 @@ class TrainUI(ctk.CTk):
         # lora model name
         components.label(frame, 0, 0, "LoRA base model",
                          tooltip="The base LoRA to train on. Leave empty to create a new LoRA")
-        components.file_entry(
+        components.path_entry(
             frame, 0, 1, self.ui_state, "lora_model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            mode="file", path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # lora rank
@@ -526,9 +532,9 @@ class TrainUI(ctk.CTk):
         # embedding model name
         components.label(frame, 0, 0, "Base embedding",
                          tooltip="The base embedding to train on. Leave empty to create a new embedding")
-        components.file_entry(
+        components.path_entry(
             frame, 0, 1, self.ui_state, "embedding.model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            mode="file", path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
         )
 
         # token count
@@ -784,6 +790,18 @@ class TrainUI(ctk.CTk):
     def start_training(self):
         if self.training_thread is None:
             self.save_default()
+
+            # --- pre-training validation gate ---
+            errors = flush_and_validate_all()
+
+            if errors:
+                messagebox.showerror(
+                    "Cannot Start Training",
+                    "Please fix the following errors before training:\n\n"
+                    + "\n".join(f"• {e}" for e in errors),
+                )
+                return
+
             self._set_training_button_running()
 
             if self.train_config.tensorboard and not self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
