@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from modules.util import create
 from modules.util.args.ConvertModelArgs import ConvertModelArgs
+from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
@@ -65,9 +66,11 @@ class ConvertModelUI(ctk.CTkToplevel):
             ("PixArt Sigma", ModelType.PIXART_SIGMA),
             ("Flux Dev", ModelType.FLUX_DEV_1),
             ("Flux Fill Dev", ModelType.FLUX_FILL_DEV_1),
+            ("Flux 2", ModelType.FLUX_2),
             ("Hunyuan Video", ModelType.HUNYUAN_VIDEO),
             ("Chroma1", ModelType.CHROMA_1), #TODO does this just work? HiDream is not here
             ("QwenImage", ModelType.QWEN), #TODO does this just work? HiDream is not here
+            ("ZImage", ModelType.Z_IMAGE),
         ], self.ui_state, "model_type")
 
         # training method
@@ -132,6 +135,7 @@ class ConvertModelUI(ctk.CTkToplevel):
                     ),
                     weight_dtypes=self.convert_model_args.weight_dtypes(),
                     #TODO quantization layer filter
+                    quantization=QuantizationConfig.default_values(),
                 )
             elif self.convert_model_args.training_method in [TrainingMethod.LORA, TrainingMethod.EMBEDDING]:
                 model = model_loader.load(
@@ -142,6 +146,7 @@ class ConvertModelUI(ctk.CTkToplevel):
                     ),
                     weight_dtypes=self.convert_model_args.weight_dtypes(),
                     #TODO quantization layer filter
+                    quantization=QuantizationConfig.default_values(),
                 )
             else:
                 raise Exception("could not load model: " + self.convert_model_args.input_name)
