@@ -633,6 +633,7 @@ class GenericTrainer(BaseTrainer):
         epochs = range(train_progress.epoch, self.config.epochs, 1)
 
         for _epoch in tqdm(epochs, desc="epoch") if multi.is_master() else epochs:
+            multi.sync_commands(self.commands)
             if self.commands.get_stop_command():
                 return
             self.callbacks.on_update_status("Starting epoch/caching")
