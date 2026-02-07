@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 import contextlib
+import os
+import re
+import sys
 import tkinter as tk
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
+
+from modules.util.enum.PathIOType import PathIOType
 
 if TYPE_CHECKING:
     from modules.util.ui.UIState import UIState
@@ -18,6 +25,108 @@ UNDO_DEBOUNCE_MS = 500
 ERROR_BORDER_COLOR = "#dc3545"
 
 _active_validators: set[FieldValidator] = set()
+
+TRAILING_SLASH_RE = re.compile(r"[\\/]$")
+ENDS_WITH_EXT = re.compile(r"\.[A-Za-z0-9]+$")
+HUGGINGFACE_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+
+_INVALID_CHARS = {chr(c) for c in range(32)}
+_IS_WINDOWS = sys.platform == "win32"
+if _IS_WINDOWS:
+    _INVALID_CHARS |= set('<>"|?*')
+
+_FORMAT_EXTENSIONS: dict[str, str] = {
+    "CKPT": ".ckpt",
+    "SAFETENSORS": ".safetensors",
+    "LEGACY_SAFETENSORS": ".safetensors",
+    "COMFY_LORA": ".safetensors",
+}
+
+
+def _is_huggingface_repo_or_file(value: str) -> bool:
+    trimmed = value.strip()
+
+    if trimmed.startswith("https://"):
+        parsed = urlparse(trimmed)
+        if parsed.netloc not in {"huggingface.co", "huggingface.com"}:
+            return False
+        parts = parsed.path.strip("/").split("/")
+        if len(parts) >= 5 and parts[2] in {"resolve", "blob"}:
+            return bool(ENDS_WITH_EXT.search(parts[-1]))
+        return False
+
+    if len(trimmed) > 96:
+        return False
+    if " " in trimmed or "\t" in trimmed:
+        return False
+    if "—" in trimmed or ".." in trimmed:
+        return False
+    if trimmed.startswith(("\\\\", "//", "/")):
+        return False
+    if len(trimmed) >= 2 and trimmed[1] == ":" and trimmed[0].isalpha():
+        return False
+    if trimmed.count("/") != 1:
+        return False
+
+    return bool(HUGGINGFACE_REPO_RE.match(trimmed))
+
+
+def _has_invalid_chars(value: str) -> bool:
+    return bool(_INVALID_CHARS.intersection(value))
+
+
+def _check_overwrite(path: str, *, is_dir: bool, prevent: bool) -> str | None:
+    if not prevent:
+        return None
+    abs_path = os.path.abspath(path)
+    if is_dir and os.path.isdir(abs_path):
+        return "Output folder already exists (overwrite prevented)"
+    if not is_dir and os.path.isfile(abs_path):
+        return "Output file already exists (overwrite prevented)"
+    return None
+
+
+def validate_path(
+    value: str,
+    io_type: PathIOType = PathIOType.INPUT,
+    *,
+    prevent_overwrites: bool = False,
+    output_format: str | None = None,
+) -> str | None:
+    """Return an error string if *value* is an invalid path, else ``None``."""
+    trimmed = value.strip()
+
+    if not trimmed:
+        return "Path is empty"
+    if TRAILING_SLASH_RE.search(trimmed):
+        return "Path must not end with a slash"
+    if _has_invalid_chars(trimmed):
+        return "Path contains invalid characters"
+
+    if io_type == PathIOType.INPUT and _is_huggingface_repo_or_file(trimmed):
+        return None
+
+    if io_type in (PathIOType.OUTPUT, PathIOType.MODEL):
+        if not os.path.isdir(os.path.dirname(os.path.abspath(trimmed))):
+            return "Parent folder does not exist"
+
+    if io_type == PathIOType.MODEL and output_format is not None:
+        if output_format == "DIFFUSERS":
+            if ENDS_WITH_EXT.search(trimmed):
+                return "Diffusers output must be a directory path, not a file"
+            return _check_overwrite(trimmed, is_dir=True, prevent=prevent_overwrites)
+
+        expected_ext = _FORMAT_EXTENSIONS.get(output_format, "")
+        if expected_ext:
+            suffix = (PureWindowsPath(trimmed) if _IS_WINDOWS else PurePosixPath(trimmed)).suffix.lower()
+            if suffix != expected_ext:
+                return f"Extension must be '{expected_ext}' for {output_format} format"
+        return _check_overwrite(trimmed, is_dir=False, prevent=prevent_overwrites)
+
+    if io_type == PathIOType.OUTPUT:
+        return _check_overwrite(trimmed, is_dir=False, prevent=prevent_overwrites)
+
+    return None
 
 DEFAULT_MAX_UNDO = 20
 
@@ -248,6 +357,48 @@ class FieldValidator:
         if next_val is not None:
             self._set_value(next_val)
         return "break"
+
+
+@dataclass
+class PathContext:
+    io_type: PathIOType = PathIOType.INPUT
+    prevent_overwrites_var: tk.BooleanVar | None = None
+    output_format_var: tk.StringVar | None = None
+
+
+class PathValidator(FieldValidator):
+    """FieldValidator with additional path-specific checks."""
+
+    def __init__(
+        self,
+        component: ctk.CTkEntry,
+        var: tk.Variable,
+        ui_state: UIState,
+        var_name: str,
+        path_ctx: PathContext | None = None,
+        max_undo: int = DEFAULT_MAX_UNDO,
+    ):
+        super().__init__(component, var, ui_state, var_name, max_undo=max_undo)
+        self.path_ctx = path_ctx or PathContext()
+
+    def validate(self, value: str) -> str | None:
+        base_err = super().validate(value)
+        if base_err is not None:
+            return base_err
+        if value == "":
+            return None
+
+        ctx = self.path_ctx
+        return validate_path(
+            value,
+            io_type=ctx.io_type,
+            prevent_overwrites=ctx.prevent_overwrites_var.get() if ctx.prevent_overwrites_var is not None else False,
+            output_format=ctx.output_format_var.get() if ctx.output_format_var is not None else None,
+        )
+
+    def revalidate(self) -> None:
+        if self.component.winfo_exists():
+            self._validate_and_style(self.var.get())
 
 
 def flush_and_validate_all() -> list[str]:

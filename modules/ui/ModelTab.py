@@ -5,6 +5,7 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
+from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -613,10 +614,19 @@ class ModelTab:
             allow_legacy_safetensors: bool = False,
             allow_comfy: bool = False,
     ) -> int:
+        prevent_overwrites_var = self.ui_state.get_var("prevent_overwrites")
+        output_format_var = self.ui_state.get_var("output_model_format")
+
         # output model destination
         components.label(frame, row, 0, "Model Output Destination",
                          tooltip="Filename or directory where the output model is saved")
-        components.path_entry(frame, row, 1, self.ui_state, "output_model_destination", mode="file", is_output=True)
+        dest_frame = components.path_entry(
+            frame, row, 1, self.ui_state, "output_model_destination",
+            mode="file",
+            io_type=PathIOType.MODEL,
+            prevent_overwrites_var=prevent_overwrites_var,
+            output_format_var=output_format_var,
+        )
 
         # output data type
         components.label(frame, row, 3, "Output Data Type",
@@ -645,6 +655,14 @@ class ModelTab:
         components.label(frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
         components.options_kv(frame, row, 1, formats, self.ui_state, "output_model_format")
+
+        path_validator = getattr(dest_frame, '_path_validator', None)
+        if path_validator is not None:
+            def _on_format_or_overwrite_change(*_args):
+                path_validator.revalidate()
+
+            output_format_var.trace_add("write", _on_format_or_overwrite_change)
+            prevent_overwrites_var.trace_add("write", _on_format_or_overwrite_change)
 
         # include config
         components.label(frame, row, 3, "Include Config",

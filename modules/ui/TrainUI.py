@@ -257,6 +257,11 @@ class TrainUI(ctk.CTk):
                          tooltip="Only populate the cache, without any training")
         components.switch(frame, 2, 3, self.ui_state, "only_cache")
 
+        # prevent overwrites
+        components.label(frame, 3, 0, "Prevent Overwrites",
+                         tooltip="When enabled, output paths that already exist on disk will be flagged as invalid to avoid accidental overwrites")
+        components.switch(frame, 3, 1, self.ui_state, "prevent_overwrites")
+
         # debug
         components.label(frame, 4, 0, "Debug mode",
                          tooltip="Save debug information during the training into the debug directory")

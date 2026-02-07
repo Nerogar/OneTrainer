@@ -1,12 +1,14 @@
+import tkinter as tk
 from collections.abc import Callable
 from tkinter import filedialog
 from typing import Any, Literal
 
+from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions
 from modules.util.ui.ToolTip import ToolTip
 from modules.util.ui.UIState import UIState
-from modules.util.ui.validation import FieldValidator
+from modules.util.ui.validation import FieldValidator, PathContext, PathValidator
 
 import customtkinter as ctk
 from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
@@ -50,6 +52,7 @@ def entry(
         width: int = 140,
         sticky: str = "new",
         max_undo: int | None = None,
+        validator_factory: Callable[..., FieldValidator] | None = None,
 ):
     var = ui_state.get_var(var_name)
     trace_id = None
@@ -60,8 +63,12 @@ def entry(
     component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky=sticky)
 
     undo_kwargs = {"max_undo": max_undo} if max_undo is not None else {}
-    validator = FieldValidator(component, var, ui_state, var_name, **undo_kwargs)
+    if validator_factory is not None:
+        validator = validator_factory(component, var, ui_state, var_name, **undo_kwargs)
+    else:
+        validator = FieldValidator(component, var, ui_state, var_name, **undo_kwargs)
     validator.attach()
+    component._validator = validator  # type: ignore[attr-defined]
 
     original_destroy = component.destroy
 
@@ -91,18 +98,35 @@ def path_entry(
         master, row, column, ui_state: UIState, var_name: str,
         *,
         mode: Literal["file", "dir"] = "file",
-        is_output: bool = False,
+        io_type: PathIOType = PathIOType.INPUT,
         path_modifier: Callable[[str], str] | None = None,
         allow_model_files: bool = True,
         allow_image_files: bool = False,
         command: Callable[[str], None] | None = None,
+        prevent_overwrites_var: tk.BooleanVar | None = None,
+        output_format_var: tk.StringVar | None = None,
 ):
+
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
     frame.grid_columnconfigure(0, weight=1)
 
-    entry(frame, row=0, column=0, ui_state=ui_state, var_name=var_name)
+    path_ctx = PathContext(
+        io_type=io_type,
+        prevent_overwrites_var=prevent_overwrites_var,
+        output_format_var=output_format_var,
+    )
+
+    def _path_validator_factory(comp, var, state, name, **kw):
+        return PathValidator(comp, var, state, name, path_ctx=path_ctx, **kw)
+
+    entry_component = entry(
+        frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
+        validator_factory=_path_validator_factory,
+    )
+
+    use_save_dialog = io_type in (PathIOType.OUTPUT, PathIOType.MODEL)
 
     def __open_dialog():
         if mode == "dir":
@@ -123,7 +147,7 @@ def path_entry(
                     ("Image", ' '.join([f"*.{x}" for x in supported_image_extensions()])),
                 ])
 
-            if is_output:
+            if use_save_dialog:
                 chosen = filedialog.asksaveasfilename(filetypes=filetypes)
             else:
                 chosen = filedialog.askopenfilename(filetypes=filetypes)
@@ -140,31 +164,9 @@ def path_entry(
     button_component = ctk.CTkButton(frame, text="...", width=40, command=__open_dialog)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
 
+    frame._path_validator = getattr(entry_component, '_validator', None)  # type: ignore[attr-defined]
+
     return frame
-
-
-# Keep backwards-compatible aliases so any not-yet-migrated callers still work
-def file_entry(
-        master, row, column, ui_state: UIState, var_name: str,
-        is_output: bool = False,
-        path_modifier: Callable[[str], str] | None = None,
-        allow_model_files: bool = True,
-        allow_image_files: bool = False,
-        command: Callable[[str], None] | None = None,
-):
-    return path_entry(
-        master, row, column, ui_state, var_name,
-        mode="file", is_output=is_output, path_modifier=path_modifier,
-        allow_model_files=allow_model_files, allow_image_files=allow_image_files,
-        command=command,
-    )
-
-
-def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Callable[[str], None] | None = None):
-    return path_entry(
-        master, row, column, ui_state, var_name,
-        mode="dir", command=command,
-    )
 
 
 def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_name, supports_time_units: bool = True):

@@ -7,6 +7,7 @@ from modules.util.args.ConvertModelArgs import ConvertModelArgs
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
+from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModelNames import EmbeddingName, ModelNames
 from modules.util.torch_util import torch_gc
@@ -107,7 +108,12 @@ class ConvertModelUI(ctk.CTkToplevel):
         # output model destination
         components.label(master, 5, 0, "Model Output Destination",
                          tooltip="Filename or directory where the output model is saved")
-        components.path_entry(master, 5, 1, self.ui_state, "output_model_destination", mode="file", is_output=True)
+        components.path_entry(
+            master, 5, 1, self.ui_state, "output_model_destination",
+            mode="file",
+            io_type=PathIOType.OUTPUT,
+            output_format_var=self.ui_state.get_var("output_model_format"),
+        )
 
         self.button = components.button(master, 6, 1, "Convert", self.convert_model)
 
