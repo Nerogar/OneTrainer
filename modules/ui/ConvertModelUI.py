@@ -140,6 +140,7 @@ class ConvertModelUI(ctk.CTkToplevel):
                 model = model_loader.load(
                     model_type=self.convert_model_args.model_type,
                     model_names=ModelNames(
+                        base_model=None,
                         lora=self.convert_model_args.input_name,
                         embedding=EmbeddingName(str(uuid4()), self.convert_model_args.input_name),
                     ),
