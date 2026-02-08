@@ -10,8 +10,8 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.image_util import load_image
 from modules.util.ui import components
-from modules.util.ui.validation import DebounceTimer
 from modules.util.ui.UIState import UIState
+from modules.util.ui.validation import DebounceTimer
 
 import customtkinter as ctk
 from PIL import Image
