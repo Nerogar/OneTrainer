@@ -134,7 +134,6 @@ class ConvertModelUI(ctk.CTkToplevel):
                         base_model=self.convert_model_args.input_name,
                     ),
                     weight_dtypes=self.convert_model_args.weight_dtypes(),
-                    #TODO quantization layer filter
                     quantization=QuantizationConfig.default_values(),
                 )
             elif self.convert_model_args.training_method in [TrainingMethod.LORA, TrainingMethod.EMBEDDING]:
@@ -145,7 +144,6 @@ class ConvertModelUI(ctk.CTkToplevel):
                         embedding=EmbeddingName(str(uuid4()), self.convert_model_args.input_name),
                     ),
                     weight_dtypes=self.convert_model_args.weight_dtypes(),
-                    #TODO quantization layer filter
                     quantization=QuantizationConfig.default_values(),
                 )
             else:
