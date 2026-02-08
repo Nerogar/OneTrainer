@@ -7,7 +7,6 @@ import sys
 import tkinter as tk
 from collections import deque
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
@@ -188,13 +187,6 @@ class DebounceTimer:
             self._after_id = None
 
 
-@dataclass
-class _ValidationState:
-    touched: bool = False
-    trace_name: str | None = None
-    bound: bool = False
-
-
 class FieldValidator:
     def __init__(
         self,
@@ -218,14 +210,21 @@ class FieldValidator:
         except Exception:
             self._original_border_color = "gray50"
 
-        self._state = _ValidationState()
+        self._shadow_var = tk.StringVar(master=component)
+        self._shadow_trace_name: str | None = None
+        self._real_var_trace_name: str | None = None
+        self._syncing = False
+        self._touched = False
+        self._bound = False
+
         self._debounce: DebounceTimer | None = None
         self._undo_debounce: DebounceTimer | None = None
         self._undo = UndoHistory(max_undo)
-        self._applying_undo = False
 
     def attach(self) -> None:
-        s = self._state
+        self._shadow_var.set(self.var.get())
+        self._swap_textvariable(self._shadow_var)
+
         self._debounce = DebounceTimer(
             self.component, DEBOUNCE_TYPING_MS, self._on_debounce_fire
         )
@@ -233,7 +232,8 @@ class FieldValidator:
             self.component, UNDO_DEBOUNCE_MS, self._push_undo_snapshot
         )
 
-        s.trace_name = self.var.trace_add("write", self._on_var_write)
+        self._shadow_trace_name = self._shadow_var.trace_add("write", self._on_shadow_write)
+        self._real_var_trace_name = self.var.trace_add("write", self._on_real_var_write)
 
         self.component.bind("<FocusIn>", self._on_focus_in)
         self.component.bind("<Key>", self._on_user_input)
@@ -246,26 +246,56 @@ class FieldValidator:
         self.component.bind("<Control-Shift-Z>", self._on_redo)
         self.component.bind("<Control-y>", self._on_redo)
         self.component.bind("<Control-Y>", self._on_redo)
+        self.component.bind("<Return>", self._on_enter)
 
-        s.bound = True
+        self._bound = True
         _active_validators.add(self)
 
     def detach(self) -> None:
-        s = self._state
-        if not s.bound:
+        if not self._bound:
             return
-        s.bound = False
+        self._bound = False
         _active_validators.discard(self)
+
+        self._commit()
 
         if self._debounce:
             self._debounce.cancel()
         if self._undo_debounce:
             self._undo_debounce.cancel()
 
-        if s.trace_name:
+        if self._shadow_trace_name:
             with contextlib.suppress(Exception):
-                self.var.trace_remove("write", s.trace_name)
-            s.trace_name = None
+                self._shadow_var.trace_remove("write", self._shadow_trace_name)
+            self._shadow_trace_name = None
+
+        if self._real_var_trace_name:
+            with contextlib.suppress(Exception):
+                self.var.trace_remove("write", self._real_var_trace_name)
+            self._real_var_trace_name = None
+
+        self._swap_textvariable(self.var)
+
+    def _swap_textvariable(self, new_var: tk.Variable) -> None:
+        comp = self.component
+        if comp._textvariable_callback_name:
+            with contextlib.suppress(Exception):
+                comp._textvariable.trace_remove("write", comp._textvariable_callback_name)  # type: ignore[union-attr]
+            comp._textvariable_callback_name = ""
+
+        comp.configure(textvariable=new_var)
+
+        if new_var is not None:
+            comp._textvariable_callback_name = new_var.trace_add(
+                "write", comp._textvariable_callback
+            )
+
+    def _commit(self) -> None:
+        shadow_val = self._shadow_var.get()
+        if shadow_val != self.var.get():
+            self._syncing = True
+            self.var.set(shadow_val)
+            self._syncing = False
 
     def validate(self, value: str) -> str | None:
         """Return an error string if *value* is invalid, else None."""
@@ -320,11 +350,12 @@ class FieldValidator:
             self._apply_error()
             return False
 
-    def _on_var_write(self, *_args) -> None:
-        if self._applying_undo:
+    def _on_shadow_write(self, *_args) -> None:
+        if self._syncing:
             return
-        s = self._state
-        if not s.touched:
+        if not self._touched:
+            # external sync or initial set — commit immediately
+            self._commit()
             if self._debounce:
                 self._debounce.cancel()
             return
@@ -333,34 +364,56 @@ class FieldValidator:
         if self._undo_debounce:
             self._undo_debounce.call()
 
+    def _on_real_var_write(self, *_args) -> None:
+        if self._syncing:
+            return
+        # external change (preset load, file dialog, etc) — sync to shadow var
+        self._syncing = True
+        self._shadow_var.set(self.var.get())
+        self._syncing = False
+        self._validate_and_style(self._shadow_var.get())
+
     def _push_undo_snapshot(self) -> None:
-        self._undo.push(self.var.get())
+        self._undo.push(self._shadow_var.get())
 
     def _on_debounce_fire(self) -> None:
-        self._validate_and_style(self.var.get())
+        val = self._shadow_var.get()
+        if self._validate_and_style(val):
+            self._commit()
 
     def _on_focus_in(self, _e=None) -> None:
-        self._state.touched = False
-        self._undo.push(self.var.get())
+        self._touched = False
+        self._undo.push(self._shadow_var.get())
 
     def _on_user_input(self, _e=None) -> None:
-        self._state.touched = True
+        self._touched = True
 
     def _on_focus_out(self, _e=None) -> None:
-        if self._state.touched:
-            self._validate_and_style(self.var.get())
+        if self._debounce:
+            self._debounce.cancel()
         if self._undo_debounce:
             self._undo_debounce.cancel()
-        self._undo.push(self.var.get())
+        if self._touched:
+            if self._validate_and_style(self._shadow_var.get()):
+                self._commit()
+        self._undo.push(self._shadow_var.get())
+
+    def _on_enter(self, _e=None) -> None:
+        if self._debounce:
+            self._debounce.cancel()
+        if self._touched:
+            if self._validate_and_style(self._shadow_var.get()):
+                self._commit()
 
     def _set_value(self, value: str) -> None:
-        self._applying_undo = True
-        self.var.set(value)
-        self._applying_undo = False
-        self._validate_and_style(value)
+        self._syncing = True
+        self._shadow_var.set(value)
+        self._syncing = False
+        if self._validate_and_style(value):
+            self._commit()
 
     def _on_undo(self, _e=None) -> str:
-        previous = self._undo.undo(self.var.get())
+        previous = self._undo.undo(self._shadow_var.get())
         if previous is not None:
             self._set_value(previous)
         return "break"
@@ -413,7 +466,7 @@ class PathValidator(FieldValidator):
 
     def revalidate(self) -> None:
         if self.component.winfo_exists():
-            self._validate_and_style(self.var.get())
+            self._validate_and_style(self._shadow_var.get())
 
 
 def flush_and_validate_all() -> list[str]:
@@ -423,7 +476,7 @@ def flush_and_validate_all() -> list[str]:
         if v._debounce:
             v._debounce.cancel()
 
-        value = v.var.get()
+        value = v._shadow_var.get()
         error = v.validate(value)
 
         if error is not None:
@@ -431,5 +484,6 @@ def flush_and_validate_all() -> list[str]:
             invalid.append(f"{v.var_name}: {error}")
         else:
             v._clear_error()
+            v._commit()
 
     return invalid
