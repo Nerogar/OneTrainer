@@ -614,18 +614,13 @@ class ModelTab:
             allow_legacy_safetensors: bool = False,
             allow_comfy: bool = False,
     ) -> int:
-        prevent_overwrites_var = self.ui_state.get_var("prevent_overwrites")
-        output_format_var = self.ui_state.get_var("output_model_format")
-
         # output model destination
         components.label(frame, row, 0, "Model Output Destination",
                          tooltip="Filename or directory where the output model is saved")
-        dest_frame = components.path_entry(
+        components.path_entry(
             frame, row, 1, self.ui_state, "output_model_destination",
             mode="file",
             io_type=PathIOType.MODEL,
-            prevent_overwrites_var=prevent_overwrites_var,
-            output_format_var=output_format_var,
         )
 
         # output data type
@@ -655,14 +650,6 @@ class ModelTab:
         components.label(frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
         components.options_kv(frame, row, 1, formats, self.ui_state, "output_model_format")
-
-        path_validator = getattr(dest_frame, '_path_validator', None)
-        if path_validator is not None:
-            def _on_format_or_overwrite_change(*_args):
-                path_validator.revalidate()
-
-            output_format_var.trace_add("write", _on_format_or_overwrite_change)
-            prevent_overwrites_var.trace_add("write", _on_format_or_overwrite_change)
 
         # include config
         components.label(frame, row, 3, "Include Config",

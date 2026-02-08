@@ -203,11 +203,15 @@ class FieldValidator:
         ui_state: UIState,
         var_name: str,
         max_undo: int = DEFAULT_MAX_UNDO,
+        extra_validate: Callable[[str], str | None] | None = None,
+        required: bool = False,
     ):
         self.component = component
         self.var = var
         self.ui_state = ui_state
         self.var_name = var_name
+        self._extra_validate = extra_validate
+        self._required = required
 
         try:
             self._original_border_color = component.cget("border_color")
@@ -271,6 +275,8 @@ class FieldValidator:
         default_val = meta.default
 
         if value == "":
+            if self._required:
+                return "Value required"
             if nullable:
                 return None
             if declared_type is str:
@@ -281,14 +287,21 @@ class FieldValidator:
 
         try:
             if declared_type is int:
-                int(value)
+                v = int(value)
+                if v < 0:
+                    return "Value must be non-negative"
             elif declared_type is float:
-                float(value)
+                v = float(value)
+                if v < 0:
+                    return "Value must be non-negative"
             elif declared_type is bool:
                 if value.lower() not in ("true", "false", "0", "1"):
                     return "Invalid bool"
         except ValueError:
             return "Invalid value"
+
+        if self._extra_validate is not None:
+            return self._extra_validate(value)
 
         return None
 
@@ -359,13 +372,6 @@ class FieldValidator:
         return "break"
 
 
-@dataclass
-class PathContext:
-    io_type: PathIOType = PathIOType.INPUT
-    prevent_overwrites_var: tk.BooleanVar | None = None
-    output_format_var: tk.StringVar | None = None
-
-
 class PathValidator(FieldValidator):
     """FieldValidator with additional path-specific checks."""
 
@@ -375,11 +381,19 @@ class PathValidator(FieldValidator):
         var: tk.Variable,
         ui_state: UIState,
         var_name: str,
-        path_ctx: PathContext | None = None,
+        io_type: PathIOType = PathIOType.INPUT,
         max_undo: int = DEFAULT_MAX_UNDO,
+        extra_validate: Callable[[str], str | None] | None = None,
+        required: bool = False,
     ):
-        super().__init__(component, var, ui_state, var_name, max_undo=max_undo)
-        self.path_ctx = path_ctx or PathContext()
+        super().__init__(component, var, ui_state, var_name, max_undo=max_undo, extra_validate=extra_validate, required=required)
+        self.io_type = io_type
+
+    def _get_var_safe(self, name: str) -> tk.Variable | None:
+        try:
+            return self.ui_state.get_var(name)
+        except (KeyError, AttributeError):
+            return None
 
     def validate(self, value: str) -> str | None:
         base_err = super().validate(value)
@@ -388,12 +402,13 @@ class PathValidator(FieldValidator):
         if value == "":
             return None
 
-        ctx = self.path_ctx
+        prevent_var = self._get_var_safe("prevent_overwrites")
+        format_var = self._get_var_safe("output_model_format")
         return validate_path(
             value,
-            io_type=ctx.io_type,
-            prevent_overwrites=ctx.prevent_overwrites_var.get() if ctx.prevent_overwrites_var is not None else False,
-            output_format=ctx.output_format_var.get() if ctx.output_format_var is not None else None,
+            io_type=self.io_type,
+            prevent_overwrites=prevent_var.get() if prevent_var is not None else False,
+            output_format=format_var.get() if format_var is not None else None,
         )
 
     def revalidate(self) -> None:

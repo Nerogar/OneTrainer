@@ -474,52 +474,52 @@ class TrainUI(ctk.CTk):
         frame.pack(fill="both", expand=1)
         return frame
 
-    def lora_tab(self, master):
-        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, weight=1)
-        frame.grid_columnconfigure(2, minsize=50)
-        frame.grid_columnconfigure(3, weight=0)
-        frame.grid_columnconfigure(4, weight=1)
+    # def lora_tab(self, master):
+    #     frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
+    #     frame.grid_columnconfigure(0, weight=0)
+    #     frame.grid_columnconfigure(1, weight=1)
+    #     frame.grid_columnconfigure(2, minsize=50)
+    #     frame.grid_columnconfigure(3, weight=0)
+    #     frame.grid_columnconfigure(4, weight=1)
 
-        # lora model name
-        components.label(frame, 0, 0, "LoRA base model",
-                         tooltip="The base LoRA to train on. Leave empty to create a new LoRA")
-        components.path_entry(
-            frame, 0, 1, self.ui_state, "lora_model_name",
-            mode="file", path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
-        )
+    #     # lora model name
+    #     components.label(frame, 0, 0, "LoRA base model",
+    #                      tooltip="The base LoRA to train on. Leave empty to create a new LoRA")
+    #     components.path_entry(
+    #         frame, 0, 1, self.ui_state, "lora_model_name",
+    #         mode="file", path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+    #     )
 
-        # lora rank
-        components.label(frame, 1, 0, "LoRA rank",
-                         tooltip="The rank parameter used when creating a new LoRA")
-        components.entry(frame, 1, 1, self.ui_state, "lora_rank")
+    #     # lora rank
+    #     components.label(frame, 1, 0, "LoRA rank",
+    #                      tooltip="The rank parameter used when creating a new LoRA")
+    #     components.entry(frame, 1, 1, self.ui_state, "lora_rank", required=True)
 
-        # lora rank
-        components.label(frame, 2, 0, "LoRA alpha",
-                         tooltip="The alpha parameter used when creating a new LoRA")
-        components.entry(frame, 2, 1, self.ui_state, "lora_alpha")
+    #     # lora alpha
+    #     components.label(frame, 2, 0, "LoRA alpha",
+    #                      tooltip="The alpha parameter used when creating a new LoRA")
+    #     components.entry(frame, 2, 1, self.ui_state, "lora_alpha", required=True)
 
-        # Dropout Percentage
-        components.label(frame, 3, 0, "Dropout Probability",
-                         tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
-        components.entry(frame, 3, 1, self.ui_state, "dropout_probability")
+    #     # Dropout Percentage
+    #     components.label(frame, 3, 0, "Dropout Probability",
+    #                      tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
+    #     components.entry(frame, 3, 1, self.ui_state, "dropout_probability")
 
-        # lora weight dtype
-        components.label(frame, 4, 0, "LoRA Weight Data Type",
-                         tooltip="The LoRA weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(frame, 4, 1, [
-            ("float32", DataType.FLOAT_32),
-            ("bfloat16", DataType.BFLOAT_16),
-        ], self.ui_state, "lora_weight_dtype")
+    #     # lora weight dtype
+    #     components.label(frame, 4, 0, "LoRA Weight Data Type",
+    #                      tooltip="The LoRA weight data type used for training. This can reduce memory consumption, but reduces precision")
+    #     components.options_kv(frame, 4, 1, [
+    #         ("float32", DataType.FLOAT_32),
+    #         ("bfloat16", DataType.BFLOAT_16),
+    #     ], self.ui_state, "lora_weight_dtype")
 
-        # For use with additional embeddings.
-        components.label(frame, 5, 0, "Bundle Embeddings",
-                         tooltip="Bundles any additional embeddings into the LoRA output file, rather than as separate files")
-        components.switch(frame, 5, 1, self.ui_state, "bundle_additional_embeddings")
+    #     # For use with additional embeddings.
+    #     components.label(frame, 5, 0, "Bundle Embeddings",
+    #                      tooltip="Bundles any additional embeddings into the LoRA output file, rather than as separate files")
+    #     components.switch(frame, 5, 1, self.ui_state, "bundle_additional_embeddings")
 
-        frame.pack(fill="both", expand=1)
-        return frame
+    #     frame.pack(fill="both", expand=1)
+    #     return frame
 
     def embedding_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")

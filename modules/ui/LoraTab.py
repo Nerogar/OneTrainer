@@ -5,6 +5,7 @@ from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import PeftType
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+from modules.util.ui.validation_helpers import check_range
 
 import customtkinter as ctk
 
@@ -89,12 +90,12 @@ class LoraTab:
             # rank
             components.label(master, 1, 0, f"{name} rank",
                             tooltip=f"The rank parameter used when creating a new {name}")
-            components.entry(master, 1, 1, self.ui_state, "lora_rank")
+            components.entry(master, 1, 1, self.ui_state, "lora_rank", required=True, extra_validate=check_range(lower=1, message="Rank must be at least 1"))
 
             # alpha
             components.label(master, 2, 0, f"{name} alpha",
                             tooltip=f"The alpha parameter used when creating a new {name}")
-            components.entry(master, 2, 1, self.ui_state, "lora_alpha")
+            components.entry(master, 2, 1, self.ui_state, "lora_alpha", required=True)
 
             # Dropout Percentage
             components.label(master, 3, 0, "Dropout Probability",
@@ -119,7 +120,7 @@ class LoraTab:
             # Block Size
             components.label(master, 1, 0, f"{name} Block Size",
                             tooltip=f"The block size parameter used when creating a new {name}")
-            components.entry(master, 1, 1, self.ui_state, "oft_block_size")
+            components.entry(master, 1, 1, self.ui_state, "oft_block_size", required=True)
 
             # COFT
             components.label(master, 1, 3, "Constrained OFT (COFT)",

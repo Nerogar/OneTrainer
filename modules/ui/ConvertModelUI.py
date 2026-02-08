@@ -111,8 +111,7 @@ class ConvertModelUI(ctk.CTkToplevel):
         components.path_entry(
             master, 5, 1, self.ui_state, "output_model_destination",
             mode="file",
-            io_type=PathIOType.OUTPUT,
-            output_format_var=self.ui_state.get_var("output_model_format"),
+            io_type=PathIOType.MODEL,
         )
 
         self.button = components.button(master, 6, 1, "Convert", self.convert_model)

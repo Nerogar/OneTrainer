@@ -1,3 +1,4 @@
+import contextlib
 import tkinter as tk
 from collections.abc import Callable
 from tkinter import filedialog
@@ -8,7 +9,7 @@ from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions
 from modules.util.ui.ToolTip import ToolTip
 from modules.util.ui.UIState import UIState
-from modules.util.ui.validation import FieldValidator, PathContext, PathValidator
+from modules.util.ui.validation import DEFAULT_MAX_UNDO, FieldValidator, PathValidator
 
 import customtkinter as ctk
 from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
@@ -53,6 +54,8 @@ def entry(
         sticky: str = "new",
         max_undo: int | None = None,
         validator_factory: Callable[..., FieldValidator] | None = None,
+        extra_validate: Callable[[str], str | None] | None = None,
+        required: bool = False,
 ):
     var = ui_state.get_var(var_name)
     trace_id = None
@@ -62,11 +65,20 @@ def entry(
     component = ctk.CTkEntry(master, textvariable=var, width=width)
     component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky=sticky)
 
-    undo_kwargs = {"max_undo": max_undo} if max_undo is not None else {}
     if validator_factory is not None:
-        validator = validator_factory(component, var, ui_state, var_name, **undo_kwargs)
+        validator = validator_factory(
+            component, var, ui_state, var_name,
+            max_undo=max_undo or DEFAULT_MAX_UNDO,
+            extra_validate=extra_validate,
+            required=required,
+        )
     else:
-        validator = FieldValidator(component, var, ui_state, var_name, **undo_kwargs)
+        validator = FieldValidator(
+            component, var, ui_state, var_name,
+            max_undo=max_undo or DEFAULT_MAX_UNDO,
+            extra_validate=extra_validate,
+            required=required,
+        )
     validator.attach()
     component._validator = validator  # type: ignore[attr-defined]
 
@@ -103,28 +115,31 @@ def path_entry(
         allow_model_files: bool = True,
         allow_image_files: bool = False,
         command: Callable[[str], None] | None = None,
-        prevent_overwrites_var: tk.BooleanVar | None = None,
-        output_format_var: tk.StringVar | None = None,
+        required: bool = False,
 ):
-
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
     frame.grid_columnconfigure(0, weight=1)
 
-    path_ctx = PathContext(
-        io_type=io_type,
-        prevent_overwrites_var=prevent_overwrites_var,
-        output_format_var=output_format_var,
-    )
-
     def _path_validator_factory(comp, var, state, name, **kw):
-        return PathValidator(comp, var, state, name, path_ctx=path_ctx, **kw)
+        return PathValidator(comp, var, state, name, io_type=io_type, **kw)
 
     entry_component = entry(
         frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
         validator_factory=_path_validator_factory,
+        required=required,
     )
+
+    trace_ids = []
+    if io_type in (PathIOType.OUTPUT, PathIOType.MODEL):
+        validator = getattr(entry_component, '_validator', None)
+        if validator is not None:
+            for dep_var_name in ("prevent_overwrites", "output_model_format"):
+                with contextlib.suppress(KeyError, AttributeError):
+                    dep_var = ui_state.get_var(dep_var_name)
+                    tid = dep_var.trace_add("write", lambda *_a: validator.revalidate())
+                    trace_ids.append((dep_var, tid))
 
     use_save_dialog = io_type in (PathIOType.OUTPUT, PathIOType.MODEL)
 
@@ -164,7 +179,14 @@ def path_entry(
     button_component = ctk.CTkButton(frame, text="...", width=40, command=__open_dialog)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
 
-    frame._path_validator = getattr(entry_component, '_validator', None)  # type: ignore[attr-defined]
+    if trace_ids:
+        original_frame_destroy = frame.destroy
+        def _frame_destroy():
+            for dep_var, tid in trace_ids:
+                with contextlib.suppress(tk.TclError, ValueError):
+                    dep_var.trace_remove("write", tid)
+            original_frame_destroy()
+        frame.destroy = _frame_destroy  # type: ignore[assignment]
 
     return frame
 
