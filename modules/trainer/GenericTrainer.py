@@ -183,17 +183,20 @@ class GenericTrainer(BaseTrainer):
         backup_dirpath = os.path.join(self.config.workspace_dir, "backup")
         if os.path.exists(backup_dirpath):
             backup_directories = sorted(
-                [dirpath for dirpath in os.listdir(backup_dirpath) if
-                 os.path.isdir(os.path.join(backup_dirpath, dirpath))],
+                [name for name in os.listdir(backup_dirpath) if
+                 os.path.isdir(os.path.join(backup_dirpath, name))],
+                key=lambda n: TrainConfig._extract_backup_datetime(
+                    os.path.join(backup_dirpath, n), n
+                ),
                 reverse=True,
             )
 
-            for dirpath in backup_directories[backups_to_keep:]:
-                dirpath = os.path.join(backup_dirpath, dirpath)
+            for name in backup_directories[backups_to_keep:]:
+                full = os.path.join(backup_dirpath, name)
                 try:
-                    shutil.rmtree(dirpath)
+                    shutil.rmtree(full)
                 except Exception:
-                    print(f"Could not delete old rolling backup {dirpath}")
+                    print(f"Could not delete old rolling backup {full}")
 
         return
 
@@ -431,7 +434,8 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("Creating backup")
 
-        backup_name = f"{get_string_timestamp()}-backup-{train_progress.filename_string()}"
+        safe_prefix = path_util.safe_filename(self.config.save_filename_prefix, max_length=None)
+        backup_name = f"{safe_prefix}{get_string_timestamp()}-backup-{train_progress.filename_string()}"
         backup_path = os.path.join(self.config.workspace_dir, "backup", backup_name)
 
         # Special case for schedule-free optimizers.
@@ -478,10 +482,11 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("Saving")
 
+        safe_prefix = path_util.safe_filename(self.config.save_filename_prefix, max_length=None)
         save_path = os.path.join(
             self.config.workspace_dir,
             "save",
-            f"{self.config.save_filename_prefix}{get_string_timestamp()}-save-{train_progress.filename_string()}{self.config.output_model_format.file_extension()}"
+            f"{safe_prefix}{get_string_timestamp()}-save-{train_progress.filename_string()}{self.config.output_model_format.file_extension()}"
         )
         if print_msg:
             print_cb("Saving " + save_path)
