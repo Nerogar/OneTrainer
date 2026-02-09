@@ -100,23 +100,23 @@ class SampleFrame(ctk.CTkFrame):
             components.label(bottom_frame, 4, 0, "steps:")
             components.entry(bottom_frame, 4, 1, self.ui_state, "diffusion_steps")
 
-            # inpainting
-            components.label(bottom_frame, 5, 0, "inpainting:",
-                             tooltip="Enables inpainting sampling. Only available when sampling from an inpainting model.")
-            components.switch(bottom_frame, 5, 1, self.ui_state, "sample_inpainting")
-
             # base image path
-            components.label(bottom_frame, 6, 0, "base image path:",
-                             tooltip="The base image used when inpainting.")
-            components.file_entry(bottom_frame, 6, 1, self.ui_state, "base_image_path",
+            components.label(bottom_frame, 5, 0, "base image path:",
+                             tooltip="The image used for inpainting and as reference image for edit models.")
+            components.file_entry(bottom_frame, 5, 1, self.ui_state, "base_image_path",
                                   allow_model_files=False,
                                   allow_image_files=True,
                                   )
 
             # mask image path
-            components.label(bottom_frame, 6, 2, "mask image path:",
+            components.label(bottom_frame, 5, 2, "mask image path:",
                              tooltip="The mask used when inpainting.")
-            components.file_entry(bottom_frame, 6, 3, self.ui_state, "mask_image_path",
+            components.file_entry(bottom_frame, 5, 3, self.ui_state, "mask_image_path",
                                   allow_model_files=False,
                                   allow_image_files=True,
                                   )
+
+            # inpainting
+            components.label(bottom_frame, 6, 0, "inpainting:",
+                             tooltip="Enables inpainting sampling. Only available when sampling from an inpainting model.")
+            components.switch(bottom_frame, 6, 1, self.ui_state, "sample_inpainting")

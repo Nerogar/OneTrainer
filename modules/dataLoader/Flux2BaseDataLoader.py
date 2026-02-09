@@ -35,9 +35,12 @@ class Flux2BaseDataLoader(
 ):
     def _preparation_modules(self, config: TrainConfig, model: Flux2Model):
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
+        rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
+        encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
         if model.is_dev():
             tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=config.text_encoder_sequence_length,
                                         apply_chat_template = lambda caption: mistral_format_input([caption], MISTRAL_SYSTEM_MESSAGE), apply_chat_template_kwargs = {'add_generation_prompt': False},
@@ -60,6 +63,8 @@ class Flux2BaseDataLoader(
         modules = [rescale_image, encode_image, image_sample]
         if config.masked_training or config.model_type.has_mask_input():
             modules.append(downscale_mask)
+        if config.custom_conditioning_image:
+            modules += [rescale_conditioning_image, encode_conditioning_image, conditioning_image_sample]
 
         modules += [tokenize_prompt, encode_prompt]
         return modules
@@ -69,6 +74,8 @@ class Flux2BaseDataLoader(
 
         if config.masked_training or config.model_type.has_mask_input():
             image_split_names.append('latent_mask')
+        if config.custom_conditioning_image:
+            image_split_names.append('latent_conditioning_image')
 
         image_aggregate_names = ['crop_resolution', 'image_path']
 
@@ -102,6 +109,8 @@ class Flux2BaseDataLoader(
 
         if config.masked_training or config.model_type.has_mask_input():
             output_names.append('latent_mask')
+        if config.custom_conditioning_image:
+            output_names.append('latent_conditioning_image')
 
         output_names.append('text_encoder_hidden_state')
 
@@ -122,9 +131,11 @@ class Flux2BaseDataLoader(
             model.vae_to(self.train_device)
 
         decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        decode_conditioning_image = DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         upscale_mask = ScaleImage(in_name='latent_mask', out_name='decoded_mask', factor=8)
         decode_prompt = DecodeTokens(in_name='tokens', out_name='decoded_prompt', tokenizer=model.tokenizer)
         save_image = SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1, before_save_fun=before_save_fun)
+        save_conditioning_image = SaveImage(image_in_name='decoded_conditioning_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1, before_save_fun=before_save_fun)
         # SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1, before_save_fun=before_save_fun)
         save_mask = SaveImage(image_in_name='decoded_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1, before_save_fun=before_save_fun)
         save_prompt = SaveText(text_in_name='decoded_prompt', original_path_in_name='image_path', path=debug_dir, before_save_fun=before_save_fun)
@@ -139,8 +150,9 @@ class Flux2BaseDataLoader(
         modules.append(save_image)
 
         if config.masked_training or config.model_type.has_mask_input():
-            modules.append(upscale_mask)
-            modules.append(save_mask)
+            modules += [upscale_mask, save_mask]
+        if config.custom_conditioning_image:
+            modules += [decode_conditioning_image, save_conditioning_image]
 
         modules.append(decode_prompt)
         modules.append(save_prompt)

@@ -117,7 +117,8 @@ class ModelType(Enum):
         return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \
             or self == ModelType.STABLE_DIFFUSION_20_INPAINTING \
             or self == ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING \
-            or self == ModelType.FLUX_FILL_DEV_1
+            or self == ModelType.FLUX_FILL_DEV_1 \
+            or self == ModelType.FLUX_2
 
     def has_depth_input(self):
         return self == ModelType.STABLE_DIFFUSION_20_DEPTH

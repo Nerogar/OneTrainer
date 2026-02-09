@@ -74,8 +74,13 @@ class BaseModelSampler(metaclass=ABCMeta):
         pass
 
     @staticmethod
-    def quantize_resolution(resolution: int, quantization: int) -> int:
-        return round(resolution / quantization) * quantization
+    def quantize_resolution(resolution: int, quantization: int, mode: str='round') -> int:
+        if mode == 'round':
+            return round(resolution / quantization) * quantization
+        elif mode == 'floor':
+            return (resolution // quantization) * quantization
+        else:
+            raise RuntimeError
 
     @staticmethod
     def save_sampler_output(
