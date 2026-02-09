@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     import customtkinter as ctk
 
 
-DEBOUNCE_TYPING_MS = 250
+DEBOUNCE_TYPING_MS = 500
 UNDO_DEBOUNCE_MS = 500
 ERROR_BORDER_COLOR = "#dc3545"
 
@@ -412,6 +412,8 @@ class FieldValidator:
             if declared_type in (int, float):
                 if declared_type(value) < 0:
                     return "Value must be non-negative"
+                if self._required and declared_type is int and int(value) == 0:
+                    return "Value must be greater than zero"
             elif declared_type is bool:
                 if value.lower() not in ("true", "false", "0", "1"):
                     return "Invalid bool"

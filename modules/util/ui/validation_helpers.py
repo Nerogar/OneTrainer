@@ -11,8 +11,7 @@ def check_range(
     upper_inclusive: bool = True,
     message: str | None = None,
 ) -> Callable[[str], str | None]:
-    """Validate that a numeric value falls within specified range, by default both bounds are inclusive.
-    """
+    """Validate that a numeric value falls within specified range, by default both bounds are inclusive."""
 
     def _check(value: str) -> str | None:
         try:

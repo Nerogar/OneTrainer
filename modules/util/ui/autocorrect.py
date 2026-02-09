@@ -1,3 +1,4 @@
+import contextlib
 import os
 import re
 import sys
@@ -19,8 +20,11 @@ _INVISIBLE_UNICODE_CHARS_RE = re.compile(
     "]"
 )
 _CONSECUTIVE_WHITESPACE_RE = re.compile(r"[ \t]+")
-_NUMERIC_SEPARATOR_RE = re.compile(r"[_,]")
+_NUMERIC_SEPARATOR_RE = re.compile(r"[_,\u066b]")
 _NON_FLOAT_NOTATION_CHARS_RE = re.compile(r"[^0-9eE.\-]")
+# Natch one decimal separator: period, comma, or Arabic momayyez (٫)
+_ANY_DECIMAL_RE = re.compile(r"^(-?\d+)[.,\u066b](\d*)$")
+_FOREIGN_DECIMAL_RE = re.compile(r"^(-?\d+)[,\u066b](\d+)$")
 _WINDOWS_DRIVE_PREFIX_RE = re.compile(r"^[A-Za-z]:[/\\]")
 _FILE_EXTENSION_SUFFIX_RE = re.compile(r"\.[A-Za-z0-9]+$")
 
@@ -62,7 +66,21 @@ def autocorrect_int(value: str) -> str:
     result = value.strip()
     if result.startswith("+") and len(result) > 1:
         result = result[1:]
-    result = _NUMERIC_SEPARATOR_RE.sub("", result)
+    result = result.replace("_", "")
+    # strip spaces between digits
+    result = re.sub(r"(?<=\d) +(?=\d)", "", result)
+    # if the value is only digits + exactly one decimal separator (. , ٫), round.
+    m = _ANY_DECIMAL_RE.match(result)
+    if m:
+        # Exactly 3 digits after the separator ⇒ thousand separator, not decimal
+        if len(m.group(2)) == 3:
+            result = m.group(1) + m.group(2)
+        else:
+            normalized = m.group(1) + "." + m.group(2)
+            with contextlib.suppress(ValueError):
+                result = str(round(float(normalized)))
+    else:
+        result = _NUMERIC_SEPARATOR_RE.sub("", result)
     return result
 
 
@@ -80,7 +98,10 @@ def autocorrect_float(value: str, *, is_learning_rate: bool = False) -> str:
     if result.startswith("+") and len(result) > 1:
         result = result[1:]
 
-    result = _NUMERIC_SEPARATOR_RE.sub("", result)
+    result = result.replace("_", "")
+    # Coerce a foreign decimal separator (comma, Arabic ٫) into a period
+    m = _FOREIGN_DECIMAL_RE.match(result)
+    result = m.group(1) + "." + m.group(2) if m else _NUMERIC_SEPARATOR_RE.sub("", result)
 
     if result.startswith("."):
         result = "0" + result
