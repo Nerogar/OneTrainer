@@ -35,7 +35,7 @@ class ZImageLoRASetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        self._create_model_part_parameters(parameter_group_collection, "transformer_lora", model.transformer_lora, config.transformer)
+        self._create_model_part_parameters(parameter_group_collection, "transformer", model.transformer_lora, config.transformer)
         return parameter_group_collection
 
     def __setup_requires_grad(
@@ -47,7 +47,7 @@ class ZImageLoRASetup(
         model.transformer.requires_grad_(False)
         model.vae.requires_grad_(False)
 
-        self._setup_model_part_requires_grad("transformer_lora", model.transformer_lora, config.transformer, model.train_progress)
+        self._setup_model_part_requires_grad("transformer", model.transformer_lora, config.transformer, model.train_progress)
 
     def setup_model(
             self,
@@ -55,7 +55,7 @@ class ZImageLoRASetup(
             config: TrainConfig,
     ):
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "diffusion_model", config, config.layer_filter.split(",") #FIXME https://github.com/comfyanonymous/ComfyUI/pull/11135
+            model.transformer, "transformer", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:

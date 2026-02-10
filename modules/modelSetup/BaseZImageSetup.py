@@ -11,7 +11,7 @@ from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowM
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.util.checkpointing_util import (
-    enable_checkpointing_for_qwen25vl_encoder_layers,
+    enable_checkpointing_for_qwen3_encoder_layers,
     enable_checkpointing_for_z_image_transformer,
 )
 from modules.util.config.TrainConfig import TrainConfig
@@ -52,7 +52,7 @@ class BaseZImageSetup(
                 enable_checkpointing_for_z_image_transformer(model.transformer, config)
             if model.text_encoder is not None:
                 model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_qwen25vl_encoder_layers(model.text_encoder, config)
+                    enable_checkpointing_for_qwen3_encoder_layers(model.text_encoder, config)
 
         if config.force_circular_padding:
             raise NotImplementedError #TODO applies to Z-Image?

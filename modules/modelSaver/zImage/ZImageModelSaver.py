@@ -58,6 +58,8 @@ class ZImageModelSaver(
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
 
+        print("Warning: Comfy can only load their own incompatible format of Z-Image full finetunes. To use this file in Comfy, it can be converted using https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/z_image_convert_original_to_comfy.py")
+
         save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
 
     def __save_internal(
