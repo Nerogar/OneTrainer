@@ -10,6 +10,7 @@ from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2Im
 from modules.util import path_util
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
+from modules.util.enum.ImagePreprocessing import ImagePreprocessing
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
@@ -155,59 +156,53 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
 
     def _aspect_bucketing_in(self, config: TrainConfig, aspect_bucketing_quantization: int, frame_dim_enabled:bool=False):
         calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
+
+        aspect_bucketing = AspectBucketing(
+            quantization=aspect_bucketing_quantization,
+            resolution_in_name='original_resolution',
+            target_resolution_in_name='settings.target_resolution',
+            enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
+            target_resolutions_override_in_name='concept.image.resolution_override',
+            target_frames_in_name='settings.target_frames',
+            frame_dim_enabled=frame_dim_enabled,
+            scale_resolution_out_name='scale_resolution',
+            crop_resolution_out_name='crop_resolution',
+            possible_resolutions_out_name='possible_resolutions'
+        )
+
+        single_aspect_calculation = SingleAspectCalculation(
+            resolution_in_name='original_resolution',
+            target_resolution_in_name='settings.target_resolution',
+            enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
+            target_resolutions_override_in_name='concept.image.resolution_override',
+            scale_resolution_out_name='scale_resolution',
+            crop_resolution_out_name='crop_resolution',
+            possible_resolutions_out_name='possible_resolutions'
+        )
+
+        quantize_resolution = QuantizeResolution(
+            quantization=aspect_bucketing_quantization,
+            resolution_in_name='original_resolution',
+            scale_resolution_out_name='scale_resolution',
+            crop_resolution_out_name='crop_resolution',
+            possible_resolutions_out_name='possible_resolutions'
+        )
+
+        pad_image = PadImage(name='image', target_resolution_in_name='scale_resolution')
+        pad_mask = PadImage(name='mask', target_resolution_in_name='scale_resolution', padding_mode='constant', quantization=8)
+
         modules: list = [calc_aspect]
 
-        if config.keep_image_size:
-            quantize_resolution = QuantizeResolution(
-                quantization=aspect_bucketing_quantization,
-                resolution_in_name='original_resolution',
-                scale_resolution_out_name='scale_resolution',
-                crop_resolution_out_name='crop_resolution',
-                possible_resolutions_out_name='possible_resolutions'
-            )
+        match config.image_preprocessing:
+            case ImagePreprocessing.ASPECT_RATIO_BUCKETING:
+                modules.append(aspect_bucketing)
+            case ImagePreprocessing.SQUARE_CENTER_CROP:
+                modules.append(single_aspect_calculation)
+            case ImagePreprocessing.ORIGINAL_SIZE:
+                modules.extend([quantize_resolution, pad_image])
 
-            pad_image = PadImage(
-                name='image',
-                target_resolution_in_name='scale_resolution',
-            )
-
-            pad_mask = PadImage(
-                name='mask',
-                target_resolution_in_name='scale_resolution',
-                padding_mode='constant',
-                quantization=8
-            )
-
-            modules.append(quantize_resolution)
-            modules.append(pad_image)
-
-            if config.masked_training or config.model_type.has_mask_input():
-                modules.append(pad_mask)
-
-        elif config.aspect_ratio_bucketing:
-            modules.append(AspectBucketing(
-                quantization=aspect_bucketing_quantization,
-                resolution_in_name='original_resolution',
-                target_resolution_in_name='settings.target_resolution',
-                enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
-                target_resolutions_override_in_name='concept.image.resolution_override',
-                target_frames_in_name='settings.target_frames',
-                frame_dim_enabled=frame_dim_enabled,
-                scale_resolution_out_name='scale_resolution',
-                crop_resolution_out_name='crop_resolution',
-                possible_resolutions_out_name='possible_resolutions'
-            ))
-
-        else:
-            modules.append(SingleAspectCalculation(
-                resolution_in_name='original_resolution',
-                target_resolution_in_name='settings.target_resolution',
-                enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
-                target_resolutions_override_in_name='concept.image.resolution_override',
-                scale_resolution_out_name='scale_resolution',
-                crop_resolution_out_name='crop_resolution',
-                possible_resolutions_out_name='possible_resolutions'
-            ))
+                if config.masked_training or config.model_type.has_mask_input():
+                    modules.append(pad_mask)
 
         return modules
 
