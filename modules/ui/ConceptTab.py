@@ -257,6 +257,8 @@ class ConceptWidget(ctk.CTkFrame):
         concept_path = ConceptWindow.get_concept_path(getattr(self.concept, 'path', None))
         if concept_path:
             for path in pathlib.Path(concept_path).glob(glob_pattern):
+                if any(part.startswith('.') for part in path.relative_to(concept_path).parts):
+                    continue
                 extension = os.path.splitext(path)[1]
                 if (path.is_file()
                         and path_util.is_supported_image_extension(extension)
