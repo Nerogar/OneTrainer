@@ -1,6 +1,10 @@
 from modules.model.FluxModel import FluxModel
 from modules.modelSetup.BaseFluxSetup import BaseFluxSetup
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
@@ -135,3 +139,6 @@ class FluxFineTuneSetup(
             if model.embedding_wrapper_2 is not None:
                 model.embedding_wrapper_2.normalize_embeddings()
         self.__setup_requires_grad(model, config)
+
+factory.register(BaseModelSetup, FluxFineTuneSetup, ModelType.FLUX_DEV_1, TrainingMethod.FINE_TUNE)
+factory.register(BaseModelSetup, FluxFineTuneSetup, ModelType.FLUX_FILL_DEV_1, TrainingMethod.FINE_TUNE)

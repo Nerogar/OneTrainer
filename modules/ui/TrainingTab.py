@@ -1,19 +1,8 @@
-from modules.modelSetup.BaseChromaSetup import PRESETS as chroma_presets
-from modules.modelSetup.BaseFluxSetup import PRESETS as flux_presets
-from modules.modelSetup.BaseHiDreamSetup import PRESETS as hidream_presets
-from modules.modelSetup.BaseHunyuanVideoSetup import PRESETS as hunyuan_video_presets
-from modules.modelSetup.BasePixArtAlphaSetup import PRESETS as pixart_presets
-from modules.modelSetup.BaseQwenSetup import PRESETS as qwen_presets
-from modules.modelSetup.BaseSanaSetup import PRESETS as sana_presets
-from modules.modelSetup.BaseStableDiffusion3Setup import PRESETS as sd3_presets
-from modules.modelSetup.BaseStableDiffusionSetup import PRESETS as sd_presets
-from modules.modelSetup.BaseStableDiffusionXLSetup import PRESETS as sdxl_presets
-from modules.modelSetup.BaseWuerstchenSetup import PRESETS as sc_presets
-from modules.modelSetup.BaseZImageSetup import PRESETS as z_image_presets
 from modules.ui.OffloadingWindow import OffloadingWindow
 from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
 from modules.ui.SchedulerParamsWindow import SchedulerParamsWindow
 from modules.ui.TimestepDistributionWindow import TimestepDistributionWindow
+from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
@@ -80,8 +69,10 @@ class TrainingTab:
             self.__setup_wuerstchen_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_pixart():
             self.__setup_pixart_alpha_ui(column_0, column_1, column_2)
-        elif self.train_config.model_type.is_flux():
+        elif self.train_config.model_type.is_flux_1():
             self.__setup_flux_ui(column_0, column_1, column_2)
+        elif self.train_config.model_type.is_flux_2():
+            self.__setup_flux_2_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_chroma():
             self.__setup_chroma_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_qwen():
@@ -172,6 +163,18 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True)
+        self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
+
+        self.__create_masked_frame(column_2, 1)
+        self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
+
+    def __setup_flux_2_ui(self, column_0, column_1, column_2):
+        self.__create_base_frame(column_0, 0)
+        self.__create_text_encoder_frame(column_0, 1, supports_clip_skip=False, supports_training=False, supports_sequence_length=True)
+
+        self.__create_base2_frame(column_1, 0)
+        self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True, supports_force_attention_mask=False)
         self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1)
@@ -411,12 +414,11 @@ class TrainingTab:
                          tooltip="Enables circular padding for all conv layers to better train seamless images")
         components.switch(frame, row, 1, self.ui_state, "force_circular_padding")
 
-    def __create_text_encoder_frame(self, master, row, supports_clip_skip=True, supports_training=True):
+    def __create_text_encoder_frame(self, master, row, supports_clip_skip=True, supports_training=True, supports_sequence_length=False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
 
-        # train text encoder
         if supports_training:
             components.label(frame, 0, 0, "Train Text Encoder",
                              tooltip="Enables training the text encoder model")
@@ -444,6 +446,13 @@ class TrainingTab:
             components.label(frame, 4, 0, "Clip Skip",
                              tooltip="The number of additional clip layers to skip. 0 = the model default")
             components.entry(frame, 4, 1, self.ui_state, "text_encoder_layer_skip")
+
+        if supports_sequence_length:
+            # text encoder sequence length
+            components.label(frame, row, 0, "Text Encoder Sequence Length",
+                             tooltip="Number of tokens for captions")
+            components.entry(frame, row, 1, self.ui_state, "text_encoder_sequence_length")
+            row += 1
 
     def __create_text_encoder_n_frame(
             self,
@@ -665,7 +674,7 @@ class TrainingTab:
         if supports_dynamic_timestep_shifting:
             # dynamic timestep shifting
             components.label(frame, 9, 0, "Dynamic Timestep Shifting",
-                             tooltip="Dynamically shift the timestep distribution based on resolution.")
+                             tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. Note: For Z-Image and Flux2, the dynamic shifting parameters are likely wrong and unknown. Use with care or set your own, fixed shift.", wide_tooltip=True)
             components.switch(frame, 9, 1, self.ui_state, "dynamic_timestep_shifting")
 
 
@@ -766,33 +775,8 @@ class TrainingTab:
         row += 1
 
     def __create_layer_frame(self, master, row):
-        presets = []
-        if self.train_config.model_type.is_stable_diffusion(): #TODO simplify
-            presets = sd_presets
-        elif self.train_config.model_type.is_stable_diffusion_xl():
-            presets = sdxl_presets
-        elif self.train_config.model_type.is_stable_diffusion_3():
-            presets = sd3_presets
-        elif self.train_config.model_type.is_wuerstchen():
-            presets = sc_presets
-        elif self.train_config.model_type.is_pixart():
-            presets = pixart_presets
-        elif self.train_config.model_type.is_flux():
-            presets = flux_presets
-        elif self.train_config.model_type.is_qwen():
-            presets = qwen_presets
-        elif self.train_config.model_type.is_chroma():
-            presets = chroma_presets
-        elif self.train_config.model_type.is_sana():
-            presets = sana_presets
-        elif self.train_config.model_type.is_hunyuan_video():
-            presets = hunyuan_video_presets
-        elif self.train_config.model_type.is_hi_dream():
-            presets = hidream_presets
-        elif self.train_config.model_type.is_z_image():
-            presets = z_image_presets
-        else:
-            presets = {"full": []}
+        cls = create.get_model_setup_class(self.train_config.model_type, self.train_config.training_method)
+        presets = cls.LAYER_PRESETS if cls is not None else {"full": []}
         components.layer_filter_entry(master, row, 0, self.ui_state,
             preset_var_name="layer_filter_preset", presets=presets,
             preset_label="Layer Filter",

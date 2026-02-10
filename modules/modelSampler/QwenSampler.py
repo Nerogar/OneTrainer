@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 from modules.model.QwenModel import QwenModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
@@ -97,9 +98,6 @@ class QwenSampler(BaseModelSampler):
             if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
                 extra_step_kwargs["generator"] = generator #TODO purpose?
 
-            #txt_seq_lens = text_attention_mask.sum(dim=1).tolist()
-            txt_seq_lens = [text_attention_mask.shape[1]] * text_attention_mask.shape[0]
-
             #FIXME list of lists is not according to type hint, but according to diffusers code
             #https://github.com/huggingface/diffusers/issues/12295
             img_shapes = [[(
@@ -108,14 +106,10 @@ class QwenSampler(BaseModelSampler):
                 width // vae_scale_factor // 2)
             ]] * batch_size
 
+            if torch.all(text_attention_mask):
+                text_attention_mask = None
+
             self.model.transformer_to(self.train_device)
-
-            #FIXME bug workaround for https://github.com/huggingface/diffusers/issues/12294
-            image_seq_len = latent_image.shape[1]
-            image_attention_mask=torch.ones((batch_size, image_seq_len), dtype=torch.bool, device=latent_image.device)
-            attention_mask = torch.cat([text_attention_mask, image_attention_mask], dim=1)
-            attention_mask_2d = attention_mask[:, None, None, :] * attention_mask[:, None, :, None]
-
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 latent_model_input = torch.cat([latent_image] * batch_size)
                 expanded_timestep = timestep.expand(batch_size)
@@ -124,12 +118,8 @@ class QwenSampler(BaseModelSampler):
                     timestep=expanded_timestep / 1000,
                     encoder_hidden_states=combined_prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
                     encoder_hidden_states_mask=text_attention_mask,
-                    txt_seq_lens=txt_seq_lens,
                     img_shapes=img_shapes,
-                    attention_kwargs = {
-                        "attention_mask": attention_mask_2d,
-                    },
-                    return_dict=True
+                    return_dict=True,
                 ).sample
 
                 if cfg_scale > 1.0:
@@ -198,3 +188,5 @@ class QwenSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
+
+factory.register(BaseModelSampler, QwenSampler, ModelType.QWEN)

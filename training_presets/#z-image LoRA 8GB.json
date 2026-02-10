@@ -1,5 +1,5 @@
 {
-    "base_model_name": "Tongyi-MAI/Z-Image-Turbo",
+    "base_model_name": "Tongyi-MAI/Z-Image",
     "batch_size": 2,
     "learning_rate": 0.0003,
     "model_type": "Z_IMAGE",
@@ -9,8 +9,7 @@
     "compile": true,
     "transformer": {
         "train": true,
-        "weight_dtype": "INT_W8A8",
-        "model_name": "https://huggingface.co/ostris/Z-Image-De-Turbo/blob/main/z_image_de_turbo_v1_bf16.safetensors"
+        "weight_dtype": "FLOAT_8"
     },
     "text_encoder": {
         "train": false,

@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 from modules.model.ZImageModel import ZImageModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
@@ -162,3 +163,5 @@ class ZImageSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
+
+factory.register(BaseModelSampler, ZImageSampler, ModelType.Z_IMAGE)
