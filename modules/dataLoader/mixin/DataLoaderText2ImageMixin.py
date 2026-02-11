@@ -30,12 +30,11 @@ from mgds.pipelineModules.GetFilename import GetFilename
 from mgds.pipelineModules.ImageToVideo import ImageToVideo
 from mgds.pipelineModules.InlineAspectBatchSorting import InlineAspectBatchSorting
 from mgds.pipelineModules.InlineDistributedSampler import InlineDistributedSampler
+from mgds.pipelineModules.KeepAspectCalculation import KeepAspectCalculation
 from mgds.pipelineModules.LoadImage import LoadImage
 from mgds.pipelineModules.LoadMultipleTexts import LoadMultipleTexts
 from mgds.pipelineModules.LoadVideo import LoadVideo
 from mgds.pipelineModules.ModifyPath import ModifyPath
-from mgds.pipelineModules.PadImage import PadImage
-from mgds.pipelineModules.QuantizeResolution import QuantizeResolution
 from mgds.pipelineModules.RandomBrightness import RandomBrightness
 from mgds.pipelineModules.RandomCircularMaskShrink import RandomCircularMaskShrink
 from mgds.pipelineModules.RandomContrast import RandomContrast
@@ -180,29 +179,26 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             possible_resolutions_out_name='possible_resolutions'
         )
 
-        quantize_resolution = QuantizeResolution(
-            quantization=aspect_bucketing_quantization,
+        keep_aspect_calculation = KeepAspectCalculation(
             resolution_in_name='original_resolution',
+            target_resolution_in_name='settings.target_resolution',
+            enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
+            target_resolutions_override_in_name='concept.image.resolution_override',
             scale_resolution_out_name='scale_resolution',
             crop_resolution_out_name='crop_resolution',
-            possible_resolutions_out_name='possible_resolutions'
+            quantization=aspect_bucketing_quantization,
+            #possible_resolutions_out_name='possible_resolutions'
         )
-
-        pad_image = PadImage(name='image', target_resolution_in_name='scale_resolution')
-        pad_mask = PadImage(name='mask', target_resolution_in_name='scale_resolution', padding_mode='constant', quantization=8)
 
         modules: list = [calc_aspect]
 
         match config.image_preprocessing:
-            case ImagePreprocessing.ASPECT_RATIO_BUCKETING:
-                modules.append(aspect_bucketing)
             case ImagePreprocessing.SQUARE_CENTER_CROP:
                 modules.append(single_aspect_calculation)
-            case ImagePreprocessing.ORIGINAL_SIZE:
-                modules.extend([quantize_resolution, pad_image])
-
-                if config.masked_training or config.model_type.has_mask_input():
-                    modules.append(pad_mask)
+            case ImagePreprocessing.ASPECT_RATIO_BUCKETING:
+                modules.append(aspect_bucketing)
+            case ImagePreprocessing.KEEP_ASPECT_RATIO:
+                modules.append(keep_aspect_calculation)
 
         return modules
 

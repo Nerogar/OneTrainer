@@ -348,13 +348,13 @@ class TrainUI(ctk.CTk):
 
         # image preprocessing
         components.label(frame, 0, 0, "Image Preprocessing",
-                         tooltip="Keep Original Size: Run training on the original image size, both sides padded to multiples of 32 if necessary. Make sure to provide enough images with the same size to fill at least one batch.\n"
-                                 "Square Center Crop: Crop images at the center to resolution^2.\n"
-                                 "Aspect Ratio Bucketing: Enables training on images with different aspect ratios. Images are scaled to roughly resolution^2 pixels and slightly cropped to fit into generalised aspect ratio buckets.")
+                         tooltip="Square Center Crop: Crop images at the center to resolution^2.\n\n"
+                                 "Aspect Ratio Bucketing: Enables training on images with vastly different aspect ratios. Images are scaled to roughly resolution^2 pixels and cropped to fit into generalised aspect ratio buckets.\n\n"
+                                 "Keep Aspect Ratio: Images are only downscaled to roughly resolution^2 pixels while preserving the original aspect ratio. If necessary, both width and height are cropped down to multiples of a model-specific value (typically 64). Set the resolution to a high value to train on the original image sizes but make sure to provide enough images with the same size to fill at least one batch.")
         components.options_kv(frame, 0, 1, [
-            ("Keep Original Size", ImagePreprocessing.ORIGINAL_SIZE),
             ("Square Center Crop", ImagePreprocessing.SQUARE_CENTER_CROP),
             ("Aspect Ratio Bucketing", ImagePreprocessing.ASPECT_RATIO_BUCKETING),
+            ("Keep Aspect Ratio", ImagePreprocessing.KEEP_ASPECT_RATIO),
         ], self.ui_state, "image_preprocessing")
 
         # latent caching
