@@ -25,6 +25,7 @@ class ModelType(Enum):
 
     FLUX_DEV_1 = 'FLUX_DEV_1'
     FLUX_FILL_DEV_1 = 'FLUX_FILL_DEV_1'
+    FLUX_2 = 'FLUX_2'
 
     SANA = 'SANA'
 
@@ -35,6 +36,8 @@ class ModelType(Enum):
     CHROMA_1 = 'CHROMA_1'
 
     QWEN = 'QWEN'
+
+    Z_IMAGE = 'Z_IMAGE'
 
     def __str__(self):
         return self.value
@@ -76,7 +79,15 @@ class ModelType(Enum):
 
     def is_flux(self):
         return self == ModelType.FLUX_DEV_1 \
+            or self == ModelType.FLUX_FILL_DEV_1 \
+            or self == ModelType.FLUX_2
+
+    def is_flux_1(self):
+        return self == ModelType.FLUX_DEV_1 \
             or self == ModelType.FLUX_FILL_DEV_1
+
+    def is_flux_2(self):
+        return self == ModelType.FLUX_2
 
     def is_chroma(self):
         return self == ModelType.CHROMA_1
@@ -92,6 +103,9 @@ class ModelType(Enum):
 
     def is_hi_dream(self):
         return self == ModelType.HI_DREAM_FULL
+
+    def is_z_image(self):
+        return self == ModelType.Z_IMAGE
 
     def has_mask_input(self) -> bool:
         return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \
@@ -111,7 +125,7 @@ class ModelType(Enum):
     def has_multiple_text_encoders(self):
         return self.is_stable_diffusion_3() \
             or self.is_stable_diffusion_xl() \
-            or self.is_flux() \
+            or self.is_flux_1() \
             or self.is_hunyuan_video() \
             or self.is_hi_dream() \
 

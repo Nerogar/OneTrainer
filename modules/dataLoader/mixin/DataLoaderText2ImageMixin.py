@@ -1,10 +1,17 @@
+import os
 import re
+from abc import ABCMeta, abstractmethod
 from collections.abc import Callable
 
 import modules.util.multi_gpu_util as multi
+from modules.model.BaseModel import BaseModel
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.util import path_util
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
+from modules.util.torch_util import torch_gc
+from modules.util.TrainProgress import TrainProgress
 
 from mgds.OutputPipelineModule import OutputPipelineModule
 from mgds.pipelineModules.AspectBatchSorting import AspectBatchSorting
@@ -12,6 +19,7 @@ from mgds.pipelineModules.AspectBucketing import AspectBucketing
 from mgds.pipelineModules.CalcAspect import CalcAspect
 from mgds.pipelineModules.CapitalizeTags import CapitalizeTags
 from mgds.pipelineModules.CollectPaths import CollectPaths
+from mgds.pipelineModules.DiskCache import DiskCache
 from mgds.pipelineModules.DistributedSampler import DistributedSampler
 from mgds.pipelineModules.DownloadHuggingfaceDatasets import DownloadHuggingfaceDatasets
 from mgds.pipelineModules.DropTags import DropTags
@@ -40,16 +48,14 @@ from mgds.pipelineModules.SelectInput import SelectInput
 from mgds.pipelineModules.SelectRandomText import SelectRandomText
 from mgds.pipelineModules.ShuffleTags import ShuffleTags
 from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
+from mgds.pipelineModules.VariationSorting import VariationSorting
 
 import torch
 
 from diffusers import AutoencoderKL
 
 
-class DataLoaderText2ImageMixin:
-    def __init__(self):
-        pass
-
+class DataLoaderText2ImageMixin(metaclass=ABCMeta):
     def _enumerate_input_modules(self, config: TrainConfig, allow_videos: bool = False) -> list:
         supported_extensions = set()
         supported_extensions |= path_util.supported_image_extensions()
@@ -85,7 +91,7 @@ class DataLoaderText2ImageMixin:
             self,
             config: TrainConfig,
             train_dtype: DataType,
-            allow_video: bool = False,
+            vae_frame_dim: bool = False,
     ) -> list:
         load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=0, range_max=1, supported_extensions=path_util.supported_image_extensions(), dtype=train_dtype.torch_dtype())
         load_video = LoadVideo(path_in_name='image_path', target_frame_count_in_name='settings.target_frames', video_out_name='image', range_min=0, range_max=1, target_frame_rate=24, supported_extensions=path_util.supported_video_extensions(), dtype=train_dtype.torch_dtype())
@@ -109,7 +115,7 @@ class DataLoaderText2ImageMixin:
 
         modules = [load_image, load_video]
 
-        if allow_video:
+        if vae_frame_dim:
             modules.append(image_to_video)
 
         modules.extend([load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text])
@@ -123,7 +129,7 @@ class DataLoaderText2ImageMixin:
         if config.custom_conditioning_image:
             modules.append(load_cond_image)
 
-        if allow_video:
+        if vae_frame_dim:
             modules.append(mask_to_video)
 
         return modules
@@ -256,6 +262,8 @@ class DataLoaderText2ImageMixin:
 
     def _output_modules_from_out_names(
             self,
+            model: BaseModel,
+            model_setup: ModelSetupText2ImageMixin,
             output_names: list[str | tuple[str, str]],
             config: TrainConfig,
             before_cache_image_fun: Callable[[], None] | None = None,
@@ -264,6 +272,14 @@ class DataLoaderText2ImageMixin:
             autocast_context: list[torch.autocast | None] = None,
             train_dtype: DataType | None = None,
     ):
+        if before_cache_image_fun is None:
+            def prepare_vae():
+                model.to(self.temp_device)
+                model.vae_to(self.train_device)
+                model.eval()
+                torch_gc()
+            before_cache_image_fun = prepare_vae
+
         sort_names = output_names + ['concept']
 
         output_names = output_names + [
@@ -306,3 +322,121 @@ class DataLoaderText2ImageMixin:
         modules.append(output)
 
         return modules
+
+    def _cache_modules_from_names(
+            self,
+            model: BaseModel,
+            model_setup: ModelSetupText2ImageMixin,
+            image_split_names: list[str],
+            image_aggregate_names: list[str],
+            text_split_names: list[str],
+            sort_names: list[str],
+            config: TrainConfig,
+            text_caching: bool,
+            before_cache_image_fun: Callable[[], None] | None = None,
+    ):
+        image_cache_dir = os.path.join(config.cache_dir, "image")
+        text_cache_dir = os.path.join(config.cache_dir, "text")
+
+        if before_cache_image_fun is None:
+            def prepare_vae():
+                model.to(self.temp_device)
+                model.vae_to(self.train_device)
+                model.eval()
+                torch_gc()
+            before_cache_image_fun = prepare_vae
+
+        def before_cache_text_fun():
+            model_setup.prepare_text_caching(model, config)
+
+        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations',
+                                     balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'],
+                                     group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
+
+        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',
+                                    variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
+
+        modules = []
+
+        if config.latent_caching:
+            modules.append(image_disk_cache)
+
+            sort_names = [x for x in sort_names if x not in image_aggregate_names]
+            sort_names = [x for x in sort_names if x not in image_split_names]
+
+            if text_caching:
+                modules.append(text_disk_cache)
+                sort_names = [x for x in sort_names if x not in text_split_names]
+
+        if len(sort_names) > 0:
+            variation_sorting = VariationSorting(names=sort_names, balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',
+                                                 variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled')
+
+            modules.append(variation_sorting)
+
+        return modules
+
+
+    def _create_dataset(
+            self,
+            config: TrainConfig,
+            model: BaseModel,
+            model_setup: ModelSetupText2ImageMixin,
+            train_progress: TrainProgress,
+            is_validation: bool,
+            aspect_bucketing_quantization: int,
+            frame_dim_enabled: bool=False,
+            allow_video_files: bool=False,
+            vae_frame_dim: bool=False,
+            supports_inpainting: bool=True, #TODO many models probably don't support inpainting, but this has been enabled in most dataloaders before refactoring, too
+    ):
+        enumerate_input = self._enumerate_input_modules(config, allow_videos=allow_video_files)
+        load_input = self._load_input_modules(config, model.train_dtype, vae_frame_dim=vae_frame_dim)
+        mask_augmentation = self._mask_augmentation_modules(config)
+        aspect_bucketing_in = self._aspect_bucketing_in(config, aspect_bucketing_quantization, frame_dim_enabled)
+        crop_modules = self._crop_modules(config)
+        augmentation_modules = self._augmentation_modules(config)
+        if supports_inpainting:
+            inpainting_modules = self._inpainting_modules(config)
+        preparation_modules = self._preparation_modules(config, model)
+        cache_modules = self._cache_modules(config, model, model_setup)
+        output_modules = self._output_modules(config, model, model_setup)
+
+        debug_modules = self._debug_modules(config, model)
+
+        return self._create_mgds(
+            config,
+            [
+                enumerate_input,
+                load_input,
+                mask_augmentation,
+                aspect_bucketing_in,
+                crop_modules,
+                augmentation_modules
+            ] + ([inpainting_modules] if supports_inpainting else []) + [
+                preparation_modules,
+                cache_modules,
+                output_modules,
+
+                debug_modules if config.debug_mode else None,
+                # inserted before output_modules, which contains a sorting operation
+            ],
+            train_progress,
+            is_validation
+        )
+
+    @abstractmethod
+    def _preparation_modules(self, config: TrainConfig, model: BaseModel):
+        pass
+
+    @abstractmethod
+    def _cache_modules(self, config: TrainConfig, model: BaseModel, model_setup: BaseModelSetup):
+        pass
+
+    @abstractmethod
+    def _output_modules(self, config: TrainConfig, model: BaseModel, model_setup: BaseModelSetup):
+        pass
+
+    @abstractmethod
+    def _debug_modules(self, config: TrainConfig, model: BaseModel):
+        pass

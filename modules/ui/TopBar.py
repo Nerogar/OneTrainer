@@ -92,13 +92,15 @@ class TopBar:
                 ("Stable Cascade", ModelType.STABLE_CASCADE_1),
                 ("PixArt Alpha", ModelType.PIXART_ALPHA),
                 ("PixArt Sigma", ModelType.PIXART_SIGMA),
-                ("Flux Dev", ModelType.FLUX_DEV_1),
+                ("Flux Dev.1", ModelType.FLUX_DEV_1),
                 ("Flux Fill Dev", ModelType.FLUX_FILL_DEV_1),
+                ("Flux 2 [Dev, Klein]", ModelType.FLUX_2),
                 ("Sana", ModelType.SANA),
                 ("Hunyuan Video", ModelType.HUNYUAN_VIDEO),
                 ("HiDream Full", ModelType.HI_DREAM_FULL),
                 ("Chroma1", ModelType.CHROMA_1),
                 ("QwenImage", ModelType.QWEN),
+                ("Z-Image", ModelType.Z_IMAGE),
             ],
             ui_state=self.ui_state,
             var_name="model_type",
@@ -122,7 +124,7 @@ class TopBar:
                 or self.train_config.model_type.is_stable_diffusion_xl() \
                 or self.train_config.model_type.is_wuerstchen() \
                 or self.train_config.model_type.is_pixart() \
-                or self.train_config.model_type.is_flux() \
+                or self.train_config.model_type.is_flux_1() \
                 or self.train_config.model_type.is_sana() \
                 or self.train_config.model_type.is_hunyuan_video() \
                 or self.train_config.model_type.is_hi_dream() \
@@ -132,7 +134,9 @@ class TopBar:
                 ("LoRA", TrainingMethod.LORA),
                 ("Embedding", TrainingMethod.EMBEDDING),
             ]
-        elif self.train_config.model_type.is_qwen():
+        elif self.train_config.model_type.is_qwen() \
+             or self.train_config.model_type.is_z_image() \
+             or self.train_config.model_type.is_flux_2():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),

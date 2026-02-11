@@ -1,7 +1,11 @@
 from modules.model.QwenModel import QwenModel
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseQwenSetup import BaseQwenSetup
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
@@ -122,3 +126,5 @@ class QwenLoRASetup(
             train_progress: TrainProgress
     ):
         self.__setup_requires_grad(model, config)
+
+factory.register(BaseModelSetup, QwenLoRASetup, ModelType.QWEN, TrainingMethod.LORA)

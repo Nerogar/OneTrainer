@@ -1,7 +1,11 @@
 from modules.model.FluxModel import FluxModel
 from modules.modelSetup.BaseFluxSetup import BaseFluxSetup
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
@@ -177,3 +181,6 @@ class FluxLoRASetup(
             if model.embedding_wrapper_2 is not None:
                 model.embedding_wrapper_2.normalize_embeddings()
         self.__setup_requires_grad(model, config)
+
+factory.register(BaseModelSetup, FluxLoRASetup, ModelType.FLUX_DEV_1, TrainingMethod.LORA)
+factory.register(BaseModelSetup, FluxLoRASetup, ModelType.FLUX_FILL_DEV_1, TrainingMethod.LORA)
