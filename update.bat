@@ -128,7 +128,7 @@ goto :install_dependencies
 :install_dependencies
 echo Installing dependencies...
 echo Upgrading pip and setuptools...
-"%PYTHON%" -m pip install --upgrade --upgrade-strategy eager pip setuptools
+"%PYTHON%" -m pip install --upgrade --upgrade-strategy eager pip setuptools==81.0.0
 if errorlevel 1 (
     echo Error: pip upgrade failed.
     goto :end_error
