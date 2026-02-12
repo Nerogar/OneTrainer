@@ -85,13 +85,14 @@ def entry(
     original_destroy = component.destroy
 
     def new_destroy():
+        validator.detach()
+
         # 'temporary' fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
         # unfortunately Tom has admitted to forgetting about how to maintain CTK so this likely will never be merged
         if component._textvariable_callback_name:
-            component._textvariable.trace_remove("write", component._textvariable_callback_name)  # type: ignore[union-attr]
+            with contextlib.suppress(tk.TclError):
+                component._textvariable.trace_remove("write", component._textvariable_callback_name)  # type: ignore[union-attr]
             component._textvariable_callback_name = ""
-
-        validator.detach()
 
         if command is not None and trace_id is not None:
             ui_state.remove_var_trace(var_name, trace_id)

@@ -105,6 +105,10 @@ def validate_path(
     if io_type == PathIOType.INPUT and _is_huggingface_repo_or_file(trimmed):
         return None
 
+    if io_type == PathIOType.INPUT:
+        if not os.path.exists(os.path.abspath(trimmed)):
+            return "Input path does not exist"
+
     if io_type in (PathIOType.OUTPUT, PathIOType.MODEL):
         if not os.path.isdir(os.path.dirname(os.path.abspath(trimmed))):
             return "Parent folder does not exist"
