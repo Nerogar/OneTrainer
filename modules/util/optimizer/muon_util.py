@@ -76,7 +76,13 @@ def build_muon_adam_key_fn(
                 for param_name, p in lora_module.named_parameters():
                     if p.requires_grad:
                         full_param_name = f"{full_prefix}.{param_name}"
-                        param_map[id(p)] = get_optim_type(full_param_name, p)
+                        # B (Up) -> Muon, A (Down) -> Adam
+                        if "lora_up.weight" in param_name and p.ndim > 1:
+                            param_map[id(p)] = 'muon'
+                        elif "lora_down.weight" in param_name:
+                            param_map[id(p)] = 'adam'
+                        else:
+                            param_map[id(p)] = get_optim_type(full_param_name, p)
                         all_processed_params.append(p)
         elif isinstance(module, torch.nn.Module) and any(p.requires_grad for p in module.parameters()):
             for param_name, p in module.named_parameters():
