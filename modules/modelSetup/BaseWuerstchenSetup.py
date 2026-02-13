@@ -9,6 +9,7 @@ from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiff
 from modules.modelSetup.mixin.ModelSetupDiffusionMixin import ModelSetupDiffusionMixin
 from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
+from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.checkpointing_util import (
     enable_checkpointing_for_clip_encoder_layers,
@@ -23,21 +24,12 @@ from modules.util.dtype_util import (
 )
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.quantization_util import quantize_layers
+from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor
 
-# This is correct for the latest cascade, but other Wuerstchen models may have
-# different names. I honestly don't know what makes a good preset here so I'm
-# just guessing.
-PRESETS = {
-    "attn-only": ["attention"],
-    "full": [],
-    "down-blocks": ["down_blocks"],
-    "up-blocks": ["up_blocks"],
-    "mapper-only": ["mapper"],
-}
 
 class BaseWuerstchenSetup(
     BaseModelSetup,
@@ -46,8 +38,19 @@ class BaseWuerstchenSetup(
     ModelSetupNoiseMixin,
     ModelSetupDiffusionMixin,
     ModelSetupEmbeddingMixin,
+    ModelSetupText2ImageMixin,
     metaclass=ABCMeta,
 ):
+    # This is correct for the latest cascade, but other Wuerstchen models may have
+    # different names. I honestly don't know what makes a good preset here so I'm
+    # just guessing.
+    LAYER_PRESETS = {
+        "attn-only": ["attention"],
+        "full": [],
+        "down-blocks": ["down_blocks"],
+        "up-blocks": ["up_blocks"],
+        "mapper-only": ["mapper"],
+    }
 
     def setup_optimizations(
             self,
@@ -357,3 +360,12 @@ class BaseWuerstchenSetup(
             train_device=self.train_device,
             alphas_cumprod_fun=self.__alpha_cumprod,
         ).mean()
+
+    def prepare_text_caching(self, model: WuerstchenModel, config: TrainConfig):
+        model.to(self.temp_device)
+
+        if not config.train_text_encoder_or_embedding():
+            model.text_encoder_to(self.train_device)
+
+        model.eval()
+        torch_gc()

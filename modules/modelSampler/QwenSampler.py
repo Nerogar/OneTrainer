@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 from modules.model.QwenModel import QwenModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
@@ -105,8 +106,10 @@ class QwenSampler(BaseModelSampler):
                 width // vae_scale_factor // 2)
             ]] * batch_size
 
-            self.model.transformer_to(self.train_device)
+            if torch.all(text_attention_mask):
+                text_attention_mask = None
 
+            self.model.transformer_to(self.train_device)
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 latent_model_input = torch.cat([latent_image] * batch_size)
                 expanded_timestep = timestep.expand(batch_size)
@@ -185,3 +188,5 @@ class QwenSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
+
+factory.register(BaseModelSampler, QwenSampler, ModelType.QWEN)

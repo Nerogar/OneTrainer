@@ -361,7 +361,7 @@ function install_requirements_in_active_env {
     # when running in existing environments. It ensures that all libraries will
     # be upgraded to the same versions as a fresh reinstall of requirements.txt.
     print "Installing requirements in active environment..."
-    run_pip_in_active_env install --upgrade --upgrade-strategy eager pip setuptools
+    run_pip_in_active_env install --upgrade --upgrade-strategy eager pip setuptools==81.0.0
     run_pip_in_active_env install --upgrade --upgrade-strategy eager -r requirements-global.txt -r "$(get_platform_requirements_path)"
     export OT_MUST_INSTALL_REQUIREMENTS="false"
 
