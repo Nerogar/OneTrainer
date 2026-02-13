@@ -119,7 +119,7 @@ class QwenSampler(BaseModelSampler):
                     encoder_hidden_states=combined_prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
                     encoder_hidden_states_mask=text_attention_mask if not torch.all(text_attention_mask) else None,
                     img_shapes=img_shapes,
-                    return_dict=True
+                    return_dict=True,
                 ).sample
 
                 if cfg_scale > 1.0:
