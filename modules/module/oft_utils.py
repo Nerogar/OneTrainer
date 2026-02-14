@@ -145,8 +145,14 @@ class OFTRotationModule(nn.Module):
             with torch.no_grad():
                 self.weight.copy_(self._project_batch(self.weight, coft_eps=self.coft_eps))
 
+        if self.scaled_oft:
+            # Apply scaling to the weight (Q matrix) before Cayley transform
+            effective_weight = self.weight / (self.n_elements**0.5)
+        else:
+            effective_weight = self.weight
+
         orth_rotate = self._cayley_batch(
-            self.weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms
+            effective_weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms
         )
         orth_rotate = self.dropout(orth_rotate)
 
