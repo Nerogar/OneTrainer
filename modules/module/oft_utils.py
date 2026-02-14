@@ -44,6 +44,7 @@ class OFTRotationModule(nn.Module):
         coft=False,
         coft_eps=6e-5,
         block_share=False,
+        scaled_oft=False,
         use_cayley_neumann=True,
         num_cayley_neumann_terms=5,
         dropout_probability=0.0,
@@ -57,6 +58,7 @@ class OFTRotationModule(nn.Module):
         self.coft = coft
         self.coft_eps = coft_eps
         self.block_share = block_share
+        self.scaled_oft = scaled_oft
         self.use_cayley_neumann = use_cayley_neumann
         self.num_cayley_neumann_terms = num_cayley_neumann_terms
         # Create indices for upper triangle (excluding diagonal)
