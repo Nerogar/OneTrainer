@@ -440,7 +440,7 @@ class OFTModule(PeftBase):
             return self.orig_forward(rotated_x, *args, **kwargs)
 
         if self.scaled_oft:
-            effective_weight = self.oft_R.weight / (self.n_elements**0.5)
+            effective_weight = self.oft_R.weight / (self.oft_R.n_elements**0.5)
         else:
             effective_weight = self.oft_R.weight
 
