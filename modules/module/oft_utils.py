@@ -147,7 +147,7 @@ class OFTRotationModule(nn.Module):
             with torch.no_grad():
                 self.weight.copy_(self._project_batch(self.weight, coft_eps=self.coft_eps))
 
-        effective_weight = self.weight / self.oft_R.n_elements ** 0.5 if self.scaled_oft else self.weight
+        effective_weight = self.weight / self.n_elements ** 0.5 if self.scaled_oft else self.weight
 
         orth_rotate = self._cayley_batch(
             effective_weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms
