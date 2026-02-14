@@ -148,7 +148,6 @@ class OFTRotationModule(nn.Module):
                 self.weight.copy_(self._project_batch(self.weight, coft_eps=self.coft_eps))
 
         if self.scaled_oft:
-            # Apply scaling to the weight (Q matrix) before Cayley transform
             effective_weight = self.weight / (self.n_elements**0.5)
         else:
             effective_weight = self.weight
