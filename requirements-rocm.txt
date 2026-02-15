@@ -2,6 +2,7 @@
 # please open an issue or pull request on github
 
 # pytorch
+# not upgraded because of github.com/pytorch/pytorch/issues/173308
 --extra-index-url https://download.pytorch.org/whl/rocm6.3
 torch==2.9.1+rocm6.3
 torchvision==0.24.1+rocm6.3
