@@ -1,6 +1,10 @@
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BasePixArtAlphaSetup import BasePixArtAlphaSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
@@ -73,9 +77,10 @@ class PixArtAlphaFineTuneSetup(
         self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
-        self.__setup_requires_grad(model, config)
 
-        init_model_parameters(model, self.create_parameters(model, config), self.train_device)
+        params = self.create_parameters(model, config)
+        self.__setup_requires_grad(model, config)
+        init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
             self,
@@ -114,3 +119,6 @@ class PixArtAlphaFineTuneSetup(
             self._normalize_output_embeddings(model.all_text_encoder_embeddings())
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
+
+factory.register(BaseModelSetup, PixArtAlphaFineTuneSetup, ModelType.PIXART_ALPHA, TrainingMethod.FINE_TUNE)
+factory.register(BaseModelSetup, PixArtAlphaFineTuneSetup, ModelType.PIXART_SIGMA, TrainingMethod.FINE_TUNE)

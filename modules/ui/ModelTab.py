@@ -1,17 +1,6 @@
 from pathlib import Path
 
-from modules.modelSetup.BaseChromaSetup import PRESETS as chroma_presets
-from modules.modelSetup.BaseFluxSetup import PRESETS as flux_presets
-from modules.modelSetup.BaseHiDreamSetup import PRESETS as hidream_presets
-from modules.modelSetup.BaseHunyuanVideoSetup import PRESETS as hunyuan_video_presets
-from modules.modelSetup.BasePixArtAlphaSetup import PRESETS as pixart_presets
-from modules.modelSetup.BaseQwenSetup import PRESETS as qwen_presets
-from modules.modelSetup.BaseSanaSetup import PRESETS as sana_presets
-from modules.modelSetup.BaseStableDiffusion3Setup import PRESETS as sd3_presets
-from modules.modelSetup.BaseStableDiffusionSetup import PRESETS as sd_presets
-from modules.modelSetup.BaseStableDiffusionXLSetup import PRESETS as sdxl_presets
-from modules.modelSetup.BaseWuerstchenSetup import PRESETS as sc_presets
-from modules.modelSetup.BaseZImageSetup import PRESETS as z_image_presets
+from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
@@ -66,8 +55,10 @@ class ModelTab:
             self.__setup_wuerstchen_ui(base_frame)
         elif self.train_config.model_type.is_pixart():
             self.__setup_pixart_alpha_ui(base_frame)
-        elif self.train_config.model_type.is_flux():
+        elif self.train_config.model_type.is_flux_1():
             self.__setup_flux_ui(base_frame)
+        elif self.train_config.model_type.is_flux_2():
+            self.__setup_flux_2_ui(base_frame)
         elif self.train_config.model_type.is_z_image():
             self.__setup_z_image_ui(base_frame)
         elif self.train_config.model_type.is_chroma():
@@ -132,6 +123,25 @@ class ModelTab:
             allow_override_transformer=True,
             has_text_encoder_1=True,
             has_text_encoder_2=True,
+            has_vae=True,
+        )
+        row = self.__create_output_components(
+            frame,
+            row,
+            allow_safetensors=True,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
+        )
+
+    def __setup_flux_2_ui(self, frame):
+        row = 0
+        row = self.__create_base_dtype_components(frame, row)
+        row = self.__create_base_components(
+            frame,
+            row,
+            has_transformer=True,
+            allow_override_transformer=True,
+            has_text_encoder_1=True,
             has_vae=True,
         )
         row = self.__create_output_components(
@@ -431,33 +441,8 @@ class ModelTab:
 
             row += 1
 
-        presets = []
-        if self.train_config.model_type.is_stable_diffusion(): #TODO simplify and de-duplicate with layer filter on training tab
-            presets = sd_presets
-        elif self.train_config.model_type.is_stable_diffusion_xl():
-            presets = sdxl_presets
-        elif self.train_config.model_type.is_stable_diffusion_3():
-            presets = sd3_presets
-        elif self.train_config.model_type.is_wuerstchen():
-            presets = sc_presets
-        elif self.train_config.model_type.is_pixart():
-            presets = pixart_presets
-        elif self.train_config.model_type.is_flux():
-            presets = flux_presets
-        elif self.train_config.model_type.is_qwen():
-            presets = qwen_presets
-        elif self.train_config.model_type.is_chroma():
-            presets = chroma_presets
-        elif self.train_config.model_type.is_sana():
-            presets = sana_presets
-        elif self.train_config.model_type.is_hunyuan_video():
-            presets = hunyuan_video_presets
-        elif self.train_config.model_type.is_z_image():
-            presets = z_image_presets
-        elif self.train_config.model_type.is_hi_dream():
-            presets = hidream_presets
-        else:
-            presets = {"full": []}
+        cls = create.get_model_setup_class(self.train_config.model_type, self.train_config.training_method)
+        presets = cls.LAYER_PRESETS if cls is not None else {"full": []}
 
         components.label(frame, row, 0, "Quantization")
         components.layer_filter_entry(frame, row, 1, self.ui_state,
@@ -626,6 +611,7 @@ class ModelTab:
             allow_safetensors: bool = False,
             allow_diffusers: bool = False,
             allow_legacy_safetensors: bool = False,
+            allow_comfy: bool = False,
     ) -> int:
         # output model destination
         components.label(frame, row, 0, "Model Output Destination",
@@ -653,6 +639,8 @@ class ModelTab:
             formats.append(("Diffusers", ModelFormat.DIFFUSERS))
         # if allow_legacy_safetensors:
         #     formats.append(("Legacy Safetensors", ModelFormat.LEGACY_SAFETENSORS))
+        if allow_comfy:
+            formats.append(("Comfy LoRA", ModelFormat.COMFY_LORA))
 
         components.label(frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
