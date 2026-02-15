@@ -111,6 +111,11 @@ class BaseFlux2Setup(
                 text_encoder_output=batch.get('text_encoder_hidden_state'),
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability,
             )
+            if config.cep_enabled:
+                text_encoder_output = self._apply_conditional_embedding_perturbation(
+                    text_encoder_output, config.cep_gamma, generator
+                )
+
             latent_image = model.patchify_latents(batch['latent_image'].float())
             latent_height = latent_image.shape[-2]
             latent_width = latent_image.shape[-1]
