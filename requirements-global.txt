@@ -16,13 +16,13 @@ scenedetect==0.6.6
 accelerate==1.12.0
 safetensors==0.7.0
 tensorboard==2.20.0
-pytorch-lightning==2.6.0
+pytorch-lightning==2.6.1
 
 # diffusion models
 #Note: check whether Qwen bugs in diffusers have been fixed before upgrading diffusers (see BaseQwenSetup):
 -e git+https://github.com/huggingface/diffusers.git@256e010#egg=diffusers
 gguf==0.17.1
-transformers==4.57.3
+transformers==4.57.6
 sentencepiece==0.2.1 # transitive dependency of transformers for tokenizer loading
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
