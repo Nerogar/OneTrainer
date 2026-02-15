@@ -42,7 +42,7 @@ prodigyopt==1.1.2 # prodigy optimizer
 schedulefree==1.4.1 # schedule-free optimizers
 pytorch_optimizer==3.6.0 # pytorch optimizers
 prodigy-plus-schedule-free==2.0.1 # Prodigy plus optimizer
-adv_optm==2.2.1 # advanced optimizers
+adv_optm==2.2.3 # advanced optimizers
 -e git+https://github.com/KellerJordan/Muon.git@f90a42b#egg=muon-optimizer
 
 # Profiling
