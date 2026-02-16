@@ -80,7 +80,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 
 ## Usage
 
-OneTrainer can be used in **two primary modes**: a graphical user interface (GUI) and a **command-line interface (CLI)** for finer control.
+OneTrainer can be used in **three primary modes**: a graphical user interface (GUI), a browser-based **WebUI**, and a **command-line interface (CLI)** for finer control.
 
 For a technically focused quick start, see the [Quick Start Guide](docs/QuickStartGuide.md) and for a broader overview, see the [Overview documentation](docs/Overview.md). Otherwise visit [our wiki!](https://github.com/Nerogar/OneTrainer)
 
@@ -93,6 +93,20 @@ For a technically focused quick start, see the [Quick Start Guide](docs/QuickSta
 #### Unix-based systems
 
 -   Execute `start-ui.sh` and the GUI will pop up.
+
+### WebUI Mode
+
+The WebUI starts a local HTTP server and lets you control training from your browser.
+
+#### Windows
+
+-   To start the WebUI, navigate to the OneTrainer folder and double-click `start-webui.bat`
+
+#### Unix-based systems
+
+-   Execute `start-webui.sh`
+
+Open your browser at `http://127.0.0.1:7865`.
 
 ### CLI Mode
 
