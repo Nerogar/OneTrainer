@@ -1,13 +1,11 @@
 import asyncio
 import json
-from pathlib import Path
 from typing import Any
-
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from modules.web.training_session import SessionStore
 
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse, PlainTextResponse
 
 app = FastAPI(title="OneTrainer WebUI", version="0.1.0")
 sessions = SessionStore()
@@ -361,4 +359,3 @@ def run(host: str = "127.0.0.1", port: int = 7865):
 
 if __name__ == "__main__":
     run()
-

@@ -248,4 +248,3 @@ class SessionStore:
         session = self.get_session(session_id)
         packed = session.train_config.to_pack_dict(secrets=False)
         return json.dumps(packed, indent=2)
-

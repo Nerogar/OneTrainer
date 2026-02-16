@@ -12,4 +12,3 @@ fi
 prepare_runtime_environment
 
 run_python_in_active_env "scripts/web_ui.py" "$@"
-
