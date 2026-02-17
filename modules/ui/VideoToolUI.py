@@ -7,12 +7,14 @@ import shlex
 import subprocess
 import threading
 import webbrowser
+from fractions import Fraction
 from tkinter import filedialog
 
 from modules.util.image_util import load_image
 from modules.util.path_util import SUPPORTED_VIDEO_EXTENSIONS
 from modules.util.ui import components
 
+import av
 import customtkinter as ctk
 import cv2
 import scenedetect
@@ -378,9 +380,39 @@ class VideoToolUI(ctk.CTkToplevel):
             self.__update_status(f'Found {len(input_videos)} videos to process')
             return input_videos
 
-    def __get_random_aspect(self, height : int, width : int, variation: float) -> tuple[int, int, int, int]:
-        #given input image dimensions output new dimensions and random offset
-        #return original dimensions and no offset if variation is zero
+    def __run_in_thread(self, target, *args):
+        """Clear status box and run target function in a daemon thread."""
+        self.status_label.configure(state="normal")
+        self.status_label.delete(index1="1.0", index2="end")
+        self.status_label.configure(state="disabled")
+        t = threading.Thread(target=target, args=args)
+        t.daemon = True
+        t.start()
+
+    @staticmethod
+    def __parse_timestamp_to_frames(timestamp: str, fps: float) -> int:
+        return int(sum(int(x) * 60 ** i for i, x in enumerate(reversed(timestamp.split(':')))) * fps)
+
+    def __get_safe_fps(self, video: cv2.VideoCapture, video_path: str) -> float:
+        fps = video.get(cv2.CAP_PROP_FPS) or 0.0
+        if fps <= 0:
+            self.__update_status(f'Warning: Could not read FPS for "{os.path.basename(video_path)}". Falling back to 30 FPS.')
+            return 30.0
+        return fps
+
+    @staticmethod
+    def __get_output_dir(use_subdir: bool, batch_mode: bool, output_entry: str,
+                         video_path, input_dir: str) -> str:
+        if use_subdir and batch_mode:
+            return os.path.join(output_entry,
+                                os.path.splitext(os.path.relpath(video_path, input_dir))[0])
+        elif use_subdir:
+            return os.path.join(output_entry,
+                                os.path.splitext(os.path.basename(video_path))[0])
+        return output_entry
+
+    def __get_random_aspect(self, height: int, width: int, variation: float) -> tuple[int, int, int, int]:
+        # Return original dimensions and no offset if variation is zero
         if variation == 0:
             return 0, height, 0, width
 
@@ -417,7 +449,7 @@ class VideoToolUI(ctk.CTkToplevel):
         frame_contours, _ = cv2.findContours(frame_thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if frame_contours:
             #select largest contour by area
-            frame_maincontour = max(frame_contours, key=cv2.contourArea)
+            frame_maincontour = max(frame_contours, key=lambda c: cv2.contourArea(c))
             x1, y1, w1, h1 = cv2.boundingRect(frame_maincontour)
         else:   #fallback if no contours detected
             x1 = 0
@@ -432,12 +464,7 @@ class VideoToolUI(ctk.CTkToplevel):
         return x1, y1, w1, h1
 
     def __extract_clips_button(self, batch_mode: bool):
-        self.status_label.configure(state="normal")
-        self.status_label.delete(index1="1.0", index2="end")    #clear status text box
-        self.status_label.configure(state="disabled")
-        t = threading.Thread(target = self.__extract_clips_multi, args = [batch_mode])
-        t.daemon = True
-        t.start()
+        self.__run_in_thread(self.__extract_clips_multi, batch_mode)
 
     def __extract_clips_multi(self, batch_mode: bool):
         if not pathlib.Path(self.clip_output_entry.get()).is_dir() or self.clip_output_entry.get() == "":
@@ -471,25 +498,15 @@ class VideoToolUI(ctk.CTkToplevel):
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             for video_path in input_videos:
-                if self.output_subdir_clip_entry.get() and batch_mode:
-                    output_directory = os.path.join(output_entry,
-                                                    os.path.splitext(os.path.relpath(video_path, input_multiple_entry))[0])
-                elif self.output_subdir_clip_entry.get() and not batch_mode:
-                    output_directory = os.path.join(output_entry,
-                                                    os.path.splitext(os.path.basename(video_path))[0])
-                else:
-                    output_directory = output_entry
-
-                if batch_mode:
-                    #batch mode (running all videos in a folder) ignores start/stop time option and always uses 00:00:00 to 99:99:99
-                    executor.submit(self.__extract_clips,
-                                    str(video_path), "00:00:00", "99:99:99", max_length, self.split_at_cuts.get(),
-                                    self.clip_bordercrop_entry.get(), crop_variation, target_fps, output_directory)
-                else:
-                    executor.submit(self.__extract_clips,
-                                    str(video_path), str(self.clip_time_start_entry.get()),
-                                    str(self.clip_time_end_entry.get()), max_length, self.split_at_cuts.get(),
-                                    self.clip_bordercrop_entry.get(), crop_variation, target_fps, output_directory)
+                output_directory = self.__get_output_dir(
+                    self.output_subdir_clip_entry.get(), batch_mode,
+                    output_entry, video_path, input_multiple_entry)
+                time_start = "00:00:00" if batch_mode else str(self.clip_time_start_entry.get())
+                time_end = "99:99:99" if batch_mode else str(self.clip_time_end_entry.get())
+                executor.submit(self.__extract_clips,
+                                str(video_path), time_start, time_end, max_length,
+                                self.split_at_cuts.get(), bool(self.clip_bordercrop_entry.get()),
+                                crop_variation, target_fps, output_directory)
 
         if batch_mode:
             self.__update_status(f'Clip extraction from all videos in "{input_multiple_entry}" complete')
@@ -497,19 +514,14 @@ class VideoToolUI(ctk.CTkToplevel):
             self.__update_status(f'Clip extraction from "{input_single_entry}" complete')
 
     def __extract_clips(self, video_path: str, timestamp_min: str, timestamp_max: str, max_length: float,
-                        split_at_cuts: bool, remove_borders : bool, crop_variation: float, target_fps: float, output_dir: str):
+                        split_at_cuts: bool, remove_borders: bool, crop_variation: float, target_fps: float, output_dir: str):
         video = cv2.VideoCapture(video_path)
-        vid_fps = video.get(cv2.CAP_PROP_FPS) or 0
-        if vid_fps <= 0:
-            self.__update_status(f'Warning: Could not read FPS for "{os.path.basename(video_path)}". Falling back to 30 FPS.')
-            vid_fps = 30.0
-        max_length_frames = int(max_length * vid_fps)   #convert max length from seconds to frames
-        min_length_frames = max(int(0.25*vid_fps), 1)   #minimum clip length of 1/4 second or 1 frame
+        vid_fps = self.__get_safe_fps(video, video_path)
+        max_length_frames = int(max_length * vid_fps)
+        min_length_frames = max(int(0.25 * vid_fps), 1)
         total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
-        timestamp_max_frame = int(sum(int(x) * 60 ** i for i, x in enumerate(reversed(timestamp_max.split(':')))) * vid_fps)
-        timestamp_max_frame = min(timestamp_max_frame, max(total_frames - 1, 0))
-        timestamp_min_frame = int(sum(int(x) * 60 ** i for i, x in enumerate(reversed(timestamp_min.split(':')))) * vid_fps)
-        timestamp_min_frame = min(timestamp_min_frame, timestamp_max_frame)
+        timestamp_max_frame = min(self.__parse_timestamp_to_frames(timestamp_max, vid_fps), max(total_frames - 1, 0))
+        timestamp_min_frame = min(self.__parse_timestamp_to_frames(timestamp_min, vid_fps), timestamp_max_frame)
 
         if split_at_cuts:
             #use scenedetect to find cuts, based on start/end frame number
@@ -520,10 +532,10 @@ class VideoToolUI(ctk.CTkToplevel):
                 start_time=int(timestamp_min_frame),
                 end_time=int(timestamp_max_frame))
             scene_list = [(x[0].get_frames(), x[1].get_frames()) for x in timecode_list]
-            if len(scene_list) == 0:
-                scene_list = [(timestamp_min_frame, timestamp_max_frame)]    #use start/end frames if no scenes detected
+            if not scene_list:
+                scene_list = [(timestamp_min_frame, timestamp_max_frame)]
         else:
-            scene_list = [(timestamp_min_frame, timestamp_max_frame)]  #default if not using cuts, start and end of time range
+            scene_list = [(timestamp_min_frame, timestamp_max_frame)]
 
         scene_list_split = []
         for scene in scene_list:
@@ -533,30 +545,33 @@ class VideoToolUI(ctk.CTkToplevel):
                 new_length = int(length/n)
                 new_splits = range(scene[0], scene[1]+min_length_frames, new_length)   #divide clip into closest chunks to max_length
                 for i, _n in enumerate(new_splits[:-1]):
-                    if new_splits[i+1] - new_splits[i] > min_length_frames:
-                        scene_list_split += [(new_splits[i], new_splits[i+1])]
-            else:
-                if length > (min_length_frames+2):
-                    scene_list_split += [(scene[0]+1, scene[1]-1)]      #trim first and last frame from detected scenes to avoid transition artifacts
+                    if new_splits[i + 1] - new_splits[i] > min_length_frames:
+                        scene_list_split.append((new_splits[i], new_splits[i + 1]))
+            elif length > (min_length_frames + 2):
+                # Trim first/last frame to avoid transition artifacts
+                scene_list_split.append((scene[0] + 1, scene[1] - 1))
 
         self.__update_status(f'Video "{os.path.basename(video_path)}" being split into {len(scene_list_split)} clips in "{output_dir}"')
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-            for scene in scene_list_split:
+            futures = [
                 executor.submit(self.__save_clip, scene, video_path, target_fps,
                                 remove_borders, crop_variation, output_dir)
+                for scene in scene_list_split
+            ]
+            for future in concurrent.futures.as_completed(futures):
+                exc = future.exception()
+                if exc is not None:
+                    self.__update_status(f'Error saving clip: {exc}')
 
         video.release()
 
-    def __save_clip(self, scene : tuple[int, int], video_path : str, target_fps : float, remove_borders : bool, crop_variation : float, output_dir : str):
+    def __save_clip(self, scene: tuple[int, int], video_path: str, target_fps: float,
+                    remove_borders: bool, crop_variation: float, output_dir: str):
         basename, ext = os.path.splitext(os.path.basename(video_path))
         video = cv2.VideoCapture(str(video_path))
-        fps = video.get(cv2.CAP_PROP_FPS) or 0.0
-        if fps <= 0:
-            self.__update_status(f'Warning: Could not read FPS for "{os.path.basename(video_path)}". Falling back to 30 FPS.')
-            fps = 30.0
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+        fps = self.__get_safe_fps(video, video_path)
+        os.makedirs(output_dir, exist_ok=True)
         output_name = f'{output_dir}{os.sep}{basename}_{scene[0]}-{scene[1]}'
         output_ext = ".mp4"
 
@@ -568,11 +583,10 @@ class VideoToolUI(ctk.CTkToplevel):
             video.release()
             return
 
-        #crop out borders of frame - blends five random frames from the scene to get "average" image
-        #helps prevent incorrect cropping when sampled frame may be all black or otherwise detect incorrect border
+        # Blend random frames to detect borders, avoiding incorrect crop from black frames
         if remove_borders:
             frame_blend = frame
-            for i in range(5):  # blend 5 random frames to get average
+            for i in range(5):
                 random_frame = random.randint(scene[0], scene[1])
                 video.set(cv2.CAP_PROP_POS_FRAMES, random_frame)
                 success, frame = video.read()
@@ -588,40 +602,107 @@ class VideoToolUI(ctk.CTkToplevel):
             h1, w1, _ = frame.shape
 
         y2, h2, x2, w2 = self.__get_random_aspect(h1, w1, crop_variation)
+        # Ensure dimensions are even, required
+        h2 -= h2 % 2
+        w2 -= w2 % 2
         print(end='\x1b[2K')    #clear terminal so next line can overwrite it
         print(f'Saving frames {scene[0]}-{scene[1]} at size {w2}x{h2}', end="\r")
         video.set(cv2.CAP_PROP_POS_FRAMES, (scene[1] + scene[0])//2)
         success, frame = video.read()
         if success:
-            preview = Image.fromarray(
-                    cv2.cvtColor(frame[y1+y2:y1+y2+h2, x1+x2:x1+x2+w2], cv2.COLOR_BGR2RGB))
-            preview.thumbnail((150, 150))
-            self.preview_image.configure(light_image=preview, size=preview.size)
-            #truncate filename of long files so UI doesn't shift around
-            filename_truncated = basename + ext if len(basename) < 20 else basename[:18] + ".." + ext
-            self.preview_image_label.configure(
-            text=f'{filename_truncated}\nFrames: {scene[0]}-{scene[1]}\nSize: {w2}x{h2}')
+            try:
+                preview = Image.fromarray(
+                        cv2.cvtColor(frame[y1+y2:y1+y2+h2, x1+x2:x1+x2+w2], cv2.COLOR_BGR2RGB))
+                preview.thumbnail((150, 150))
+                self.preview_image.configure(light_image=preview, size=preview.size)
+                #truncate filename of long files so UI doesn't shift around
+                filename_truncated = basename + ext if len(basename) < 20 else basename[:18] + ".." + ext
+                self.preview_image_label.configure(
+                text=f'{filename_truncated}\nFrames: {scene[0]}-{scene[1]}\nSize: {w2}x{h2}')
+            except Exception:
+                pass
         video.release()
 
         if target_fps <= 0:
             target_fps = fps
-        cmd = [
-                "ffmpeg", "-y",
-                "-i", f"{video_path}",
-                "-ss", f"{scene[0]/fps}",
-                "-to", f"{scene[1]/fps}",
-                "-vf", f"crop={w2}:{h2}:{x1+x2}:{y1+y2},fps={target_fps}",
-                f"{output_name}{output_ext}",
-            ]
-        subprocess.run(cmd, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
 
-    def __extract_images_button(self, batch_mode : bool):
-        self.status_label.configure(state="normal")
-        self.status_label.delete(index1="1.0", index2="end")    #clear status text box
-        self.status_label.configure(state="disabled")
-        t = threading.Thread(target = self.__extract_images_multi, args = [batch_mode])
-        t.daemon = True
-        t.start()
+        output_path = f'{output_name}{output_ext}'
+        self.__write_clip_av(video_path, output_path, scene, fps, target_fps,
+                             x1 + x2, y1 + y2, w2, h2)
+
+    @staticmethod
+    def __write_clip_av(video_path: str, output_path: str, scene: tuple[int, int],
+                        src_fps: float, target_fps: float,
+                        crop_x: int, crop_y: int, crop_w: int, crop_h: int):
+        start_sec = scene[0] / src_fps
+        end_sec = scene[1] / src_fps
+        rate_frac = Fraction(target_fps).limit_denominator(10000)
+        stream_time_base = Fraction(rate_frac.denominator, rate_frac.numerator)
+
+        with av.open(video_path) as input_container:
+            in_video = input_container.streams.video[0]
+            in_video.thread_type = 'AUTO'
+            in_audio = input_container.streams.audio[0] if input_container.streams.audio else None
+
+            with av.open(output_path, mode='w') as output_container:
+                out_video = output_container.add_stream('libx264', rate=rate_frac)
+                out_video.width = crop_w
+                out_video.height = crop_h
+                out_video.pix_fmt = 'yuv420p'
+                out_video.time_base = stream_time_base
+
+                out_audio = output_container.add_stream_from_template(in_audio) if in_audio else None
+
+                input_container.seek(int(start_sec * 1_000_000))
+
+                out_frame_idx = 0
+                out_time_step = 1.0 / target_fps
+                video_done = False
+                decode_streams = [s for s in (in_video, in_audio) if s is not None]
+
+                for packet in input_container.demux(decode_streams):
+                    if packet.stream == in_video:
+                        if video_done:
+                            continue
+                        for frame in packet.decode():
+                            if frame.time is None or frame.time < start_sec:
+                                continue
+                            if frame.time >= end_sec:
+                                video_done = True
+                                break
+
+                            # FPS conversion: skip frames when source fps > target fps
+                            if frame.time < start_sec + out_frame_idx * out_time_step:
+                                continue
+
+                            img = frame.to_ndarray(format='bgr24')
+                            cropped = img[crop_y:crop_y + crop_h, crop_x:crop_x + crop_w]
+                            out_frame = av.VideoFrame.from_ndarray(cropped, format='bgr24')
+                            out_frame.pts = out_frame_idx
+                            out_frame.time_base = stream_time_base
+
+                            for out_pkt in out_video.encode(out_frame):
+                                output_container.mux(out_pkt)
+                            out_frame_idx += 1
+
+                    elif packet.stream == in_audio and out_audio is not None:
+                        if packet.dts is None:
+                            continue
+                        pkt_time = float(packet.pts * packet.time_base)
+                        if pkt_time < start_sec or pkt_time >= end_sec:
+                            continue
+                        # Re-timestamp audio relative to clip start
+                        packet.pts = int((pkt_time - start_sec) / packet.time_base)
+                        packet.dts = packet.pts
+                        packet.stream = out_audio
+                        output_container.mux(packet)
+
+                # Flush video encoder
+                for pkt in out_video.encode():
+                    output_container.mux(pkt)
+
+    def __extract_images_button(self, batch_mode: bool):
+        self.__run_in_thread(self.__extract_images_multi, batch_mode)
 
     def __extract_images_multi(self, batch_mode : bool):
         if not pathlib.Path(self.image_output_entry.get()).is_dir() or self.image_output_entry.get() == "":
@@ -650,54 +731,37 @@ class VideoToolUI(ctk.CTkToplevel):
             return
 
         input_videos = self.__get_vid_paths(batch_mode, input_single_entry, input_multiple_entry)
-        if len(input_videos) == 0:  #exit if no paths found
+        if not input_videos:
             return
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             for video_path in input_videos:
-                if self.output_subdir_img_entry.get() and batch_mode:
-                    output_directory = os.path.join(output_entry,
-                                                    os.path.splitext(os.path.relpath(video_path, input_multiple_entry))[0])
-                elif self.output_subdir_img_entry.get() and not batch_mode:
-                    output_directory = os.path.join(output_entry,
-                                                    os.path.splitext(os.path.basename(video_path))[0])
-                else:
-                    output_directory = output_entry
-
-                if batch_mode:
-                    #batch mode (running all videos in a folder) ignores start/stop time option and always uses 00:00:00 to 99:99:99
-                    executor.submit(self.__save_frames,
-                                    str(video_path), "00:00:00", "99:99:99", capture_rate,
-                                    blur_threshold, self.image_bordercrop.get(),
-                                    crop_variation, output_directory)
-                else:
-                    executor.submit(self.__save_frames,
-                                    str(video_path), str(self.image_time_start_entry.get()),
-                                    str(self.image_time_end_entry.get()), capture_rate,
-                                    blur_threshold, self.image_bordercrop.get(),
-                                    crop_variation, output_directory)
+                output_directory = self.__get_output_dir(
+                    self.output_subdir_img_entry.get(), batch_mode,
+                    output_entry, video_path, input_multiple_entry)
+                time_start = "00:00:00" if batch_mode else str(self.image_time_start_entry.get())
+                time_end = "99:99:99" if batch_mode else str(self.image_time_end_entry.get())
+                executor.submit(self.__save_frames,
+                                str(video_path), time_start, time_end, capture_rate,
+                                blur_threshold, self.image_bordercrop.get(),
+                                crop_variation, output_directory)
         if batch_mode:
             self.__update_status(f'Image extraction from all videos in {input_multiple_entry} complete')
         else:
             self.__update_status(f'Image extraction from "{input_single_entry}" complete')
 
     def __save_frames(self, video_path: str, timestamp_min: str, timestamp_max: str, capture_rate: float,
-                      blur_threshold: float, remove_borders : bool, crop_variation: float, output_dir: str):
+                      blur_threshold: float, remove_borders: bool, crop_variation: float, output_dir: str):
         video = cv2.VideoCapture(video_path)
-        vid_fps = video.get(cv2.CAP_PROP_FPS) or 0
-        if vid_fps <= 0:
-            self.__update_status(f'Warning: Could not read FPS for "{os.path.basename(video_path)}". Falling back to 30 FPS.')
-            vid_fps = 30.0
+        vid_fps = self.__get_safe_fps(video, video_path)
         if capture_rate <= 0:
             self.__update_status("Images/sec must be > 0.")
             video.release()
             return
-        image_rate = max(int(vid_fps / capture_rate), 1)   #frames between captures (min 1)
+        image_rate = max(int(vid_fps / capture_rate), 1)
         total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
-        timestamp_max_frame = int(sum(int(x) * 60 ** i for i, x in enumerate(reversed(timestamp_max.split(':')))) * vid_fps)
-        timestamp_max_frame = min(timestamp_max_frame, max(total_frames - 1, 0))
-        timestamp_min_frame = int(sum(int(x) * 60 ** i for i, x in enumerate(reversed(timestamp_min.split(':')))) * vid_fps)
-        timestamp_min_frame = min(timestamp_min_frame, timestamp_max_frame)
+        timestamp_max_frame = min(self.__parse_timestamp_to_frames(timestamp_max, vid_fps), max(total_frames - 1, 0))
+        timestamp_min_frame = min(self.__parse_timestamp_to_frames(timestamp_min, vid_fps), timestamp_max_frame)
         frame_range = range(timestamp_min_frame, timestamp_max_frame, image_rate)
         frame_list = []
 
@@ -715,7 +779,7 @@ class VideoToolUI(ctk.CTkToplevel):
             success, frame = video.read()
             if success and frame is not None:
                 frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                frame_sharpness = cv2.Laplacian(frame_grayscale, cv2.CV_64F).var()  #get sharpness of greyscale pic
+                frame_sharpness = cv2.Laplacian(frame_grayscale, cv2.CV_64F).var()
                 output_list.append((f, frame_sharpness))
 
         if not output_list:
@@ -724,13 +788,12 @@ class VideoToolUI(ctk.CTkToplevel):
             return
 
         output_list_sorted = sorted(output_list, key=lambda x: x[1])
-        cutoff = int(blur_threshold*len(output_list_sorted))     #calculate cutoff as portion of total frames
-        output_list_cut = output_list_sorted[cutoff:]            #keep all frames above cutoff
+        cutoff = int(blur_threshold * len(output_list_sorted))
+        output_list_cut = output_list_sorted[cutoff:]
         self.__update_status(f'{cutoff} blurriest images have been dropped from "{os.path.basename(video_path)}"')
 
         basename, ext = os.path.splitext(os.path.basename(video_path))
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
 
         for f in output_list_cut:
             filename = f'{output_dir}{os.sep}{basename}_{f[0]}.jpg'
@@ -750,29 +813,26 @@ class VideoToolUI(ctk.CTkToplevel):
 
             y2, h2, x2, w2 = self.__get_random_aspect(h1, w1, crop_variation)
 
-            if success and frame is not None:
+            if success and frame is not None and frame_cropped is not None:
                 print(end='\x1b[2K')    #clear terminal so next line can overwrite it
                 print(f'Saving frame {f[0]} at size {w2}x{h2}', end="\r")
-                preview = Image.fromarray(
-                    cv2.cvtColor(frame_cropped[y2:y2+h2, x2:x2+w2], cv2.COLOR_BGR2RGB))
-                preview.thumbnail((150, 150))
-                filename_truncated = basename + ext if len(basename) < 20 else basename[:17] + "..." + ext
-                self.preview_image.configure(light_image=preview, size=preview.size)
-                self.preview_image_label.configure(text=f'{filename_truncated}\nFrame: {f[0]}\nSize: {w2}x{h2}')
+                try:
+                    preview = Image.fromarray(
+                        cv2.cvtColor(frame_cropped[y2:y2+h2, x2:x2+w2], cv2.COLOR_BGR2RGB))
+                    preview.thumbnail((150, 150))
+                    filename_truncated = basename + ext if len(basename) < 20 else basename[:17] + "..." + ext
+                    self.preview_image.configure(light_image=preview, size=preview.size)
+                    self.preview_image_label.configure(text=f'{filename_truncated}\nFrame: {f[0]}\nSize: {w2}x{h2}')
+                except Exception:
+                    pass  # preview update is non-critical
 
-                cv2.imwrite(filename, frame_cropped[y2:y2+h2, x2:x2+w2])    #save images
+                cv2.imwrite(filename, frame_cropped[y2:y2+h2, x2:x2+w2])
         video.release()
 
     def __download_button(self, batch_mode: bool):
-        self.status_label.configure(state="normal")
-        self.status_label.delete(index1="1.0", index2="end")    #clear status text box
-        self.status_label.configure(state="disabled")
-        t = threading.Thread(target = self.__download_multi, args = [batch_mode])
-        t.daemon = True
-        t.start()
+        self.__run_in_thread(self.__download_multi, batch_mode)
 
     def __update_status(self, status_text: str):
-        #prints given text to the terminal, as well as appends it to status box
         print(status_text)
         self.status_label.configure(state="normal")
         self.status_label.insert(index="end", text=status_text + "\n")
