@@ -102,7 +102,7 @@ class SampleFrame(ctk.CTkFrame):
                     ("Euler Karras", NoiseScheduler.EULER_KARRAS),
                     ("DPM++ Karras", NoiseScheduler.DPMPP_KARRAS),
                     ("DPM++ SDE Karras", NoiseScheduler.DPMPP_SDE_KARRAS),
-                    ("UniPC Karras", NoiseScheduler.UNIPC_KARRAS),# TODO: update diffusers to fix UNIPC_KARRAS (see https://github.com/huggingface/diffusers/pull/4581)
+                    ("UniPC Karras", NoiseScheduler.UNIPC_KARRAS)
                 ], self.ui_state, "noise_scheduler")
 
             # steps
