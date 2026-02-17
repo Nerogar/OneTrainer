@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 from modules.model.FluxModel import FluxModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
@@ -146,7 +147,6 @@ class FluxSampler(BaseModelSampler):
 
             self.model.transformer_to(self.temp_device)
             torch_gc()
-
             latent_image = self.model.unpack_latents(
                 latent_image,
                 height // vae_scale_factor,
@@ -159,7 +159,7 @@ class FluxSampler(BaseModelSampler):
             latents = (latent_image / vae.config.scaling_factor) + vae.config.shift_factor
             image = vae.decode(latents, return_dict=False)[0]
 
-            do_denormalize = [True] * image.shape[0]
+            do_denormalize = [True] * image.shape[0] #TODO remove and test, from Flux and other models. True is the default
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
             self.model.vae_to(self.temp_device)
@@ -450,3 +450,6 @@ class FluxSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
+
+factory.register(BaseModelSampler, FluxSampler, ModelType.FLUX_DEV_1)
+factory.register(BaseModelSampler, FluxSampler, ModelType.FLUX_FILL_DEV_1)

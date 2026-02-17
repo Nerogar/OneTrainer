@@ -1,31 +1,11 @@
 from modules.model.QwenModel import QwenModel
-from modules.modelSaver.BaseModelSaver import BaseModelSaver
-from modules.modelSaver.mixin.InternalModelSaverMixin import InternalModelSaverMixin
+from modules.modelSaver.GenericFineTuneModelSaver import make_fine_tune_model_saver
 from modules.modelSaver.qwen.QwenModelSaver import QwenModelSaver
-from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
-import torch
-
-
-class QwenFineTuneModelSaver(
-    BaseModelSaver,
-    InternalModelSaverMixin,
-):
-    def __init__(self):
-        super().__init__()
-
-    def save(
-            self,
-            model: QwenModel,
-            model_type: ModelType,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
-    ):
-        base_model_saver = QwenModelSaver()
-
-        base_model_saver.save(model, output_model_format, output_model_destination, dtype)
-
-        if output_model_format == ModelFormat.INTERNAL:
-            self._save_internal_data(model, output_model_destination)
+QwenFineTuneModelSaver = make_fine_tune_model_saver(
+    ModelType.QWEN,
+    model_class=QwenModel,
+    model_saver_class=QwenModelSaver,
+    embedding_saver_class=None,
+)
