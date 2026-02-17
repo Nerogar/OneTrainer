@@ -165,7 +165,7 @@ def benchmark_int8(m, k, n, device = 'cuda'):
     run_benchmark(lambda: mm_8bit(y_8, w_8), "triton mm backward int8")
 
     run_benchmark(lambda: int8_forward_tokenwise(x, w_8, w_scale, bias=None, compute_dtype=torch.bfloat16), "torch forward int", compile=True)
-    run_benchmark(lambda: int8_backward_axiswise(y, w_8, w_scale, bias=None, compute_dtype=torch.bfloat16), "triton backward int", compile=True)
+    run_benchmark(lambda: int8_backward_axiswise(y, w_8, w_scale), "triton backward int", compile=True)
 
 
 @torch.no_grad()
@@ -184,7 +184,7 @@ def benchmark_fp8(m, k, n, device = 'cuda'):
         torch._scaled_mm(a, b.T.contiguous().T, out_dtype=torch.bfloat16, scale_a=one_scale.float(), scale_b=w_scale.float())
     run_benchmark(lambda: torch_backward(y_8, w_8), "torch mm backward fp8")
     run_benchmark(lambda: mm_8bit(y_8, w_8), "triton mm backward fp8")
-    run_benchmark(lambda: fp8_forward_tokenwise(x, w_8, w_scale), "torch forward fp8", compile=True)
+    run_benchmark(lambda: fp8_forward_tokenwise(x, w_8, w_scale, bias=None, compute_dtype=torch.bfloat16), "torch forward fp8", compile=True)
     run_benchmark(lambda: fp8_backward_axiswise(y, w_8, w_scale), "triton backward fp8", compile=True)
 
 
