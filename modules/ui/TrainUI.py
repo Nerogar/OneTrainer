@@ -301,11 +301,11 @@ class TrainUI(ctk.CTk):
         # device
         components.label(frame, 10, 0, "Dataloader Threads",
                          tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
-        components.entry(frame, 10, 1, self.ui_state, "dataloader_threads")
+        components.entry(frame, 10, 1, self.ui_state, "dataloader_threads", required=True)
 
         components.label(frame, 11, 0, "Train Device",
                          tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\". Must be \"cuda\" for multi-GPU training.")
-        components.entry(frame, 11, 1, self.ui_state, "train_device")
+        components.entry(frame, 11, 1, self.ui_state, "train_device", required=True)
 
         components.label(frame, 12, 0, "Multi-GPU",
                          tooltip="Enable multi-GPU training")
