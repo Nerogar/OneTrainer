@@ -1,8 +1,6 @@
-# WebUI (Experimental)
+# WebUI
 
-OneTrainer now includes an **optional WebUI mode** that runs alongside the existing native desktop UI.
-
-This mode is intentionally additive and does **not** modify or replace the existing [`start-ui.bat`](../start-ui.bat) / [`start-ui.sh`](../start-ui.sh) flow.
+OneTrainer supports WebUI as the primary interactive UI for browser-based operation.
 
 ## What this provides
 
@@ -10,17 +8,18 @@ This mode is intentionally additive and does **not** modify or replace the exist
 - Runtime training state endpoint (status + progress + logs)
 - Reuse of the same training backend (`TrainConfig`, trainer factory, callbacks, commands)
 
-## What this does not replace
+## Legacy desktop UI status
 
-- The native CustomTkinter desktop UI remains the primary and fully featured UI
-- Captioning/masking and conversion tools are still desktop windows
-- TensorBoard behavior remains unchanged
+- The legacy CustomTkinter desktop training UI in [`scripts/train_ui.py`](../scripts/train_ui.py) is deprecated for this workflow.
+- For WebUI workflows, run [`scripts/train_webui.py`](../scripts/train_webui.py) directly.
+- TensorBoard behavior remains unchanged.
 
 ## Start WebUI
 
 ### Windows
 
-- Run [`start-webui.bat`](../start-webui.bat)
+- Run directly: `python scripts\\train_webui.py --host 127.0.0.1 --port 7860`
+- Optional wrapper: [`start-webui.bat`](../start-webui.bat)
 
 Optional environment variables:
 
@@ -29,7 +28,8 @@ Optional environment variables:
 
 ### Linux/macOS
 
-- Run [`start-webui.sh`](../start-webui.sh)
+- Run directly: `python scripts/train_webui.py --host 127.0.0.1 --port 7860`
+- Optional wrapper: [`start-webui.sh`](../start-webui.sh)
 
 Optional environment variables:
 
@@ -64,14 +64,13 @@ Implemented in [`scripts/train_webui.py`](../scripts/train_webui.py).
 - `config_path` is required and must be valid JSON
 - `secrets_path` is optional (defaults to `secrets.json` fallback logic)
 
-## Non-breaking architecture notes
+## Architecture notes
 
-- Web mode is implemented in new files only:
+- Web mode is implemented primarily in new files:
   - [`scripts/train_webui.py`](../scripts/train_webui.py)
   - [`modules/webui/WebUIService.py`](../modules/webui/WebUIService.py)
   - [`start-webui.bat`](../start-webui.bat)
   - [`start-webui.sh`](../start-webui.sh)
-- Existing desktop UI entrypoints are untouched
 - Training still runs through existing shared backend creation (`create.create_trainer`)
 
 ## Dependency additions
@@ -86,5 +85,5 @@ These are added to [`requirements-global.txt`](../requirements-global.txt).
 ## Current limitations
 
 - Minimal initial web front-end intended as a safe baseline
-- Not yet feature-parity with desktop tabs
+- Not yet feature-parity with all legacy desktop tabs
 - Single training job at a time per WebUI process

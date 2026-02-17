@@ -80,26 +80,26 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 
 ## Usage
 
-OneTrainer can be used in **three primary modes**: a graphical user interface (GUI), an experimental **WebUI**, and a **command-line interface (CLI)** for finer control.
+OneTrainer can be used in **two primary modes**: a **WebUI** and a **command-line interface (CLI)** for finer control.
 
 For a technically focused quick start, see the [Quick Start Guide](docs/QuickStartGuide.md) and for a broader overview, see the [Overview documentation](docs/Overview.md). Otherwise visit [our wiki!](https://github.com/Nerogar/OneTrainer)
 
-### GUI Mode
+### WebUI Mode
 
 #### Windows
 
--   To start the UI, navigate to the OneTrainer folder and double-click `start-ui.bat`
+-   Start WebUI directly with: `python scripts\\train_webui.py --host 127.0.0.1 --port 7860`
 
 #### Unix-based systems
 
--   Execute `start-ui.sh` and the GUI will pop up.
+-   Start WebUI directly with: `python scripts/train_webui.py --host 127.0.0.1 --port 7860`
 
-### WebUI Mode (Experimental)
+Optional wrapper launchers are also available:
 
--   Windows: run `start-webui.bat`
--   Linux/macOS: run `start-webui.sh`
+-   Windows: `start-webui.bat`
+-   Linux/macOS: `start-webui.sh`
 
-The WebUI documentation is available at [docs/WebUI.md](docs/WebUI.md).
+Detailed WebUI documentation is available at [docs/WebUI.md](docs/WebUI.md).
 
 ### CLI Mode
 
@@ -108,7 +108,7 @@ If you need more control or a headless approach OT also supports the command-lin
 All functionality is split into different scripts located in the `scripts` directory. This currently includes:
 
 -   `train.py` The central training script
--   `train_ui.py` A UI for training
+-   `train_ui.py` Legacy desktop training UI (deprecated)
 -   `train_webui.py` A browser-based experimental WebUI for training control
 -   `caption_ui.py` A UI for manual or automatic captioning and mask creation for masked training
 -   `convert_model_ui.py` A UI for model conversions
