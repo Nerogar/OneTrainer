@@ -41,7 +41,7 @@ class BaseFluxSetup(
     LAYER_PRESETS = {
         "attn-mlp": ["attn", "ff.net"],
         "attn-only": ["attn"],
-        "blocks": ["transformer_block"],
+        "blocks": ["transformer_blocks"],
         "full": [],
     }
 
