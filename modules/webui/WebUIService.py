@@ -176,4 +176,3 @@ class WebUIService:
                 "progress": dict(self._progress),
                 "logs": list(self._logs),
             }
-

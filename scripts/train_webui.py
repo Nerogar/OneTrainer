@@ -10,11 +10,10 @@ from typing import Any
 
 from modules.webui.WebUIService import WebUIService
 
+import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-
-import uvicorn
 
 
 class StartTrainingRequest(BaseModel):
@@ -192,4 +191,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

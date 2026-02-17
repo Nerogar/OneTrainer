@@ -15,4 +15,3 @@ WEBUI_HOST="${WEBUI_HOST:-127.0.0.1}"
 WEBUI_PORT="${WEBUI_PORT:-7860}"
 
 run_python_in_active_env "scripts/train_webui.py" --host "${WEBUI_HOST}" --port "${WEBUI_PORT}" "$@"
-

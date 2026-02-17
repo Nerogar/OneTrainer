@@ -88,4 +88,3 @@ These are added to [`requirements-global.txt`](../requirements-global.txt).
 - Minimal initial web front-end intended as a safe baseline
 - Not yet feature-parity with desktop tabs
 - Single training job at a time per WebUI process
-
