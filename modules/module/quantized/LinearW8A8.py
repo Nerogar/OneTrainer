@@ -15,7 +15,7 @@ from torch import Tensor, nn
 
 
 @torch.no_grad()
-def int8_forward_tokenwise(x: Tensor, weight: Tensor, weight_scale: float, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
+def int8_forward_tokenwise(x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
     x_8, x_scale = quantize_int8_axiswise(x, dim=-1)
     res = torch._int_mm(x_8, weight.T)
     res_scaled = res.float().mul_(weight_scale * x_scale).to(compute_dtype)
@@ -24,7 +24,7 @@ def int8_forward_tokenwise(x: Tensor, weight: Tensor, weight_scale: float, bias:
     return res_scaled
 
 @torch.no_grad()
-def fp8_forward_tokenwise(x: Tensor, weight: Tensor, weight_scale: float, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
+def fp8_forward_tokenwise(x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
     x_8, x_scale = quantize_fp8_axiswise(x, dim=-1)
     one = torch.ones(1, device=x.device)
     res = torch._scaled_mm(x_8, weight.T, scale_a=one, scale_b=weight_scale.float(), out_dtype=torch.float)
@@ -34,14 +34,14 @@ def fp8_forward_tokenwise(x: Tensor, weight: Tensor, weight_scale: float, bias: 
     return res_scaled
 
 @torch.no_grad()
-def int8_backward_axiswise(output: Tensor, weight: Tensor, weight_scale: float) -> Tensor:
+def int8_backward_axiswise(output: Tensor, weight: Tensor, weight_scale: Tensor) -> Tensor:
     output_8, output_scale = quantize_int8_axiswise(output, dim=-1)
     #almost always, grad outputs are already contiguous and this is a no-op. But there are some grad outputs from SDXL that are non-contiguous:
     mm_res = mm_8bit(output_8.contiguous(), weight)
     return mm_res.float().mul_(weight_scale * output_scale).to(output.dtype)
 
 @torch.no_grad()
-def fp8_backward_axiswise(output: Tensor, weight: Tensor, weight_scale: float) -> Tensor:
+def fp8_backward_axiswise(output: Tensor, weight: Tensor, weight_scale: Tensor) -> Tensor:
     output_8, output_scale = quantize_fp8_axiswise(output, dim=-1)
     mm_res = mm_8bit(output_8.contiguous(), weight)
     return mm_res.float().mul_(weight_scale * output_scale).to(output.dtype)
@@ -49,7 +49,7 @@ def fp8_backward_axiswise(output: Tensor, weight: Tensor, weight_scale: float) -
 
 class LinearInt8Function(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x: Tensor, weight: Tensor, weight_scale: float, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
+    def forward(ctx, x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
         ctx.save_for_backward(weight, weight_scale)
         return int8_forward_tokenwise(x, weight, weight_scale, bias, compute_dtype)
 
@@ -63,7 +63,7 @@ class LinearInt8Function(torch.autograd.Function):
 
 class LinearFp8Function(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x: Tensor, weight: Tensor, weight_scale: float, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
+    def forward(ctx, x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
         ctx.save_for_backward(weight, weight_scale)
         return fp8_forward_tokenwise(x, weight, weight_scale, bias, compute_dtype)
 
