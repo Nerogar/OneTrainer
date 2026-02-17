@@ -4,7 +4,7 @@ torch==2.9.1+cu128
 torchvision==0.24.1+cu128
 onnxruntime-gpu==1.23.2
 nvidia-nccl-cu12==2.27.5; sys_platform == "linux"
-triton-windows==3.6.0.post25; sys_platform == "win32"
+triton-windows==3.5.1.post24; sys_platform == "win32"
 
 # optimizers
 bitsandbytes==0.49.1 # bitsandbytes for 8-bit optimizers and weight quantization
