@@ -26,7 +26,7 @@ def int8_forward_tokenwise(x: Tensor, weight: Tensor, weight_scale: Tensor, bias
 @torch.no_grad()
 def fp8_forward_tokenwise(x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
     x_8, x_scale = quantize_fp8_axiswise(x, dim=-1)
-    one = torch.ones(1, device=x.device)
+    one = torch.tensor(1.0, device=x.device)
     res = torch._scaled_mm(x_8, weight.T, scale_a=one, scale_b=weight_scale.float(), out_dtype=torch.float)
     res_scaled = res.mul_(x_scale).to(compute_dtype) #much faster than scaled by _scaled_mm
     if bias is not None:
