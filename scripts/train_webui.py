@@ -12,6 +12,7 @@ def main():
     app.launch(
         server_name="0.0.0.0",
         server_port=7860,
+        share=True,
         theme=gr.themes.Soft(),
         allowed_paths=[LOGO_DIR],
     )
