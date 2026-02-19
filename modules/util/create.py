@@ -883,6 +883,8 @@ def create_optimizer(
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 approx_mars=optimizer_config.approx_mars if optimizer_config.approx_mars is not None else False,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
+                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
                 **adam_kwargs
             )
 
