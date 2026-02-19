@@ -85,7 +85,7 @@ class LoraTab:
             components.switch(master, 3, 4, self.ui_state, "lora_decompose_output_axis")
 
             components.label(master, 4, 3, "Use Stiefel LoRA",
-                             tooltip="Use Stiefel manifold initialization and optimizer.")
+                             tooltip="Implements Stiefel-LoRA, which treats the B-factor as an orthogonal matrix updated via manifold projection and retraction. This addresses the 'rank collapse' issue found in standard LoRA/DoRA training. Includes rank-invariant scaling (LR/Weight Decay). Alpha is MUST set equal to Rank.")
 
             stiefel_frame = ctk.CTkFrame(master, fg_color="transparent")
             stiefel_frame.grid(row=4, column=4, sticky="w")
