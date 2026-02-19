@@ -11,7 +11,6 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.quantization_util import get_unquantized_weight, get_weight_shape
-from modules.util.enum.Optimizer import Optimizer
 
 import torch
 import torch.nn.functional as F
@@ -604,7 +603,7 @@ class LoRAModuleWrapper:
         self.peft_type = config.peft_type
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
-        use_stiefel = config.optimizer == Optimizer.Stiefel_LoRA
+        use_stiefel = config.use_stiefel
 
         self.module_filters = [
             ModuleFilter(pattern, use_regex=config.layer_filter_regex)

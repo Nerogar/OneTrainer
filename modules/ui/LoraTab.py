@@ -84,6 +84,24 @@ class LoraTab:
                              tooltip="Apply the weight decomposition on the output axis instead of the input axis.")
             components.switch(master, 3, 4, self.ui_state, "lora_decompose_output_axis")
 
+            components.label(master, 4, 3, "Use Stiefel LoRA",
+                             tooltip="Use Stiefel manifold initialization and optimizer.")
+
+            stiefel_frame = ctk.CTkFrame(master, fg_color="transparent")
+            stiefel_frame.grid(row=4, column=4, sticky="w")
+            components.switch(stiefel_frame, 0, 0, self.ui_state, "use_stiefel")
+
+            def open_stiefel_settings():
+                from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
+                from modules.util.enum.Optimizer import Optimizer
+                self.ui_state.get_var("use_stiefel").set(True)
+                self.ui_state.get_var("optimizer.optimizer").set(str(Optimizer.Stiefel_LoRA))
+                self.train_config.optimizer.optimizer = Optimizer.Stiefel_LoRA
+                window = OptimizerParamsWindow(self.master, self.train_config, self.ui_state)
+                self.master.wait_window(window)
+
+            ctk.CTkButton(stiefel_frame, text="...", width=30, command=open_stiefel_settings).grid(row=0, column=1, padx=(5, 0))
+
         # LoRA and LoHA shared settings
         if peft_type == PeftType.LORA or peft_type == PeftType.LOHA:
             # rank
