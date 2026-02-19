@@ -10,6 +10,7 @@ from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2Im
 from modules.util import path_util
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
+from modules.util.enum.ImagePreprocessing import ImagePreprocessing
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
@@ -29,6 +30,7 @@ from mgds.pipelineModules.GetFilename import GetFilename
 from mgds.pipelineModules.ImageToVideo import ImageToVideo
 from mgds.pipelineModules.InlineAspectBatchSorting import InlineAspectBatchSorting
 from mgds.pipelineModules.InlineDistributedSampler import InlineDistributedSampler
+from mgds.pipelineModules.KeepAspectCalculation import KeepAspectCalculation
 from mgds.pipelineModules.LoadImage import LoadImage
 from mgds.pipelineModules.LoadMultipleTexts import LoadMultipleTexts
 from mgds.pipelineModules.LoadVideo import LoadVideo
@@ -154,7 +156,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
     def _aspect_bucketing_in(self, config: TrainConfig, aspect_bucketing_quantization: int, frame_dim_enabled:bool=False):
         calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
 
-        aspect_bucketing_quantization = AspectBucketing(
+        aspect_bucketing = AspectBucketing(
             quantization=aspect_bucketing_quantization,
             resolution_in_name='original_resolution',
             target_resolution_in_name='settings.target_resolution',
@@ -177,12 +179,26 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             possible_resolutions_out_name='possible_resolutions'
         )
 
-        modules = [calc_aspect]
+        keep_aspect_calculation = KeepAspectCalculation(
+            resolution_in_name='original_resolution',
+            target_resolution_in_name='settings.target_resolution',
+            enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
+            target_resolutions_override_in_name='concept.image.resolution_override',
+            scale_resolution_out_name='scale_resolution',
+            crop_resolution_out_name='crop_resolution',
+            quantization=aspect_bucketing_quantization,
+            #possible_resolutions_out_name='possible_resolutions'
+        )
 
-        if config.aspect_ratio_bucketing:
-            modules.append(aspect_bucketing_quantization)
-        else:
-            modules.append(single_aspect_calculation)
+        modules: list = [calc_aspect]
+
+        match config.image_preprocessing:
+            case ImagePreprocessing.SQUARE_CENTER_CROP:
+                modules.append(single_aspect_calculation)
+            case ImagePreprocessing.ASPECT_RATIO_BUCKETING:
+                modules.append(aspect_bucketing)
+            case ImagePreprocessing.KEEP_ASPECT_RATIO:
+                modules.append(keep_aspect_calculation)
 
         return modules
 
