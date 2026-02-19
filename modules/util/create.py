@@ -789,6 +789,22 @@ def create_optimizer(
                 alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
             )
 
+        # Stiefel_LoRA Optimizer
+        case Optimizer.Stiefel_LoRA:
+            from adv_optm import Stiefel_LoRA
+            optimizer = Stiefel_LoRA(
+                params=parameters,
+                lr=config.learning_rate,
+                momentum=optimizer_config.momentum if optimizer_config.momentum is not None else 0,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
+                cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
+                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+            )
+
         # LION_ADV Optimizer
         case Optimizer.LION_ADV:
             from adv_optm import Lion_adv
