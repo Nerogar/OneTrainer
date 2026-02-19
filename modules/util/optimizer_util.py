@@ -556,7 +556,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "weight_decay": 0.0,
         "nnmf_factor": False,
         "stochastic_rounding": True,
-        "compiled_optimizer": False,
+        "compile": False,
         "fused_back_pass": False,
         "Simplified_AdEMAMix": False,
         "alpha_grad": 100.0,
