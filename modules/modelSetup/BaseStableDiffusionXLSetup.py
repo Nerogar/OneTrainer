@@ -83,6 +83,7 @@ class BaseStableDiffusionXLSetup(
         quantize_layers(model.text_encoder_2, self.train_device, model.train_dtype, config)
         quantize_layers(model.vae, self.train_device, model.vae_train_dtype, config)
         quantize_layers(model.unet, self.train_device, model.train_dtype, config)
+        self._set_attention_backend(model.unet, config.attention_mechanism)
 
     def _setup_embeddings(
             self,

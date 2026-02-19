@@ -177,8 +177,8 @@ class QwenModel(BaseModel):
         #pad to 16 because attention processors and/or torch.compile can have issues with uneven sequence lengths, but only pad if an attention mask has to be used anyway:
         #TODO the second condition could trigger https://github.com/pytorch/pytorch/issues/165506 again, but try like this because no attention mask
         #is preferable: https://github.com/Nerogar/OneTrainer/pull/1109
-        if max_seq_length % 16 > 0 and (seq_lengths != max_seq_length).any():
-            max_seq_length += (16 - max_seq_length % 16)
+        if max_seq_length % 64 > 0 and (seq_lengths != max_seq_length).any():
+            max_seq_length += (64 - max_seq_length % 64)
 
         text_encoder_output = text_encoder_output[:, :max_seq_length, :]
         bool_attention_mask = tokens_mask[:, :max_seq_length].bool()

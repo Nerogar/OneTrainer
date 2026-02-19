@@ -117,7 +117,7 @@ class QwenSampler(BaseModelSampler):
                     hidden_states=latent_model_input.to(dtype=self.model.train_dtype.torch_dtype()),
                     timestep=expanded_timestep / 1000,
                     encoder_hidden_states=combined_prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
-                    encoder_hidden_states_mask=text_attention_mask,
+                    encoder_hidden_states_mask=text_attention_mask if not torch.all(text_attention_mask) else None,
                     img_shapes=img_shapes,
                     return_dict=True,
                 ).sample
