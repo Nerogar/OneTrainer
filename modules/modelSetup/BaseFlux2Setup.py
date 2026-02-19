@@ -112,13 +112,11 @@ class BaseFlux2Setup(
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability,
             )
             latent_image = model.patchify_latents(batch['latent_image'].float())
-            latent_height = latent_image.shape[-2]
-            latent_width = latent_image.shape[-1]
             scaled_latent_image = model.scale_latents(latent_image)
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
-            shift = model.calculate_timestep_shift(latent_height, latent_width)
+            shift = model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
             timestep = self._get_timestep_discrete(
                 model.noise_scheduler.config['num_train_timesteps'],
                 deterministic,
@@ -145,6 +143,16 @@ class BaseFlux2Setup(
             text_ids = model.prepare_text_ids(text_encoder_output)
             image_ids = model.prepare_latent_image_ids(latent_input)
             packed_latent_input = model.pack_latents(latent_input)
+            image_seq_len = packed_latent_input.shape[1]
+
+            if 'latent_conditioning_image' in batch:
+                latent_cond_image = model.patchify_latents(batch['latent_conditioning_image'].float())
+                scaled_latent_cond_image = model.scale_latents(latent_cond_image)
+                packed_latent_cond_image = model.pack_latents(scaled_latent_cond_image)
+                packed_latent_input = torch.cat([packed_latent_input, packed_latent_cond_image], dim=1)
+
+                cond_image_ids = model.prepare_latent_image_ids(scaled_latent_cond_image, index=1)
+                image_ids = torch.cat([image_ids, cond_image_ids], dim=1)
 
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
@@ -155,7 +163,7 @@ class BaseFlux2Setup(
                 img_ids=image_ids,
                 joint_attention_kwargs=None,
                 return_dict=True
-            ).sample
+            ).sample[:, :image_seq_len, :]
 
             predicted_flow = model.unpack_latents(
                 packed_predicted_flow,

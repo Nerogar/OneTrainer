@@ -710,8 +710,8 @@ class TrainingTab:
         components.entry(frame, 4, 1, self.ui_state, "masked_prior_preservation_weight")
 
         # use custom conditioning image
-        components.label(frame, 5, 0, "Custom Conditioning Image",
-                         tooltip="When custom conditioning image is enabled, will use png postfix with -condlabel instead of automatically generated.It's suitable for special scenarios, such as object removal, allowing the model to learn a certain behavior concept")
+        components.label(frame, 5, 0, "Edit Training /\nCustom Conditioning Image",
+                         tooltip="Uses a file with -condlabel postfix as reference image for edit models. For inpainting models, the file is used as custom conditioning image instead of an automatically generated conditioning image.")
         components.switch(frame, 5, 1, self.ui_state, "custom_conditioning_image")
 
     def __create_loss_frame(self, master, row, supports_vb_loss: bool = False):

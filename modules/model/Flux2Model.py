@@ -237,10 +237,11 @@ class Flux2Model(BaseModel):
 
     #code adapted from https://github.com/huggingface/diffusers/blob/c8656ed73c638e51fc2e777a5fd355d69fa5220f/src/diffusers/pipelines/flux2/pipeline_flux2.py
     @staticmethod
-    def prepare_latent_image_ids(latents: torch.Tensor) -> torch.Tensor:
+    def prepare_latent_image_ids(latents: torch.Tensor, index: int=0) -> torch.Tensor:
         batch_size, _, height, width = latents.shape
+        scale = 10
 
-        t = torch.arange(1, device=latents.device)
+        t = torch.arange(1, device=latents.device) + index * scale
         h = torch.arange(height, device=latents.device)
         w = torch.arange(width, device=latents.device)
         l_ = torch.arange(1, device=latents.device)
