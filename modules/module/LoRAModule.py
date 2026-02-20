@@ -290,12 +290,14 @@ class LoRAModule(PeftBase):
     rank: int
     alpha: torch.Tensor
     dropout: Dropout
+    use_stiefel: bool
 
     # Note there's a few times in this class where we assert the existence of
     # optional members. This is because these members might not exist at
     # construction, but definitely exist by the time those methods are called.
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float, use_stiefel: bool = False):
+        self.use_stiefel = use_stiefel
         super().__init__(prefix, orig_module)
 
         self.rank = rank
@@ -312,8 +314,18 @@ class LoRAModule(PeftBase):
     def initialize_weights(self):
         self._initialized = True
         self.lora_down, self.lora_up = self.create_layer()
-        nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
-        nn.init.zeros_(self.lora_up.weight)
+
+        if self.use_stiefel:
+            # Stiefel Initialization
+            # Paper requires B (lora_up) to be on Stiefel Manifold (Orthonormal).
+            # To ensure the adapter starts as Identity (0 impact), we must set A (lora_down) to 0.
+            nn.init.orthogonal_(self.lora_up.weight)
+            nn.init.zeros_(self.lora_down.weight)
+            self.lora_down.weight._is_lora_A = True
+            self.lora_up.weight._is_lora_B = True
+        else:
+            nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
+            nn.init.zeros_(self.lora_up.weight)
 
     def check_initialized(self):
         super().check_initialized()
@@ -519,6 +531,8 @@ class DoRAModule(LoRAModule):
                 .to(device=self.orig_module.weight.device)
             )
 
+        self.dora_scale._is_dora_scale = True
+
         del orig_weight
 
     def check_initialized(self):
@@ -593,6 +607,7 @@ class LoRAModuleWrapper:
         self.peft_type = config.peft_type
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
+        use_stiefel = config.use_stiefel
 
         self.module_filters = [
             ModuleFilter(pattern, use_regex=config.layer_filter_regex)
@@ -609,12 +624,15 @@ class LoRAModuleWrapper:
                     'norm_epsilon': config.lora_decompose_norm_epsilon,
                     'decompose_output_axis': config.lora_decompose_output_axis,
                     'train_device': torch.device(config.train_device),
+                    'use_stiefel': use_stiefel,
                 }
             else:
                 self.klass = LoRAModule
                 self.dummy_klass = DummyLoRAModule
                 self.additional_args = [self.rank, self.alpha]
-                self.additional_kwargs = {}
+                self.additional_kwargs = {
+                'use_stiefel': use_stiefel
+                }
         elif self.peft_type == PeftType.LOHA:
             self.klass = LoHaModule
             self.dummy_klass = DummyLoHaModule
