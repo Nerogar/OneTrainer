@@ -14,10 +14,10 @@ def validate_resolution(model_type) -> Callable[[str], str | None]:
         multiple = 64
         if model_type.is_stable_diffusion():
             multiple = 8
-        elif model_type.is_pixart() or model_type.is_flow_matching():
-            multiple = 16
         elif model_type.is_sana() or model_type.is_qwen():
             multiple = 32
+        elif model_type.is_pixart():
+            multiple = 16
         elif model_type.is_wuerstchen():
             multiple = 128
 
