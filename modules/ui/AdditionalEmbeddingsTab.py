@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from modules.ui.ConfigList import ConfigList
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig
@@ -91,7 +90,7 @@ class EmbeddingWidget(ctk.CTkFrame):
                          tooltip="The base embedding to train on. Leave empty to create a new embedding")
         components.path_entry(
             top_frame, 0, 3, self.ui_state, "model_name",
-            mode="file", path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            mode="file", path_modifier=components.json_path_modifier
         )
 
         # placeholder

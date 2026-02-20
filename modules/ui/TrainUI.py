@@ -488,7 +488,7 @@ class TrainUI(ctk.CTk):
                          tooltip="The base embedding to train on. Leave empty to create a new embedding")
         components.path_entry(
             frame, 0, 1, self.ui_state, "embedding.model_name",
-            mode="file", path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            mode="file", path_modifier=components.json_path_modifier
         )
 
         # token count
@@ -749,10 +749,10 @@ class TrainUI(ctk.CTk):
             errors = flush_and_validate_all()
 
             if errors:
+                bullet_list = "\n".join(f"• {e}" for e in errors)
                 messagebox.showerror(
                     "Cannot Start Training",
-                    "Please fix the following errors before training:\n\n"
-                    + "\n".join(f"• {e}" for e in errors),
+                    f"Please fix the following errors before training:\n\n{bullet_list}",
                 )
                 return
 

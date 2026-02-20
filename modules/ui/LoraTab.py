@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
@@ -67,7 +66,7 @@ class LoraTab:
                          tooltip=f"The base {name} to train on. Leave empty to create a new {name}")
         entry = components.path_entry(
             master, 0, 1, self.ui_state, "lora_model_name",
-            mode="file", path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            mode="file", path_modifier=components.json_path_modifier
         )
         entry.grid(row=0, column=1, columnspan=4)
 

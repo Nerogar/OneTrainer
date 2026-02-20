@@ -301,7 +301,8 @@ class TrainingTab:
         # learning rate min factor
         components.label(frame, 4, 0, "Learning Rate Min Factor",
                          tooltip="Unit = float. Method = percentage. For a factor of 0.1, the final LR will be 10% of the initial LR. If the initial LR is 1e-4, the final LR will be 1e-5.")
-        components.entry(frame, 4, 1, self.ui_state, "learning_rate_min_factor", extra_validate=check_range(lower=0, upper=0.99, message="Learning rate min factor must be between 0 and 0.99"))
+        components.entry(frame, 4, 1, self.ui_state, "learning_rate_min_factor",
+                         extra_validate=check_range(lower=0, upper=0.99, message="Learning rate min factor must be between 0 and 0.99"))
 
         # learning rate cycles
         components.label(frame, 5, 0, "Learning Rate Cycles",
@@ -316,7 +317,7 @@ class TrainingTab:
         # batch size
         components.label(frame, 7, 0, "Local Batch Size",
                          tooltip="The batch size of one training step. If you use multiple GPUs, this is the batch size of each GPU (local batch size).")
-        components.entry(frame, 7, 1, self.ui_state, "batch_size", required=True, )
+        components.entry(frame, 7, 1, self.ui_state, "batch_size", required=True)
 
         # accumulation steps
         components.label(frame, 8, 0, "Accumulation Steps",
@@ -696,12 +697,14 @@ class TrainingTab:
         # unmasked probability
         components.label(frame, 1, 0, "Unmasked Probability",
                          tooltip="When masked training is enabled, specifies the number of training steps done on unmasked samples")
-        components.entry(frame, 1, 1, self.ui_state, "unmasked_probability", extra_validate=check_range(lower=0, upper=1, message="Unmasked probability must be between 0 and 1"))
+        components.entry(frame, 1, 1, self.ui_state, "unmasked_probability",
+                         extra_validate=check_range(lower=0, upper=1, message="Unmasked probability must be between 0 and 1"))
 
         # unmasked weight
         components.label(frame, 2, 0, "Unmasked Weight",
                          tooltip="When masked training is enabled, specifies the loss weight of areas outside the masked region")
-        components.entry(frame, 2, 1, self.ui_state, "unmasked_weight", extra_validate=check_range(lower=0, upper=1, message="Unmasked weight must be between 0 and 1"))
+        components.entry(frame, 2, 1, self.ui_state, "unmasked_weight",
+                         extra_validate=check_range(lower=0, upper=1, message="Unmasked weight must be between 0 and 1"))
 
         # normalize masked area loss
         components.label(frame, 3, 0, "Normalize Masked Area Loss",
@@ -711,7 +714,8 @@ class TrainingTab:
         # masked prior preservation
         components.label(frame, 4, 0, "Masked Prior Preservation Weight",
                          tooltip="Preserves regions outside the mask using the original untrained model output as a target. Only available for LoRA training. If enabled, use a low unmasked weight.")
-        components.entry(frame, 4, 1, self.ui_state, "masked_prior_preservation_weight", extra_validate=check_range(lower=0, upper=1, message="Masked prior preservation weight must be between 0 and 1"))
+        components.entry(frame, 4, 1, self.ui_state, "masked_prior_preservation_weight",
+                         extra_validate=check_range(lower=0, upper=1, message="Masked prior preservation weight must be between 0 and 1"))
 
         # use custom conditioning image
         components.label(frame, 5, 0, "Custom Conditioning Image",
@@ -769,7 +773,8 @@ class TrainingTab:
         if not self.train_config.model_type.is_flow_matching():
             components.label(frame, row, 0, "Gamma",
                              tooltip="Inverse strength of loss weighting. Range: 1-20, only applies to Min SNR and P2.")
-            components.entry(frame, row, 1, self.ui_state, "loss_weight_strength", extra_validate=check_range(lower=1, upper=20, message="Gamma must be between 1 and 20"))
+            components.entry(frame, row, 1, self.ui_state, "loss_weight_strength",
+                             extra_validate=check_range(lower=1, upper=20, message="Gamma must be between 1 and 20"))
             row += 1
 
         # Loss Scaler

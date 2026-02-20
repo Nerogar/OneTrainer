@@ -1,6 +1,7 @@
 import contextlib
 import tkinter as tk
 from collections.abc import Callable
+from pathlib import Path
 from tkinter import filedialog
 from typing import Any, Literal
 
@@ -107,12 +108,17 @@ def entry(
     return component
 
 
+def json_path_modifier(x: str | Path) -> Path:
+    x = Path(x).absolute()
+    return x.parent if x.suffix == ".json" else x
+
+
 def path_entry(
         master, row, column, ui_state: UIState, var_name: str,
         *,
         mode: Literal["file", "dir"] = "file",
         io_type: PathIOType = PathIOType.INPUT,
-        path_modifier: Callable[[str], str] | None = None,
+        path_modifier: Callable[[str], str | Path] | None = None,
         allow_model_files: bool = True,
         allow_image_files: bool = False,
         command: Callable[[str], None] | None = None,
@@ -174,10 +180,11 @@ def path_entry(
             if path_modifier:
                 chosen = path_modifier(chosen)
 
-            ui_state.get_var(var_name).set(chosen)
+            chosen_str = str(chosen)
+            ui_state.get_var(var_name).set(chosen_str)
 
             if command:
-                command(chosen)
+                command(chosen_str)
 
     button_component = ctk.CTkButton(frame, text="...", width=40, command=__open_dialog)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
