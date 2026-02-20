@@ -16,7 +16,7 @@ from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.optimizer_util import change_optimizer
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
-from modules.util.ui.validation_helpers import check_range
+from modules.util.ui.validation_helpers import check_range, validate_resolution
 
 import customtkinter as ctk
 
@@ -402,7 +402,8 @@ class TrainingTab:
         # resolution
         components.label(frame, row, 0, "Resolution",
                          tooltip="The resolution used for training. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format <width>x<height>")
-        components.entry(frame, row, 1, self.ui_state, "resolution", required=True)
+        components.entry(frame, row, 1, self.ui_state, "resolution", required=True,
+                         extra_validate=validate_resolution(self.train_config.model_type))
         row += 1
 
         # frames

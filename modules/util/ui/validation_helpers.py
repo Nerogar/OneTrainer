@@ -3,6 +3,51 @@ from __future__ import annotations
 from collections.abc import Callable
 
 
+def validate_resolution(model_type) -> Callable[[str], str | None]:
+    """Return a resolution validator bound to a specific model_type."""
+
+    def _check(value: str) -> str | None:
+        value = value.strip()
+        if not value:
+            return None
+
+        multiple = 64
+        if model_type.is_stable_diffusion():
+            multiple = 8
+        elif model_type.is_pixart() or model_type.is_flow_matching():
+            multiple = 16
+        elif model_type.is_sana() or model_type.is_qwen():
+            multiple = 32
+        elif model_type.is_wuerstchen():
+            multiple = 128
+
+        dims = []
+
+        if 'x' in value:
+            parts = value.split('x')
+            if len(parts) == 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+                dims = [int(parts[0].strip()), int(parts[1].strip())]
+            else:
+                return "Invalid format. Use <width>x<height> (e.g., 1024x768)"
+
+        else:
+            parts = value.split(',')
+            if all(p.strip().isdigit() for p in parts):
+                dims = [int(p.strip()) for p in parts]
+            else:
+                return "Must be a single integer, <width>x<height>, or comma-separated integers"
+
+        for d in dims:
+            if d <= 0:
+                return f"Resolution cannot be less than or equal to 0 (found {d})."
+            if d % multiple != 0:
+                return f"Dimensions must be multiples of {multiple} for {model_type.value} (found {d})."
+
+        return None
+
+    return _check
+
+
 def check_range(
     *,
     lower: float | None = None,
@@ -11,8 +56,7 @@ def check_range(
     upper_inclusive: bool = True,
     message: str | None = None,
 ) -> Callable[[str], str | None]:
-    """Validate that a numeric value falls within specified range, by default both bounds are inclusive.
-    """
+    """Validate that a numeric value falls within specified range, by default both bounds are inclusive."""
 
     def _check(value: str) -> str | None:
         try:

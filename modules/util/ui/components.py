@@ -116,6 +116,7 @@ def path_entry(
         allow_model_files: bool = True,
         allow_image_files: bool = False,
         command: Callable[[str], None] | None = None,
+        extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
 ):
     frame = ctk.CTkFrame(master, fg_color="transparent")
@@ -129,6 +130,7 @@ def path_entry(
     entry_component = entry(
         frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
         validator_factory=_path_validator_factory,
+        extra_validate=extra_validate,
         required=required,
     )
 
