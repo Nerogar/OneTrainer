@@ -321,6 +321,8 @@ class LoRAModule(PeftBase):
             # To ensure the adapter starts as Identity (0 impact), we must set A (lora_down) to 0.
             nn.init.orthogonal_(self.lora_up.weight)
             nn.init.zeros_(self.lora_down.weight)
+            self.lora_down.weight._is_lora_A = True
+            self.lora_up.weight._is_lora_B = True
         else:
             nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
             nn.init.zeros_(self.lora_up.weight)
@@ -528,6 +530,8 @@ class DoRAModule(LoRAModule):
                 .transpose(1, 0)
                 .to(device=self.orig_module.weight.device)
             )
+
+        self.dora_scale._is_dora_scale = True
 
         del orig_weight
 
