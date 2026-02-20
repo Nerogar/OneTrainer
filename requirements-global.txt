@@ -10,19 +10,20 @@ scipy==1.15.3
 matplotlib==3.10.3
 av==16.1.0
 yt-dlp  #no pinned version, frequently updated for compatibility with sites
-scenedetect==0.6.6
+scenedetect==0.6.7.1
 parse==1.20.2
+setuptools==81.0.0
 
 # pytorch
-accelerate==1.7.0
-safetensors==0.5.3
-tensorboard==2.19.0
-pytorch-lightning==2.5.1.post0
+accelerate==1.12.0
+safetensors==0.7.0
+tensorboard==2.20.0
+pytorch-lightning==2.6.1
 
 # diffusion models
--e git+https://github.com/huggingface/diffusers.git@6a1904e#egg=diffusers
+-e git+https://github.com/huggingface/diffusers.git@99daaa8#egg=diffusers
 gguf==0.17.1
-transformers==4.56.2
+transformers==4.57.6
 sentencepiece==0.2.1 # transitive dependency of transformers for tokenizer loading
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
@@ -41,7 +42,7 @@ prodigyopt==1.1.2 # prodigy optimizer
 schedulefree==1.4.1 # schedule-free optimizers
 pytorch_optimizer==3.6.0 # pytorch optimizers
 prodigy-plus-schedule-free==2.0.1 # Prodigy plus optimizer
-adv_optm==2.2.1 # advanced optimizers
+adv_optm==2.2.3 # advanced optimizers
 -e git+https://github.com/KellerJordan/Muon.git@f90a42b#egg=muon-optimizer
 
 # Profiling

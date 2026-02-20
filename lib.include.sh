@@ -33,8 +33,8 @@ export OT_SCRIPT_DEBUG="${OT_SCRIPT_DEBUG:-false}"
 # Internal environment variables.
 # NOTE: Version check supports "3", "3.1" and "3.1.5" specifier formats.
 export OT_PYTHON_VERSION_MINIMUM="3.10"
-export OT_PYTHON_VERSION_TOO_HIGH="3.13"
-export OT_CONDA_USE_PYTHON_VERSION="3.10"
+export OT_PYTHON_VERSION_TOO_HIGH="3.14"
+export OT_CONDA_USE_PYTHON_VERSION="3.13"
 export OT_MUST_INSTALL_REQUIREMENTS="false"
 export OT_UPDATE_METADATA_FILE="${SCRIPT_DIR}/update.var"
 export OT_HOST_OS="$(uname -s)"
@@ -361,7 +361,7 @@ function install_requirements_in_active_env {
     # when running in existing environments. It ensures that all libraries will
     # be upgraded to the same versions as a fresh reinstall of requirements.txt.
     print "Installing requirements in active environment..."
-    run_pip_in_active_env install --upgrade --upgrade-strategy eager pip setuptools
+    run_pip_in_active_env install --upgrade --upgrade-strategy eager pip setuptools==81.0.0
     run_pip_in_active_env install --upgrade --upgrade-strategy eager -r requirements-global.txt -r "$(get_platform_requirements_path)"
     export OT_MUST_INSTALL_REQUIREMENTS="false"
 
