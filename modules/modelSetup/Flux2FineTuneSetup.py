@@ -54,8 +54,9 @@ class Flux2FineTuneSetup(
             model: Flux2Model,
             config: TrainConfig,
     ):
+        params = self.create_parameters(model, config)
         self.__setup_requires_grad(model, config)
-        init_model_parameters(model, self.create_parameters(model, config), self.train_device)
+        init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
             self,
