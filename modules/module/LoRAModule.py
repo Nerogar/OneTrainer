@@ -469,6 +469,87 @@ class OFTModule(PeftBase):
     def dropout(self):
         return self.oft_R.dropout
 
+class DoRAOFTModule(OFTModule):
+    """
+    DoRA applied to OFT.
+    Since OFT (Orthogonal Finetuning) applies a rotation R such that W_new = W_orig @ R^T,
+    and R is orthogonal, the norm of the weight rows (output features) is preserved.
+    ||W_new|| = ||W_orig||.
+
+    Standard DoRA: W_new = m * (V / ||V||).
+    In OFT-DoRA: V = W_orig @ R^T.
+    Since ||V|| = ||W_orig|| is constant under rotation, we can simplify:
+    W_final = m * ( (W_orig @ R^T) / ||W_orig|| )
+            = (m / ||W_orig||) * OFT(x)
+
+    We learn 'm' (dora_scale) and the rotation parameters.
+    """
+    dora_scale: nn.Parameter | None
+    initial_norm: Tensor | None
+
+    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, coft: bool, coft_eps: float, block_share: bool, **kwargs):
+        self.dora_scale = None
+
+        super().__init__(prefix, orig_module, oft_block_size, coft, coft_eps, block_share, **kwargs)
+
+        if not hasattr(self, "initial_norm"):
+            self.register_buffer("initial_norm", None)
+
+    def initialize_weights(self):
+        super().initialize_weights()
+
+        # Calculate initial norms (magnitude) of the weights
+        if isinstance(self.orig_module, nn.Linear):
+            weight = get_unquantized_weight(self.orig_module, torch.float32, self.orig_module.weight.device)
+            norm = torch.norm(weight, dim=1, keepdim=True)
+        elif isinstance(self.orig_module, nn.Conv2d):
+            weight = self.orig_module.weight.detach().float()
+            norm = torch.norm(weight.reshape(weight.shape[0], -1), dim=1).reshape(weight.shape[0], 1, 1, 1)
+        else:
+            raise NotImplementedError("DoRA-OFT only supports Linear and Conv2d")
+
+        if hasattr(self, "initial_norm"):
+             self.initial_norm = norm.to(self.orig_module.weight.device).detach()
+        else:
+             self.register_buffer("initial_norm", norm.to(self.orig_module.weight.device).detach())
+
+        # Initialize learnable magnitude vector to the initial norm
+        self.dora_scale = nn.Parameter(self.initial_norm.clone())
+
+    def check_initialized(self):
+        super().check_initialized()
+        assert self.dora_scale is not None
+        assert self.initial_norm is not None
+
+    def forward(self, x, *args, **kwargs):
+        # Get the standard OFT output
+        # result = W_orig @ R^T @ x + bias
+        result = super().forward(x, *args, **kwargs)
+
+        # Remove the original bias temporarily
+        bias = self.orig_module.bias
+        if bias is not None:
+            if isinstance(self.orig_module, nn.Conv2d):
+                bias_view = bias.view(1, -1, 1, 1)
+            else:
+                bias_view = bias
+            result = result - bias_view
+
+        # Apply DoRA Scaling
+        scale = (self.dora_scale) / (self.initial_norm)
+
+        if isinstance(self.orig_module, nn.Linear):
+            scale = scale.view(1, -1)
+        elif isinstance(self.orig_module, nn.Conv2d):
+            scale = scale.view(1, -1, 1, 1)
+
+        result = result * scale
+
+        # Re-add bias
+        if bias is not None:
+             result = result + bias_view
+
+        return result
 
 class DoRAModule(LoRAModule):
     """Weight-decomposed low rank adaptation.
@@ -571,6 +652,7 @@ DummyLoRAModule = LoRAModule.make_dummy()
 DummyDoRAModule = DoRAModule.make_dummy()
 DummyLoHaModule = LoHaModule.make_dummy()
 DummyOFTModule = OFTModule.make_dummy()
+DummyDoRAOFTModule = DoRAOFTModule.make_dummy()
 
 
 class LoRAModuleWrapper:
@@ -593,6 +675,7 @@ class LoRAModuleWrapper:
         self.peft_type = config.peft_type
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
+        dora_oft = config.dora_oft
 
         self.module_filters = [
             ModuleFilter(pattern, use_regex=config.layer_filter_regex)
@@ -621,8 +704,13 @@ class LoRAModuleWrapper:
             self.additional_args = [self.rank, self.alpha]
             self.additional_kwargs = {}
         elif self.peft_type == PeftType.OFT_2:
-            self.klass = OFTModule
-            self.dummy_klass = DummyOFTModule
+            if dora_oft:
+                 self.klass = DoRAOFTModule
+                 self.dummy_klass = DummyDoRAOFTModule
+            else:
+                 self.klass = OFTModule
+                 self.dummy_klass = DummyOFTModule
+                 
             self.additional_args = [
                 config.oft_block_size,
                 config.oft_coft,
