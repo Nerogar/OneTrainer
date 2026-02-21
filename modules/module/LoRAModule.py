@@ -344,16 +344,18 @@ class OFTModule(PeftBase):
     coft: bool
     coft_eps: float
     block_share: bool
+    scaled_oft: bool
     dropout_probability: float
     adjustment_info: tuple[int, int] | None # for reporting
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, coft: bool, coft_eps: float, block_share: bool, **kwargs):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, coft: bool, coft_eps: float, block_share: bool, scaled_oft: bool, **kwargs):
         super().__init__(prefix, orig_module)
         self.oft_block_size = oft_block_size
         self.rank = 0
         self.coft = coft
         self.coft_eps = coft_eps
         self.block_share = block_share
+        self.use_scaled_oft = scaled_oft
         self.dropout_probability = kwargs.pop('dropout_probability', 0.0)
         self.oft_R = None
         self.adjustment_info = None
@@ -421,6 +423,7 @@ class OFTModule(PeftBase):
             coft=self.coft,
             coft_eps=self.coft_eps,
             block_share=self.block_share,
+            scaled_oft=self.use_scaled_oft,
             use_cayley_neumann=True,
             num_cayley_neumann_terms=5,
             dropout_probability=self.dropout_probability,
@@ -436,9 +439,11 @@ class OFTModule(PeftBase):
             rotated_x = self.oft_R(x)
             return self.orig_forward(rotated_x, *args, **kwargs)
 
+        effective_weight = self.oft_R.weight / self.oft_R.n_elements ** 0.5 if self.use_scaled_oft else self.oft_R.weight
+
         # For Conv2d, we must rotate the weights, not the input, to preserve spatial information.
         orth_rotate = self.oft_R._cayley_batch(
-            self.oft_R.weight, self.oft_R.block_size, self.oft_R.use_cayley_neumann, self.oft_R.num_cayley_neumann_terms
+            effective_weight, self.oft_R.block_size, self.oft_R.use_cayley_neumann, self.oft_R.num_cayley_neumann_terms
         )
         orth_rotate = self.oft_R.dropout(orth_rotate)
 
@@ -716,6 +721,7 @@ class LoRAModuleWrapper:
                 config.oft_coft,
                 config.coft_eps,
                 config.oft_block_share,
+                config.scaled_oft,
             ]
             self.additional_kwargs = {
                 'dropout_probability': config.dropout_probability,

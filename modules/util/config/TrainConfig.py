@@ -533,6 +533,7 @@ class TrainConfig(BaseConfig):
     coft_eps: float
     oft_block_share: bool
     dora_oft: bool
+    scaled_oft: bool
 
     # optimizer
     optimizer: TrainOptimizerConfig
@@ -1163,6 +1164,7 @@ class TrainConfig(BaseConfig):
         data.append(("coft_eps", 1e-4, float, False))
         data.append(("oft_block_share", False, bool, False))
         data.append(("dora_oft", False, bool, False))
+        data.append(("scaled_oft", False, bool, False))
 
         # optimizer
         data.append(("optimizer", TrainOptimizerConfig.default_values(), TrainOptimizerConfig, False))
