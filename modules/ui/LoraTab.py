@@ -136,9 +136,9 @@ class LoraTab:
             components.switch(master, 3, 4, self.ui_state, "oft_block_share")
 
             # DoRA-OFT
-            components.label(master, 3, 3, "DoRA OFT (DOFT)",
+            components.label(master, 4, 3, "DoRA OFT (DOFT)",
                              tooltip="Combines Weight-Decomposed Low-Rank Adaptation (DoRA) with OFT. By decoupling the weight into magnitude and direction components, it achieves the superior training dynamics of DoRA but with the stability and performance of OFT. Because OFT is norm-preserving, it avoids the heavy re-calculations typically found in standard DoRA, resulting in faster training (same speed as standard OFT) and better convergence.")
-            components.switch(master, 3, 4, self.ui_state, "dora_oft")
+            components.switch(master, 4, 4, self.ui_state, "dora_oft")
 
             # Dropout Percentage
             components.label(master, 2, 0, "Dropout Probability",
