@@ -91,6 +91,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_ui_state = text_ui_state
         self.image_preview_file_index = 0
         self.preview_augmentations = ctk.BooleanVar(self, True)
+        self.bucket_fig = None
 
         self.title("Concept")
         self.geometry("800x700")
@@ -514,6 +515,10 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_color = f"#{int(text_color[0]/256):x}{int(text_color[1]/256):x}{int(text_color[2]/256):x}"
 
         plt.set_loglevel('WARNING')     #suppress errors about data type in bar chart
+
+        # Store previous figure to release once we're no longer using it
+        prev_bucket_fig = self.bucket_fig
+
         self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7,3))
         self.canvas = FigureCanvasTkAgg(self.bucket_fig, master=frame)
         self.canvas.get_tk_widget().grid(row=19, column=0, columnspan=4, rowspan=2)
@@ -530,6 +535,11 @@ class ConceptWindow(ctk.CTkToplevel):
         self.bucket_ax.tick_params(axis='y', colors=self.text_color, which="both")
         self.bucket_ax.xaxis.label.set_color(self.text_color)
         self.bucket_ax.yaxis.label.set_color(self.text_color)
+
+        # Close any previous figure handle (if we had one)
+        if prev_bucket_fig is not None:
+            plt.close(prev_bucket_fig)
+            prev_bucket_fig = None
 
         #refresh stats - must be after all labels are defined or will give error
         self.refresh_basic_stats_button = components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: self.__get_concept_stats_threaded(False, 9999),
@@ -917,6 +927,13 @@ class ConceptWindow(ctk.CTkToplevel):
                 self.__get_concept_stats(False, 2)    #force rescan if config is empty, timeout of 2 sec
                 if self.concept.concept_stats["processing_time"] < 0.1:
                     self.__get_concept_stats(True, 2)    #do advanced scan automatically if basic took <0.1s
+
+    def destroy(self):
+        if self.bucket_fig is not None:
+            plt.close(self.bucket_fig)
+            self.bucket_fig = None
+
+        super().destroy()
 
     def __ok(self):
         self.destroy()
