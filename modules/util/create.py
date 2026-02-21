@@ -847,7 +847,7 @@ def create_optimizer(
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}
             if MuonWithAuxAdam:
-                adam_config = optimizer_config.muon_adam_config
+                adam_config = optimizer_config.muon_adam_config if optimizer_config.muon_adam_config is not None else {}
                 adam_config_dict = adam_config if isinstance(adam_config, dict) else adam_config.to_dict()
 
                 valid_adam_keys = {k for k in inspect.signature(Muon_adv.__init__).parameters if k.startswith('adam_')}
@@ -899,7 +899,7 @@ def create_optimizer(
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}
             if MuonWithAuxAdam:
-                adam_config = optimizer_config.muon_adam_config
+                adam_config = optimizer_config.muon_adam_config if optimizer_config.muon_adam_config is not None else {}
                 # Handle both dict (from JSON/Config) and Object (legacy/runtime)
                 adam_config_dict = adam_config if isinstance(adam_config, dict) else adam_config.to_dict()
 
