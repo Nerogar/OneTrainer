@@ -1,7 +1,9 @@
 import json
 import os
+import re
 import uuid
 from copy import deepcopy
+from datetime import datetime
 from typing import Any
 
 from modules.util.config.BaseConfig import BaseConfig
@@ -368,6 +370,10 @@ class TrainConfig(BaseConfig):
     validate_after: float
     validate_after_unit: TimeUnit
     continue_last_backup: bool
+    prevent_overwrites: bool
+    auto_correct_input: bool
+    friendly_run_names: bool
+    output_name_as_run_name: bool
     include_train_config: ConfigPart
 
     # multi-GPU
@@ -569,7 +575,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=10,
+            config_version=12,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -581,6 +587,8 @@ class TrainConfig(BaseConfig):
                 7: self.__migration_7,
                 8: self.__migration_8,
                 9: self.__migration_9,
+                10: self.__migration_10,
+                11: self.__migration_11,
             }
         )
 
@@ -800,6 +808,18 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_10(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        migrated_data.setdefault("prevent_overwrites", True)
+        return migrated_data
+
+    def __migration_11(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        migrated_data.setdefault("auto_correct_input", True)
+        migrated_data.setdefault("friendly_run_names", False)
+        migrated_data.setdefault("output_name_as_run_name", False)
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
@@ -878,18 +898,39 @@ class TrainConfig(BaseConfig):
         else:
             return self.additional_embeddings
 
+    @staticmethod
+    def _extract_backup_datetime(full_path: str, name: str) -> datetime:
+        """Get timestamp from a backup so that run-name prefixing doesn't break backup ordering"""
+
+        m = re.search(r"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})", name)
+        if m:
+            try:
+                return datetime.strptime(m.group(1), "%Y-%m-%d_%H-%M-%S")
+            except ValueError:
+                pass
+        try:
+            stat = os.stat(full_path)
+            birth = getattr(stat, "st_birthtime", None) or stat.st_ctime
+            return datetime.fromtimestamp(birth)
+        except OSError:
+            return datetime.min
+
     def get_last_backup_path(self) -> str | None:
         backups_path = os.path.join(self.workspace_dir, "backup")
         if os.path.exists(backups_path):
-            backup_paths = sorted(
-                [path for path in os.listdir(backups_path) if
-                 os.path.isdir(os.path.join(backups_path, path))],
-                reverse=True,
-            )
+            backup_dirs = [
+                name for name in os.listdir(backups_path)
+                if os.path.isdir(os.path.join(backups_path, name))
+            ]
 
-            if backup_paths:
-                last_backup_path = backup_paths[0]
-                return os.path.join(backups_path, last_backup_path)
+            if backup_dirs:
+                last = max(
+                    backup_dirs,
+                    key=lambda n: self._extract_backup_datetime(
+                        os.path.join(backups_path, n), n
+                    ),
+                )
+                return os.path.join(backups_path, last)
 
         return None
 
@@ -953,6 +994,10 @@ class TrainConfig(BaseConfig):
         data.append(("validate_after", 1, int, False))
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
         data.append(("continue_last_backup", False, bool, False))
+        data.append(("prevent_overwrites", True, bool, False))
+        data.append(("auto_correct_input", True, bool, False))
+        data.append(("friendly_run_names", False, bool, False))
+        data.append(("output_name_as_run_name", False, bool, False))
         data.append(("include_train_config", ConfigPart.NONE, ConfigPart, False))
 
         #multi-GPU
