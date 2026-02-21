@@ -44,6 +44,7 @@ class OFTRotationModule(nn.Module):
         coft=False,
         coft_eps=6e-5,
         block_share=False,
+        scaled_oft=False,
         use_cayley_neumann=True,
         num_cayley_neumann_terms=5,
         dropout_probability=0.0,
@@ -57,6 +58,9 @@ class OFTRotationModule(nn.Module):
         self.coft = coft
         self.coft_eps = coft_eps
         self.block_share = block_share
+        self.use_scaled_oft = scaled_oft
+        if self.use_scaled_oft:
+            self.register_buffer("scaled_oft", torch.tensor(1))
         self.use_cayley_neumann = use_cayley_neumann
         self.num_cayley_neumann_terms = num_cayley_neumann_terms
         # Create indices for upper triangle (excluding diagonal)
@@ -145,8 +149,10 @@ class OFTRotationModule(nn.Module):
             with torch.no_grad():
                 self.weight.copy_(self._project_batch(self.weight, coft_eps=self.coft_eps))
 
+        effective_weight = self.weight / self.n_elements ** 0.5 if self.use_scaled_oft else self.weight
+
         orth_rotate = self._cayley_batch(
-            self.weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms
+            effective_weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms
         )
         orth_rotate = self.dropout(orth_rotate)
 
