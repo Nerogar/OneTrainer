@@ -102,8 +102,10 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
     def __aspect_bucketing_in(self, config: TrainConfig):
         calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
 
+        quantization = 8
+
         aspect_bucketing = AspectBucketing(
-            quantization=8,
+            quantization=quantization,
             resolution_in_name='original_resolution',
             target_resolution_in_name='settings.target_resolution',
             enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
@@ -122,7 +124,8 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             target_resolutions_override_in_name='concept.image.resolution_override',
             scale_resolution_out_name='scale_resolution',
             crop_resolution_out_name='crop_resolution',
-            possible_resolutions_out_name='possible_resolutions'
+            possible_resolutions_out_name='possible_resolutions',
+            quantization=quantization,
         )
 
         modules = [calc_aspect]
