@@ -3,23 +3,13 @@ from __future__ import annotations
 from collections.abc import Callable
 
 
-def validate_resolution(model_type) -> Callable[[str], str | None]:
-    """Return a resolution validator bound to a specific model_type."""
+def validate_resolution() -> Callable[[str], str | None]:
+    """Return a resolution validator."""
 
     def _check(value: str) -> str | None:
         value = value.strip()
         if not value:
             return None
-
-        multiple = 64
-        if model_type.is_stable_diffusion():
-            multiple = 8
-        elif model_type.is_sana() or model_type.is_qwen():
-            multiple = 32
-        elif model_type.is_pixart():
-            multiple = 16
-        elif model_type.is_wuerstchen():
-            multiple = 128
 
         dims = []
 
@@ -40,8 +30,6 @@ def validate_resolution(model_type) -> Callable[[str], str | None]:
         for d in dims:
             if d <= 0:
                 return f"Resolution cannot be less than or equal to 0 (found {d})."
-            if d % multiple != 0:
-                return f"Dimensions must be multiples of {multiple} for {model_type.value} (found {d})."
 
         return None
 

@@ -404,7 +404,7 @@ class TrainingTab:
         components.label(frame, row, 0, "Resolution",
                          tooltip="The resolution used for training. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format <width>x<height>")
         components.entry(frame, row, 1, self.ui_state, "resolution", required=True,
-                         extra_validate=validate_resolution(self.train_config.model_type))
+                         extra_validate=validate_resolution())
         row += 1
 
         # frames

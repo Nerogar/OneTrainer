@@ -570,7 +570,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=11,
+            config_version=10,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -582,7 +582,6 @@ class TrainConfig(BaseConfig):
                 7: self.__migration_7,
                 8: self.__migration_8,
                 9: self.__migration_9,
-                10: self.__migration_10,
             }
         )
 
@@ -800,11 +799,6 @@ class TrainConfig(BaseConfig):
         replace_dtype("decoder_vqgan")
         migrated_data.pop("weight_dtype")
 
-        return migrated_data
-
-    def __migration_10(self, data: dict) -> dict:
-        migrated_data = data.copy()
-        migrated_data.setdefault("prevent_overwrites", True)
         return migrated_data
 
     def weight_dtypes(self) -> ModelWeightDtypes:

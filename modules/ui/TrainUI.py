@@ -258,6 +258,7 @@ class TrainUI(ctk.CTk):
                          tooltip="Only populate the cache, without any training")
         components.switch(frame, 2, 3, self.ui_state, "only_cache")
 
+        # TODO: In Phase 4 rework the general tab.
         # prevent overwrites
         components.label(frame, 3, 0, "Prevent Overwrites",
                          tooltip="When enabled, output paths that already exist on disk will be flagged as invalid to avoid accidental overwrites")

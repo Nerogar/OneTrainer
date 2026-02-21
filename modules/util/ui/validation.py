@@ -11,6 +11,7 @@ from pathlib import PurePosixPath, PureWindowsPath
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.PathIOType import PathIOType
 
 if TYPE_CHECKING:
@@ -33,13 +34,6 @@ _INVALID_CHARS = {chr(c) for c in range(32)}
 _IS_WINDOWS = sys.platform == "win32"
 if _IS_WINDOWS:
     _INVALID_CHARS |= set('<>"|?*')
-
-_FORMAT_EXTENSIONS: dict[str, str] = {
-    "CKPT": ".ckpt",
-    "SAFETENSORS": ".safetensors",
-    "LEGACY_SAFETENSORS": ".safetensors",
-    "COMFY_LORA": ".safetensors",
-}
 
 
 def _is_huggingface_repo_or_file(value: str) -> bool:
@@ -102,6 +96,16 @@ def validate_path(
     if _has_invalid_chars(trimmed):
         return "Path contains invalid characters"
 
+    if trimmed.startswith("cloud:"):
+        cloud_path = trimmed[6:]
+        if not cloud_path:
+            return "Cloud path is empty"
+        if cloud_path.startswith(("http://", "https://")):
+            return "Cloud path cannot be a URL"
+        if "\\" in cloud_path:
+            return "Cloud path must use forward slashes (/)"
+        return None
+
     if io_type == PathIOType.INPUT and _is_huggingface_repo_or_file(trimmed):
         return None
 
@@ -119,7 +123,11 @@ def validate_path(
                 return "Diffusers output must be a directory path, not a file"
             return _check_overwrite(trimmed, is_dir=True, prevent=prevent_overwrites)
 
-        expected_ext = _FORMAT_EXTENSIONS.get(output_format, "")
+        try:
+            expected_ext = ModelFormat[output_format].file_extension()
+        except KeyError:
+            expected_ext = ""
+
         if expected_ext:
             suffix = (PureWindowsPath(trimmed) if _IS_WINDOWS else PurePosixPath(trimmed)).suffix.lower()
             if suffix != expected_ext:
