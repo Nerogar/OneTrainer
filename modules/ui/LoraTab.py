@@ -1,10 +1,10 @@
-from pathlib import Path
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import PeftType
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+from modules.util.ui.validation_helpers import check_range
 
 import customtkinter as ctk
 
@@ -64,9 +64,9 @@ class LoraTab:
         # lora model name
         components.label(master, 0, 0, f"{name} base model",
                          tooltip=f"The base {name} to train on. Leave empty to create a new {name}")
-        entry = components.file_entry(
+        entry = components.path_entry(
             master, 0, 1, self.ui_state, "lora_model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            mode="file", path_modifier=components.json_path_modifier
         )
         entry.grid(row=0, column=1, columnspan=4)
 
@@ -89,12 +89,12 @@ class LoraTab:
             # rank
             components.label(master, 1, 0, f"{name} rank",
                             tooltip=f"The rank parameter used when creating a new {name}")
-            components.entry(master, 1, 1, self.ui_state, "lora_rank")
+            components.entry(master, 1, 1, self.ui_state, "lora_rank", required=True, extra_validate=check_range(lower=1, message="Rank must be at least 1"))
 
             # alpha
             components.label(master, 2, 0, f"{name} alpha",
                             tooltip=f"The alpha parameter used when creating a new {name}")
-            components.entry(master, 2, 1, self.ui_state, "lora_alpha")
+            components.entry(master, 2, 1, self.ui_state, "lora_alpha", required=True)
 
             # Dropout Percentage
             components.label(master, 3, 0, "Dropout Probability",
@@ -119,7 +119,7 @@ class LoraTab:
             # Block Size
             components.label(master, 1, 0, f"{name} Block Size",
                             tooltip=f"The block size parameter used when creating a new {name}")
-            components.entry(master, 1, 1, self.ui_state, "oft_block_size")
+            components.entry(master, 1, 1, self.ui_state, "oft_block_size", required=True)
 
             # COFT
             components.label(master, 1, 3, "Constrained OFT (COFT)",

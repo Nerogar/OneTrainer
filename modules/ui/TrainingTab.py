@@ -16,6 +16,7 @@ from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.optimizer_util import change_optimizer
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+from modules.util.ui.validation_helpers import check_range, validate_resolution
 
 import customtkinter as ctk
 
@@ -290,7 +291,7 @@ class TrainingTab:
         # learning rate
         components.label(frame, 2, 0, "Learning Rate",
                          tooltip="The base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "learning_rate")
+        components.entry(frame, 2, 1, self.ui_state, "learning_rate", required=True)
 
         # learning rate warmup steps
         components.label(frame, 3, 0, "Learning Rate Warmup Steps",
@@ -300,7 +301,8 @@ class TrainingTab:
         # learning rate min factor
         components.label(frame, 4, 0, "Learning Rate Min Factor",
                          tooltip="Unit = float. Method = percentage. For a factor of 0.1, the final LR will be 10% of the initial LR. If the initial LR is 1e-4, the final LR will be 1e-5.")
-        components.entry(frame, 4, 1, self.ui_state, "learning_rate_min_factor")
+        components.entry(frame, 4, 1, self.ui_state, "learning_rate_min_factor",
+                         extra_validate=check_range(lower=0, upper=0.99, message="Learning rate min factor must be between 0 and 0.99"))
 
         # learning rate cycles
         components.label(frame, 5, 0, "Learning Rate Cycles",
@@ -310,17 +312,17 @@ class TrainingTab:
         # epochs
         components.label(frame, 6, 0, "Epochs",
                          tooltip="The number of epochs for a full training run")
-        components.entry(frame, 6, 1, self.ui_state, "epochs")
+        components.entry(frame, 6, 1, self.ui_state, "epochs", required=True)
 
         # batch size
         components.label(frame, 7, 0, "Local Batch Size",
                          tooltip="The batch size of one training step. If you use multiple GPUs, this is the batch size of each GPU (local batch size).")
-        components.entry(frame, 7, 1, self.ui_state, "batch_size")
+        components.entry(frame, 7, 1, self.ui_state, "batch_size", required=True)
 
         # accumulation steps
         components.label(frame, 8, 0, "Accumulation Steps",
                          tooltip="Number of accumulation steps. Increase this number to trade batch size for training speed")
-        components.entry(frame, 8, 1, self.ui_state, "gradient_accumulation_steps")
+        components.entry(frame, 8, 1, self.ui_state, "gradient_accumulation_steps", required=True)
 
         # Learning Rate Scaler
         components.label(frame, 9, 0, "Learning Rate Scaler",
@@ -348,7 +350,9 @@ class TrainingTab:
         # ema decay
         components.label(frame, row, 0, "EMA Decay",
                          tooltip="Decay parameter of the EMA model. Higher numbers will average more steps. For datasets of hundreds or thousands of images, set this to 0.9999. For smaller datasets, set it to 0.999 or even 0.998")
-        components.entry(frame, row, 1, self.ui_state, "ema_decay")
+        components.entry(frame, row, 1, self.ui_state, "ema_decay",
+                         extra_validate=check_range(lower=0.5, upper=1,
+                                                   message="EMA decay must be between 0.5 and 1"))
         row += 1
 
         # ema update step interval
@@ -399,14 +403,15 @@ class TrainingTab:
         # resolution
         components.label(frame, row, 0, "Resolution",
                          tooltip="The resolution used for training. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format <width>x<height>")
-        components.entry(frame, row, 1, self.ui_state, "resolution")
+        components.entry(frame, row, 1, self.ui_state, "resolution", required=True,
+                         extra_validate=validate_resolution())
         row += 1
 
         # frames
         if video_training_enabled:
             components.label(frame, row, 0, "Frames",
                              tooltip="The number of frames used for training.")
-            components.entry(frame, row, 1, self.ui_state, "frames")
+            components.entry(frame, row, 1, self.ui_state, "frames", required=True)
             row += 1
 
         # force circular padding
@@ -649,27 +654,27 @@ class TrainingTab:
         # min noising strength
         components.label(frame, 4, 0, "Min Noising Strength",
                          tooltip="Specifies the minimum noising strength used during training. This can help to improve composition, but prevents finer details from being trained")
-        components.entry(frame, 4, 1, self.ui_state, "min_noising_strength")
+        components.entry(frame, 4, 1, self.ui_state, "min_noising_strength", required=True)
 
         # max noising strength
         components.label(frame, 5, 0, "Max Noising Strength",
                          tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
-        components.entry(frame, 5, 1, self.ui_state, "max_noising_strength")
+        components.entry(frame, 5, 1, self.ui_state, "max_noising_strength", required=True)
 
         # noising weight
         components.label(frame, 6, 0, "Noising Weight",
                          tooltip="Controls the weight parameter of the timestep distribution function. Use the preview to see more details.")
-        components.entry(frame, 6, 1, self.ui_state, "noising_weight")
+        components.entry(frame, 6, 1, self.ui_state, "noising_weight", required=True)
 
         # noising bias
         components.label(frame, 7, 0, "Noising Bias",
                          tooltip="Controls the bias parameter of the timestep distribution function. Use the preview to see more details.")
-        components.entry(frame, 7, 1, self.ui_state, "noising_bias")
+        components.entry(frame, 7, 1, self.ui_state, "noising_bias", required=True)
 
         # timestep shift
         components.label(frame, 8, 0, "Timestep Shift",
                          tooltip="Shift the timestep distribution. Use the preview to see more details.")
-        components.entry(frame, 8, 1, self.ui_state, "timestep_shift")
+        components.entry(frame, 8, 1, self.ui_state, "timestep_shift", required=True)
 
         if supports_dynamic_timestep_shifting:
             # dynamic timestep shifting
@@ -692,12 +697,14 @@ class TrainingTab:
         # unmasked probability
         components.label(frame, 1, 0, "Unmasked Probability",
                          tooltip="When masked training is enabled, specifies the number of training steps done on unmasked samples")
-        components.entry(frame, 1, 1, self.ui_state, "unmasked_probability")
+        components.entry(frame, 1, 1, self.ui_state, "unmasked_probability",
+                         extra_validate=check_range(lower=0, upper=1, message="Unmasked probability must be between 0 and 1"))
 
         # unmasked weight
         components.label(frame, 2, 0, "Unmasked Weight",
                          tooltip="When masked training is enabled, specifies the loss weight of areas outside the masked region")
-        components.entry(frame, 2, 1, self.ui_state, "unmasked_weight")
+        components.entry(frame, 2, 1, self.ui_state, "unmasked_weight",
+                         extra_validate=check_range(lower=0, upper=1, message="Unmasked weight must be between 0 and 1"))
 
         # normalize masked area loss
         components.label(frame, 3, 0, "Normalize Masked Area Loss",
@@ -707,7 +714,8 @@ class TrainingTab:
         # masked prior preservation
         components.label(frame, 4, 0, "Masked Prior Preservation Weight",
                          tooltip="Preserves regions outside the mask using the original untrained model output as a target. Only available for LoRA training. If enabled, use a low unmasked weight.")
-        components.entry(frame, 4, 1, self.ui_state, "masked_prior_preservation_weight")
+        components.entry(frame, 4, 1, self.ui_state, "masked_prior_preservation_weight",
+                         extra_validate=check_range(lower=0, upper=1, message="Masked prior preservation weight must be between 0 and 1"))
 
         # use custom conditioning image
         components.label(frame, 5, 0, "Custom Conditioning Image",
@@ -722,33 +730,33 @@ class TrainingTab:
         # MSE Strength
         components.label(frame, 0, 0, "MSE Strength",
                          tooltip="Mean Squared Error strength for custom loss settings. Strengths should generally sum to 1.")
-        components.entry(frame, 0, 1, self.ui_state, "mse_strength")
+        components.entry(frame, 0, 1, self.ui_state, "mse_strength", required=True)
 
         # MAE Strength
         components.label(frame, 1, 0, "MAE Strength",
                          tooltip="Mean Absolute Error strength for custom loss settings. Strengths should generally sum to 1.")
-        components.entry(frame, 1, 1, self.ui_state, "mae_strength")
+        components.entry(frame, 1, 1, self.ui_state, "mae_strength", required=True)
 
         # log-cosh Strength
         components.label(frame, 2, 0, "log-cosh Strength",
                          tooltip="Log - Hyperbolic cosine Error strength for custom loss settings. Strengths should generally sum to 1.")
-        components.entry(frame, 2, 1, self.ui_state, "log_cosh_strength")
+        components.entry(frame, 2, 1, self.ui_state, "log_cosh_strength", required=True)
 
         # Huber Strength
         components.label(frame, 3, 0, "Huber Strength",
                          tooltip="Huber loss strength for custom loss settings. Less sensitive to outliers than MSE. Strengths should generally sum to 1.")
-        components.entry(frame, 3, 1, self.ui_state, "huber_strength")
+        components.entry(frame, 3, 1, self.ui_state, "huber_strength", required=True)
 
         # Huber Delta
         components.label(frame, 4, 0, "Huber Delta",
                          tooltip="Delta parameter for huber loss")
-        components.entry(frame, 4, 1, self.ui_state, "huber_delta")
+        components.entry(frame, 4, 1, self.ui_state, "huber_delta", required=True)
 
         if supports_vb_loss:
             # VB Strength
             components.label(frame, 5, 0, "VB Strength",
                              tooltip="Variational lower-bound strength for custom loss settings. Should be set to 1 for variational diffusion models")
-            components.entry(frame, 5, 1, self.ui_state, "vb_loss_strength")
+            components.entry(frame, 5, 1, self.ui_state, "vb_loss_strength", required=True)
 
         # Loss Weight function
         components.label(frame, 6, 0, "Loss Weight Function",
@@ -765,7 +773,8 @@ class TrainingTab:
         if not self.train_config.model_type.is_flow_matching():
             components.label(frame, row, 0, "Gamma",
                              tooltip="Inverse strength of loss weighting. Range: 1-20, only applies to Min SNR and P2.")
-            components.entry(frame, row, 1, self.ui_state, "loss_weight_strength")
+            components.entry(frame, row, 1, self.ui_state, "loss_weight_strength",
+                             extra_validate=check_range(lower=1, upper=20, message="Gamma must be between 1 and 20"))
             row += 1
 
         # Loss Scaler
