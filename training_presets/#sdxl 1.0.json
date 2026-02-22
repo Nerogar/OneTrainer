@@ -4,12 +4,6 @@
     "output_model_destination": "models/model.safetensors",
     "output_model_format": "SAFETENSORS",
     "resolution": "1024",
-    "text_encoder": {
-        "train": false
-    },
-    "text_encoder_2": {
-        "train": false
-    },
     "training_method": "FINE_TUNE",
     "vae": {
         "weight_dtype": "FLOAT_32"
@@ -18,9 +12,11 @@
         "weight_dtype": "BFLOAT_16"
     },
     "text_encoder": {
+        "train": false,
         "weight_dtype": "BFLOAT_16"
     },
     "text_encoder_2": {
+        "train": false,
         "weight_dtype": "BFLOAT_16"
     }
 }

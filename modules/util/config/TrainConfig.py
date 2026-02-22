@@ -994,7 +994,7 @@ class TrainConfig(BaseConfig):
         data.append(("validate_after", 1, int, False))
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
         data.append(("continue_last_backup", False, bool, False))
-        data.append(("prevent_overwrites", True, bool, False))
+        data.append(("prevent_overwrites", False, bool, False))
         data.append(("auto_correct_input", True, bool, False))
         data.append(("friendly_run_names", False, bool, False))
         data.append(("output_name_as_run_name", False, bool, False))

@@ -12,6 +12,7 @@ from pathlib import PurePosixPath, PureWindowsPath
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.ui.autocorrect import (
     INVALID_PATH_CHARS,
@@ -22,6 +23,8 @@ from modules.util.ui.autocorrect import (
     is_learning_rate_field,
 )
 from modules.util.ui.ToolTip import ValidationTooltip
+
+import friendlywords as fw
 
 if TYPE_CHECKING:
     from modules.util.ui.UIState import UIState
@@ -72,14 +75,6 @@ def _describe_invalid_chars(value: str) -> str:
     return f": {shown}"
 
 
-_FORMAT_EXTENSIONS: dict[str, str] = {
-    "CKPT": ".ckpt",
-    "SAFETENSORS": ".safetensors",
-    "LEGACY_SAFETENSORS": ".safetensors",
-    "COMFY_LORA": ".safetensors",
-}
-
-
 def _is_huggingface_repo_or_file(value: str) -> bool:
     trimmed = value.strip()
 
@@ -92,14 +87,17 @@ def _is_huggingface_repo_or_file(value: str) -> bool:
             return bool(ENDS_WITH_EXT.search(parts[-1]))
         return False
 
-    if (
-        len(trimmed) > 96
-        or " " in trimmed or "\t" in trimmed
-        or "—" in trimmed or ".." in trimmed
-        or trimmed.startswith(("\\\\", "//", "/"))
-        or (len(trimmed) >= 2 and trimmed[1] == ":" and trimmed[0].isalpha())
-        or trimmed.count("/") != 1
-    ):
+    if len(trimmed) > 96:
+        return False
+    if " " in trimmed or "\t" in trimmed:
+        return False
+    if "—" in trimmed or ".." in trimmed:
+        return False
+    if trimmed.startswith(("\\\\", "//", "/")):
+        return False
+    if len(trimmed) >= 2 and trimmed[1] == ":" and trimmed[0].isalpha():
+        return False
+    if trimmed.count("/") != 1:
         return False
 
     return bool(HUGGINGFACE_REPO_RE.match(trimmed))
@@ -137,8 +135,22 @@ def validate_path(
     if _has_invalid_chars(trimmed):
         return "Path contains invalid characters" + _describe_invalid_chars(trimmed)
 
+    if trimmed.startswith("cloud:"):
+        cloud_path = trimmed[6:]
+        if not cloud_path:
+            return "Cloud path is empty"
+        if cloud_path.startswith(("http://", "https://")):
+            return "Cloud path cannot be a URL"
+        if "\\" in cloud_path:
+            return "Cloud path must use forward slashes (/)"
+        return None
+
     if io_type == PathIOType.INPUT and _is_huggingface_repo_or_file(trimmed):
         return None
+
+    if io_type == PathIOType.INPUT:
+        if not os.path.exists(os.path.abspath(trimmed)):
+            return "Input path does not exist"
 
     if io_type in (PathIOType.OUTPUT, PathIOType.MODEL):
         if not os.path.isdir(os.path.dirname(os.path.abspath(trimmed))):
@@ -150,7 +162,11 @@ def validate_path(
                 return "Diffusers output must be a directory path, not a file"
             return _check_overwrite(trimmed, is_dir=True, prevent=prevent_overwrites)
 
-        expected_ext = _FORMAT_EXTENSIONS.get(output_format, "")
+        try:
+            expected_ext = ModelFormat[output_format].file_extension()
+        except KeyError:
+            expected_ext = ""
+
         if expected_ext:
             suffix = (PureWindowsPath(trimmed) if _IS_WINDOWS else PurePosixPath(trimmed)).suffix.lower()
             if suffix != expected_ext:
@@ -183,7 +199,7 @@ class UndoHistory:
         if top == current and len(self._stack) > 1:
             self._redo_stack.append(self._stack.pop())
             return self._stack[-1]
-        if top != current:
+        elif top != current:
             self._redo_stack.append(current)
             return top
         return None
@@ -392,6 +408,7 @@ class FieldValidator:
             self._syncing = False
 
     def validate(self, value: str) -> str | None:
+        """Return an error string if *value* is invalid, else None."""
         meta = self.ui_state.get_field_metadata(self.var_name)
         declared_type = meta.type
         nullable = meta.nullable
@@ -529,6 +546,7 @@ class FieldValidator:
 
 
 class PathValidator(FieldValidator):
+    """FieldValidator with additional path-specific checks."""
 
     def __init__(
         self,
@@ -556,7 +574,12 @@ class PathValidator(FieldValidator):
         if fmt is None:
             return default
         fmt_str = str(fmt)
-        return "" if fmt_str == "DIFFUSERS" else _FORMAT_EXTENSIONS.get(fmt_str, default)
+        if fmt_str == "DIFFUSERS":
+            return ""
+        try:
+            return ModelFormat[fmt_str].file_extension()
+        except KeyError:
+            return default
 
     def _autocorrect_value(self, value: str) -> str:
         if not value:
@@ -565,15 +588,11 @@ class PathValidator(FieldValidator):
         return autocorrect_path(value, self.io_type, expected_ext=ext)
 
     def validate(self, value: str) -> str | None:
+        base_err = super().validate(value)
+        if base_err is not None:
+            return base_err
         if value == "":
-            if self._required:
-                return "Value required"
             return None
-
-        if self._extra_validate is not None:
-            extra_err = self._extra_validate(value)
-            if extra_err is not None:
-                return extra_err
 
         return validate_path(
             value,
@@ -608,8 +627,7 @@ class PathValidator(FieldValidator):
 
         if use_friendly:
             try:
-                import friendlywords as fw
-                name = fw.generate(2, separator="_")  # type: ignore
+                name = fw.generate(2, separator="_")
             except Exception:
                 name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         else:

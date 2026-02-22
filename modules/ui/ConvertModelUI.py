@@ -1,5 +1,4 @@
 import traceback
-from pathlib import Path
 from uuid import uuid4
 
 from modules.util import create
@@ -88,7 +87,7 @@ class ConvertModelUI(ctk.CTkToplevel):
                          tooltip="Filename, directory or hugging face repository of the base model")
         components.path_entry(
             master, 2, 1, self.ui_state, "input_name",
-            mode="file", path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            mode="file", path_modifier=components.json_path_modifier
         )
 
         # output data type

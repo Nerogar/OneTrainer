@@ -63,7 +63,7 @@ def autocorrect_string(value: str) -> str:
 def autocorrect_int(value: str) -> str:
     if not value:
         return value
-    result = value.strip()
+    result = autocorrect_string(value)
     if result.startswith("+") and len(result) > 1:
         result = result[1:]
     result = result.replace("_", "")
@@ -88,7 +88,7 @@ def autocorrect_float(value: str, *, is_learning_rate: bool = False) -> str:
     if not value:
         return value
 
-    result = value.strip()
+    result = autocorrect_string(value)
 
     if is_learning_rate:
         result = _NON_FLOAT_NOTATION_CHARS_RE.sub("", result)

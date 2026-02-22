@@ -1,6 +1,7 @@
 import contextlib
 import tkinter as tk
 from collections.abc import Callable
+from pathlib import Path
 from tkinter import filedialog
 from typing import Any, Literal
 
@@ -85,13 +86,14 @@ def entry(
     original_destroy = component.destroy
 
     def new_destroy():
+        validator.detach()
+
         # 'temporary' fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
         # unfortunately Tom has admitted to forgetting about how to maintain CTK so this likely will never be merged
         if component._textvariable_callback_name:
-            component._textvariable.trace_remove("write", component._textvariable_callback_name)  # type: ignore[union-attr]
+            with contextlib.suppress(tk.TclError):
+                component._textvariable.trace_remove("write", component._textvariable_callback_name)  # type: ignore[union-attr]
             component._textvariable_callback_name = ""
-
-        validator.detach()
 
         if command is not None and trace_id is not None:
             ui_state.remove_var_trace(var_name, trace_id)
@@ -106,15 +108,21 @@ def entry(
     return component
 
 
+def json_path_modifier(x: str | Path) -> Path:
+    x = Path(x).absolute()
+    return x.parent if x.suffix == ".json" else x
+
+
 def path_entry(
         master, row, column, ui_state: UIState, var_name: str,
         *,
         mode: Literal["file", "dir"] = "file",
         io_type: PathIOType = PathIOType.INPUT,
-        path_modifier: Callable[[str], str] | None = None,
+        path_modifier: Callable[[str], str | Path] | None = None,
         allow_model_files: bool = True,
         allow_image_files: bool = False,
         command: Callable[[str], None] | None = None,
+        extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
 ):
     frame = ctk.CTkFrame(master, fg_color="transparent")
@@ -128,6 +136,7 @@ def path_entry(
     entry_component = entry(
         frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
         validator_factory=_path_validator_factory,
+        extra_validate=extra_validate,
         required=required,
     )
 
@@ -171,10 +180,11 @@ def path_entry(
             if path_modifier:
                 chosen = path_modifier(chosen)
 
-            ui_state.get_var(var_name).set(chosen)
+            chosen_str = str(chosen)
+            ui_state.get_var(var_name).set(chosen_str)
 
             if command:
-                command(chosen)
+                command(chosen_str)
 
     button_component = ctk.CTkButton(frame, text="...", width=40, command=__open_dialog)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
