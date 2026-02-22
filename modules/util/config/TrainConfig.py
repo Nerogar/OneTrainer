@@ -587,8 +587,6 @@ class TrainConfig(BaseConfig):
                 7: self.__migration_7,
                 8: self.__migration_8,
                 9: self.__migration_9,
-                10: self.__migration_10,
-                11: self.__migration_11,
             }
         )
 
@@ -806,18 +804,6 @@ class TrainConfig(BaseConfig):
         replace_dtype("decoder_vqgan")
         migrated_data.pop("weight_dtype")
 
-        return migrated_data
-
-    def __migration_10(self, data: dict) -> dict:
-        migrated_data = data.copy()
-        migrated_data.setdefault("prevent_overwrites", True)
-        return migrated_data
-
-    def __migration_11(self, data: dict) -> dict:
-        migrated_data = data.copy()
-        migrated_data.setdefault("auto_correct_input", True)
-        migrated_data.setdefault("friendly_run_names", False)
-        migrated_data.setdefault("output_name_as_run_name", False)
         return migrated_data
 
     def weight_dtypes(self) -> ModelWeightDtypes:
