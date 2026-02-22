@@ -492,10 +492,10 @@ class DoRAOFTModule(OFTModule):
     dora_scale: nn.Parameter | None
     initial_norm: Tensor | None
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, coft: bool, coft_eps: float, block_share: bool, **kwargs):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, coft: bool, coft_eps: float, block_share: bool, scaled_oft: bool, **kwargs):
         self.dora_scale = None
 
-        super().__init__(prefix, orig_module, oft_block_size, coft, coft_eps, block_share, **kwargs)
+        super().__init__(prefix, orig_module, oft_block_size, coft, coft_eps, block_share, scaled_oft, **kwargs)
 
         if not hasattr(self, "initial_norm"):
             self.register_buffer("initial_norm", None)
