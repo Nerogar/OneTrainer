@@ -51,8 +51,7 @@ def _format_char(c: str) -> str:
     """Return a human-readable representation of a single character."""
     cp = ord(c)
     if cp < 32:
-        # Control characters — show as U+00XX
-        return f"U+{cp:04X}"
+        return f"U+{cp:04X}" # control chars
     # Printable but forbidden (e.g. Windows-reserved)
     return repr(c)
 
