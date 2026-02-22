@@ -106,7 +106,7 @@ def build_muon_adam_key_fn(
                     'block', # UNet
                     'text_model.encoder.layers', # TEs (CLIPs)
                 ]
-            case ModelType.STABLE_DIFFUSION_3 | ModelType.STABLE_DIFFUSION_35 | ModelType.SANA  | ModelType.FLUX_DEV_1  | ModelType.CHROMA_1  | ModelType.QWEN  | ModelType.PIXART_ALPHA | ModelType.PIXART_SIGMA:
+            case ModelType.STABLE_DIFFUSION_3 | ModelType.STABLE_DIFFUSION_35 | ModelType.SANA  | ModelType.FLUX_DEV_1  | ModelType.FLUX_2 | ModelType.CHROMA_1  | ModelType.QWEN  | ModelType.PIXART_ALPHA | ModelType.PIXART_SIGMA:
                 default_patterns = [
                     'transformer_blocks',
                     'encoder.block', # TE (T5)

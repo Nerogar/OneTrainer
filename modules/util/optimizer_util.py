@@ -154,7 +154,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "muon_adam_lr": 3e-4,
         "muon_te1_adam_lr": None,
         "muon_te2_adam_lr": None,
-        "muon_adam_config": None,
+        "muon_adam_config": {},
     },
     Optimizer.AdEMAMix_8BIT: {
         "beta1": 0.9,
@@ -533,12 +533,12 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "k_warmup_steps": None,
     },
     Optimizer.SIGNSGD_ADV: {
-        "momentum": 0.99,
+        "momentum": 0.95,
         "cautious_wd": False,
         "weight_decay": 0.0,
         "nnmf_factor": False,
         "stochastic_rounding": True,
-        "compiled_optimizer": False,
+        "compile": False,
         "fused_back_pass": False,
         "orthogonal_gradient": False,
         "Simplified_AdEMAMix": False,
@@ -609,7 +609,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "normuon_eps": 1e-8,
         "orthogonal_gradient": False,
         "approx_mars": False,
-        "muon_adam_config": None,
+        "muon_adam_config": {},
     },
     Optimizer.ADAMUON_ADV: {
         "beta1": 0.95,
@@ -640,7 +640,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "normuon_variant": True,
         "orthogonal_gradient": False,
         "approx_mars": False,
-        "muon_adam_config": None,
+        "muon_adam_config": {},
     },
     Optimizer.ADABELIEF: {
         "beta1": 0.9,

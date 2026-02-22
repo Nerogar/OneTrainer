@@ -124,7 +124,7 @@ class GenericTrainer(BaseTrainer):
 
         if self.config.quantization.cache_dir is None:
             self.config.quantization.cache_dir = self.config.cache_dir + "/quantization"
-            os.makedirs(self.config.quantization.cache_dir, exist_ok=True)
+        os.makedirs(self.config.quantization.cache_dir, exist_ok=True)
 
         self.model = self.model_loader.load(
             model_type=self.config.model_type,
@@ -146,7 +146,7 @@ class GenericTrainer(BaseTrainer):
         self.callbacks.on_update_status("creating the data loader/caching")
 
         self.data_loader = self.create_data_loader(
-            self.model, self.model.train_progress
+            self.model, self.model_setup, self.model.train_progress
         )
         self.model_saver = self.create_model_saver()
 
@@ -158,7 +158,7 @@ class GenericTrainer(BaseTrainer):
 
         if self.config.validation:
             self.validation_data_loader = self.create_data_loader(
-                self.model, self.model.train_progress, is_validation=True
+                self.model, self.model_setup, self.model.train_progress, is_validation=True
             )
 
     def __save_config_to_workspace(self):
@@ -214,63 +214,65 @@ class GenericTrainer(BaseTrainer):
             folder_postfix: str = "",
             is_custom_sample: bool = False,
     ):
-        for i, sample_config in multi.distributed_enumerate(sample_config_list, distribute=not self.config.samples_to_tensorboard and not ema_applied):
-            if sample_config.enabled:
-                try:
-                    safe_prompt = path_util.safe_filename(sample_config.prompt)
+        for i, sample_config in multi.distributed_enumerate(
+            [sample_config for sample_config in sample_config_list if sample_config.enabled],
+            distribute=not self.config.samples_to_tensorboard and not ema_applied
+        ):
+            try:
+                safe_prompt = path_util.safe_filename(sample_config.prompt)
 
-                    if is_custom_sample:
-                        sample_dir = os.path.join(
-                            self.config.workspace_dir,
-                            "samples",
-                            "custom",
-                        )
-                    else:
-                        sample_dir = os.path.join(
-                            self.config.workspace_dir,
-                            "samples",
-                            f"{str(i)} - {safe_prompt}{folder_postfix}",
-                        )
-
-                    sample_path = os.path.join(
-                        sample_dir,
-                        f"{self.config.save_filename_prefix}{get_string_timestamp()}-training-sample-{train_progress.filename_string()}"
+                if is_custom_sample:
+                    sample_dir = os.path.join(
+                        self.config.workspace_dir,
+                        "samples",
+                        "custom",
+                    )
+                else:
+                    sample_dir = os.path.join(
+                        self.config.workspace_dir,
+                        "samples",
+                        f"{str(i)} - {safe_prompt}{folder_postfix}",
                     )
 
-                    def on_sample_default(sampler_output: ModelSamplerOutput):
-                        if self.config.samples_to_tensorboard and sampler_output.file_type == FileType.IMAGE:
-                            self.tensorboard.add_image(
-                                f"sample{str(i)} - {safe_prompt}", pil_to_tensor(sampler_output.data),  # noqa: B023
-                                train_progress.global_step
-                            )
-                        self.callbacks.on_sample_default(sampler_output)
+                sample_path = os.path.join(
+                    sample_dir,
+                    f"{self.config.save_filename_prefix}{get_string_timestamp()}-training-sample-{train_progress.filename_string()}"
+                )
 
-                    def on_sample_custom(sampler_output: ModelSamplerOutput):
-                        self.callbacks.on_sample_custom(sampler_output)
+                def on_sample_default(sampler_output: ModelSamplerOutput):
+                    if self.config.samples_to_tensorboard and sampler_output.file_type == FileType.IMAGE:
+                        self.tensorboard.add_image(
+                            f"sample{str(i)} - {safe_prompt}", pil_to_tensor(sampler_output.data),  # noqa: B023
+                            train_progress.global_step
+                        )
+                    self.callbacks.on_sample_default(sampler_output)
 
-                    on_sample = on_sample_custom if is_custom_sample else on_sample_default
-                    on_update_progress = self.callbacks.on_update_sample_custom_progress if is_custom_sample else self.callbacks.on_update_sample_default_progress
+                def on_sample_custom(sampler_output: ModelSamplerOutput):
+                    self.callbacks.on_sample_custom(sampler_output)
 
-                    self.model.to(self.temp_device)
-                    self.model.eval()
+                on_sample = on_sample_custom if is_custom_sample else on_sample_default
+                on_update_progress = self.callbacks.on_update_sample_custom_progress if is_custom_sample else self.callbacks.on_update_sample_default_progress
 
-                    sample_config = copy.copy(sample_config)
-                    sample_config.from_train_config(self.config)
+                self.model.to(self.temp_device)
+                self.model.eval()
 
-                    self.model_sampler.sample(
-                        sample_config=sample_config,
-                        destination=sample_path,
-                        image_format=self.config.sample_image_format,
-                        video_format=self.config.sample_video_format,
-                        audio_format=self.config.sample_audio_format,
-                        on_sample=on_sample,
-                        on_update_progress=on_update_progress,
-                    )
-                except Exception:
-                    traceback.print_exc()
-                    print("Error during sampling, proceeding without sampling")
+                sample_config = copy.copy(sample_config)
+                sample_config.from_train_config(self.config)
 
-                torch_gc()
+                self.model_sampler.sample(
+                    sample_config=sample_config,
+                    destination=sample_path,
+                    image_format=self.config.sample_image_format,
+                    video_format=self.config.sample_video_format,
+                    audio_format=self.config.sample_audio_format,
+                    on_sample=on_sample,
+                    on_update_progress=on_update_progress,
+                )
+            except Exception:
+                traceback.print_exc()
+                print("Error during sampling, proceeding without sampling")
+
+            torch_gc()
 
     def __sample_during_training(
             self,

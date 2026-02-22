@@ -147,14 +147,14 @@ class ConceptWindow(ctk.CTkToplevel):
         # path
         components.label(frame, 3, 0, "Path",
                          tooltip="Path where the training data is located")
-        components.dir_entry(frame, 3, 1, self.ui_state, "path")
+        components.path_entry(frame, 3, 1, self.ui_state, "path", mode="dir")
         components.button(frame, 3, 2, text="download now", command=self.__download_dataset_threaded,
                           tooltip="Download dataset from Huggingface now, for the purpose of previewing and statistics. Otherwise, it will be downloaded when you start training. Path must be a Huggingface repository.")
 
         # prompt source
         components.label(frame, 4, 0, "Prompt Source",
                          tooltip="The source for prompts used during training. When selecting \"From single text file\", select a text file that contains a list of prompts")
-        prompt_path_entry = components.file_entry(frame, 4, 2, self.text_ui_state, "prompt_path")
+        prompt_path_entry = components.path_entry(frame, 4, 2, self.text_ui_state, "prompt_path", mode="file")
 
         def set_prompt_path_entry_enabled(option: str):
             if option == 'concept':
@@ -862,9 +862,6 @@ class ConceptWindow(ctk.CTkToplevel):
         return aspect_string
 
     def __get_concept_stats(self, advanced_checks: bool, wait_time: float):
-        if not os.path.isdir(self.concept.path):
-            print(f"Unable to get statistics for invalid concept path: {self.concept.path}")
-            return
         start_time = time.perf_counter()
         last_update = time.perf_counter()
         self.cancel_scan_flag.clear()
@@ -872,7 +869,7 @@ class ConceptWindow(ctk.CTkToplevel):
         concept_path = self.get_concept_path(self.concept.path)
 
         if not concept_path:
-           print(f"Unable to get statistics for invalid concept path: {self.concept.path}")
+           print(f"Unable to get statistics for concept path: {self.concept.path}")
            self.concept_stats_tab.after(0, self.__enable_scan_buttons)
            return
         subfolders = [concept_path]

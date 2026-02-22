@@ -1,34 +1,12 @@
 from modules.model.ChromaModel import ChromaModel
-from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.chroma.ChromaEmbeddingSaver import ChromaEmbeddingSaver
 from modules.modelSaver.chroma.ChromaModelSaver import ChromaModelSaver
-from modules.modelSaver.mixin.InternalModelSaverMixin import InternalModelSaverMixin
-from modules.util.enum.ModelFormat import ModelFormat
+from modules.modelSaver.GenericFineTuneModelSaver import make_fine_tune_model_saver
 from modules.util.enum.ModelType import ModelType
 
-import torch
-
-
-class ChromaFineTuneModelSaver(
-    BaseModelSaver,
-    InternalModelSaverMixin,
-):
-    def __init__(self):
-        super().__init__()
-
-    def save(
-            self,
-            model: ChromaModel,
-            model_type: ModelType,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
-    ):
-        base_model_saver = ChromaModelSaver()
-        embedding_model_saver = ChromaEmbeddingSaver()
-
-        base_model_saver.save(model, output_model_format, output_model_destination, dtype)
-        embedding_model_saver.save_multiple(model, output_model_format, output_model_destination, dtype)
-
-        if output_model_format == ModelFormat.INTERNAL:
-            self._save_internal_data(model, output_model_destination)
+ChromaFineTuneModelSaver = make_fine_tune_model_saver(
+    ModelType.CHROMA_1,
+    model_class=ChromaModel,
+    model_saver_class=ChromaModelSaver,
+    embedding_saver_class=ChromaEmbeddingSaver,
+)

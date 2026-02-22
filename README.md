@@ -6,7 +6,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 
 ## Features
 
--   **Supported models**: Z-Image, Qwen Image, FLUX.1, Chroma, Stable Diffusion 1.5, 2.0, 2.1, 3.0, 3.5, SDXL, Würstchen-v2, Stable Cascade,
+-   **Supported models**: Z-Image, Qwen Image, FLUX.1, Flux.2 Dev and Klein, Chroma, Stable Diffusion 1.5, 2.0, 2.1, 3.0, 3.5, SDXL, Würstchen-v2, Stable Cascade,
     PixArt-Alpha, PixArt-Sigma, Sana, Hunyuan Video and inpainting models
 -   **Model formats**: diffusers and ckpt models
 -   **Training methods**: Full fine-tuning, LoRA, embeddings
@@ -34,7 +34,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 ## Installation
 
 > [!IMPORTANT]
-> Installing OneTrainer requires Python >=3.10 and <3.13.
+> Installing OneTrainer requires Python >=3.10 and <3.14.
 > You can download Python at https://www.python.org/downloads/windows/.
 > Then follow the below steps.
 
@@ -63,7 +63,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 > sudo apt-get install libgl1
 > ```
 >
-> Additionally it's been reported Alpine, Arch and Xubuntuu Linux may be missing `tkinter`. Install it via `apk add py3-tk` for Alpine and `sudo pacman -S tk` for Arch.
+> Additionally it's been reported Alpine, Arch and Xubuntu Linux may be missing `tkinter`. Install it via `apk add py3-tk` for Alpine and `sudo pacman -S tk` for Arch.
 
 ## Updating
 

@@ -1,21 +1,10 @@
-from pathlib import Path
 
-from modules.modelSetup.BaseChromaSetup import PRESETS as chroma_presets
-from modules.modelSetup.BaseFluxSetup import PRESETS as flux_presets
-from modules.modelSetup.BaseHiDreamSetup import PRESETS as hidream_presets
-from modules.modelSetup.BaseHunyuanVideoSetup import PRESETS as hunyuan_video_presets
-from modules.modelSetup.BasePixArtAlphaSetup import PRESETS as pixart_presets
-from modules.modelSetup.BaseQwenSetup import PRESETS as qwen_presets
-from modules.modelSetup.BaseSanaSetup import PRESETS as sana_presets
-from modules.modelSetup.BaseStableDiffusion3Setup import PRESETS as sd3_presets
-from modules.modelSetup.BaseStableDiffusionSetup import PRESETS as sd_presets
-from modules.modelSetup.BaseStableDiffusionXLSetup import PRESETS as sdxl_presets
-from modules.modelSetup.BaseWuerstchenSetup import PRESETS as sc_presets
-from modules.modelSetup.BaseZImageSetup import PRESETS as z_image_presets
+from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
+from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -66,8 +55,10 @@ class ModelTab:
             self.__setup_wuerstchen_ui(base_frame)
         elif self.train_config.model_type.is_pixart():
             self.__setup_pixart_alpha_ui(base_frame)
-        elif self.train_config.model_type.is_flux():
+        elif self.train_config.model_type.is_flux_1():
             self.__setup_flux_ui(base_frame)
+        elif self.train_config.model_type.is_flux_2():
+            self.__setup_flux_2_ui(base_frame)
         elif self.train_config.model_type.is_z_image():
             self.__setup_z_image_ui(base_frame)
         elif self.train_config.model_type.is_chroma():
@@ -132,6 +123,25 @@ class ModelTab:
             allow_override_transformer=True,
             has_text_encoder_1=True,
             has_text_encoder_2=True,
+            has_vae=True,
+        )
+        row = self.__create_output_components(
+            frame,
+            row,
+            allow_safetensors=True,
+            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
+            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
+        )
+
+    def __setup_flux_2_ui(self, frame):
+        row = 0
+        row = self.__create_base_dtype_components(frame, row)
+        row = self.__create_base_components(
+            frame,
+            row,
+            has_transformer=True,
+            allow_override_transformer=True,
+            has_text_encoder_1=True,
             has_vae=True,
         )
         row = self.__create_output_components(
@@ -355,9 +365,9 @@ class ModelTab:
         # base model
         components.label(frame, row, 0, "Base Model",
                          tooltip="Filename, directory or Hugging Face repository of the base model")
-        components.file_entry(
+        components.path_entry(
             frame, row, 1, self.ui_state, "base_model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            mode="file", path_modifier=components.json_path_modifier
         )
 
         # compile
@@ -400,9 +410,9 @@ class ModelTab:
                 # prior model
                 components.label(frame, row, 0, "Prior Model",
                                  tooltip="Filename, directory or Hugging Face repository of the prior model")
-                components.file_entry(
+                components.path_entry(
                     frame, row, 1, self.ui_state, "prior.model_name",
-                    path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+                    mode="file", path_modifier=components.json_path_modifier
                 )
 
             # prior weight dtype
@@ -418,9 +428,9 @@ class ModelTab:
                 # transformer model
                 components.label(frame, row, 0, "Override Transformer / GGUF",
                                  tooltip="Can be used to override the transformer in the base model. Safetensors and GGUF files are supported, local and on Huggingface. If a GGUF file is used, the DataType must also be set to GGUF")
-                components.file_entry(
+                components.path_entry(
                     frame, row, 1, self.ui_state, "transformer.model_name",
-                    path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+                    mode="file", path_modifier=components.json_path_modifier
                 )
 
             # transformer weight dtype
@@ -431,33 +441,8 @@ class ModelTab:
 
             row += 1
 
-        presets = []
-        if self.train_config.model_type.is_stable_diffusion(): #TODO simplify and de-duplicate with layer filter on training tab
-            presets = sd_presets
-        elif self.train_config.model_type.is_stable_diffusion_xl():
-            presets = sdxl_presets
-        elif self.train_config.model_type.is_stable_diffusion_3():
-            presets = sd3_presets
-        elif self.train_config.model_type.is_wuerstchen():
-            presets = sc_presets
-        elif self.train_config.model_type.is_pixart():
-            presets = pixart_presets
-        elif self.train_config.model_type.is_flux():
-            presets = flux_presets
-        elif self.train_config.model_type.is_qwen():
-            presets = qwen_presets
-        elif self.train_config.model_type.is_chroma():
-            presets = chroma_presets
-        elif self.train_config.model_type.is_sana():
-            presets = sana_presets
-        elif self.train_config.model_type.is_hunyuan_video():
-            presets = hunyuan_video_presets
-        elif self.train_config.model_type.is_z_image():
-            presets = z_image_presets
-        elif self.train_config.model_type.is_hi_dream():
-            presets = hidream_presets
-        else:
-            presets = {"full": []}
+        cls = create.get_model_setup_class(self.train_config.model_type, self.train_config.training_method)
+        presets = cls.LAYER_PRESETS if cls is not None else {"full": []}
 
         components.label(frame, row, 0, "Quantization")
         components.layer_filter_entry(frame, row, 1, self.ui_state,
@@ -527,9 +512,9 @@ class ModelTab:
                 # text encoder 4 weight dtype
                 components.label(frame, row, 0, "Text Encoder 4 Override",
                                  tooltip="Filename, directory or Hugging Face repository of the text encoder 4 model")
-                components.file_entry(
+                components.path_entry(
                     frame, row, 1, self.ui_state, "text_encoder_4.model_name",
-                    path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+                    mode="file", path_modifier=components.json_path_modifier
                 )
 
             # text encoder 4 weight dtype
@@ -544,9 +529,9 @@ class ModelTab:
             # base model
             components.label(frame, row, 0, "VAE Override",
                              tooltip="Directory or Hugging Face repository of a VAE model in diffusers format. Can be used to override the VAE included in the base model. Using a safetensor VAE file will cause an error that the model cannot be loaded.")
-            components.file_entry(
+            components.path_entry(
                 frame, row, 1, self.ui_state, "vae.model_name",
-                path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+                mode="file", path_modifier=components.json_path_modifier
             )
 
             # vae weight dtype
@@ -563,9 +548,9 @@ class ModelTab:
         # effnet encoder model
         components.label(frame, row, 0, "Effnet Encoder Model",
                          tooltip="Filename, directory or Hugging Face repository of the effnet encoder model")
-        components.file_entry(
+        components.path_entry(
             frame, row, 1, self.ui_state, "effnet_encoder.model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            mode="file", path_modifier=components.json_path_modifier
         )
 
         # effnet encoder weight dtype
@@ -587,9 +572,9 @@ class ModelTab:
         # decoder model
         components.label(frame, row, 0, "Decoder Model",
                          tooltip="Filename, directory or Hugging Face repository of the decoder model")
-        components.file_entry(
+        components.path_entry(
             frame, row, 1, self.ui_state, "decoder.model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            mode="file", path_modifier=components.json_path_modifier
         )
 
         # decoder weight dtype
@@ -626,11 +611,16 @@ class ModelTab:
             allow_safetensors: bool = False,
             allow_diffusers: bool = False,
             allow_legacy_safetensors: bool = False,
+            allow_comfy: bool = False,
     ) -> int:
         # output model destination
         components.label(frame, row, 0, "Model Output Destination",
                          tooltip="Filename or directory where the output model is saved")
-        components.file_entry(frame, row, 1, self.ui_state, "output_model_destination", is_output=True)
+        components.path_entry(
+            frame, row, 1, self.ui_state, "output_model_destination",
+            mode="file",
+            io_type=PathIOType.MODEL,
+        )
 
         # output data type
         components.label(frame, row, 3, "Output Data Type",
@@ -653,6 +643,8 @@ class ModelTab:
             formats.append(("Diffusers", ModelFormat.DIFFUSERS))
         # if allow_legacy_safetensors:
         #     formats.append(("Legacy Safetensors", ModelFormat.LEGACY_SAFETENSORS))
+        if allow_comfy:
+            formats.append(("Comfy LoRA", ModelFormat.COMFY_LORA))
 
         components.label(frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
