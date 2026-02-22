@@ -118,7 +118,7 @@ if errorlevel 1 (
 )
 
 echo.
-"%PYTHON%" "%~dp0scripts\util\version_check.py" 3.10 3.13 2>&1
+"%PYTHON%" "%~dp0scripts\util\version_check.py" 3.10 3.14 2>&1
 if errorlevel 1 (
     echo.
     goto :wrong_python_version

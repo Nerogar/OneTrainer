@@ -124,7 +124,7 @@ class GenericTrainer(BaseTrainer):
 
         if self.config.quantization.cache_dir is None:
             self.config.quantization.cache_dir = self.config.cache_dir + "/quantization"
-            os.makedirs(self.config.quantization.cache_dir, exist_ok=True)
+        os.makedirs(self.config.quantization.cache_dir, exist_ok=True)
 
         self.model = self.model_loader.load(
             model_type=self.config.model_type,

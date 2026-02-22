@@ -862,9 +862,6 @@ class ConceptWindow(ctk.CTkToplevel):
         return aspect_string
 
     def __get_concept_stats(self, advanced_checks: bool, wait_time: float):
-        if not os.path.isdir(self.concept.path):
-            print(f"Unable to get statistics for invalid concept path: {self.concept.path}")
-            return
         start_time = time.perf_counter()
         last_update = time.perf_counter()
         self.cancel_scan_flag.clear()
@@ -872,7 +869,7 @@ class ConceptWindow(ctk.CTkToplevel):
         concept_path = self.get_concept_path(self.concept.path)
 
         if not concept_path:
-           print(f"Unable to get statistics for invalid concept path: {self.concept.path}")
+           print(f"Unable to get statistics for concept path: {self.concept.path}")
            self.concept_stats_tab.after(0, self.__enable_scan_buttons)
            return
         subfolders = [concept_path]
