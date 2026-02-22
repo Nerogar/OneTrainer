@@ -682,7 +682,15 @@ class TrainingTab:
                              tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. Note: For Z-Image and Flux2, the dynamic shifting parameters are likely wrong and unknown. Use with care or set your own, fixed shift.", wide_tooltip=True)
             components.switch(frame, 9, 1, self.ui_state, "dynamic_timestep_shifting")
 
+        # Conditional Embedding Perturbation (CEP)
+        cep_label = components.label(frame, 10, 0, "Conditional Embedding Perturbation (CEP)",
+                         tooltip="Inject a slight noise into the TEs outputs to enhance the quality, diversity, and fidelity of the generated images.")
+        cep_label.configure(wraplength=130, justify="left")
+        components.switch(frame, 10, 1, self.ui_state, "cep_enabled")
 
+        components.label(frame, 11, 0, "CEP Gamma",
+                         tooltip="Gamma controls perturbation noise magnitude, paper's default is 1. Only has an effect if CEP is enabled")
+        components.entry(frame, 11, 1, self.ui_state, "cep_gamma")
 
     def __create_masked_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
