@@ -610,7 +610,7 @@ class ConceptWindow(ctk.CTkToplevel):
         concept_path = self.get_concept_path(self.concept.path)
         if concept_path:
             for path in pathlib.Path(concept_path).glob(glob_pattern):
-                if any(part.startswith('.') for part in path.relative_to(concept_path).parts):
+                if any(part.startswith('.') for part in path.relative_to(concept_path).parent.parts):
                     continue
                 extension = os.path.splitext(path)[1]
                 if path.is_file() and path_util.is_supported_image_extension(extension) \
