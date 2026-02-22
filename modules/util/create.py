@@ -686,6 +686,7 @@ def create_optimizer(
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
                 k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                scaled_optm=optimizer_config.scaled_optm if optimizer_config.scaled_optm is not None else False,
             )
 
         # ADOPT_ADV Optimizer
@@ -713,6 +714,7 @@ def create_optimizer(
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
                 k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                scaled_optm=optimizer_config.scaled_optm if optimizer_config.scaled_optm is not None else False,
             )
 
         # PRODIGY_ADV Optimizer
@@ -770,6 +772,7 @@ def create_optimizer(
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
                 k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                scaled_optm=optimizer_config.scaled_optm if optimizer_config.scaled_optm is not None else False,
             )
 
         # SignSGD_ADV Optimizer
@@ -787,6 +790,7 @@ def create_optimizer(
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
                 Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
                 alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+                scaled_optm=optimizer_config.scaled_optm if optimizer_config.scaled_optm is not None else False,
             )
 
         # LION_ADV Optimizer
@@ -807,6 +811,7 @@ def create_optimizer(
                 kappa_p=optimizer_config.kappa_p if optimizer_config.kappa_p is not None else 1.0,
                 auto_kappa_p=optimizer_config.auto_kappa_p if optimizer_config.auto_kappa_p is not None else False,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                scaled_optm=optimizer_config.scaled_optm if optimizer_config.scaled_optm is not None else False,
             )
 
         # LION_PRODIGY_ADV Optimizer

@@ -314,6 +314,8 @@ class LoRAModule(PeftBase):
         self.lora_down, self.lora_up = self.create_layer()
         nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
         nn.init.zeros_(self.lora_up.weight)
+        self.lora_down.weight._is_lora_A = True
+        self.lora_up.weight._is_lora_B = True
 
     def check_initialized(self):
         super().check_initialized()
@@ -427,6 +429,7 @@ class OFTModule(PeftBase):
         )
 
         nn.init.zeros_(self.oft_R.weight)
+        self.oft_R.weight._is_oft = True
 
     def forward(self, x, *args, **kwargs):
         self.check_initialized()
@@ -519,6 +522,7 @@ class DoRAModule(LoRAModule):
                 .to(device=self.orig_module.weight.device)
             )
 
+        self.dora_scale._is_dora_scale = True
         del orig_weight
 
     def check_initialized(self):
