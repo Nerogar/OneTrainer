@@ -963,9 +963,7 @@ def create_optimizer(
                     }
                 else:  # is adam
                     adam_config = optimizer_config.muon_adam_config
-                    if adam_config is None:
-                        adam_config = {}
-                    elif not isinstance(adam_config, dict):
+                    if not isinstance(adam_config, dict):
                         adam_config = adam_config.to_dict()
 
                     beta1 = adam_config.get('beta1')
