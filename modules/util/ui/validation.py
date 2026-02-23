@@ -7,12 +7,24 @@ import sys
 import tkinter as tk
 from collections import deque
 from collections.abc import Callable
+from datetime import datetime
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.PathIOType import PathIOType
+from modules.util.ui.autocorrect import (
+    INVALID_PATH_CHARS,
+    autocorrect_float,
+    autocorrect_int,
+    autocorrect_path,
+    autocorrect_string,
+    is_learning_rate_field,
+)
+from modules.util.ui.ToolTip import ValidationTooltip
+
+import friendlywords as fw
 
 if TYPE_CHECKING:
     from modules.util.ui.UIState import UIState
@@ -20,7 +32,7 @@ if TYPE_CHECKING:
     import customtkinter as ctk
 
 
-DEBOUNCE_TYPING_MS = 250
+DEBOUNCE_TYPING_MS = 500
 UNDO_DEBOUNCE_MS = 500
 ERROR_BORDER_COLOR = "#dc3545"
 
@@ -30,10 +42,30 @@ TRAILING_SLASH_RE = re.compile(r"[\\/]$")
 ENDS_WITH_EXT = re.compile(r"\.[A-Za-z0-9]+$")
 HUGGINGFACE_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
-_INVALID_CHARS = {chr(c) for c in range(32)}
 _IS_WINDOWS = sys.platform == "win32"
-if _IS_WINDOWS:
-    _INVALID_CHARS |= set('<>"|?*')
+
+_MAX_DISPLAY_CHARS = 5
+
+
+def _format_char(c: str) -> str:
+    """Return a human-readable representation of a single character."""
+    cp = ord(c)
+    if cp < 32:
+        return f"U+{cp:04X}" # control chars
+    # Printable but forbidden (e.g. Windows-reserved)
+    return repr(c)
+
+
+def _describe_invalid_chars(value: str) -> str:
+    """Return a suffix like ``': '?', '*'`` listing the offending characters."""
+    bad = sorted(set(value) & INVALID_PATH_CHARS)
+    if not bad:
+        return ""
+
+    shown = ", ".join(_format_char(c) for c in bad[:_MAX_DISPLAY_CHARS])
+    if len(bad) > _MAX_DISPLAY_CHARS:
+        shown += f" and {len(bad) - _MAX_DISPLAY_CHARS} more"
+    return f": {shown}"
 
 
 def _is_huggingface_repo_or_file(value: str) -> bool:
@@ -65,17 +97,17 @@ def _is_huggingface_repo_or_file(value: str) -> bool:
 
 
 def _has_invalid_chars(value: str) -> bool:
-    return bool(_INVALID_CHARS.intersection(value))
+    return bool(INVALID_PATH_CHARS.intersection(value))
 
 
 def _check_overwrite(path: str, *, is_dir: bool, prevent: bool) -> str | None:
     if not prevent:
         return None
     abs_path = os.path.abspath(path)
-    if is_dir and os.path.isdir(abs_path):
-        return "Output folder already exists (overwrite prevented)"
-    if not is_dir and os.path.isfile(abs_path):
-        return "Output file already exists (overwrite prevented)"
+    check = os.path.isdir if is_dir else os.path.isfile
+    if check(abs_path):
+        kind = "folder" if is_dir else "file"
+        return f"Output {kind} already exists (overwrite prevented)"
     return None
 
 
@@ -94,7 +126,7 @@ def validate_path(
     if TRAILING_SLASH_RE.search(trimmed):
         return "Path must not end with a slash"
     if _has_invalid_chars(trimmed):
-        return "Path contains invalid characters"
+        return "Path contains invalid characters" + _describe_invalid_chars(trimmed)
 
     if trimmed.startswith("cloud:"):
         cloud_path = trimmed[6:]
@@ -217,10 +249,9 @@ class FieldValidator:
         self._extra_validate = extra_validate
         self._required = required
 
-        try:
+        self._original_border_color = "gray50"
+        with contextlib.suppress(Exception):
             self._original_border_color = component.cget("border_color")
-        except Exception:
-            self._original_border_color = "gray50"
 
         self._shadow_var = tk.StringVar(master=component)
         self._shadow_trace_name: str | None = None
@@ -232,6 +263,56 @@ class FieldValidator:
         self._debounce: DebounceTimer | None = None
         self._undo_debounce: DebounceTimer | None = None
         self._undo = UndoHistory(max_undo)
+        self._tooltip: ValidationTooltip | None = None
+
+    def _widget_alive(self) -> bool:
+        try:
+            return self.component.winfo_exists()
+        except tk.TclError:
+            return False
+
+    def _get_var_safe(self, name: str) -> tk.Variable | None:
+        try:
+            return self.ui_state.get_var(name)
+        except (KeyError, AttributeError):
+            return None
+
+    def _get_var_value(self, name: str, default: Any = None) -> Any:
+        var = self._get_var_safe(name)
+        return var.get() if var is not None else default
+
+    def _cancel_debounces(self) -> None:
+        if self._debounce:
+            self._debounce.cancel()
+        if self._undo_debounce:
+            self._undo_debounce.cancel()
+
+    def _auto_correct_enabled(self) -> bool:
+        return bool(self._get_var_value("auto_correct_input", False))
+
+    def _autocorrect_value(self, value: str) -> str:
+        if not value:
+            return value
+        meta = self.ui_state.get_field_metadata(self.var_name)
+        declared_type = meta.type
+        if declared_type is int:
+            return autocorrect_int(value)
+        elif declared_type is float:
+            return autocorrect_float(value, is_learning_rate=is_learning_rate_field(self.var_name))
+        elif declared_type is str:
+            return autocorrect_string(value)
+        return value
+
+    def _apply_autocorrect(self, value: str) -> str:
+        if not self._auto_correct_enabled():
+            return value
+        corrected = self._autocorrect_value(value)
+        if corrected != value:
+            self._undo.push(value)
+            self._syncing = True
+            self._shadow_var.set(corrected)
+            self._syncing = False
+        return corrected
 
     def attach(self) -> None:
         self._shadow_var.set(self.var.get())
@@ -270,11 +351,11 @@ class FieldValidator:
         _active_validators.discard(self)
 
         self._commit()
+        self._cancel_debounces()
 
-        if self._debounce:
-            self._debounce.cancel()
-        if self._undo_debounce:
-            self._undo_debounce.cancel()
+        if self._tooltip is not None:
+            self._tooltip.destroy()
+            self._tooltip = None
 
         if self._shadow_trace_name:
             with contextlib.suppress(Exception):
@@ -298,8 +379,18 @@ class FieldValidator:
         comp.configure(textvariable=new_var)
 
         if new_var is not None:
+            # Wrap the CTkEntry callback so it won't fire on a destroyed widget
+            original_cb = comp._textvariable_callback
+
+            def _safe_textvariable_callback(*args):
+                try:
+                    if comp.winfo_exists() and comp._entry.winfo_exists():
+                        original_cb(*args)
+                except tk.TclError:
+                    pass
+
             comp._textvariable_callback_name = new_var.trace_add(
-                "write", comp._textvariable_callback
+                "write", _safe_textvariable_callback
             )
 
     def _commit(self) -> None:
@@ -328,14 +419,11 @@ class FieldValidator:
             return None
 
         try:
-            if declared_type is int:
-                v = int(value)
-                if v < 0:
+            if declared_type in (int, float):
+                if declared_type(value) < 0:
                     return "Value must be non-negative"
-            elif declared_type is float:
-                v = float(value)
-                if v < 0:
-                    return "Value must be non-negative"
+                if self._required and declared_type is int and int(value) == 0:
+                    return "Value must be greater than zero"
             elif declared_type is bool:
                 if value.lower() not in ("true", "false", "0", "1"):
                     return "Invalid bool"
@@ -347,20 +435,28 @@ class FieldValidator:
 
         return None
 
-    def _apply_error(self) -> None:
+    def _apply_error(self, error_msg: str = "", *, from_typing: bool = False) -> None:
+        if not self._widget_alive():
+            return
         self.component.configure(border_color=ERROR_BORDER_COLOR)
+        if self._tooltip is None:
+            self._tooltip = ValidationTooltip(self.component)
+        self._tooltip.show_error(error_msg or "Invalid value", from_typing=from_typing)
 
     def _clear_error(self) -> None:
+        if not self._widget_alive():
+            return
         self.component.configure(border_color=self._original_border_color)
+        if self._tooltip is not None:
+            self._tooltip.clear_error()
 
-    def _validate_and_style(self, value: str) -> bool:
+    def _validate_and_style(self, value: str, *, from_typing: bool = False) -> bool:
         error = self.validate(value)
         if error is None:
             self._clear_error()
             return True
-        else:
-            self._apply_error()
-            return False
+        self._apply_error(error, from_typing=from_typing)
+        return False
 
     def _on_shadow_write(self, *_args) -> None:
         if self._syncing:
@@ -389,30 +485,35 @@ class FieldValidator:
         self._undo.push(self._shadow_var.get())
 
     def _on_debounce_fire(self) -> None:
-        val = self._shadow_var.get()
-        if self._validate_and_style(val):
+        if not self._widget_alive():
+            return
+        val = self._apply_autocorrect(self._shadow_var.get())
+        if self._validate_and_style(val, from_typing=True):
             self._commit()
 
     def _on_focus_in(self, _e=None) -> None:
         self._touched = False
         self._undo.push(self._shadow_var.get())
+        if self._tooltip is not None:
+            self._tooltip.on_focus_in()
 
     def _on_user_input(self, _e=None) -> None:
         self._touched = True
+        if self._tooltip is not None:
+            self._tooltip.on_user_keystroke()
 
     def _on_focus_out(self, _e=None) -> None:
-        if self._debounce:
-            self._debounce.cancel()
-        if self._undo_debounce:
-            self._undo_debounce.cancel()
+        self._cancel_debounces()
         if self._touched:
-            if self._validate_and_style(self._shadow_var.get()):
+            val = self._apply_autocorrect(self._shadow_var.get())
+            if self._validate_and_style(val):
                 self._commit()
         self._undo.push(self._shadow_var.get())
+        if self._tooltip is not None:
+            self._tooltip.on_focus_out()
 
     def _on_enter(self, _e=None) -> None:
-        if self._debounce:
-            self._debounce.cancel()
+        self._cancel_debounces()
         if self._touched:
             if self._validate_and_style(self._shadow_var.get()):
                 self._commit()
@@ -453,12 +554,31 @@ class PathValidator(FieldValidator):
     ):
         super().__init__(component, var, ui_state, var_name, max_undo=max_undo, extra_validate=extra_validate, required=required)
         self.io_type = io_type
+        self._model_blank_timer: DebounceTimer | None = None
 
-    def _get_var_safe(self, name: str) -> tk.Variable | None:
+    def _cancel_debounces(self) -> None:
+        super()._cancel_debounces()
+        if self._model_blank_timer is not None:
+            self._model_blank_timer.cancel()
+            self._model_blank_timer = None
+
+    def _get_format_ext(self, default: str = ".safetensors") -> str:
+        fmt = self._get_var_value("output_model_format")
+        if fmt is None:
+            return default
+        fmt_str = str(fmt)
+        if fmt_str == "DIFFUSERS":
+            return ""
         try:
-            return self.ui_state.get_var(name)
-        except (KeyError, AttributeError):
-            return None
+            return ModelFormat[fmt_str].file_extension()
+        except KeyError:
+            return default
+
+    def _autocorrect_value(self, value: str) -> str:
+        if not value:
+            return value
+        ext = self._get_format_ext("") if self.io_type == PathIOType.MODEL else None
+        return autocorrect_path(value, self.io_type, expected_ext=ext)
 
     def validate(self, value: str) -> str | None:
         base_err = super().validate(value)
@@ -467,18 +587,48 @@ class PathValidator(FieldValidator):
         if value == "":
             return None
 
-        prevent_var = self._get_var_safe("prevent_overwrites")
-        format_var = self._get_var_safe("output_model_format")
         return validate_path(
             value,
             io_type=self.io_type,
-            prevent_overwrites=prevent_var.get() if prevent_var is not None else False,
-            output_format=format_var.get() if format_var is not None else None,
+            prevent_overwrites=self._get_var_value("prevent_overwrites", False),
+            output_format=self._get_var_value("output_model_format"),
         )
 
     def revalidate(self) -> None:
         if self.component.winfo_exists():
             self._validate_and_style(self._shadow_var.get())
+
+    def _on_debounce_fire(self) -> None:
+        super()._on_debounce_fire()
+        if self.io_type == PathIOType.MODEL and self._shadow_var.get().strip() == "":
+            self._schedule_model_blank_fill()
+
+    def _schedule_model_blank_fill(self) -> None:
+        if self._model_blank_timer is not None:
+            self._model_blank_timer.cancel()
+        self._model_blank_timer = DebounceTimer(
+            self.component, DEBOUNCE_TYPING_MS * 2, self._fill_default_model_name,
+        )
+        self._model_blank_timer.call()
+
+    def _fill_default_model_name(self) -> None:
+        if self._shadow_var.get().strip():
+            return
+
+        ext = self._get_format_ext()
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+        if self._get_var_value("friendly_run_names", False):
+            try:
+                name = fw.generate(2, separator="_")  # type: ignore[attr-defined]
+            except Exception:
+                name = timestamp
+        else:
+            method = str(self._get_var_value("training_method", "model")).lower().replace(" ", "_")
+            name = f"{method}_{timestamp}"
+
+        self._undo.push(self._shadow_var.get())
+        self._set_value(os.path.join("models", f"{name}{ext}"))
 
 
 def flush_and_validate_all() -> list[str]:
@@ -492,7 +642,7 @@ def flush_and_validate_all() -> list[str]:
         error = v.validate(value)
 
         if error is not None:
-            v._apply_error()
+            v._apply_error(error)
             invalid.append(f"{v.var_name}: {error}")
         else:
             v._clear_error()
