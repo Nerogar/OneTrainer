@@ -58,19 +58,13 @@ def _format_char(c: str) -> str:
 
 def _describe_invalid_chars(value: str) -> str:
     """Return a suffix like ``': '?', '*'`` listing the offending characters."""
-    seen: set[str] = set()
-    bad: list[str] = []
-    for ch in value:
-        if ch in INVALID_PATH_CHARS and ch not in seen:
-            seen.add(ch)
-            bad.append(ch)
+    bad = sorted(set(value) & INVALID_PATH_CHARS)
     if not bad:
         return ""
-    bad.sort(key=ord)
+
     shown = ", ".join(_format_char(c) for c in bad[:_MAX_DISPLAY_CHARS])
-    extra = len(bad) - _MAX_DISPLAY_CHARS
-    if extra > 0:
-        shown += f" and {extra} more"
+    if len(bad) > _MAX_DISPLAY_CHARS:
+        shown += f" and {len(bad) - _MAX_DISPLAY_CHARS} more"
     return f": {shown}"
 
 
@@ -622,17 +616,16 @@ class PathValidator(FieldValidator):
             return
 
         ext = self._get_format_ext()
-        use_friendly = bool(self._get_var_value("friendly_run_names", False))
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-        if use_friendly:
+        if self._get_var_value("friendly_run_names", False):
             try:
-                name = fw.generate(2, separator="_")
+                name = fw.generate(2, separator="_")  # type: ignore[attr-defined]
             except Exception:
-                name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                name = timestamp
         else:
-            method = self._get_var_value("training_method")
-            method_str = str(method).lower().replace(" ", "_") if method is not None else "model"
-            name = f"{method_str}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+            method = str(self._get_var_value("training_method", "model")).lower().replace(" ", "_")
+            name = f"{method}_{timestamp}"
 
         self._undo.push(self._shadow_var.get())
         self._set_value(os.path.join("models", f"{name}{ext}"))

@@ -63,22 +63,17 @@ def autocorrect_string(value: str) -> str:
 def autocorrect_int(value: str) -> str:
     if not value:
         return value
-    result = autocorrect_string(value)
-    if result.startswith("+") and len(result) > 1:
-        result = result[1:]
-    result = result.replace("_", "")
+    result = autocorrect_string(value).lstrip("+").replace("_", "")
     # strip spaces between digits
     result = re.sub(r"(?<=\d) +(?=\d)", "", result)
     # if the value is only digits + exactly one decimal separator (. , ٫), round.
-    m = _ANY_DECIMAL_RE.match(result)
-    if m:
+    if m := _ANY_DECIMAL_RE.match(result):
         # Exactly 3 digits after the separator ⇒ thousand separator, not decimal
         if len(m.group(2)) == 3:
             result = m.group(1) + m.group(2)
         else:
-            normalized = m.group(1) + "." + m.group(2)
             with contextlib.suppress(ValueError):
-                result = str(round(float(normalized)))
+                result = str(round(float(f"{m.group(1)}.{m.group(2)}")))
     else:
         result = _NUMERIC_SEPARATOR_RE.sub("", result)
     return result
@@ -95,21 +90,17 @@ def autocorrect_float(value: str, *, is_learning_rate: bool = False) -> str:
         if not result:
             return result
 
-    if result.startswith("+") and len(result) > 1:
-        result = result[1:]
+    result = result.lstrip("+").replace("_", "")
 
-    result = result.replace("_", "")
     # Coerce a foreign decimal separator (comma, Arabic ٫) into a period
-    m = _FOREIGN_DECIMAL_RE.match(result)
-    result = m.group(1) + "." + m.group(2) if m else _NUMERIC_SEPARATOR_RE.sub("", result)
+    if m := _FOREIGN_DECIMAL_RE.match(result):
+        result = f"{m.group(1)}.{m.group(2)}"
+    else:
+        result = _NUMERIC_SEPARATOR_RE.sub("", result)
 
-    if result.startswith("."):
-        result = "0" + result
-    elif result.startswith("-.") and len(result) > 2:
-        result = "-0" + result[1:]
-
+    result = re.sub(r"^(-?)\.", r"\g<1>0.", result)
     if result.endswith(".") and len(result) > 1:
-        result = result + "0"
+        result += "0"
 
     return result
 
@@ -127,44 +118,26 @@ def autocorrect_path(
         return result
 
     # Silently strip characters that are never valid in a path.
-    if INVALID_PATH_CHARS.intersection(result):
-        result = "".join(c for c in result if c not in INVALID_PATH_CHARS)
-        if not result:
-            return result
+    result = result.translate({ord(c): None for c in INVALID_PATH_CHARS})
+    if not result:
+        return result
 
     if result.startswith("~"):
         result = os.path.expanduser(result)
 
     if _IS_WINDOWS:
         is_unc = result.startswith(("\\\\", "//"))
-
-        if _WINDOWS_DRIVE_PREFIX_RE.match(result) or is_unc:
-            result = result.replace("/", "\\")
-
-        normalised = os.path.normpath(result)
-
-        if is_unc and not normalised.startswith("\\\\"):
-            normalised = "\\\\" + normalised.lstrip("\\")
-
-        result = normalised
-    else:
-        if not _WINDOWS_DRIVE_PREFIX_RE.match(result):
-            result = os.path.normpath(result)
+        result = os.path.normpath(result.replace("/", "\\"))
+        if is_unc and not result.startswith("\\\\"):
+            result = "\\\\" + result.lstrip("\\")
+    elif not _WINDOWS_DRIVE_PREFIX_RE.match(result):
+        result = os.path.normpath(result)
 
     if io_type in (PathIOType.OUTPUT, PathIOType.MODEL):
         result = result.rstrip(os.sep)
 
     if expected_ext is not None and io_type == PathIOType.MODEL and result:
-        existing_ext_match = _FILE_EXTENSION_SUFFIX_RE.search(result)
-        if expected_ext == "":
-            # Diffusers: directory output — strip any file extension
-            if existing_ext_match:
-                result = result[: existing_ext_match.start()]
-        elif existing_ext_match:
-            if existing_ext_match.group().lower() != expected_ext.lower():
-                result = result[: existing_ext_match.start()] + expected_ext
-        else:
-            result += expected_ext
+        result = _FILE_EXTENSION_SUFFIX_RE.sub("", result) + expected_ext
 
     return result
 

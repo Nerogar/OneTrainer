@@ -81,7 +81,6 @@ class ValidationTooltip:
 
     # Class-level singleton tracking
     _active_instance: "ValidationTooltip | None" = None
-    _root_bindings_installed: set[int] = set()  # id(root) already hooked
 
     def __init__(self, widget: tk.Widget, text: str = ""):
         self.widget = widget
@@ -100,56 +99,12 @@ class ValidationTooltip:
         self._bind_ids: list[tuple[str, str]] = []
         self._bind("<Enter>", self._on_enter)
         self._bind("<Leave>", self._on_leave)
-
-        self._install_root_bindings()
+        self._bind("<Unmap>", lambda e: self._hide())
 
     def _bind(self, sequence: str, handler: Callable[[tk.Event], None]):
         with contextlib.suppress(tk.TclError):
             func_id = self.widget.bind(sequence, handler, add=True)
             self._bind_ids.append((sequence, func_id))
-
-    def _install_root_bindings(self):
-        try:
-            root = self.widget.winfo_toplevel()
-        except tk.TclError:
-            return
-
-        root_id = id(root)
-        if root_id in ValidationTooltip._root_bindings_installed:
-            return
-        ValidationTooltip._root_bindings_installed.add(root_id)
-
-        def _dismiss_active(_e=None):
-            inst = ValidationTooltip._active_instance
-            if inst is not None:
-                inst._hide()
-
-        with contextlib.suppress(tk.TclError):
-            root.bind("<Unmap>", _dismiss_active, add=True)
-            root.bind("<FocusOut>", _dismiss_active, add=True)
-
-        ValidationTooltip._hook_tabviews(root)
-
-    @staticmethod
-    def _hook_tabviews(root):
-        try:
-            for child in root.winfo_children():
-                if hasattr(child, "_segmented_button"):
-                    sb = child._segmented_button
-                    if hasattr(sb, "_current_value") and not getattr(sb, "_validation_tooltip_hooked", False):
-                        cv = sb._current_value
-                        if isinstance(cv, tk.Variable):
-                            sb._validation_tooltip_hooked = True
-                            cv.trace_add("write", ValidationTooltip._on_tab_changed)
-                ValidationTooltip._hook_tabviews(child)
-        except (tk.TclError, RuntimeError):
-            pass
-
-    @staticmethod
-    def _on_tab_changed(*_args):
-        inst = ValidationTooltip._active_instance
-        if inst is not None:
-            inst._hide()
 
     def show_error(self, text: str, *, from_typing: bool = False):
         self.text = text
@@ -235,10 +190,6 @@ class ValidationTooltip:
 
         self._bind_configure_events()
 
-        # Re-hook tabviews (new tabs may have been added)
-        with contextlib.suppress(tk.TclError):
-            ValidationTooltip._hook_tabviews(self.widget.winfo_toplevel())
-
     def _hide(self):
         self._cancel_auto_hide()
         self._unbind_configure_events()
@@ -275,13 +226,13 @@ class ValidationTooltip:
     def _bind_configure_events(self):
         self._unbind_configure_events()
 
-        def _on_configure(_e=None):
-            if self._toplevel is not None:
-                self._reposition()
-
         targets: list[tk.Misc] = [self.widget]
         with contextlib.suppress(tk.TclError):
             targets.append(self.widget.winfo_toplevel())
+
+        def _on_configure(e=None):
+            if self._toplevel is not None and getattr(e, "widget", None) in targets:
+                self._reposition()
 
         for target in targets:
             with contextlib.suppress(tk.TclError):
