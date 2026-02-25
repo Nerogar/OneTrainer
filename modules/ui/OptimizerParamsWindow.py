@@ -205,6 +205,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'l1_adaptive': {'title': 'L1 Adaptive', 'tooltip': 'Scales the learning rate dynamically by the L1 norm of the gradient to handle gradient heterogeneity. This makes the signed-optimizers semi-adaptive.', 'type': 'bool'},
             'centered_wd': {'title': 'Centered Weight Decay', 'tooltip': 'Centered Weight Decay coefficient. Instead of decaying weights toward zero, they are decayed toward their initial values (anchors). This can be used together with standard weight decay.', 'type': 'float'},
             'centered_wd_mode': {'title': 'Centered WD Mode', 'tooltip': """The quantization format used to store the anchor weights to save VRAM. Options include: 'full': Stores anchors in the original parameter's precision. 'float8': Uses torch.float8_e4m3fn for a balance of precision and memory. 'int8': Uses 8-bit block-wise quantization. 'int4': Uses 4-bit block-wise quantization.""", 'type': 'str'},
+            'factored_2nd': {'title': 'Factored 2nd', 'tooltip': 'Whether to keep the first moment uncompressed (dense), while only factorizing the second moment. This makes the optimizer highly robust to a wide range of LRs, mimicking high-order optimization.', 'type': 'bool'},
         }
         # @formatter:on
 

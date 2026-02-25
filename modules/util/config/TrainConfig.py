@@ -149,6 +149,7 @@ class TrainOptimizerConfig(BaseConfig):
     l1_adaptive: False
     centered_wd: float
     centered_wd_mode: CenteredWDMode
+    factored_2nd: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -273,6 +274,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("l1_adaptive", False, bool, False))
         data.append(("centered_wd", 0.0, float, False))
         data.append(("centered_wd_mode", CenteredWDMode.FLOAT8, CenteredWDMode, False))
+        data.append(("factored_2nd", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
