@@ -690,8 +690,6 @@ def create_optimizer(
                 scaled_optm=optimizer_config.scaled_optm if optimizer_config.scaled_optm is not None else False,
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
-                centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
-                centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
             )
 
         # ADOPT_ADV Optimizer

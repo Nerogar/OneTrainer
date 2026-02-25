@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class CenteredWDMode(str, Enum):
     FULL = "full"
     FLOAT8 = "float8"
