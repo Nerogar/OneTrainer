@@ -3,6 +3,7 @@ from tkinter import TclError
 
 from modules.ui.MuonAdamWindow import MUON_AUX_ADAM_DEFAULTS, MuonAdamWindow
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
+from modules.util.enum.CenteredWDMode import CenteredWDMode
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.optimizer_util import (
     OPTIMIZER_DEFAULT_PARAMETERS,
@@ -204,7 +205,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'freeze_on_flip': {'title': 'Freeze-on-Flip', 'tooltip': 'Projected One-hit freeze. Masks updates for coordinates where the gradient sign flips compared to the previous step. Over the steps, this makes the signed update semi-continuous.', 'type': 'bool'},
             'l1_adaptive': {'title': 'L1 Adaptive', 'tooltip': 'Scales the learning rate dynamically by the L1 norm of the gradient to handle gradient heterogeneity. This makes the signed-optimizers semi-adaptive.', 'type': 'bool'},
             'centered_wd': {'title': 'Centered Weight Decay', 'tooltip': 'Centered Weight Decay coefficient. Instead of decaying weights toward zero, they are decayed toward their initial values (anchors). This can be used together with standard weight decay.', 'type': 'float'},
-            'centered_wd_mode': {'title': 'Centered WD Mode', 'tooltip': """The quantization format used to store the anchor weights to save VRAM. Options include: 'full': Stores anchors in the original parameter's precision. 'float8': Uses torch.float8_e4m3fn for a balance of precision and memory. 'int8': Uses 8-bit block-wise quantization. 'int4': Uses 4-bit block-wise quantization.""", 'type': 'str'},
+            'centered_wd_mode': {'title': 'Centered WD Mode', 'tooltip': """The quantization format used to store the anchor weights to save VRAM. Options include: 'full': Stores anchors in the original parameter's precision. 'float8': Uses torch.float8_e4m3fn for a balance of precision and memory. 'int8': Uses 8-bit block-wise quantization. 'int4': Uses 4-bit block-wise quantization.""", 'type': 'CenteredWDMode'},
             'factored_2nd': {'title': 'Factored 2nd', 'tooltip': 'Whether to keep the first moment uncompressed (dense), while only factorizing the second moment. This makes the optimizer highly robust to a wide range of LRs, mimicking high-order optimization.', 'type': 'bool'},
         }
         # @formatter:on
@@ -242,6 +243,9 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
                     tooltip="Configure the auxiliary AdamW_adv optimizer",
                     width=20, padx=5                )
                 self.toggle_muon_adam_button()
+            elif type == 'CenteredWDMode':
+                components.options(master, row, col + 1, [x.value for x in CenteredWDMode], self.optimizer_ui_state, key,
+                                   command=self.update_user_pref)
             elif type != 'bool':
                 components.entry(master, row, col + 1, self.optimizer_ui_state, key,
                                  command=self.update_user_pref)
