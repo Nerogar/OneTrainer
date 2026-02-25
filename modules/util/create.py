@@ -687,6 +687,10 @@ def create_optimizer(
                 k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
                 scaled_optm=optimizer_config.scaled_optm if optimizer_config.scaled_optm is not None else False,
+                centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
+                centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
+                centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
+                centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
             )
 
         # ADOPT_ADV Optimizer
@@ -715,6 +719,8 @@ def create_optimizer(
                 k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
                 scaled_optm=optimizer_config.scaled_optm if optimizer_config.scaled_optm is not None else False,
+                centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
+                centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
             )
 
         # PRODIGY_ADV Optimizer
@@ -773,6 +779,8 @@ def create_optimizer(
                 k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
                 scaled_optm=optimizer_config.scaled_optm if optimizer_config.scaled_optm is not None else False,
+                centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
+                centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
             )
 
         # SignSGD_ADV Optimizer
@@ -791,6 +799,10 @@ def create_optimizer(
                 Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
                 alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
                 scaled_optm=optimizer_config.scaled_optm if optimizer_config.scaled_optm is not None else False,
+                freeze_on_flip=optimizer_config.freeze_on_flip if optimizer_config.freeze_on_flip is not None else False,
+                l1_adaptive=optimizer_config.l1_adaptive if optimizer_config.l1_adaptive is not None else False,
+                centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
+                centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
             )
 
         # LION_ADV Optimizer
@@ -811,7 +823,11 @@ def create_optimizer(
                 kappa_p=optimizer_config.kappa_p if optimizer_config.kappa_p is not None else 1.0,
                 auto_kappa_p=optimizer_config.auto_kappa_p if optimizer_config.auto_kappa_p is not None else False,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                freeze_on_flip=optimizer_config.freeze_on_flip if optimizer_config.freeze_on_flip is not None else False,
+                l1_adaptive=optimizer_config.l1_adaptive if optimizer_config.l1_adaptive is not None else False,
                 scaled_optm=optimizer_config.scaled_optm if optimizer_config.scaled_optm is not None else False,
+                centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
+                centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
             )
 
         # LION_PRODIGY_ADV Optimizer

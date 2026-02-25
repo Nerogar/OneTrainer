@@ -5,6 +5,7 @@ from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.torch_util import optimizer_to_device_
+from modules.util.enum.CenteredWDMode import CenteredWDMode
 
 import torch
 
@@ -463,6 +464,8 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "kourkoutas_beta": False,
         "k_warmup_steps": None,
         "scaled_optm": False,
+        "centered_wd": 0.0,
+        "centered_wd_mode": CenteredWDMode.FLOAT8,
     },
     Optimizer.ADOPT_ADV: {
         "beta1": 0.9,
@@ -486,6 +489,8 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "kourkoutas_beta": False,
         "k_warmup_steps": None,
         "scaled_optm": False,
+        "centered_wd": 0.0,
+        "centered_wd_mode": CenteredWDMode.FLOAT8,
     },
     Optimizer.PRODIGY_ADV: {
         "beta1": 0.9,
@@ -515,6 +520,8 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "alpha_grad": 100.0,
         "kourkoutas_beta": False,
         "k_warmup_steps": None,
+        "centered_wd": 0.0,
+        "centered_wd_mode": CenteredWDMode.FLOAT8,
     },
     Optimizer.SIMPLIFIED_AdEMAMix: {
         "beta1": 0.99,
@@ -534,6 +541,8 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "kourkoutas_beta": False,
         "k_warmup_steps": None,
         "scaled_optm": False,
+        "centered_wd": 0.0,
+        "centered_wd_mode": CenteredWDMode.FLOAT8,
     },
     Optimizer.SIGNSGD_ADV: {
         "momentum": 0.95,
@@ -546,7 +555,11 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "orthogonal_gradient": False,
         "Simplified_AdEMAMix": False,
         "alpha_grad": 100.0,
+        "freeze_on_flip": False,
+        "l1_adaptive": False,
         "scaled_optm": False,
+        "centered_wd": 0.0,
+        "centered_wd_mode": CenteredWDMode.FLOAT8,
     },
     Optimizer.LION_ADV: {
         "beta1": 0.9,
@@ -562,7 +575,11 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "orthogonal_gradient": False,
         "kappa_p": 1.0,
         "auto_kappa_p": True,
+        "freeze_on_flip": False,
+        "l1_adaptive": False,
         "scaled_optm": False,
+        "centered_wd": 0.0,
+        "centered_wd_mode": CenteredWDMode.FLOAT8,
     },
     Optimizer.LION_PRODIGY_ADV: {
         "beta1": 0.9,
