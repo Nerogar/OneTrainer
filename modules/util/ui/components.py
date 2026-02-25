@@ -153,8 +153,20 @@ def path_entry(
     use_save_dialog = io_type in (PathIOType.OUTPUT, PathIOType.MODEL)
 
     def __open_dialog():
+        # Determine currently selected filename and/or directory
+        current_dir, current_filename = None, None
+        current_path_str = ui_state.get_var(var_name).get() or None
+        if current_path_str is not None:
+            current_path = Path(current_path_str)
+            if mode == "file":
+                current_dir = str(current_path.parent)
+                current_filename = str(current_path.name)
+            elif mode == "dir":
+                current_dir = str(current_path)
+                current_filename = None
+
         if mode == "dir":
-            chosen = filedialog.askdirectory()
+            chosen = filedialog.askdirectory(initialdir=current_dir)
         else:
             filetypes = [
                 ("All Files", "*.*"),
@@ -172,9 +184,11 @@ def path_entry(
                 ])
 
             if use_save_dialog:
-                chosen = filedialog.asksaveasfilename(filetypes=filetypes)
+                chosen = filedialog.asksaveasfilename(filetypes=filetypes, initialdir=current_dir,
+                                                      initialfile=current_filename)
             else:
-                chosen = filedialog.askopenfilename(filetypes=filetypes)
+                chosen = filedialog.askopenfilename(filetypes=filetypes, initialdir=current_dir,
+                                                    initialfile=current_filename)
 
         if chosen:
             if path_modifier:
