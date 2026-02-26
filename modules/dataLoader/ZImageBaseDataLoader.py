@@ -2,6 +2,8 @@ import os
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
+from modules.dataLoader.zimage.PadTokens import PadTokens
+from modules.dataLoader.zimage.StripPaddedTokens import StripPaddedTokens
 from modules.model.BaseModel import BaseModel
 from modules.model.ZImageModel import PROMPT_MAX_LENGTH, ZImageModel, format_input
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
@@ -10,9 +12,6 @@ from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.TrainProgress import TrainProgress
-
-from modules.dataLoader.zimage.PadTokens import PadTokens
-from modules.dataLoader.zimage.StripPaddedTokens import StripPaddedTokens
 
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
