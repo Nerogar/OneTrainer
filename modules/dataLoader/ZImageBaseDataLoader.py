@@ -47,13 +47,14 @@ class ZImageBaseDataLoader(
         if config.masked_training or config.model_type.has_mask_input():
             modules.append(downscale_mask)
 
-        strip_padded_tokens = StripPaddedTokens(
-            tokens_name='tokens',
-            tokens_mask_name='tokens_mask',
-            hidden_state_name='text_encoder_hidden_state',
-        )
+        modules += [tokenize_prompt, encode_prompt]
 
-        modules += [tokenize_prompt, encode_prompt, strip_padded_tokens]
+        if config.latent_caching:
+            modules.append(StripPaddedTokens(
+                tokens_name='tokens',
+                tokens_mask_name='tokens_mask',
+                hidden_state_name='text_encoder_hidden_state',
+            ))
         return modules
 
     def _cache_modules(self, config: TrainConfig, model: ZImageModel, model_setup: BaseZImageSetup):
@@ -97,14 +98,7 @@ class ZImageBaseDataLoader(
 
         output_names.append('text_encoder_hidden_state')
 
-        pad_tokens = PadTokens(
-            tokens_name='tokens',
-            tokens_mask_name='tokens_mask',
-            hidden_state_name='text_encoder_hidden_state',
-            max_length=PROMPT_MAX_LENGTH,
-        )
-
-        return [pad_tokens] + self._output_modules_from_out_names(
+        output_module_list = self._output_modules_from_out_names(
             model, model_setup,
             output_names=output_names,
             config=config,
@@ -113,6 +107,16 @@ class ZImageBaseDataLoader(
             autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
         )
+
+        if config.latent_caching:
+            output_module_list = [PadTokens(
+                tokens_name='tokens',
+                tokens_mask_name='tokens_mask',
+                hidden_state_name='text_encoder_hidden_state',
+                max_length=PROMPT_MAX_LENGTH,
+            )] + output_module_list
+
+        return output_module_list
 
     def _debug_modules(self, config: TrainConfig, model: ZImageModel):
         debug_dir = os.path.join(config.debug_dir, "dataloader")
