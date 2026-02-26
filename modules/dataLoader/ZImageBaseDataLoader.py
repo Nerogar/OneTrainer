@@ -11,6 +11,9 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.TrainProgress import TrainProgress
 
+from modules.dataLoader.zimage.PadTokens import PadTokens
+from modules.dataLoader.zimage.StripPaddedTokens import StripPaddedTokens
+
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
 from mgds.pipelineModules.EncodeQwenText import EncodeQwenText
@@ -45,7 +48,13 @@ class ZImageBaseDataLoader(
         if config.masked_training or config.model_type.has_mask_input():
             modules.append(downscale_mask)
 
-        modules += [tokenize_prompt, encode_prompt]
+        strip_padded_tokens = StripPaddedTokens(
+            tokens_name='tokens',
+            tokens_mask_name='tokens_mask',
+            hidden_state_name='text_encoder_hidden_state',
+        )
+
+        modules += [tokenize_prompt, encode_prompt, strip_padded_tokens]
         return modules
 
     def _cache_modules(self, config: TrainConfig, model: ZImageModel, model_setup: BaseZImageSetup):
@@ -89,7 +98,14 @@ class ZImageBaseDataLoader(
 
         output_names.append('text_encoder_hidden_state')
 
-        return self._output_modules_from_out_names(
+        pad_tokens = PadTokens(
+            tokens_name='tokens',
+            tokens_mask_name='tokens_mask',
+            hidden_state_name='text_encoder_hidden_state',
+            max_length=PROMPT_MAX_LENGTH,
+        )
+
+        return [pad_tokens] + self._output_modules_from_out_names(
             model, model_setup,
             output_names=output_names,
             config=config,
