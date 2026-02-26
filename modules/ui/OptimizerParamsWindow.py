@@ -244,7 +244,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
                     width=20, padx=5                )
                 self.toggle_muon_adam_button()
             elif type == 'CenteredWDMode':
-                components.options(master, row, col + 1, [x.value for x in CenteredWDMode], self.optimizer_ui_state, key,
+                components.options(master, row, col + 1, [str(x) for x in CenteredWDMode], self.optimizer_ui_state, key,
                                    command=self.update_user_pref)
             elif type != 'bool':
                 components.entry(master, row, col + 1, self.optimizer_ui_state, key,

@@ -6,3 +6,6 @@ class CenteredWDMode(str, Enum):
     FLOAT8 = "float8"
     INT8 = "int8"
     INT4 = "int4"
+
+    def __str__(self):
+        return self.name
