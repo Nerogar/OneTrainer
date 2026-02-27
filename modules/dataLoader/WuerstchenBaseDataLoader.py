@@ -153,7 +153,7 @@ class WuerstchenBaseDataLoader(
     ):
         return DataLoaderText2ImageMixin._create_dataset(self,
             config, model, model_setup, train_progress, is_validation,
-            aspect_bucketing_quantization=128,
+            resolution_quantization=128,
             supports_inpainting=False,
         )
 

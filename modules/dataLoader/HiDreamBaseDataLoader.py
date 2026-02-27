@@ -217,7 +217,7 @@ class HiDreamBaseDataLoader(
     ):
         return DataLoaderText2ImageMixin._create_dataset(self,
             config, model, model_setup, train_progress, is_validation,
-            aspect_bucketing_quantization=64,
+            resolution_quantization=64,
         )
 
 factory.register(BaseDataLoader, HiDreamBaseDataLoader, ModelType.HI_DREAM_FULL)

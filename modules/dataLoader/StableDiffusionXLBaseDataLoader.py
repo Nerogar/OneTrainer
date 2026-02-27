@@ -174,7 +174,7 @@ class StableDiffusionXLBaseDataLoader(
     ):
         return DataLoaderText2ImageMixin._create_dataset(self,
             config, model, model_setup, train_progress, is_validation,
-            aspect_bucketing_quantization=64,
+            resolution_quantization=64,
         )
 factory.register(BaseDataLoader, StableDiffusionXLBaseDataLoader, ModelType.STABLE_DIFFUSION_XL_10_BASE)
 factory.register(BaseDataLoader, StableDiffusionXLBaseDataLoader, ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING)

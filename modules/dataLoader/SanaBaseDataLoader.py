@@ -150,7 +150,7 @@ class SanaBaseDataLoader(
     ):
         return DataLoaderText2ImageMixin._create_dataset(self,
             config, model, model_setup, train_progress, is_validation,
-            aspect_bucketing_quantization=32,
+            resolution_quantization=32,
         )
 
 factory.register(BaseDataLoader, SanaBaseDataLoader, ModelType.SANA)

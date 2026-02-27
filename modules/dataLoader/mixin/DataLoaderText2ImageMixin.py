@@ -151,11 +151,11 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
 
         return modules
 
-    def _aspect_bucketing_in(self, config: TrainConfig, aspect_bucketing_quantization: int, frame_dim_enabled:bool=False):
+    def _aspect_bucketing_in(self, config: TrainConfig, resolution_quantization: int, frame_dim_enabled:bool=False):
         calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
 
-        aspect_bucketing_quantization = AspectBucketing(
-            quantization=aspect_bucketing_quantization,
+        aspect_bucketing = AspectBucketing(
+            quantization=resolution_quantization,
             resolution_in_name='original_resolution',
             target_resolution_in_name='settings.target_resolution',
             enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
@@ -174,13 +174,14 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             target_resolutions_override_in_name='concept.image.resolution_override',
             scale_resolution_out_name='scale_resolution',
             crop_resolution_out_name='crop_resolution',
-            possible_resolutions_out_name='possible_resolutions'
+            possible_resolutions_out_name='possible_resolutions',
+            quantization=resolution_quantization,
         )
 
         modules = [calc_aspect]
 
         if config.aspect_ratio_bucketing:
-            modules.append(aspect_bucketing_quantization)
+            modules.append(aspect_bucketing)
         else:
             modules.append(single_aspect_calculation)
 
@@ -384,7 +385,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             model_setup: ModelSetupText2ImageMixin,
             train_progress: TrainProgress,
             is_validation: bool,
-            aspect_bucketing_quantization: int,
+            resolution_quantization: int,
             frame_dim_enabled: bool=False,
             allow_video_files: bool=False,
             vae_frame_dim: bool=False,
@@ -393,7 +394,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
         enumerate_input = self._enumerate_input_modules(config, allow_videos=allow_video_files)
         load_input = self._load_input_modules(config, model.train_dtype, vae_frame_dim=vae_frame_dim)
         mask_augmentation = self._mask_augmentation_modules(config)
-        aspect_bucketing_in = self._aspect_bucketing_in(config, aspect_bucketing_quantization, frame_dim_enabled)
+        aspect_bucketing_in = self._aspect_bucketing_in(config, resolution_quantization, frame_dim_enabled)
         crop_modules = self._crop_modules(config)
         augmentation_modules = self._augmentation_modules(config)
         if supports_inpainting:
