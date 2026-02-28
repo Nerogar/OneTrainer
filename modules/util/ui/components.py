@@ -156,6 +156,7 @@ def path_entry(
         # Determine currently selected filename and/or directory
         current_dir, current_filename = None, None
         current_path_str = ui_state.get_var(var_name).get() or None
+
         if current_path_str is not None:
             current_path = Path(current_path_str)
             if mode == "file":
