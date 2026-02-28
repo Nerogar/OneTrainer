@@ -550,6 +550,17 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "Simplified_AdEMAMix": False,
         "alpha_grad": 100.0,
     },
+    Optimizer.Stiefel_LoRA: {
+        "momentum": 0.95,
+        "cautious_wd": False,
+        "weight_decay": 0.0,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "compile": False,
+        "fused_back_pass": False,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
+    },
     Optimizer.LION_ADV: {
         "beta1": 0.9,
         "beta2": 0.99,

@@ -43,6 +43,7 @@ class Optimizer(Enum):
     SGD = 'SGD'
     SGD_8BIT = 'SGD_8BIT'
     SIGNSGD_ADV = 'SIGNSGD_ADV'
+    Stiefel_LoRA = 'Stiefel_LoRA'
 
     # Schedule-free optimizers
     SCHEDULE_FREE_ADAMW = 'SCHEDULE_FREE_ADAMW'
@@ -118,6 +119,7 @@ class Optimizer(Enum):
             Optimizer.MUON_ADV,
             Optimizer.ADAMUON_ADV,
             Optimizer.SIGNSGD_ADV,
+            Optimizer.Stiefel_LoRA,
         ]
 
     # Small helper for adjusting learning rates to adaptive optimizers.
