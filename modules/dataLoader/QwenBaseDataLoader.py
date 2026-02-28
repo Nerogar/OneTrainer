@@ -20,6 +20,8 @@ from mgds.pipelineModules.DecodeTokens import DecodeTokens
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
 from mgds.pipelineModules.EncodeQwenText import EncodeQwenText
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
+from mgds.pipelineModules.PadMaskedTokens import PadMaskedTokens
+from mgds.pipelineModules.PruneMaskedTokens import PruneMaskedTokens
 from mgds.pipelineModules.RescaleImageChannels import RescaleImageChannels
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.SaveImage import SaveImage
@@ -41,6 +43,7 @@ class QwenBaseDataLoader(
                                    format_text=DEFAULT_PROMPT_TEMPLATE, additional_format_text_tokens=DEFAULT_PROMPT_TEMPLATE_CROP_START)
         encode_prompt = EncodeQwenText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask',
                                        text_encoder=model.text_encoder, hidden_state_output_index=-1, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(), crop_start=DEFAULT_PROMPT_TEMPLATE_CROP_START)
+        prune_masked_tokens = PruneMaskedTokens(tokens_name='tokens', tokens_mask_name='tokens_mask', hidden_state_name='text_encoder_hidden_state')
 
         modules = [rescale_image, encode_image, image_sample]
         if config.masked_training or config.model_type.has_mask_input():
@@ -50,6 +53,9 @@ class QwenBaseDataLoader(
 
         if not config.train_text_encoder_or_embedding():
             modules.append(encode_prompt)
+
+        if config.latent_caching and not config.train_text_encoder_or_embedding():
+            modules.append(prune_masked_tokens)
 
         return modules
 
@@ -82,6 +88,8 @@ class QwenBaseDataLoader(
         )
 
     def _output_modules(self, config: TrainConfig, model: QwenModel, model_setup: BaseQwenSetup):
+        pad_masked_tokens = PadMaskedTokens(tokens_name='tokens', tokens_mask_name='tokens_mask', hidden_state_name='text_encoder_hidden_state', max_length=PROMPT_MAX_LENGTH)
+
         output_names = [
             'image_path', 'latent_image',
             'prompt',
@@ -96,7 +104,7 @@ class QwenBaseDataLoader(
         if not config.train_text_encoder_or_embedding():
             output_names.append('text_encoder_hidden_state')
 
-        return self._output_modules_from_out_names(
+        output_module_list = self._output_modules_from_out_names(
             model, model_setup,
             output_names=output_names,
             config=config,
@@ -105,6 +113,11 @@ class QwenBaseDataLoader(
             autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
         )
+
+        if config.latent_caching and not config.train_text_encoder_or_embedding():
+            output_module_list = [pad_masked_tokens] + output_module_list
+
+        return output_module_list
 
     def _debug_modules(self, config: TrainConfig, model: QwenModel): #TODO clean up
         debug_dir = os.path.join(config.debug_dir, "dataloader")
