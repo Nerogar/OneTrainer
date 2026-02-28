@@ -3,7 +3,6 @@ from tkinter import TclError
 
 from modules.ui.MuonAdamWindow import MUON_AUX_ADAM_DEFAULTS, MuonAdamWindow
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
-from modules.util.enum.CenteredWDMode import CenteredWDMode
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.optimizer_util import (
     OPTIMIZER_DEFAULT_PARAMETERS,
@@ -244,7 +243,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
                     width=20, padx=5                )
                 self.toggle_muon_adam_button()
             elif type == 'CenteredWDMode':
-                components.options(master, row, col + 1, [str(x) for x in CenteredWDMode], self.optimizer_ui_state, key,
+                components.options(master, row, col + 1, ["full", "float8", "int8", "int4"], self.optimizer_ui_state, key,
                                    command=self.update_user_pref)
             elif type != 'bool':
                 components.entry(master, row, col + 1, self.optimizer_ui_state, key,
