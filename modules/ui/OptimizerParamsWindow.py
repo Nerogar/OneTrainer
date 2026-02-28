@@ -187,7 +187,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'muon_adam_lr': {'title': 'Auxiliary Adam LR', 'tooltip': 'Learning rate for the auxiliary AdamW optimizer. If empty, it will use the main learning rate.', 'type': 'float'},
             'muon_te1_adam_lr': {'title': 'AuxAdam TE1 LR', 'tooltip': 'Learning rate for the auxiliary AdamW optimizer for the first text encoder. If empty, it will use the Auxiliary Adam LR.', 'type': 'float'},
             'muon_te2_adam_lr': {'title': 'AuxAdam TE2 LR', 'tooltip': 'Learning rate for the auxiliary AdamW optimizer for the second text encoder. If empty, it will use the Auxiliary Adam LR.', 'type': 'float'},
-            'rms_rescaling': {'title': 'RMS Rescaling', 'tooltip': 'Muon already scales its updates to approximate and use the same learning rate (LR) as Adam. This option integrates a more accurate method to match the Adam LR, but it is slower.', 'type': 'bool'},
+            'rms_rescaling': {'title': 'RMS Rescaling', 'tooltip': 'Normalizes Muon update magnitudes to align with Adam. This allows to reuse standard "Adam-style" learning rates instead of specialized Muon scales.', 'type': 'bool'},
             'normuon_variant': {'title': 'NorMuon Variant', 'tooltip': 'Enables the NorMuon optimizer variant, which combines Muon orthogonalization with per-neuron adaptive learning rates for better convergence and balanced parameter updates. Costs only one scalar state buffer per parameter group, size few KBs, maintaining high memory efficiency.', 'type': 'bool'},
             'beta2_normuon': {'title': 'NorMuon Beta2', 'tooltip': 'Exponential decay rate for the neuron-wise second-moment estimator in NorMuon (analogous to Adams beta2). Controls how past squared updates influence current normalization.', 'type': 'float'},
             'normuon_eps': {'title': 'NorMuon EPS', 'tooltip': 'Epsilon for NorMuon normalization stability.', 'type': 'float'},
@@ -199,6 +199,13 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'kappa_p': {'title': 'Lion-K P-value', 'tooltip': 'Controls the Lp-norm geometry for the Lion update. 1.0 = Standard Lion (Sign update, coordinate-wise), best for Transformers. 2.0 = Spherical Lion (Normalized update, rotational invariant), best for Conv2d layers (in unet models). Values between 1.0 and 2.0 interpolate behavior between the two.', 'type': 'float'},
             'auto_kappa_p': {'title': 'Auto Lion-K', 'tooltip': 'Automatically determines the optimal P-value based on layer dimensions. Uses p=2.0 (Spherical) for 4D (Conv) tensors for stability and rotational invariance, and p=1.0 (Sign) for 2D (Linear) tensors for sparsity. Overrides the manual P-value. Recommend for unet models.', 'type': 'bool'},
             'compile': {'title': 'Compiled Optimizer', 'tooltip': 'Enables PyTorch compilation for the optimizer internal step logic. This is intended to improve performance by allowing PyTorch to fuse operations and optimize the computational graph.', 'type': 'bool'},
+            'spectral_normalization': {'title': 'Spectral Scaling', 'tooltip': 'Enables explicit Spectral Normalization to automatically rescale the update magnitude and Weight Decay based on layer dimensions. This allows hyperparameters to transfer seamlessly from small to large models without retuning, while making the optimizer highly robust to a wide range of learning rates. This ensures consistent performance across different model sizes, adapter methods, and ranks. ', 'type': 'bool'},
+            'scaled_optm': {'title': 'Scaled Optimizer', 'tooltip': 'Automatically rescale the update magnitude and Weight Decay based on layer dimensions and type. This allows hyperparameters to transfer seamlessly from small to large models without retuning. This ensures consistent performance across different model sizes, adapter methods, and ranks. For LoRAs set alpha=rank. Using this, LoRA shares the same LR as full finetuning for all ranks.', 'type': 'bool'},
+            'freeze_on_flip': {'title': 'Freeze-on-Flip', 'tooltip': 'Projected One-hit freeze. Masks updates for coordinates where the gradient sign flips compared to the previous step. Over the steps, this makes the signed update semi-continuous.', 'type': 'bool'},
+            'l1_adaptive': {'title': 'L1 Adaptive', 'tooltip': 'Scales the learning rate dynamically by the L1 norm of the gradient to handle gradient heterogeneity. This makes the signed-optimizers semi-adaptive.', 'type': 'bool'},
+            'centered_wd': {'title': 'Centered Weight Decay', 'tooltip': 'Centered Weight Decay coefficient. Instead of decaying weights toward zero, they are decayed toward their initial values (anchors). This can be used together with standard weight decay.', 'type': 'float'},
+            'centered_wd_mode': {'title': 'Centered WD Mode', 'tooltip': """The quantization format used to store the anchor weights to save VRAM. Options include: 'full': Stores anchors in the original parameter's precision. 'float8': Uses torch.float8_e4m3fn for a balance of precision and memory. 'int8': Uses 8-bit block-wise quantization. 'int4': Uses 4-bit block-wise quantization.""", 'type': 'CenteredWDMode'},
+            'factored_2nd': {'title': 'Factored 2nd', 'tooltip': 'Whether to keep the first moment uncompressed (dense), while only factorizing the second moment. This makes the optimizer highly robust to a wide range of LRs, mimicking high-order optimization.', 'type': 'bool'},
         }
         # @formatter:on
 
@@ -235,6 +242,9 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
                     tooltip="Configure the auxiliary AdamW_adv optimizer",
                     width=20, padx=5                )
                 self.toggle_muon_adam_button()
+            elif type == 'CenteredWDMode':
+                components.options(master, row, col + 1, ["full", "float8", "int8", "int4"], self.optimizer_ui_state, key,
+                                   command=self.update_user_pref)
             elif type != 'bool':
                 components.entry(master, row, col + 1, self.optimizer_ui_state, key,
                                  command=self.update_user_pref)
