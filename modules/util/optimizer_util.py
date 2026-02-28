@@ -4,7 +4,6 @@ from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
-from modules.util.optimizer.muon_util import build_muon_adam_key_fn
 from modules.util.torch_util import optimizer_to_device_
 
 import torch
@@ -59,13 +58,8 @@ def init_model_parameters(
     #to be safe, do that before the optimizer is created because the optimizer could take copies
     multi.broadcast_parameters(parameters.parameters(), train_device)
 
-    layer_key_fn = None
-    if model.train_config.optimizer.MuonWithAuxAdam:
-        print("INFO: Creating layer keys for MuonWithAuxAdam.")
-        layer_key_fn = build_muon_adam_key_fn(model, model.train_config)
-
     model.optimizer = create.create_optimizer(
-        parameters, model.optimizer_state_dict, model.train_config, layer_key_fn
+        parameters, model.optimizer_state_dict, model.train_config, model=model
     )
 
     if model.optimizer is not None:
@@ -596,6 +590,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "low_rank_ortho": False,
         "ortho_rank": 128,
         "rms_rescaling": True,
+        "spectral_normalization": False,
         "nnmf_factor": False,
         "stochastic_rounding": True,
         "compile": False,
@@ -627,6 +622,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "low_rank_ortho": False,
         "ortho_rank": 128,
         "rms_rescaling": True,
+        "spectral_normalization": False,
         "nnmf_factor": False,
         "stochastic_rounding": True,
         "compile": False,
