@@ -162,7 +162,7 @@ def path_entry(
                 current_dir = str(current_path.parent)
                 current_filename = str(current_path.name)
             elif mode == "dir":
-                current_dir = str(current_path)
+                current_dir = str(current_path.parent)
                 current_filename = None
 
         if mode == "dir":
