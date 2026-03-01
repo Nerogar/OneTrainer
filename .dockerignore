@@ -1,4 +1,6 @@
-# If you modify this file, remember to update .dockerignore as well.
+# This file should remain in sync with .gitignore. If you need to make changes,
+# please add a comment explaining why. For items that must be removed, comment
+# them out instead of deleting them.
 
 # development
 .idea
@@ -20,7 +22,6 @@ debug*.py
 /update.var
 config.json
 secrets.json
-*.zip
 
 # environments
 /.venv*
@@ -38,4 +39,3 @@ pixi.toml
 /src
 train.bat
 debug_report.log
-config_diff.txt
