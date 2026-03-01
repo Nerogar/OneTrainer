@@ -1,5 +1,4 @@
 import traceback
-from pathlib import Path
 from uuid import uuid4
 
 from modules.util import create
@@ -8,6 +7,7 @@ from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
+from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModelNames import EmbeddingName, ModelNames
 from modules.util.torch_util import torch_gc
@@ -85,9 +85,9 @@ class ConvertModelUI(ctk.CTkToplevel):
         # input name
         components.label(master, 2, 0, "Input name",
                          tooltip="Filename, directory or hugging face repository of the base model")
-        components.file_entry(
+        components.path_entry(
             master, 2, 1, self.ui_state, "input_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            mode="file", path_modifier=components.json_path_modifier
         )
 
         # output data type
@@ -110,7 +110,11 @@ class ConvertModelUI(ctk.CTkToplevel):
         # output model destination
         components.label(master, 5, 0, "Model Output Destination",
                          tooltip="Filename or directory where the output model is saved")
-        components.file_entry(master, 5, 1, self.ui_state, "output_model_destination", is_output=True)
+        components.path_entry(
+            master, 5, 1, self.ui_state, "output_model_destination",
+            mode="file",
+            io_type=PathIOType.MODEL,
+        )
 
         self.button = components.button(master, 6, 1, "Convert", self.convert_model)
 
