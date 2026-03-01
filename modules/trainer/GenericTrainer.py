@@ -633,6 +633,9 @@ class GenericTrainer(BaseTrainer):
         epochs = range(train_progress.epoch, self.config.epochs, 1)
 
         for _epoch in tqdm(epochs, desc="epoch") if multi.is_master() else epochs:
+            multi.sync_commands(self.commands)
+            if self.commands.get_stop_command():
+                return
             self.callbacks.on_update_status("Starting epoch/caching")
 
             #call start_next_epoch with only one process at first, because it might write to the cache. All subsequent processes can read in parallel:
@@ -683,7 +686,7 @@ class GenericTrainer(BaseTrainer):
                 if self.commands.get_stop_command():
                     multi.warn_parameter_divergence(self.parameters, train_device)
 
-                if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
+                if not self.commands.get_stop_command() and self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
                     self.__enqueue_sample_during_training(
                         lambda: self.__sample_during_training(train_progress, train_device)
                     )
