@@ -214,8 +214,8 @@ class GenericTrainer(BaseTrainer):
             folder_postfix: str = "",
             is_custom_sample: bool = False,
     ):
-        for i, sample_config in multi.distributed_enumerate(
-            [sample_config for sample_config in sample_config_list if sample_config.enabled],
+        for i, sample_config in multi.distributed(
+            [(i, sample_config) for i, sample_config in enumerate(sample_config_list) if sample_config.enabled],
             distribute=not self.config.samples_to_tensorboard and not ema_applied
         ):
             try:
