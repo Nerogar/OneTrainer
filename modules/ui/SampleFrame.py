@@ -15,7 +15,7 @@ class SampleFrame(ctk.CTkFrame):
             ui_state: UIState,
             include_prompt: bool = True,
             include_settings: bool = True,
-            model_type: ModelType | None = None,
+            model_type: ModelType = ModelType.STABLE_DIFFUSION_15,
     ):
         ctk.CTkFrame.__init__(self, parent, fg_color="transparent")
 
@@ -23,9 +23,9 @@ class SampleFrame(ctk.CTkFrame):
         self.ui_state = ui_state
         self.model_type = model_type
 
-        is_flow_matching = model_type is not None and model_type.is_flow_matching()
-        is_inpainting_model = model_type is not None and model_type.has_conditioning_image_input()
-        is_video_model = model_type is not None and model_type.is_video_model()
+        is_flow_matching = model_type.is_flow_matching()
+        is_inpainting_model = model_type.has_conditioning_image_input()
+        is_video_model = model_type.is_video_model()
 
         if include_prompt and include_prompt:
             self.grid_rowconfigure(0, weight=0)
