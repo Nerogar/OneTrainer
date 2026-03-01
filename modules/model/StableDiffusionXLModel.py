@@ -5,6 +5,9 @@ from modules.model.BaseModel import BaseModel, BaseModelEmbedding
 from modules.model.util.clip_util import encode_clip
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util.convert.diff2flow_util import (
+    enable_diff2flow as enable_diff2flow_conversion,
+)
 from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import (
     rescale_noise_scheduler_to_zero_terminal_snr,
 )
@@ -189,6 +192,9 @@ class StableDiffusionXLModel(BaseModel):
 
     def rescale_noise_scheduler_to_zero_terminal_snr(self):
         rescale_noise_scheduler_to_zero_terminal_snr(self.noise_scheduler)
+
+    def enable_diff2flow(self):
+        enable_diff2flow_conversion(self)
 
     def add_text_encoder_1_embeddings_to_prompt(self, prompt: str) -> str:
         return self._add_embeddings_to_prompt(self.all_text_encoder_1_embeddings(), prompt)

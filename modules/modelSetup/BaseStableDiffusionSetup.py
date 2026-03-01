@@ -222,7 +222,28 @@ class BaseStableDiffusionSetup(
 
             model_output_data = {}
 
-            if model.noise_scheduler.config.prediction_type == 'epsilon':
+            if config.diff2flow:
+                # Convert standard Diffusion Model output/target to Diff2Flow vector field
+                # Target: u_t(x) = x_0 - x_1 (Noise - Data)
+                target_velocity = latent_noise - scaled_latent_image
+
+                # Predict: Convert eps or v to vector field
+                if model.noise_scheduler.config.prediction_type == 'v_prediction':
+                    predicted_velocity = model._df_get_vector_field_from_v(
+                        predicted_latent_noise, scaled_noisy_latent_image, timestep
+                    )
+                else:
+                    predicted_velocity = model._df_get_vector_field_from_eps(
+                        predicted_latent_noise, scaled_noisy_latent_image, timestep
+                    )
+
+                model_output_data = {
+                    'loss_type': 'target',
+                    'timestep': timestep,
+                    'predicted': predicted_velocity,
+                    'target': target_velocity,
+                }
+            elif model.noise_scheduler.config.prediction_type == 'epsilon':
                 model_output_data = {
                     'loss_type': 'target',
                     'timestep': timestep,
