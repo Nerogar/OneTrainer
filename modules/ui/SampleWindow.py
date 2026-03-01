@@ -55,7 +55,10 @@ class SampleWindow(ctk.CTkToplevel):
         self.current_train_config = train_config
         self.callbacks = callbacks
         self.commands = commands
-        self.sample = SampleConfig.default_values()
+
+        # get model specific defaults
+        model_type = train_config.model_type if train_config is not None else None
+        self.sample = SampleConfig.default_values(model_type)
         self.ui_state = UIState(self, self.sample)
 
         use_external_model = self.initial_train_config is None
@@ -73,10 +76,10 @@ class SampleWindow(ctk.CTkToplevel):
         self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
 
-        prompt_frame = SampleFrame(self, self.sample, self.ui_state, include_settings=False)
+        prompt_frame = SampleFrame(self, self.sample, self.ui_state, include_settings=False, model_type=model_type)
         prompt_frame.grid(row=0, column=0, columnspan=2, padx=0, pady=0, sticky="nsew")
 
-        settings_frame = SampleFrame(self, self.sample, self.ui_state, include_prompt=False)
+        settings_frame = SampleFrame(self, self.sample, self.ui_state, include_prompt=False, model_type=model_type)
         settings_frame.grid(row=1, column=0, padx=0, pady=0, sticky="nsew")
 
         # image
