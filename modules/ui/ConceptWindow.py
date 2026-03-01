@@ -610,6 +610,8 @@ class ConceptWindow(ctk.CTkToplevel):
         concept_path = self.get_concept_path(self.concept.path)
         if concept_path:
             for path in pathlib.Path(concept_path).glob(glob_pattern):
+                if any(part.startswith('.') for part in path.relative_to(concept_path).parent.parts):
+                    continue
                 extension = os.path.splitext(path)[1]
                 if path.is_file() and path_util.is_supported_image_extension(extension) \
                         and not path.name.endswith("-masklabel.png") and not path.name.endswith("-condlabel.png"):
@@ -880,7 +882,7 @@ class ConceptWindow(ctk.CTkToplevel):
                 break
             stats_dict = concept_stats.folder_scan(path, stats_dict, advanced_checks, self.concept, start_time, wait_time, self.cancel_scan_flag)
             if self.concept.include_subdirectories and not self.cancel_scan_flag.is_set():     #add all subfolders of current directory to for loop
-                subfolders.extend([f for f in os.scandir(path) if f.is_dir()])
+                subfolders.extend([f for f in os.scandir(path) if f.is_dir() and not f.name.startswith('.')])
             self.concept.concept_stats = stats_dict
             #update GUI approx every half second
             if time.perf_counter() > (last_update + 0.5):

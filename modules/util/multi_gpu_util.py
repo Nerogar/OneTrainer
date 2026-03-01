@@ -41,6 +41,15 @@ def master_first(enabled: bool = True):
     else:
         yield()
 
+def distributed(iterable, distribute: bool=True):
+    if distribute:
+        for i, x in enumerate(iterable):
+            if i % world_size() == rank():
+                yield x
+    elif is_master():
+        for x in iterable:
+            yield x
+
 def distributed_enumerate(iterable, distribute: bool=True):
     if distribute:
         for i, x in enumerate(iterable):

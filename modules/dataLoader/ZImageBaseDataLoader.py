@@ -9,6 +9,7 @@ from modules.modelSetup.BaseZImageSetup import BaseZImageSetup
 from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
+from modules.util.thread_safety import apply_thread_safe_forward
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
@@ -36,7 +37,7 @@ class ZImageBaseDataLoader(
                                     apply_chat_template = lambda caption: format_input(caption), apply_chat_template_kwargs = {'add_generation_prompt': True, 'enable_thinking': True}
                                   )
         if config.dataloader_threads > 1:
-            raise NotImplementedError("Multiple data loader threads are not supported due to an issue with the transformers library: https://github.com/huggingface/transformers/issues/42673")
+            apply_thread_safe_forward(model.text_encoder)  # workaround for transformers#42673
         encode_prompt = EncodeQwenText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask',
                                        text_encoder=model.text_encoder, hidden_state_output_index=-2, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
 
