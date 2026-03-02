@@ -157,7 +157,7 @@ class PixArtAlphaBaseDataLoader(
     ):
         return DataLoaderText2ImageMixin._create_dataset(self,
             config, model, model_setup, train_progress, is_validation,
-            aspect_bucketing_quantization=16,
+            resolution_quantization=16,
         )
 
 factory.register(BaseDataLoader, PixArtAlphaBaseDataLoader, ModelType.PIXART_ALPHA)

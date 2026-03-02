@@ -149,7 +149,7 @@ class QwenBaseDataLoader(
     ):
         return DataLoaderText2ImageMixin._create_dataset(self,
             config, model, model_setup, train_progress, is_validation,
-            aspect_bucketing_quantization=64,
+            resolution_quantization=64,
             allow_video_files=False, #don't allow video files, but...
             vae_frame_dim=True,  #...Qwen has a video-capable VAE. convert images to video dimensions
         )

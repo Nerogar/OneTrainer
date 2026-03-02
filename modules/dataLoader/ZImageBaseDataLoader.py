@@ -136,7 +136,7 @@ class ZImageBaseDataLoader(
     ):
         return DataLoaderText2ImageMixin._create_dataset(self,
             config, model, model_setup, train_progress, is_validation,
-            aspect_bucketing_quantization=64,
+            resolution_quantization=64,
         )
 
 factory.register(BaseDataLoader, ZImageBaseDataLoader, ModelType.Z_IMAGE)
