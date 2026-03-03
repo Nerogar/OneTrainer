@@ -57,6 +57,7 @@ def entry(
         validator_factory: Callable[..., FieldValidator] | None = None,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
+        allow_negative: bool = False,
 ):
     var = ui_state.get_var(var_name)
     trace_id = None
@@ -79,6 +80,7 @@ def entry(
             max_undo=max_undo or DEFAULT_MAX_UNDO,
             extra_validate=extra_validate,
             required=required,
+            allow_negative=allow_negative,
         )
     validator.attach()
     component._validator = validator  # type: ignore[attr-defined]

@@ -240,6 +240,7 @@ class FieldValidator:
         max_undo: int = DEFAULT_MAX_UNDO,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
+        allow_negative: bool = False,
     ):
         self.component = component
         self.var = var
@@ -247,6 +248,7 @@ class FieldValidator:
         self.var_name = var_name
         self._extra_validate = extra_validate
         self._required = required
+        self._allow_negative = allow_negative
 
         self._original_border_color = "gray50"
         with contextlib.suppress(Exception):
@@ -419,9 +421,10 @@ class FieldValidator:
 
         try:
             if declared_type in (int, float):
-                if declared_type(value) < 0:
+                converted = declared_type(value)
+                if not self._allow_negative and converted < 0:
                     return "Value must be non-negative"
-                if self._required and declared_type is int and int(value) == 0:
+                if self._required and declared_type is int and converted == 0:
                     return "Value must be greater than zero"
             elif declared_type is bool:
                 if value.lower() not in ("true", "false", "0", "1"):
