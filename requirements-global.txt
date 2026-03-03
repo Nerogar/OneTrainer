@@ -1,1 +1,7 @@
 -e .
+
+# Git requirements must be repeated here, in this format
+# `pyproject.toml` doesn't support this format
+-e git+https://github.com/huggingface/diffusers.git@99daaa8#egg=diffusers
+-e git+https://github.com/Nerogar/mgds.git@5bbafa5#egg=mgds
+-e git+https://github.com/KellerJordan/Muon.git@f90a42b#egg=muon-optimizer
