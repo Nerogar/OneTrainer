@@ -20,7 +20,6 @@ from modules.util.ui.autocorrect import (
     autocorrect_int,
     autocorrect_path,
     autocorrect_string,
-    is_learning_rate_field,
 )
 from modules.util.ui.ToolTip import ValidationTooltip
 
@@ -298,7 +297,7 @@ class FieldValidator:
         if declared_type is int:
             return autocorrect_int(value)
         elif declared_type is float:
-            return autocorrect_float(value, is_learning_rate=is_learning_rate_field(self.var_name))
+            return autocorrect_float(value)
         elif declared_type is str:
             return autocorrect_string(value)
         return value

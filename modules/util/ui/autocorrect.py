@@ -21,8 +21,7 @@ _INVISIBLE_UNICODE_CHARS_RE = re.compile(
 )
 _CONSECUTIVE_WHITESPACE_RE = re.compile(r"[ \t]+")
 _NUMERIC_SEPARATOR_RE = re.compile(r"[_,\u066b]")
-_NON_FLOAT_NOTATION_CHARS_RE = re.compile(r"[^0-9eE.\-]")
-# Natch one decimal separator: period, comma, or Arabic momayyez (٫)
+# Match one decimal separator: period, comma, or Arabic momayyez
 _ANY_DECIMAL_RE = re.compile(r"^(-?\d+)[.,\u066b](\d*)$")
 _FOREIGN_DECIMAL_RE = re.compile(r"^(-?\d+)[,\u066b](\d+)$")
 _WINDOWS_DRIVE_PREFIX_RE = re.compile(r"^[A-Za-z]:[/\\]")
@@ -34,14 +33,6 @@ _IS_WINDOWS = sys.platform == "win32"
 INVALID_PATH_CHARS: frozenset[str] = frozenset(chr(c) for c in range(32))
 if _IS_WINDOWS:
     INVALID_PATH_CHARS = INVALID_PATH_CHARS | frozenset('<>"|?*')
-
-_LEARNING_RATE_NON_VALUE_SUFFIXES = frozenset({
-    "learning_rate_scheduler",
-    "learning_rate_scaler",
-    "learning_rate_cycles",
-    "learning_rate_warmup_steps",
-    "learning_rate_min_factor",
-})
 
 
 def _strip_matched_quotes(text: str) -> str:
@@ -64,11 +55,9 @@ def autocorrect_int(value: str) -> str:
     if not value:
         return value
     result = autocorrect_string(value).lstrip("+").replace("_", "")
-    # strip spaces between digits
     result = re.sub(r"(?<=\d) +(?=\d)", "", result)
     # if the value is only digits + exactly one decimal separator (. , ٫), round.
     if m := _ANY_DECIMAL_RE.match(result):
-        # Exactly 3 digits after the separator ⇒ thousand separator, not decimal
         if len(m.group(2)) == 3:
             result = m.group(1) + m.group(2)
         else:
@@ -79,20 +68,15 @@ def autocorrect_int(value: str) -> str:
     return result
 
 
-def autocorrect_float(value: str, *, is_learning_rate: bool = False) -> str:
+def autocorrect_float(value: str) -> str:
     if not value:
         return value
 
     result = autocorrect_string(value)
 
-    if is_learning_rate:
-        result = _NON_FLOAT_NOTATION_CHARS_RE.sub("", result)
-        if not result:
-            return result
-
     result = result.lstrip("+").replace("_", "")
 
-    # Coerce a foreign decimal separator (comma, Arabic ٫) into a period
+    # Coerce a international decimal separator (comma, Arabic ٫) into a period
     if m := _FOREIGN_DECIMAL_RE.match(result):
         result = f"{m.group(1)}.{m.group(2)}"
     else:
@@ -117,7 +101,6 @@ def autocorrect_path(
     if not result:
         return result
 
-    # Silently strip characters that are never valid in a path.
     result = result.translate({ord(c): None for c in INVALID_PATH_CHARS})
     if not result:
         return result
@@ -140,11 +123,3 @@ def autocorrect_path(
         result = _FILE_EXTENSION_SUFFIX_RE.sub("", result) + expected_ext
 
     return result
-
-
-def is_learning_rate_field(var_name: str) -> bool:
-    """True if *var_name* is a learning-rate value field (excludes scheduler/scaler/etc)."""
-    leaf = var_name.rsplit(".", 1)[-1]
-    if leaf in _LEARNING_RATE_NON_VALUE_SUFFIXES:
-        return False
-    return "learning_rate" in leaf
