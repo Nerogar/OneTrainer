@@ -896,7 +896,7 @@ class TrainConfig(BaseConfig):
                 pass
         try:
             stat = os.stat(full_path)
-            birth = getattr(stat, "st_birthtime", None) or stat.st_ctime
+            birth = getattr(stat, "st_birthtime", None) or stat.st_ctime or stat.st_mtime
             return datetime.fromtimestamp(birth)
         except OSError:
             return datetime.min
