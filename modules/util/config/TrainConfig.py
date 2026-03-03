@@ -575,7 +575,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=12,
+            config_version=10,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
