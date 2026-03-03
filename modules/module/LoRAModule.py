@@ -439,7 +439,8 @@ class OFTModule(PeftBase):
             rotated_x = self.oft_R(x)
             return self.orig_forward(rotated_x, *args, **kwargs)
 
-        effective_weight = self.oft_R.weight / self.oft_R.n_elements ** 0.5 if self.use_scaled_oft else self.oft_R.weight
+        scaling_factor = 2 * math.sqrt(self.oft_R.block_size - 1) if self.use_scaled_oft else 1
+        effective_weight = self.oft_R.weight / scaling_factor
 
         # For Conv2d, we must rotate the weights, not the input, to preserve spatial information.
         orth_rotate = self.oft_R._cayley_batch(
