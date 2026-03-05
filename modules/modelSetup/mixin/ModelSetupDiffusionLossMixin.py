@@ -4,7 +4,7 @@ from collections.abc import Callable
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
 from modules.util.enum.LossWeight import LossWeight
-from modules.util.loss.masked_loss import masked_losses, masked_losses_with_prior
+from modules.util.loss.masked_loss import masked_losses, masked_losses_with_prior, distillation_loss
 from modules.util.loss.vb_loss import vb_losses
 
 import torch
@@ -133,6 +133,21 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 unmasked_weight=config.unmasked_weight,
                 normalize_masked_area_loss=config.normalize_masked_area_loss,
             ).mean(mean_dim) * config.vb_loss_strength
+
+        # Distillation loss
+        if config.distillation.enabled and 'parent_target' in data and 'distillation_indices' in data:
+            distillation_indices = data['distillation_indices']
+            if len(distillation_indices) > 0:
+                # Calculate distillation loss only for samples marked as DISTILLATION
+                dist_loss = distillation_loss(
+                    student_prediction=data['predicted'][distillation_indices].to(dtype=torch.float32),
+                    parent_prediction=data['parent_target'][distillation_indices].to(dtype=torch.float32),
+                    loss_type=config.distillation.loss_type,
+                    temperature=config.distillation.kl_temperature,
+                    mask=batch['latent_mask'][distillation_indices].to(dtype=torch.float32) if config.masked_training else None,
+                    reduction='mean',
+                )
+                losses += dist_loss * config.distillation.loss_weight
 
         return losses
 

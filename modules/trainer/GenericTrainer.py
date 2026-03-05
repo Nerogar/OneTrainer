@@ -15,6 +15,7 @@ from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.module.ParentModelWrapper import ParentModelWrapper
 from modules.trainer.BaseTrainer import BaseTrainer
 from modules.util import create, path_util
 from modules.util.bf16_stochastic_rounding import set_seed as bf16_stochastic_rounding_set_seed
@@ -54,6 +55,7 @@ class GenericTrainer(BaseTrainer):
     model_sampler: BaseModelSampler
     model: BaseModel | None
     validation_data_loader: BaseDataLoader
+    parent_model_wrapper: ParentModelWrapper | None
 
     previous_sample_time: float
     sample_queue: list[Callable]
@@ -75,6 +77,7 @@ class GenericTrainer(BaseTrainer):
                 super()._start_tensorboard()
 
         self.model = None
+        self.parent_model_wrapper = None
         self.one_step_trained = False
         self.grad_hook_handles = []
 
@@ -155,6 +158,20 @@ class GenericTrainer(BaseTrainer):
         self.sample_queue = []
 
         self.parameters = self.model.parameters.parameters()
+
+        # Initialize parent model wrapper for distillation if enabled
+        if self.config.distillation.enabled:
+            self.callbacks.on_update_status("loading parent model for distillation")
+            parent_model_loader = create.create_model_loader(
+                self.config.distillation.parent_model_type,
+                TrainingMethod.FINE_TUNE  # Load parent as full model
+            )
+            self.parent_model_wrapper = ParentModelWrapper(
+                config=self.config.distillation,
+                model_loader=parent_model_loader,
+                train_device=self.config.train_device,
+                temp_device=self.config.temp_device,
+            )
 
         if self.config.validation:
             self.validation_data_loader = self.create_data_loader(
@@ -726,20 +743,49 @@ class GenericTrainer(BaseTrainer):
                     step_seed = train_progress.global_step
                     bf16_stochastic_rounding_set_seed(step_seed, train_device)
 
+                    # Identify prior prediction samples
                     prior_pred_indices = [i for i in range(self.config.batch_size)
                                           if ConceptType(batch['concept_type'][i]) == ConceptType.PRIOR_PREDICTION]
-                    if len(prior_pred_indices) > 0 \
+                    
+                    # Identify distillation samples
+                    distillation_indices = [i for i in range(self.config.batch_size)
+                                           if ConceptType(batch['concept_type'][i]) == ConceptType.DISTILLATION]
+                    
+                    # Run parent/prior model if needed for either prior prediction or distillation
+                    if len(prior_pred_indices) > 0 or len(distillation_indices) > 0 \
                             or (self.config.masked_training
                                 and self.config.masked_prior_preservation_weight > 0
                                 and self.config.training_method == TrainingMethod.LORA):
-                        with self.model_setup.prior_model(self.model, self.config), torch.no_grad():
-                            #do NOT create a subbatch using the indices, even though it would be more efficient:
-                            #different timesteps are used for a smaller subbatch by predict(), but the conditioning must match exactly:
-                            prior_model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                        with self.model_setup.distillation_parent_model(
+                            self.model, 
+                            self.config, 
+                            self.parent_model_wrapper
+                        ) as parent_model, torch.no_grad():
+                            # Do NOT create a subbatch using the indices, even though it would be more efficient:
+                            # Different timesteps are used for a smaller subbatch by predict(), but the conditioning must match exactly
+                            parent_model_output_data = self.model_setup.predict(
+                                parent_model if parent_model != self.model else self.model,
+                                batch, 
+                                self.config, 
+                                train_progress
+                            )
+                        
+                        # Run student model
                         model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
-                        prior_model_prediction = prior_model_output_data['predicted'].to(dtype=model_output_data['target'].dtype)
-                        model_output_data['target'][prior_pred_indices] = prior_model_prediction[prior_pred_indices]
+                        
+                        # Get parent predictions
+                        prior_model_prediction = parent_model_output_data['predicted'].to(dtype=model_output_data['target'].dtype)
+                        
+                        # For prior_prediction: Replace target (legacy behavior)
+                        if len(prior_pred_indices) > 0:
+                            model_output_data['target'][prior_pred_indices] = prior_model_prediction[prior_pred_indices]
+                        
+                        # Store parent prediction for masked prior preservation and distillation
                         model_output_data['prior_target'] = prior_model_prediction
+                        
+                        # For distillation: Store indices for loss calculation
+                        if len(distillation_indices) > 0:
+                            model_output_data['distillation_indices'] = distillation_indices
                     else:
                         model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 
@@ -869,6 +915,11 @@ class GenericTrainer(BaseTrainer):
 
         if self.model is not None:
             self.model.to(self.temp_device)
+
+        # Cleanup parent model wrapper if used for distillation
+        if self.parent_model_wrapper is not None:
+            self.parent_model_wrapper.unload()
+            self.parent_model_wrapper = None
 
         if multi.is_master():
             self.tensorboard.close()
