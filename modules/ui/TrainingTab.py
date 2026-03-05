@@ -568,6 +568,12 @@ class TrainingTab:
         rescale_label.configure(wraplength=130, justify="left")
         components.switch(frame, 3, 1, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
 
+        # Diff2Flow
+        rescale_diff_label = components.label(frame, 4, 0, "Diff2Flow",
+                         tooltip="Aligns the standard diffusion noise to a straight Flow Matching trajectory. This improves training convergence, speeds up generation, and resolves contrast issues like Zero-Terminal SNR ('grayish' output problem), while preserving the model's original knowledge. Compatible with both eps- and v- prediction mdoels.")
+        rescale_diff_label.configure(wraplength=130, justify="left")
+        components.switch(frame, 4, 1, self.ui_state, "diff2flow")
+
     def __create_prior_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
