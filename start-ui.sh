@@ -11,4 +11,4 @@ fi
 
 prepare_runtime_environment
 
-run_python_in_active_env "scripts/train_ui.py" "$@"
+run_in_env python "scripts/train_ui.py" "$@"
