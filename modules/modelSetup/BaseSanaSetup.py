@@ -195,6 +195,11 @@ class BaseSanaSetup(
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability,
             )
 
+            if config.cep_enabled:
+                text_encoder_output = self._apply_conditional_embedding_perturbation(
+                    text_encoder_output, config.cep_gamma, generator
+                )
+
             latent_image = batch['latent_image']
             scaled_latent_image = latent_image * vae_scaling_factor
 
