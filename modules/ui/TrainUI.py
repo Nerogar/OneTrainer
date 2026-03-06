@@ -408,7 +408,7 @@ class TrainUI(ctk.CTk):
 
         components.button(top_frame, 0, 6, "sample now", self.sample_now)
 
-        components.button(top_frame, 0, 7, "manual sample", self.open_sample_ui)
+        components.button(top_frame, 0, 7, "manual sample", self.open_manual_sample_window )
 
         components.label(sub_frame, 0, 0, "Non-EMA Sampling",
                          tooltip="Whether to include non-ema sampling when using ema.")
@@ -685,13 +685,14 @@ class TrainUI(ctk.CTk):
             self.on_update_status(f"Error generating debug package: {e}")
 
 
-    def open_sample_ui(self):
+    def open_manual_sample_window (self):
         training_callbacks = self.training_callbacks
         training_commands = self.training_commands
 
         if training_callbacks and training_commands:
             window = SampleWindow(
                 self,
+                train_config=self.train_config,
                 callbacks=training_callbacks,
                 commands=training_commands,
             )
