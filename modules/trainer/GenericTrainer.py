@@ -217,8 +217,8 @@ class GenericTrainer(BaseTrainer):
             folder_postfix: str = "",
             is_custom_sample: bool = False,
     ):
-        for i, sample_config in multi.distributed_enumerate(
-            [sample_config for sample_config in sample_config_list if sample_config.enabled],
+        for i, sample_config in multi.distributed(
+            [(i, sample_config) for i, sample_config in enumerate(sample_config_list) if sample_config.enabled],
             distribute=not self.config.samples_to_tensorboard and not ema_applied
         ):
             try:
@@ -301,7 +301,7 @@ class GenericTrainer(BaseTrainer):
                 with open(self.config.sample_definition_file_name, 'r') as f:
                     samples = json.load(f)
                     for i in range(len(samples)):
-                        samples[i] = SampleConfig.default_values().from_dict(samples[i])
+                        samples[i] = SampleConfig.default_values(self.config.model_type).from_dict(samples[i])
                     sample_params_list = samples
             # We absolutely do not want to fail training just because the sample definition file becomes missing or broken right before sampling.
             except Exception:
@@ -640,6 +640,9 @@ class GenericTrainer(BaseTrainer):
         epochs = range(train_progress.epoch, self.config.epochs, 1)
 
         for _epoch in tqdm(epochs, desc="epoch") if multi.is_master() else epochs:
+            multi.sync_commands(self.commands)
+            if self.commands.get_stop_command():
+                return
             self.callbacks.on_update_status("Starting epoch/caching")
 
             #call start_next_epoch with only one process at first, because it might write to the cache. All subsequent processes can read in parallel:
@@ -690,7 +693,7 @@ class GenericTrainer(BaseTrainer):
                 if self.commands.get_stop_command():
                     multi.warn_parameter_divergence(self.parameters, train_device)
 
-                if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
+                if not self.commands.get_stop_command() and self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
                     self.__enqueue_sample_during_training(
                         lambda: self.__sample_during_training(train_progress, train_device)
                     )

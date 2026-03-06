@@ -250,7 +250,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("muon_adam_lr", None, float, True))
         data.append(("muon_te1_adam_lr", None, float, True))
         data.append(("muon_te2_adam_lr", None, float, True))
-        data.append(("muon_adam_config", None, dict, True))
+        data.append(("muon_adam_config", {}, dict, True))
         data.append(("rms_rescaling", True, bool, True))
         data.append(("normuon_variant", False, bool, False))
         data.append(("beta2_normuon", None, float, True))
@@ -945,7 +945,7 @@ class TrainConfig(BaseConfig):
             with open(config.sample_definition_file_name, 'r') as f:
                 samples = json.load(f)
                 for i in range(len(samples)):
-                    samples[i] = SampleConfig.default_values().from_dict(samples[i])
+                    samples[i] = SampleConfig.default_values(config.model_type).from_dict(samples[i])
                 config.samples = samples
 
         config_dict = config.to_dict()
