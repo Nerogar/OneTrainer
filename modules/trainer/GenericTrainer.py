@@ -799,6 +799,11 @@ class GenericTrainer(BaseTrainer):
                         concept_types = [ConceptType(batch['concept_type'][i]) for i in range(self.config.batch_size)]
                         print(f"[Cache Generation] Batch concept types: {concept_types}")
                         print(f"[Cache Generation] Distillation samples found: {len(distillation_indices)}")
+                        
+                        # Move student model to CPU to free VRAM for parent model
+                        self.model.to('cpu')
+                        torch_gc()
+                        
                         if len(distillation_indices) == 0:
                             print(f"[Cache Generation] WARNING: No DISTILLATION concept_type samples found!")
                             print(f"[Cache Generation] Please mark your training samples with 'concept_type': 'DISTILLATION'")
@@ -817,10 +822,6 @@ class GenericTrainer(BaseTrainer):
                         
                         if multi.is_master():
                             print(f"[Cache Generation] Processing {len(distillation_indices)} distillation samples, step {train_progress.global_step}")
-                        
-                        # Move student model to CPU to free VRAM for parent model
-                        self.model.to('cpu')
-                        torch_gc()
                         
                         # Run parent model inference to generate cache
                         with self.model_setup.distillation_parent_model(
