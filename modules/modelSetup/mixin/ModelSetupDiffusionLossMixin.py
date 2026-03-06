@@ -135,13 +135,13 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             ).mean(mean_dim) * config.vb_loss_strength
 
         # Distillation loss
-        if config.distillation.enabled and 'parent_target' in data and 'distillation_indices' in data:
+        if config.distillation.enabled and 'prior_target' in data and 'distillation_indices' in data:
             distillation_indices = data['distillation_indices']
             if len(distillation_indices) > 0:
                 # Calculate distillation loss only for samples marked as DISTILLATION
                 dist_loss = distillation_loss(
                     student_prediction=data['predicted'][distillation_indices].to(dtype=torch.float32),
-                    parent_prediction=data['parent_target'][distillation_indices].to(dtype=torch.float32),
+                    parent_prediction=data['prior_target'][distillation_indices].to(dtype=torch.float32),
                     loss_type=config.distillation.loss_type,
                     temperature=config.distillation.kl_temperature,
                     mask=batch['latent_mask'][distillation_indices].to(dtype=torch.float32) if config.masked_training else None,
