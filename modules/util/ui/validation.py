@@ -619,14 +619,14 @@ class PathValidator(FieldValidator):
 
         ext = self._get_format_ext()
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        method = str(self._get_var_value("training_method", "model")).lower().replace(" ", "_")
 
         if self._get_var_value("friendly_run_names", False):
             try:
                 name = fw.generate(2, separator="_")  # type: ignore[attr-defined]
             except Exception:
-                name = timestamp
+                name = f"{method}_{timestamp}"
         else:
-            method = str(self._get_var_value("training_method", "model")).lower().replace(" ", "_")
             name = f"{method}_{timestamp}"
 
         self._undo.push(self._shadow_var.get())

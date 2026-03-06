@@ -5,8 +5,8 @@ from collections.abc import Callable
 import customtkinter as ctk
 
 _WAIT_TIME_MS = 500
-_WRAP_LENGTH = 180
-_WRAP_LENGTH_WIDE = 350
+_WRAP_LENGTH_PX = 180
+_WRAP_LENGTH_WIDE_PX = 350
 
 
 class InfoTooltip:
@@ -25,7 +25,7 @@ class InfoTooltip:
         self._y_offset = y_offset
 
         self._wait_time = _WAIT_TIME_MS  # milliseconds
-        self._wrap_length = _WRAP_LENGTH_WIDE if wide_wrap else _WRAP_LENGTH
+        self._wrap_length = _WRAP_LENGTH_WIDE_PX if wide_wrap else _WRAP_LENGTH_PX
         self.widget.bind("<Enter>", self._on_enter)
         self.widget.bind("<Leave>", self._on_leave)
         self.widget.bind("<ButtonPress>", self._on_leave)
@@ -73,7 +73,7 @@ class InfoTooltip:
 _TOOLTIP_AUTO_HIDE_MS = 5000
 _TOOLTIP_BG_COLOR = "#FFECEC"
 _TOOLTIP_TEXT_COLOR = "#5A0D0D"
-_VALIDATION_WRAP_LENGTH = 300
+_VALIDATION_WRAP_LENGTH_PX = 300
 
 
 class ValidationTooltip:
@@ -180,7 +180,7 @@ class ValidationTooltip:
 
         self._label = ctk.CTkLabel(
             toplevel, text=self.text, justify="left",
-            wraplength=_VALIDATION_WRAP_LENGTH,
+            wraplength=_VALIDATION_WRAP_LENGTH_PX,
             text_color=_TOOLTIP_TEXT_COLOR,
             fg_color=_TOOLTIP_BG_COLOR,
         )
