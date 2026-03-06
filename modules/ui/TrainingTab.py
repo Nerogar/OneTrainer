@@ -5,6 +5,7 @@ from modules.ui.TimestepDistributionWindow import TimestepDistributionWindow
 from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
+from modules.util.enum.DistillationCacheMode import DistillationCacheMode
 from modules.util.enum.DistillationLossType import DistillationLossType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
@@ -789,6 +790,20 @@ class TrainingTab:
         components.label(frame, 8, 0, "KL Temperature",
                          tooltip="Temperature parameter for KL divergence loss. Only used when loss_type is KL_DIVERGENCE. Higher values (2.0+) make the distribution matching softer. Typical range: 1.0-5.0.")
         components.entry(frame, 8, 1, self.ui_state, "distillation.kl_temperature")
+
+        # Cache Mode
+        components.label(frame, 9, 0, "Cache Mode",
+                         tooltip="Cache mode for distillation training:\n" +
+                                 "  • DISABLED: Live parent model inference (default)\n" +
+                                 "  • GENERATE_CACHE: Run parent model and save predictions to cache\n" +
+                                 "  • USE_CACHE: Load cached predictions instead of running parent model\n" +
+                                 "Two-step workflow: First run with GENERATE_CACHE, then train with USE_CACHE to save VRAM.")
+        components.options(frame, 9, 1, [str(x) for x in list(DistillationCacheMode)], self.ui_state, "distillation.cache_mode")
+
+        # Cache Directory
+        components.label(frame, 10, 0, "Cache Directory",
+                         tooltip="Directory to store/load distillation cache files. Path is relative to workspace directory. Cache files contain parent model predictions for each training sample.")
+        components.entry(frame, 10, 1, self.ui_state, "distillation.cache_dir")
 
     def __create_loss_frame(self, master, row, supports_vb_loss: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

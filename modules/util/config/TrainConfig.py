@@ -12,6 +12,7 @@ from modules.util.config.SecretsConfig import SecretsConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
+from modules.util.enum.DistillationCacheMode import DistillationCacheMode
 from modules.util.enum.DistillationLossType import DistillationLossType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
@@ -370,6 +371,10 @@ class DistillationConfig(BaseConfig):
     
     # KL-specific
     kl_temperature: float
+    
+    # Cache configuration
+    cache_mode: DistillationCacheMode
+    cache_dir: str
 
     @staticmethod
     def default_values():
@@ -385,6 +390,8 @@ class DistillationConfig(BaseConfig):
         data.append(("loss_type", DistillationLossType.MSE, DistillationLossType, False))
         data.append(("loss_weight", 1.0, float, False))
         data.append(("kl_temperature", 1.0, float, False))
+        data.append(("cache_mode", DistillationCacheMode.DISABLED, DistillationCacheMode, False))
+        data.append(("cache_dir", "workspace-cache/distillation", str, False))
         return DistillationConfig(data)
 
 class TrainConfig(BaseConfig):

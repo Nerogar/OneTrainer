@@ -15,6 +15,7 @@ from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.module.DistillationCacheManager import DistillationCacheManager
 from modules.module.ParentModelWrapper import ParentModelWrapper
 from modules.trainer.BaseTrainer import BaseTrainer
 from modules.util import create, path_util
@@ -25,6 +26,7 @@ from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
 from modules.util.enum.ConceptType import ConceptType
+from modules.util.enum.DistillationCacheMode import DistillationCacheMode
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
@@ -56,6 +58,7 @@ class GenericTrainer(BaseTrainer):
     model: BaseModel | None
     validation_data_loader: BaseDataLoader
     parent_model_wrapper: ParentModelWrapper | None
+    distillation_cache_manager: DistillationCacheManager | None
 
     previous_sample_time: float
     sample_queue: list[Callable]
@@ -78,6 +81,7 @@ class GenericTrainer(BaseTrainer):
 
         self.model = None
         self.parent_model_wrapper = None
+        self.distillation_cache_manager = None
         self.one_step_trained = False
         self.grad_hook_handles = []
 
@@ -161,17 +165,53 @@ class GenericTrainer(BaseTrainer):
 
         # Initialize parent model wrapper for distillation if enabled
         if self.config.distillation.enabled:
-            self.callbacks.on_update_status("loading parent model for distillation")
-            parent_model_loader = create.create_model_loader(
-                self.config.distillation.parent_model_type,
-                TrainingMethod.FINE_TUNE  # Load parent as full model
-            )
-            self.parent_model_wrapper = ParentModelWrapper(
-                config=self.config.distillation,
-                model_loader=parent_model_loader,
-                train_device=self.config.train_device,
-                temp_device=self.config.temp_device,
-            )
+            # Initialize cache manager if cache mode is enabled
+            if self.config.distillation.cache_mode != DistillationCacheMode.DISABLED:
+                # Resolve cache_dir path relative to workspace
+                cache_dir = self.config.distillation.cache_dir
+                if not os.path.isabs(cache_dir):
+                    cache_dir = os.path.join(self.config.workspace_dir, cache_dir)
+                
+                self.distillation_cache_manager = DistillationCacheManager(
+                    cache_dir=cache_dir,
+                    parent_model_path=self.config.distillation.parent_model_path,
+                    parent_model_type=str(self.config.distillation.parent_model_type),
+                )
+                
+                if multi.is_master():
+                    if self.config.distillation.cache_mode == DistillationCacheMode.GENERATE_CACHE:
+                        print(f"\n{'='*80}")
+                        print(f"DISTILLATION CACHE GENERATION MODE")
+                        print(f"{'='*80}")
+                        print(f"Cache directory: {cache_dir}")
+                        print(f"Parent model: {self.config.distillation.parent_model_path}")
+                        print(f"Parent model type: {self.config.distillation.parent_model_type}")
+                        print(f"All samples with concept_type 'DISTILLATION' will have their parent")
+                        print(f"model predictions cached to disk during this training run.")
+                        print(f"This cache will be reused in subsequent training runs with USE_CACHE mode.")
+                        print(f"{'='*80}\n")
+                    elif self.config.distillation.cache_mode == DistillationCacheMode.USE_CACHE:
+                        print(f"\n{'='*80}")
+                        print(f"DISTILLATION CACHE USAGE MODE")
+                        print(f"{'='*80}")
+                        print(f"Loading cached predictions from: {cache_dir}")
+                        print(f"Parent model will NOT be loaded - using cached predictions only.")
+                        print(f"{'='*80}\n")
+                self.callbacks.on_update_status("initializing distillation cache")
+            
+            # Only load parent model if not using cached predictions
+            if self.config.distillation.cache_mode != DistillationCacheMode.USE_CACHE:
+                self.callbacks.on_update_status("loading parent model for distillation")
+                parent_model_loader = create.create_model_loader(
+                    self.config.distillation.parent_model_type,
+                    TrainingMethod.FINE_TUNE  # Load parent as full model
+                )
+                self.parent_model_wrapper = ParentModelWrapper(
+                    config=self.config.distillation,
+                    model_loader=parent_model_loader,
+                    train_device=self.config.train_device,
+                    temp_device=self.config.temp_device,
+                )
 
         if self.config.validation:
             self.validation_data_loader = self.create_data_loader(
@@ -750,6 +790,159 @@ class GenericTrainer(BaseTrainer):
                     # Identify distillation samples
                     distillation_indices = [i for i in range(self.config.batch_size)
                                            if ConceptType(batch['concept_type'][i]) == ConceptType.DISTILLATION]
+                    
+                    # Debug logging for cache generation mode
+                    if (self.config.distillation.enabled and 
+                        self.config.distillation.cache_mode == DistillationCacheMode.GENERATE_CACHE and
+                        train_progress.global_step == 0 and multi.is_master()):
+                        # Log batch composition on first step
+                        concept_types = [ConceptType(batch['concept_type'][i]) for i in range(self.config.batch_size)]
+                        print(f"[Cache Generation] Batch concept types: {concept_types}")
+                        print(f"[Cache Generation] Distillation samples found: {len(distillation_indices)}")
+                        if len(distillation_indices) == 0:
+                            print(f"[Cache Generation] WARNING: No DISTILLATION concept_type samples found!")
+                            print(f"[Cache Generation] Please mark your training samples with 'concept_type': 'DISTILLATION'")
+                    
+                    # === CACHE GENERATION MODE ===
+                    if (self.config.distillation.enabled and 
+                        self.config.distillation.cache_mode == DistillationCacheMode.GENERATE_CACHE):
+                        
+                        if len(distillation_indices) == 0:
+                            # No distillation samples in this batch, skip
+                            train_progress.next_step(self.config.batch_size)
+                            continue
+                        
+                        if self.distillation_cache_manager is None:
+                            raise RuntimeError("Cache manager not initialized for GENERATE_CACHE mode")
+                        
+                        if multi.is_master():
+                            print(f"[Cache Generation] Processing {len(distillation_indices)} distillation samples, step {train_progress.global_step}")
+                        
+                        # Move student model to CPU to free VRAM for parent model
+                        self.model.to('cpu')
+                        torch_gc()
+                        
+                        # Run parent model inference to generate cache
+                        with self.model_setup.distillation_parent_model(
+                            self.model, 
+                            self.config, 
+                            self.parent_model_wrapper
+                        ) as parent_model, torch.no_grad():
+                            parent_model_output_data = self.model_setup.predict(
+                                parent_model if parent_model != self.model else self.model,
+                                batch, 
+                                self.config, 
+                                train_progress
+                            )
+                        
+                        # Save predictions to cache for each distillation sample
+                        saved_count = 0
+                        for idx in distillation_indices:
+                            try:
+                                image_path = batch['image_path'][idx]
+                                timestep_value = parent_model_output_data.get('timestep')
+                                
+                                if timestep_value is not None:
+                                    if isinstance(timestep_value, torch.Tensor):
+                                        if timestep_value.dim() > 0:
+                                            timestep = int(timestep_value[idx].item())
+                                        else:
+                                            timestep = int(timestep_value.item())
+                                    else:
+                                        timestep = int(timestep_value)
+                                else:
+                                    # If timestep not in output, use global step as fallback
+                                    timestep = train_progress.global_step
+                                
+                                prediction_dict = {
+                                    'predicted': parent_model_output_data['predicted'][idx:idx+1].detach().cpu(),
+                                    'target': parent_model_output_data.get('target', None),
+                                    'prediction_type': parent_model_output_data.get('prediction_type'),
+                                }
+                                
+                                self.distillation_cache_manager.save_prediction(
+                                    image_path=image_path,
+                                    timestep=timestep,
+                                    prediction_dict=prediction_dict,
+                                    global_step=train_progress.global_step,
+                                )
+                                saved_count += 1
+                            except Exception as e:
+                                if multi.is_master():
+                                    print(f"[Cache Generation] Error saving prediction for {batch['image_path'][idx]}: {str(e)}")
+                                raise
+                        
+                        if multi.is_master():
+                            cache_stats = self.distillation_cache_manager.get_cache_stats()
+                            print(f"[Cache Generation] Saved {saved_count} predictions (Total hits: {cache_stats['cache_hits']}, misses: {cache_stats['cache_misses']})")
+                            step_tqdm.set_postfix({
+                                'cache_gen': f"{saved_count} samples saved",
+                            })
+                        
+                        # Skip training step in cache generation mode
+                        train_progress.next_step(self.config.batch_size)
+                        continue
+                    
+                    # === USE CACHE MODE ===
+                    elif (self.config.distillation.enabled and 
+                          self.config.distillation.cache_mode == DistillationCacheMode.USE_CACHE):
+                        
+                        # Ensure student model is on training device (may have been moved to CPU during cache generation)
+                        self.model_setup.setup_train_device(self.model, self.config)
+                        
+                        # Run student model normally
+                        model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                        
+                        # Load cached predictions for distillation samples
+                        if len(distillation_indices) > 0:
+                            # Create tensor to store cached predictions
+                            prior_model_prediction = torch.zeros_like(model_output_data['predicted'])
+                            
+                            for idx in distillation_indices:
+                                image_path = batch['image_path'][idx]
+                                timestep_value = model_output_data.get('timestep')
+                                
+                                if timestep_value is not None:
+                                    if isinstance(timestep_value, torch.Tensor):
+                                        if timestep_value.dim() > 0:
+                                            timestep = int(timestep_value[idx].item())
+                                        else:
+                                            timestep = int(timestep_value.item())
+                                    else:
+                                        timestep = int(timestep_value)
+                                else:
+                                    timestep = train_progress.global_step
+                                
+                                # Load from cache
+                                cached_data = self.distillation_cache_manager.load_prediction(image_path, timestep)
+                                
+                                if cached_data is None:
+                                    raise RuntimeError(
+                                        f"Cache miss for distillation sample:\n"
+                                        f"  Image: {image_path}\n"
+                                        f"  Timestep: {timestep}\n"
+                                        f"  This may happen if cache was generated with different training parameters.\n"
+                                        f"  Please regenerate cache with GENERATE_CACHE mode."
+                                    )
+                                
+                                # Move cached prediction to correct device and dtype
+                                cached_pred = cached_data['predicted'].to(
+                                    device=model_output_data['predicted'].device,
+                                    dtype=model_output_data['target'].dtype
+                                )
+                                prior_model_prediction[idx:idx+1] = cached_pred
+                            
+                            # Store for distillation loss calculation
+                            model_output_data['prior_target'] = prior_model_prediction
+                            model_output_data['distillation_indices'] = distillation_indices
+                            
+                            if multi.is_master() and train_progress.global_step % 10 == 0:
+                                cache_stats = self.distillation_cache_manager.get_cache_stats()
+                                print(f"Cache stats - Hits: {cache_stats['cache_hits']}, Misses: {cache_stats['cache_misses']}")
+                    
+                    # === NORMAL MODE (DISABLED or live inference) ===
+                    # Ensure student model is on training device (may have been moved to CPU during cache generation)
+                    self.model_setup.setup_train_device(self.model, self.config)
                     
                     # Run parent/prior model if needed for either prior prediction or distillation
                     if len(prior_pred_indices) > 0 or len(distillation_indices) > 0 \
