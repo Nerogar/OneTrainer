@@ -143,6 +143,7 @@ class TrainOptimizerConfig(BaseConfig):
     kappa_p: float
     auto_kappa_p: False
     compile: False
+    spectral_normalization: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -261,6 +262,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("kappa_p", None, float, True))
         data.append(("auto_kappa_p", False, bool, False))
         data.append(("compile", False, bool, False))
+        data.append(("spectral_normalization", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
