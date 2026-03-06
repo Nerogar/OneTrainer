@@ -68,10 +68,13 @@ class GenericTrainer(BaseTrainer):
         super().__init__(config, callbacks, commands)
 
         if multi.is_master():
-            tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
-            os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
-            self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, f"{config.save_filename_prefix}{get_string_timestamp()}"))
-            if config.tensorboard and not config.tensorboard_always_on:
+            if config.tensorboard_enabled:
+                tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
+                os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
+                self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, f"{config.save_filename_prefix}{get_string_timestamp()}"))
+            else:
+                self.tensorboard = None
+            if config.tensorboard_is_train_only:
                 super()._start_tensorboard()
 
         self.model = None
@@ -243,7 +246,7 @@ class GenericTrainer(BaseTrainer):
                 )
 
                 def on_sample_default(sampler_output: ModelSamplerOutput):
-                    if self.config.samples_to_tensorboard and sampler_output.file_type == FileType.IMAGE:
+                    if self.config.samples_to_tensorboard and self.tensorboard is not None and sampler_output.file_type == FileType.IMAGE:
                         self.tensorboard.add_image(
                             f"sample{str(i)} - {safe_prompt}", pil_to_tensor(sampler_output.data),  # noqa: B023
                             train_progress.global_step
@@ -403,18 +406,20 @@ class GenericTrainer(BaseTrainer):
             for concept_seed, total_loss in accumulated_loss_per_concept.items():
                 average_loss = total_loss / concept_counts[concept_seed]
 
-                self.tensorboard.add_scalar(f"loss/validation_step/{mapping_seed_to_label[concept_seed]}",
-                                            average_loss,
-                                            train_progress.global_step)
+                if self.tensorboard is not None:
+                    self.tensorboard.add_scalar(f"loss/validation_step/{mapping_seed_to_label[concept_seed]}",
+                                                average_loss,
+                                                train_progress.global_step)
 
             if len(concept_counts) > 1:
                 total_loss = sum(accumulated_loss_per_concept[key] for key in concept_counts)
                 total_count = sum(concept_counts[key] for key in concept_counts)
                 total_average_loss = total_loss / total_count
 
-                self.tensorboard.add_scalar("loss/validation_step/total_average",
-                                            total_average_loss,
-                                            train_progress.global_step)
+                if self.tensorboard is not None:
+                    self.tensorboard.add_scalar("loss/validation_step/total_average",
+                                                total_average_loss,
+                                                train_progress.global_step)
 
     def __save_backup_config(self, backup_path):
         config_path = os.path.join(backup_path, "onetrainer_config")
@@ -789,15 +794,17 @@ class GenericTrainer(BaseTrainer):
                         has_gradient = False
 
                         if multi.is_master():
-                            self.model_setup.report_to_tensorboard(
-                                self.model, self.config, lr_scheduler, self.tensorboard
-                            )
+                            if self.tensorboard is not None:
+                                self.model_setup.report_to_tensorboard(
+                                    self.model, self.config, lr_scheduler, self.tensorboard
+                                )
 
                             accumulated_loss_cpu = accumulated_loss.item()
                             if math.isnan(accumulated_loss_cpu):
                                 raise RuntimeError("Training loss became NaN. This may be due to invalid parameters, precision issues, or a bug in the loss computation.")
 
-                            self.tensorboard.add_scalar("loss/train_step",accumulated_loss_cpu , train_progress.global_step)
+                            if self.tensorboard is not None:
+                                self.tensorboard.add_scalar("loss/train_step",accumulated_loss_cpu , train_progress.global_step)
                             ema_loss = ema_loss or accumulated_loss_cpu
                             ema_loss_steps += 1
                             ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
@@ -806,7 +813,8 @@ class GenericTrainer(BaseTrainer):
                                 'loss': accumulated_loss_cpu,
                                 'smooth loss': ema_loss,
                             })
-                            self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, train_progress.global_step)
+                            if self.tensorboard is not None:
+                                self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, train_progress.global_step)
 
                         accumulated_loss = 0.0
                         self.model_setup.after_optimizer_step(self.model, self.config, train_progress)
@@ -814,11 +822,12 @@ class GenericTrainer(BaseTrainer):
                         if self.model.ema:
                             assert multi.is_master()
                             update_step = train_progress.global_step // self.config.gradient_accumulation_steps
-                            self.tensorboard.add_scalar(
-                                "ema_decay",
-                                self.model.ema.get_current_decay(update_step),
-                                train_progress.global_step
-                            )
+                            if self.tensorboard is not None:
+                                self.tensorboard.add_scalar(
+                                    "ema_decay",
+                                    self.model.ema.get_current_decay(update_step),
+                                    train_progress.global_step
+                                )
                             self.model.ema.step(
                                 self.parameters,
                                 update_step
@@ -879,9 +888,10 @@ class GenericTrainer(BaseTrainer):
             self.model.to(self.temp_device)
 
         if multi.is_master():
-            self.tensorboard.close()
+            if self.tensorboard is not None:
+                self.tensorboard.close()
 
-            if self.config.tensorboard and not self.config.tensorboard_always_on:
+            if self.config.tensorboard_is_train_only:
                 super()._stop_tensorboard()
 
         for handle in self.grad_hook_handles:

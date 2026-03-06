@@ -25,6 +25,7 @@ from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType, PeftType
 from modules.util.enum.Optimizer import Optimizer
+from modules.util.enum.TensorboardMode import TensorboardMode
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -362,9 +363,8 @@ class TrainConfig(BaseConfig):
     debug_dir: str
     workspace_dir: str
     cache_dir: str
-    tensorboard: bool
+    tensorboard_mode: TensorboardMode
     tensorboard_expose: bool
-    tensorboard_always_on: bool
     tensorboard_port: str
     validation: bool
     validate_after: float
@@ -575,7 +575,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=10,
+            config_version=11,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -587,6 +587,7 @@ class TrainConfig(BaseConfig):
                 7: self.__migration_7,
                 8: self.__migration_8,
                 9: self.__migration_9,
+                10: self.__migration_10,
             }
         )
 
@@ -806,6 +807,33 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_10(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        tb_enabled = migrated_data.pop("tensorboard", True)
+        tb_always_on = migrated_data.pop("tensorboard_always_on", False)
+
+        if not tb_enabled:
+            migrated_data["tensorboard_mode"] = "OFF"
+        elif tb_always_on:
+            migrated_data["tensorboard_mode"] = "ALWAYS_ON"
+        else:
+            migrated_data["tensorboard_mode"] = "TRAIN_ONLY"
+
+        return migrated_data
+
+    @property
+    def tensorboard_enabled(self) -> bool:
+        return self.tensorboard_mode != TensorboardMode.OFF
+
+    @property
+    def tensorboard_is_always_on(self) -> bool:
+        return self.tensorboard_mode == TensorboardMode.ALWAYS_ON
+
+    @property
+    def tensorboard_is_train_only(self) -> bool:
+        return self.tensorboard_mode == TensorboardMode.TRAIN_ONLY
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
@@ -972,9 +1000,8 @@ class TrainConfig(BaseConfig):
         data.append(("debug_dir", "debug", str, False))
         data.append(("workspace_dir", "workspace/run", str, False))
         data.append(("cache_dir", "workspace-cache/run", str, False))
-        data.append(("tensorboard", True, bool, False))
+        data.append(("tensorboard_mode", TensorboardMode.ALWAYS_ON, TensorboardMode, False))
         data.append(("tensorboard_expose", False, bool, False))
-        data.append(("tensorboard_always_on", False, bool, False))
         data.append(("tensorboard_port", 6006, int, False))
         data.append(("validation", False, bool, False))
         data.append(("validate_after", 1, int, False))

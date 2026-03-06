@@ -97,7 +97,17 @@ class BaseTrainer(
         if self.config.tensorboard_expose:
             tensorboard_args.append("--bind_all")
 
-        self.tensorboard_subprocess = subprocess.Popen(tensorboard_args)
+
+        self.tensorboard_subprocess = subprocess.Popen(
+            tensorboard_args, stderr=subprocess.DEVNULL,
+        )
 
     def _stop_tensorboard(self):
-        self.tensorboard_subprocess.kill()
+        if hasattr(self, 'tensorboard_subprocess') and self.tensorboard_subprocess:
+            try:
+                self.tensorboard_subprocess.terminate()
+                self.tensorboard_subprocess.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.tensorboard_subprocess.kill()
+            except Exception:
+                pass

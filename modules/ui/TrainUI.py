@@ -37,6 +37,7 @@ from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.PathIOType import PathIOType
+from modules.util.enum.TensorboardMode import TensorboardMode
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
@@ -133,6 +134,7 @@ class TrainUI(ctk.CTk):
         self.training_commands = None
 
         self.always_on_tensorboard_subprocess = None
+        self._tb_restart_timer = None
         self.current_workspace_dir = self.train_config.workspace_dir
         self._check_start_always_on_tensorboard()
 
@@ -150,6 +152,9 @@ class TrainUI(ctk.CTk):
 
     def __close(self):
         self.top_bar_component.save_default()
+        if self._tb_restart_timer is not None:
+            self.after_cancel(self._tb_restart_timer)
+            self._tb_restart_timer = None
         self._stop_always_on_tensorboard()
         if hasattr(self, 'workspace_dir_trace_id'):
             self.ui_state.remove_var_trace("workspace_dir", self.workspace_dir_trace_id)
@@ -296,13 +301,12 @@ class TrainUI(ctk.CTk):
         components.path_entry(frame, 4, 3, self.ui_state, "debug_dir", mode="dir", io_type=PathIOType.OUTPUT)
 
         # tensorboard
-        components.label(frame, 7, 0, "Tensorboard",
-                         tooltip="Starts the Tensorboard Web UI during training")
-        components.switch(frame, 7, 1, self.ui_state, "tensorboard")
-
-        components.label(frame, 7, 2, "Always-On Tensorboard",
-                         tooltip="Keep Tensorboard accessible even when not training. Useful for monitoring completed training sessions.")
-        components.switch(frame, 7, 3, self.ui_state, "tensorboard_always_on", command=self._on_always_on_tensorboard_toggle)
+        components.label(frame, 7, 0, "Tensorboard Mode",
+                         tooltip="Off: Tensorboard is completely disabled\n"
+                                 "Always On: Tensorboard stays running at all times, even outside of training\n"
+                                 "Train Only: Tensorboard starts when training begins and stops when training ends")
+        components.options(frame, 7, 1, [str(x) for x in list(TensorboardMode)], self.ui_state,
+                           "tensorboard_mode", command=self._on_tensorboard_mode_change)
 
         components.label(frame, 8, 0, "Expose Tensorboard",
                          tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)")
@@ -782,7 +786,7 @@ class TrainUI(ctk.CTk):
         # queue UI update on Tk main thread; _set_training_button_idle applies shared styles, avoid potential race/crash
         self.after(0, self._set_training_button_idle)
 
-        if self.train_config.tensorboard_always_on and not self.always_on_tensorboard_subprocess:
+        if self.train_config.tensorboard_is_always_on and not self.always_on_tensorboard_subprocess:
             self.after(0, self._start_always_on_tensorboard)
 
     def start_training(self):
@@ -802,7 +806,7 @@ class TrainUI(ctk.CTk):
 
             self._set_training_button_running()
 
-            if self.train_config.tensorboard and not self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
+            if self.train_config.tensorboard_is_train_only and self.always_on_tensorboard_subprocess:
                 self._stop_always_on_tensorboard()
 
             self.training_commands = TrainCommands()
@@ -847,7 +851,7 @@ class TrainUI(ctk.CTk):
             train_commands.save()
 
     def _check_start_always_on_tensorboard(self):
-        if self.train_config.tensorboard_always_on and not self.always_on_tensorboard_subprocess:
+        if self.train_config.tensorboard_is_always_on and not self.always_on_tensorboard_subprocess:
             self._start_always_on_tensorboard()
 
     def _start_always_on_tensorboard(self):
@@ -871,8 +875,13 @@ class TrainUI(ctk.CTk):
         if self.train_config.tensorboard_expose:
             tensorboard_args.append("--bind_all")
 
+        env = os.environ.copy()
+        env["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
         try:
-            self.always_on_tensorboard_subprocess = subprocess.Popen(tensorboard_args)
+            self.always_on_tensorboard_subprocess = subprocess.Popen(
+                tensorboard_args, env=env, stderr=subprocess.DEVNULL,
+            )
         except Exception:
             self.always_on_tensorboard_subprocess = None
 
@@ -891,25 +900,38 @@ class TrainUI(ctk.CTk):
     def _on_workspace_dir_change(self, new_workspace_dir: str):
         if new_workspace_dir != self.current_workspace_dir:
             self.current_workspace_dir = new_workspace_dir
-
-            if self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
-                self._start_always_on_tensorboard()
+            self._schedule_tb_restart()
 
     def _on_workspace_dir_change_trace(self, *args):
         new_workspace_dir = self.train_config.workspace_dir
         if new_workspace_dir != self.current_workspace_dir:
             self.current_workspace_dir = new_workspace_dir
+            self._schedule_tb_restart()
 
-            if self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
-                self._start_always_on_tensorboard()
+    def _schedule_tb_restart(self):
+        """Debounce tensorboard restart to avoid creating ghost directories on every keystroke."""
+        if self._tb_restart_timer is not None:
+            self.after_cancel(self._tb_restart_timer)
+        self._tb_restart_timer = self.after(2000, self._deferred_tb_restart)
 
-    def _on_always_on_tensorboard_toggle(self):
-        if self.train_config.tensorboard_always_on:
-            if not (self.training_thread and self.train_config.tensorboard):
+    def _deferred_tb_restart(self):
+        self._tb_restart_timer = None
+        workspace = self.train_config.workspace_dir
+        if not workspace or not workspace.strip():
+            return
+        if self.train_config.tensorboard_is_always_on and self.always_on_tensorboard_subprocess:
+            self._start_always_on_tensorboard()
+
+    def _on_tensorboard_mode_change(self, _value: str = ""):
+        mode = self.train_config.tensorboard_mode
+        if mode == TensorboardMode.ALWAYS_ON:
+            if not (self.training_thread and self.train_config.tensorboard_enabled):
                 self._start_always_on_tensorboard()
-        else:
-            if not (self.training_thread and self.train_config.tensorboard):
+        elif mode == TensorboardMode.TRAIN_ONLY:
+            if not (self.training_thread and self.train_config.tensorboard_enabled):
                 self._stop_always_on_tensorboard()
+        else:  # OFF
+            self._stop_always_on_tensorboard()
 
     def _set_training_button_style(self, mode: str):
         if not self.training_button:
