@@ -2,11 +2,13 @@ from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 
 from modules.model.BaseModel import BaseModel
+from modules.module.ParentModelWrapper import ParentModelWrapper
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig, TrainModelPartConfig
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.TimedActionMixin import TimedActionMixin
+from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -177,6 +179,62 @@ class BaseModelSetup(
             for adapter in model.adapters():
                 adapter.hook_to_module()
 
+    @contextmanager
+    def distillation_parent_model(
+        self,
+        model: BaseModel,
+        config: TrainConfig,
+        parent_wrapper: ParentModelWrapper | None,
+    ):
+        """
+        Context manager for distillation with external parent model.
+        
+        If parent_wrapper is provided and distillation is enabled, loads the parent
+        model temporarily to train_device for inference. Otherwise falls back to
+        prior_model behavior (unhooking LoRA adapters).
+        
+        Args:
+            model: Student model being trained
+            config: Training configuration
+            parent_wrapper: Optional wrapper containing parent model
+            
+        Yields:
+            Parent model if available, otherwise the student model with adapters unhooked
+        """
+        if parent_wrapper is None or not config.distillation.enabled:
+            # Fallback to prior_model behavior
+            with self.prior_model(model, config):
+                yield model
+            return
+        
+        # Load parent model if not already loaded
+        if not parent_wrapper.is_loaded():
+            parent_wrapper.load_parent_model()
+        
+        # Memory optimization: Swap models if keeping parent on CPU
+        # Move student model to CPU before loading parent to GPU to reduce peak VRAM
+        student_was_moved = False
+        if config.distillation.keep_parent_on_cpu:
+            model.to(self.temp_device)
+            student_was_moved = True
+            torch_gc()
+        
+        # Move parent to train_device temporarily
+        parent_wrapper.to_device(self.train_device)
+        
+        try:
+            yield parent_wrapper.parent_model
+        finally:
+            # Move parent back to temp_device (CPU)
+            if config.distillation.keep_parent_on_cpu:
+                parent_wrapper.to_device(self.temp_device)
+                torch_gc()
+                
+                # Move student model back to train_device
+                if student_was_moved:
+                    model.to(self.train_device)
+                    torch_gc()
+
     def _create_model_part_parameters(
         self,
         parameter_group_collection: NamedParameterGroupCollection,
@@ -186,7 +244,7 @@ class BaseModelSetup(
         freeze: list[ModuleFilter] | None = None,
         debug: bool = False,
     ):
-        if not config.train:
+        if not config.train or model is None:
             return
 
         if freeze is not None and len(freeze) > 0:

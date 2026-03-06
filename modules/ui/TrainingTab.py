@@ -5,12 +5,15 @@ from modules.ui.TimestepDistributionWindow import TimestepDistributionWindow
 from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
+from modules.util.enum.DistillationCacheMode import DistillationCacheMode
+from modules.util.enum.DistillationLossType import DistillationLossType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
 from modules.util.enum.LearningRateScaler import LearningRateScaler
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossScaler import LossScaler
 from modules.util.enum.LossWeight import LossWeight
+from modules.util.enum.ModelType import ModelType
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.optimizer_util import change_optimizer
@@ -97,6 +100,7 @@ class TrainingTab:
         self.__create_unet_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2, supports_generalized_offset_noise=True)
 
+        self.__create_distillation_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
         self.__create_layer_frame(column_2, 3)
@@ -112,6 +116,7 @@ class TrainingTab:
         self.__create_transformer_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
+        self.__create_distillation_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
         self.__create_layer_frame(column_2, 3)
@@ -126,6 +131,7 @@ class TrainingTab:
         self.__create_unet_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2, supports_generalized_offset_noise=True)
 
+        self.__create_distillation_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
         self.__create_layer_frame(column_2, 3)
@@ -721,6 +727,91 @@ class TrainingTab:
         components.label(frame, 5, 0, "Custom Conditioning Image",
                          tooltip="When custom conditioning image is enabled, will use png postfix with -condlabel instead of automatically generated.It's suitable for special scenarios, such as object removal, allowing the model to learn a certain behavior concept")
         components.switch(frame, 5, 1, self.ui_state, "custom_conditioning_image")
+
+    def __create_distillation_frame(self, master, row):
+        frame = ctk.CTkFrame(master=master, corner_radius=5)
+        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
+        frame.grid_columnconfigure(1, weight=2)
+
+        # Enable Distillation
+        components.label(frame, 0, 0, "Enable Distillation",
+                         tooltip="Enables distillation training where the student model learns from a parent model. Use DISTILLATION concept type in training data to trigger distillation per-sample.")
+        components.switch(frame, 0, 1, self.ui_state, "distillation.enabled")
+
+        # Parent Model Path
+        components.label(frame, 1, 0, "Parent Model Path",
+                         tooltip="Path to the parent model checkpoint to learn from. The parent model should be trained or a base model that produces better outputs than your student model.")
+        components.file_entry(frame, 1, 1, self.ui_state, "distillation.parent_model_path")
+
+        # Parent Model Type
+        # Filter only Stable Diffusion family models
+        sd_model_types = [
+            ("SD 1.5", ModelType.STABLE_DIFFUSION_15),
+            ("SD 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
+            ("SD 2.0", ModelType.STABLE_DIFFUSION_20),
+            ("SD 2.0 Base", ModelType.STABLE_DIFFUSION_20_BASE),
+            ("SD 2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
+            ("SD 2.0 Depth", ModelType.STABLE_DIFFUSION_20_DEPTH),
+            ("SD 2.1", ModelType.STABLE_DIFFUSION_21),
+            ("SD 2.1 Base", ModelType.STABLE_DIFFUSION_21_BASE),
+            ("SDXL 1.0 Base", ModelType.STABLE_DIFFUSION_XL_10_BASE),
+            ("SDXL 1.0 Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
+            ("SD 3", ModelType.STABLE_DIFFUSION_3),
+            ("SD 3.5", ModelType.STABLE_DIFFUSION_35),
+        ]
+        components.label(frame, 2, 0, "Parent Model Type",
+                         tooltip="The model type of the parent model. Must match the architecture of the parent checkpoint.")
+        components.options_kv(frame, 2, 1, sd_model_types, self.ui_state, "distillation.parent_model_type")
+
+        # Quantize Parent
+        components.label(frame, 3, 0, "Quantize Parent Model",
+                         tooltip="Enables quantization of the parent model to reduce VRAM usage. Recommended for large models or limited VRAM.")
+        components.switch(frame, 3, 1, self.ui_state, "distillation.quantize_parent")
+
+        # Parent Quantization Dtype
+        components.label(frame, 4, 0, "Parent Quantization Type",
+                         tooltip="Quantization precision for parent model. NFLOAT_4 saves most VRAM (75%), INT_8 is balanced (50%), FLOAT_8 is highest quality (50%).")
+        components.options_kv(frame, 4, 1, [
+            ("None", DataType.NONE),
+            #("NFloat4", DataType.NFLOAT_4),
+            #("Int8", DataType.INT_8),
+            ("Float8", DataType.FLOAT_8),
+        ], self.ui_state, "distillation.parent_quantization_dtype")
+
+        # Keep Parent on CPU
+        components.label(frame, 5, 0, "Keep Parent on CPU",
+                         tooltip="Keeps parent model on CPU between forward passes to save VRAM. Increases training time but dramatically reduces memory usage. Recommended for very large models.")
+        components.switch(frame, 5, 1, self.ui_state, "distillation.keep_parent_on_cpu")
+
+        # Loss Type
+        components.label(frame, 6, 0, "Distillation Loss Type",
+                         tooltip="Loss function for distillation: MSE (L2), MAE (L1), HUBER (robust), KL_DIVERGENCE (distribution matching, requires kl_temperature).")
+        components.options(frame, 6, 1, [str(x) for x in list(DistillationLossType)], self.ui_state, "distillation.loss_type")
+
+        # Loss Weight
+        components.label(frame, 7, 0, "Distillation Loss Weight",
+                         tooltip="Weight multiplier for distillation loss. Higher values increase the influence of the parent model. Typical range: 0.1-1.0.")
+        components.entry(frame, 7, 1, self.ui_state, "distillation.loss_weight")
+
+        # KL Temperature
+        components.label(frame, 8, 0, "KL Temperature",
+                         tooltip="Temperature parameter for KL divergence loss. Only used when loss_type is KL_DIVERGENCE. Higher values (2.0+) make the distribution matching softer. Typical range: 1.0-5.0.")
+        components.entry(frame, 8, 1, self.ui_state, "distillation.kl_temperature")
+
+        # Cache Mode
+        components.label(frame, 9, 0, "Cache Mode",
+                         tooltip="Cache mode for distillation training:\n" +
+                                 "  • DISABLED: Live parent model inference (default)\n" +
+                                 "  • GENERATE_CACHE: Run parent model and save predictions to cache\n" +
+                                 "  • USE_CACHE: Load cached predictions instead of running parent model\n" +
+                                 "Two-step workflow: First run with GENERATE_CACHE, then train with USE_CACHE to save VRAM.")
+        components.options(frame, 9, 1, [str(x) for x in list(DistillationCacheMode)], self.ui_state, "distillation.cache_mode")
+
+        # Cache Directory
+        components.label(frame, 10, 0, "Cache Directory",
+                         tooltip="Directory to store/load distillation cache files. Path is relative to workspace directory. Cache files contain parent model predictions for each training sample.")
+        components.entry(frame, 10, 1, self.ui_state, "distillation.cache_dir")
 
     def __create_loss_frame(self, master, row, supports_vb_loss: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

@@ -12,6 +12,8 @@ from modules.util.config.SecretsConfig import SecretsConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
+from modules.util.enum.DistillationCacheMode import DistillationCacheMode
+from modules.util.enum.DistillationLossType import DistillationLossType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
 from modules.util.enum.GradientReducePrecision import GradientReducePrecision
@@ -353,6 +355,45 @@ class QuantizationConfig(BaseConfig):
         data.append(("cache_dir", None, str, True))
         return QuantizationConfig(data)
 
+class DistillationConfig(BaseConfig):
+    enabled: bool
+    parent_model_path: str
+    parent_model_type: ModelType
+    
+    # Memory management
+    quantize_parent: bool
+    parent_quantization_dtype: DataType
+    keep_parent_on_cpu: bool
+    
+    # Loss configuration
+    loss_type: DistillationLossType
+    loss_weight: float
+    
+    # KL-specific
+    kl_temperature: float
+    
+    # Cache configuration
+    cache_mode: DistillationCacheMode
+    cache_dir: str
+
+    @staticmethod
+    def default_values():
+        data = []
+
+        # name, default value, data type, nullable
+        data.append(("enabled", False, bool, False))
+        data.append(("parent_model_path", "", str, False))
+        data.append(("parent_model_type", ModelType.STABLE_DIFFUSION_15, ModelType, False))
+        data.append(("quantize_parent", True, bool, False))
+        data.append(("parent_quantization_dtype", DataType.NFLOAT_4, DataType, False))
+        data.append(("keep_parent_on_cpu", True, bool, False))
+        data.append(("loss_type", DistillationLossType.MSE, DistillationLossType, False))
+        data.append(("loss_weight", 1.0, float, False))
+        data.append(("kl_temperature", 1.0, float, False))
+        data.append(("cache_mode", DistillationCacheMode.DISABLED, DistillationCacheMode, False))
+        data.append(("cache_dir", "workspace-cache/distillation", str, False))
+        return DistillationConfig(data)
+
 class TrainConfig(BaseConfig):
     training_method: TrainingMethod
     model_type: ModelType
@@ -507,6 +548,9 @@ class TrainConfig(BaseConfig):
     normalize_masked_area_loss: bool
     masked_prior_preservation_weight: float
 
+    # distillation
+    distillation: DistillationConfig
+
     # custom conditioning image
     custom_conditioning_image: bool
 
@@ -526,6 +570,8 @@ class TrainConfig(BaseConfig):
     lora_decompose_norm_epsilon: bool
     lora_decompose_output_axis: bool
     lora_weight_dtype: DataType
+    lora_te_scale: float  # Scale factor for Text Encoder LoRA weights on load (default 1.0)
+    lora_unet_scale: float  # Scale factor for UNet LoRA weights on load (default 1.0)
     bundle_additional_embeddings: bool
 
     # oft
@@ -570,7 +616,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=10,
+            config_version=12,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -582,6 +628,8 @@ class TrainConfig(BaseConfig):
                 7: self.__migration_7,
                 8: self.__migration_8,
                 9: self.__migration_9,
+                10: self.__migration_10,
+                11: self.__migration_11,
             }
         )
 
@@ -798,6 +846,23 @@ class TrainConfig(BaseConfig):
         replace_dtype("decoder_text_encoder")
         replace_dtype("decoder_vqgan")
         migrated_data.pop("weight_dtype")
+
+        return migrated_data
+
+    def __migration_10(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        # Add LoRA weight scaling factors with default value 1.0 (no scaling)
+        migrated_data.setdefault("lora_te_scale", 1.0)
+        migrated_data.setdefault("lora_unet_scale", 1.0)
+
+        return migrated_data
+
+    def __migration_11(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        # Add distillation config with default values
+        migrated_data.setdefault("distillation", DistillationConfig.default_values().to_dict())
 
         return migrated_data
 
@@ -1130,6 +1195,10 @@ class TrainConfig(BaseConfig):
         data.append(("unmasked_weight", 0.1, float, False))
         data.append(("normalize_masked_area_loss", False, bool, False))
         data.append(("masked_prior_preservation_weight", 0.0, float, False))
+
+        # distillation
+        data.append(("distillation", DistillationConfig.default_values(), DistillationConfig, False))
+
         data.append(("custom_conditioning_image", False, bool, False))
 
         #layer filter
@@ -1156,6 +1225,8 @@ class TrainConfig(BaseConfig):
         data.append(("lora_decompose_norm_epsilon", True, bool, False))
         data.append(("lora_decompose_output_axis", False, bool, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
+        data.append(("lora_te_scale", 1.0, float, False))
+        data.append(("lora_unet_scale", 1.0, float, False))
         data.append(("bundle_additional_embeddings", True, bool, False))
 
         # oft
