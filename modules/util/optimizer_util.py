@@ -475,7 +475,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "stochastic_rounding": True,
         "compile": False,
         "fused_back_pass": False,
-        "use_atan2": False,
+        "use_atan2": True,
         "orthogonal_gradient": False,
         "use_AdEMAMix": False,
         "beta3_ema": 0.9999,
