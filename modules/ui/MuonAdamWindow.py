@@ -105,6 +105,6 @@ class MuonAdamWindow(ctk.CTkToplevel):
             components.label(master, row, col, title, tooltip=tooltip)
 
             if param_type != 'bool':
-                components.entry(master, row, col + 1, self.adam_ui_state, key)
+                components.entry(master, row, col + 1, self.adam_ui_state, key, allow_negative=True)
             else:
                 components.switch(master, row, col + 1, self.adam_ui_state, key)
