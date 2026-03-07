@@ -53,6 +53,7 @@ class ConfigList(metaclass=ABCMeta):
         self.show_toggle_button = show_toggle_button
         self.is_opening_window = False
         self._is_current_item_enabled = False
+        self.empty_state_label = None
 
         self.master.grid_rowconfigure(0, weight=0)
         self.master.grid_rowconfigure(1, weight=1)
@@ -106,6 +107,19 @@ class ConfigList(metaclass=ABCMeta):
 
     def _refresh_show_disabled_text(self):
         return
+
+    def _get_empty_state_text(self) -> str:
+        return ""
+
+    def _update_empty_state_visibility(self):
+        if self.empty_state_label is None:
+            return
+
+        should_show = len(self.current_config) == 0
+        if should_show:
+            self.empty_state_label.place(relx=0.5, rely=0.5, anchor="center")
+        else:
+            self.empty_state_label.place_forget()
 
     def _reset_filters(self):  # pragma: no cover - default noop
         search_var = getattr(self, 'search_var', None)
@@ -183,6 +197,19 @@ class ConfigList(metaclass=ABCMeta):
         if self.is_full_width:
             self.element_list.grid_columnconfigure(0, weight=1)
 
+        empty_state_text = self._get_empty_state_text()
+        if empty_state_text:
+            label_parent = getattr(self.element_list, "_parent_canvas", self.element_list)
+            self.empty_state_label = ctk.CTkLabel(
+                label_parent,
+                text=empty_state_text,
+                justify="center",
+                anchor="center",
+                wraplength=560,
+            )
+        else:
+            self.empty_state_label = None
+
         for i, element in enumerate(self.current_config):
             widget = self.create_widget(
                 self.element_list, element, i,
@@ -193,8 +220,12 @@ class ConfigList(metaclass=ABCMeta):
             )
             self.widgets.append(widget)
 
+        self._update_empty_state_visibility()
+
     def _update_widget_visibility(self):
         visible_index = 0
+
+        self._update_empty_state_visibility()
 
         for i, widget in enumerate(self.widgets):
             if i < len(self.current_config):
@@ -232,12 +263,15 @@ class ConfigList(metaclass=ABCMeta):
 
     def __add_element(self):
         new_element = self.create_new_element()
-        self.current_config.append(new_element)
+        self._append_existing_element(new_element)
+
+    def _append_existing_element(self, element: BaseConfig):
+        self.current_config.append(element)
         # incremental insertion if widgets already initialized, else fall back to full rebuild
         if self.widgets_initialized and self.element_list is not None:
             i = len(self.current_config) - 1
             widget = self.create_widget(
-                self.element_list, new_element, i,
+                self.element_list, element, i,
                 self.__open_element_window,
                 self.__remove_element,
                 self.__clone_element,
@@ -255,22 +289,7 @@ class ConfigList(metaclass=ABCMeta):
 
         if modify_element_fun is not None:
             new_element = modify_element_fun(new_element)
-        self.current_config.append(new_element)
-        if self.widgets_initialized and self.element_list is not None:
-            i = len(self.current_config) - 1
-            widget = self.create_widget(
-                self.element_list, new_element, i,
-                self.__open_element_window,
-                self.__remove_element,
-                self.__clone_element,
-                self.save_current_config
-            )
-            self.widgets.append(widget)
-            self._update_widget_visibility()
-        else:
-            self.widgets_initialized = False
-            self._create_element_list()
-        self.save_current_config()
+        self._append_existing_element(new_element)
 
     def __remove_element(self, remove_i):
         self.current_config.pop(remove_i)

@@ -1,4 +1,5 @@
 import contextlib
+import os
 import tkinter as tk
 from collections.abc import Callable
 from pathlib import Path
@@ -8,6 +9,7 @@ from typing import Any, Literal
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions
+from modules.util.ui.dnd import bind_file_drop
 from modules.util.ui.ToolTip import InfoTooltip
 from modules.util.ui.UIState import UIState
 from modules.util.ui.validation import DEFAULT_MAX_UNDO, FieldValidator, PathValidator
@@ -142,6 +144,30 @@ def path_entry(
         required=required,
     )
 
+    def __set_selected_path(chosen_path: str):
+        chosen = chosen_path
+
+        if mode == "dir" and os.path.isfile(chosen):
+            chosen = os.path.dirname(chosen)
+
+        if path_modifier:
+            chosen = str(path_modifier(chosen))
+
+        chosen_str = str(chosen)
+        ui_state.get_var(var_name).set(chosen_str)
+
+        if command:
+            command(chosen_str)
+
+    def _on_drop_paths(dropped_paths: list[str]):
+        validator = getattr(entry_component, "_validator", None)
+        if validator is not None:
+            with contextlib.suppress(Exception):
+                validator.push_undo_snapshot()
+        __set_selected_path(dropped_paths[0])
+
+    bind_file_drop(entry_component, _on_drop_paths)
+
     trace_ids = []
     if io_type in (PathIOType.OUTPUT, PathIOType.MODEL):
         validator = getattr(entry_component, '_validator', None)
@@ -194,14 +220,7 @@ def path_entry(
                                                     initialfile=current_filename)
 
         if chosen:
-            if path_modifier:
-                chosen = path_modifier(chosen)
-
-            chosen_str = str(chosen)
-            ui_state.get_var(var_name).set(chosen_str)
-
-            if command:
-                command(chosen_str)
+            __set_selected_path(chosen)
 
     button_component = ctk.CTkButton(frame, text="...", width=40, command=__open_dialog)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")

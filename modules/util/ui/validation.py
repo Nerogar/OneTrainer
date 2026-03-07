@@ -484,6 +484,9 @@ class FieldValidator:
         self._validate_and_style(self._shadow_var.get())
 
     def _push_undo_snapshot(self) -> None:
+        self.push_undo_snapshot()
+
+    def push_undo_snapshot(self) -> None:
         self._undo.push(self._shadow_var.get())
 
     def _on_debounce_fire(self) -> None:

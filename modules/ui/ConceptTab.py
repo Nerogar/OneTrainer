@@ -1,5 +1,6 @@
 import os
 import pathlib
+import platform
 from tkinter import BooleanVar, StringVar
 
 from modules.ui.ConceptWindow import ConceptWindow
@@ -10,6 +11,7 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.image_util import load_image
 from modules.util.ui import components
+from modules.util.ui.dnd import bind_file_drop
 from modules.util.ui.UIState import UIState
 from modules.util.ui.validation import DebounceTimer
 
@@ -42,6 +44,37 @@ class ConceptTab(ConfigList):
         self._add_search_bar()
         # wrap toolbar if too narrow
         self.top_frame.bind('<Configure>', lambda e: self._maybe_reposition_toolbar(e.width))
+
+    def _create_element_list(self, **filters):
+        super()._create_element_list(**filters)
+        self._bind_drop_targets()
+
+    def _get_empty_state_text(self) -> str:
+        if platform.system() == "Linux":
+            return "Your concepts are empty, click the Add button to add a concept"
+        return "Your concepts are empty, either drag n drop a folder or click the Add button to add a concept"
+
+    def _bind_drop_targets(self):
+        def _on_drop(paths: list[str]):
+            for dropped_path in paths:
+                if not os.path.isdir(dropped_path):
+                    continue
+
+                concept = self.create_new_element()
+                concept.path = dropped_path
+
+                if not concept.name:
+                    concept.name = os.path.basename(os.path.normpath(dropped_path))
+
+                self._append_existing_element(concept)
+
+        if self.element_list is not None and not getattr(self.element_list, "_dnd_bound", False):
+            if bind_file_drop(self.element_list, _on_drop):
+                self.element_list._dnd_bound = True
+
+        if self.top_frame is not None and not getattr(self.top_frame, "_dnd_bound", False):
+            if bind_file_drop(self.top_frame, _on_drop):
+                self.top_frame._dnd_bound = True
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
         return ConceptWidget(master, element, i, open_command, remove_command, clone_command, save_command)
