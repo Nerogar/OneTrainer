@@ -103,11 +103,21 @@ def _check_overwrite(path: str, *, is_dir: bool, prevent: bool) -> str | None:
     if not prevent:
         return None
     abs_path = os.path.abspath(path)
-    check = os.path.isdir if is_dir else os.path.isfile
-    if check(abs_path):
-        kind = "folder" if is_dir else "file"
-        return f"Output {kind} already exists (overwrite prevented)"
-    return None
+    if not os.path.exists(abs_path):
+        return None
+
+    if is_dir:
+        if os.path.isdir(abs_path):
+            return "Output folder already exists (overwrite prevented)"
+        if os.path.isfile(abs_path):
+            return "Output path exists as a file, but a folder is required for this input (overwrite prevented)"
+        return "Output path already exists, but is not a folder (overwrite prevented)"
+
+    if os.path.isfile(abs_path):
+        return "Output file already exists (overwrite prevented)"
+    if os.path.isdir(abs_path):
+        return "Output path exists as a folder, but a file is required (overwrite prevented)"
+    return "Output path already exists, but is not a file (overwrite prevented)"
 
 
 def validate_path(
@@ -116,6 +126,7 @@ def validate_path(
     *,
     prevent_overwrites: bool = False,
     output_format: str | None = None,
+    output_is_dir: bool = False,
 ) -> str | None:
     """Return an error string if *value* is an invalid path, else ``None``."""
     trimmed = value.strip()
@@ -166,7 +177,7 @@ def validate_path(
         return _check_overwrite(trimmed, is_dir=False, prevent=prevent_overwrites)
 
     if io_type == PathIOType.OUTPUT:
-        return _check_overwrite(trimmed, is_dir=False, prevent=prevent_overwrites)
+        return _check_overwrite(trimmed, is_dir=output_is_dir, prevent=prevent_overwrites)
 
     return None
 
@@ -550,12 +561,14 @@ class PathValidator(FieldValidator):
         ui_state: UIState,
         var_name: str,
         io_type: PathIOType = PathIOType.INPUT,
+        output_is_dir: bool = False,
         max_undo: int = DEFAULT_MAX_UNDO,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
     ):
         super().__init__(component, var, ui_state, var_name, max_undo=max_undo, extra_validate=extra_validate, required=required)
         self.io_type = io_type
+        self.output_is_dir = output_is_dir
         self._model_blank_timer: DebounceTimer | None = None
 
     def _cancel_debounces(self) -> None:
@@ -594,6 +607,7 @@ class PathValidator(FieldValidator):
             io_type=self.io_type,
             prevent_overwrites=self._get_var_value("prevent_overwrites", False),
             output_format=self._get_var_value("output_model_format"),
+            output_is_dir=self.output_is_dir,
         )
 
     def revalidate(self) -> None:

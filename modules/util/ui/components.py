@@ -133,7 +133,15 @@ def path_entry(
     frame.grid_columnconfigure(0, weight=1)
 
     def _path_validator_factory(comp, var, state, name, **kw):
-        return PathValidator(comp, var, state, name, io_type=io_type, **kw)
+        return PathValidator(
+            comp,
+            var,
+            state,
+            name,
+            io_type=io_type,
+            output_is_dir=(io_type == PathIOType.OUTPUT and mode == "dir"),
+            **kw,
+        )
 
     entry_component = entry(
         frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
