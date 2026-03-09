@@ -803,7 +803,7 @@ class SoftwareInfo:
         }
 
         # Determine the pixi environment name from OT_PLATFORM (set by our scripts)
-        platform_env = os.environ.get("OT_PLATFORM", "default")
+        platform_env = os.environ.get("OT_PLATFORM")
         cmd = ["pixi", "list", "--locked", "-e", platform_env, "--json"]
         pkg_out = Utility.run_command(cmd)
         if pkg_out:
