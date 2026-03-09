@@ -36,7 +36,6 @@ open-clip-torch==2.32.0
 -e git+https://github.com/Nerogar/mgds.git@5bbafa5#egg=mgds
 
 # optimizers
-dadaptation==3.2 # dadaptation optimizers
 lion-pytorch==0.2.3 # lion optimizer
 prodigyopt==1.1.2 # prodigy optimizer
 schedulefree==1.4.1 # schedule-free optimizers
