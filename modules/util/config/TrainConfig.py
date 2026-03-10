@@ -14,6 +14,7 @@ from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.DistillationCacheMode import DistillationCacheMode
 from modules.util.enum.DistillationLossType import DistillationLossType
+from modules.util.enum.DistillationTargetMode import DistillationTargetMode
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
 from modules.util.enum.GradientReducePrecision import GradientReducePrecision
@@ -371,6 +372,12 @@ class DistillationConfig(BaseConfig):
     
     # KL-specific
     kl_temperature: float
+
+    # Target transformation
+    target_mode: DistillationTargetMode
+    cfg_scale: float
+    rollout_steps: int
+    rollout_blend: float
     
     # Cache configuration
     cache_mode: DistillationCacheMode
@@ -390,6 +397,10 @@ class DistillationConfig(BaseConfig):
         data.append(("loss_type", DistillationLossType.MSE, DistillationLossType, False))
         data.append(("loss_weight", 1.0, float, False))
         data.append(("kl_temperature", 1.0, float, False))
+        data.append(("target_mode", DistillationTargetMode.RAW, DistillationTargetMode, False))
+        data.append(("cfg_scale", 1.0, float, False))
+        data.append(("rollout_steps", 2, int, False))
+        data.append(("rollout_blend", 0.5, float, False))
         data.append(("cache_mode", DistillationCacheMode.DISABLED, DistillationCacheMode, False))
         data.append(("cache_dir", "workspace-cache/distillation", str, False))
         return DistillationConfig(data)

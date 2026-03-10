@@ -22,7 +22,16 @@ class DistillationCacheManager:
     - Avoids model swapping overhead on low-VRAM systems
     """
     
-    def __init__(self, cache_dir: str, parent_model_path: str, parent_model_type: str):
+    def __init__(
+        self,
+        cache_dir: str,
+        parent_model_path: str,
+        parent_model_type: str,
+        target_mode: str,
+        cfg_scale: float,
+        rollout_steps: int,
+        rollout_blend: float,
+    ):
         """
         Initialize the distillation cache manager.
         
@@ -34,6 +43,10 @@ class DistillationCacheManager:
         self.cache_dir = Path(cache_dir)
         self.parent_model_path = parent_model_path
         self.parent_model_type = parent_model_type
+        self.target_mode = target_mode
+        self.cfg_scale = cfg_scale
+        self.rollout_steps = rollout_steps
+        self.rollout_blend = rollout_blend
         
         # Create cache directory if it doesn't exist
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -109,6 +122,10 @@ class DistillationCacheManager:
             'global_step': global_step,
             'parent_model_path': self.parent_model_path,
             'parent_model_type': self.parent_model_type,
+            'target_mode': self.target_mode,
+            'cfg_scale': self.cfg_scale,
+            'rollout_steps': self.rollout_steps,
+            'rollout_blend': self.rollout_blend,
         }
         
         try:
@@ -152,6 +169,34 @@ class DistillationCacheManager:
                     f"Cache metadata mismatch: parent_model_type\n"
                     f"  Expected: {self.parent_model_type}\n"
                     f"  Got: {cache_data.get('parent_model_type')}"
+                )
+
+            if cache_data.get('target_mode') != self.target_mode:
+                raise ValueError(
+                    f"Cache metadata mismatch: target_mode\n"
+                    f"  Expected: {self.target_mode}\n"
+                    f"  Got: {cache_data.get('target_mode')}"
+                )
+
+            if float(cache_data.get('cfg_scale', 1.0)) != float(self.cfg_scale):
+                raise ValueError(
+                    f"Cache metadata mismatch: cfg_scale\n"
+                    f"  Expected: {self.cfg_scale}\n"
+                    f"  Got: {cache_data.get('cfg_scale')}"
+                )
+
+            if int(cache_data.get('rollout_steps', 1)) != int(self.rollout_steps):
+                raise ValueError(
+                    f"Cache metadata mismatch: rollout_steps\n"
+                    f"  Expected: {self.rollout_steps}\n"
+                    f"  Got: {cache_data.get('rollout_steps')}"
+                )
+
+            if float(cache_data.get('rollout_blend', 0.5)) != float(self.rollout_blend):
+                raise ValueError(
+                    f"Cache metadata mismatch: rollout_blend\n"
+                    f"  Expected: {self.rollout_blend}\n"
+                    f"  Got: {cache_data.get('rollout_blend')}"
                 )
             
             self.cache_hits += 1

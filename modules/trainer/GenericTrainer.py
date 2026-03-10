@@ -28,6 +28,7 @@ from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.DistillationCacheMode import DistillationCacheMode
 from modules.util.enum.EMAMode import EMAMode
+from modules.util.enum.DistillationTargetMode import DistillationTargetMode
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
@@ -171,13 +172,17 @@ class GenericTrainer(BaseTrainer):
                 cache_dir = self.config.distillation.cache_dir
                 if not os.path.isabs(cache_dir):
                     cache_dir = os.path.join(self.config.workspace_dir, cache_dir)
-                
+
                 self.distillation_cache_manager = DistillationCacheManager(
                     cache_dir=cache_dir,
                     parent_model_path=self.config.distillation.parent_model_path,
                     parent_model_type=str(self.config.distillation.parent_model_type),
+                    target_mode=str(self.config.distillation.target_mode),
+                    cfg_scale=float(self.config.distillation.cfg_scale),
+                    rollout_steps=int(self.config.distillation.rollout_steps),
+                    rollout_blend=float(self.config.distillation.rollout_blend),
                 )
-                
+
                 if multi.is_master():
                     if self.config.distillation.cache_mode == DistillationCacheMode.GENERATE_CACHE:
                         print(f"\n{'='*80}")
@@ -186,6 +191,10 @@ class GenericTrainer(BaseTrainer):
                         print(f"Cache directory: {cache_dir}")
                         print(f"Parent model: {self.config.distillation.parent_model_path}")
                         print(f"Parent model type: {self.config.distillation.parent_model_type}")
+                        print(f"Target mode: {self.config.distillation.target_mode}")
+                        print(f"CFG scale: {self.config.distillation.cfg_scale}")
+                        print(f"Rollout steps: {self.config.distillation.rollout_steps}")
+                        print(f"Rollout blend: {self.config.distillation.rollout_blend}")
                         print(f"All samples with concept_type 'DISTILLATION' will have their parent")
                         print(f"model predictions cached to disk during this training run.")
                         print(f"This cache will be reused in subsequent training runs with USE_CACHE mode.")
@@ -198,7 +207,7 @@ class GenericTrainer(BaseTrainer):
                         print(f"Parent model will NOT be loaded - using cached predictions only.")
                         print(f"{'='*80}\n")
                 self.callbacks.on_update_status("initializing distillation cache")
-            
+
             # Only load parent model if not using cached predictions
             if self.config.distillation.cache_mode != DistillationCacheMode.USE_CACHE:
                 self.callbacks.on_update_status("loading parent model for distillation")
@@ -217,6 +226,60 @@ class GenericTrainer(BaseTrainer):
             self.validation_data_loader = self.create_data_loader(
                 self.model, self.model_setup, self.model.train_progress, is_validation=True
             )
+
+    def __build_distillation_target(
+            self,
+            batch: dict,
+            train_progress: TrainProgress,
+            parent_model: BaseModel,
+            base_parent_prediction: Tensor,
+            target: Tensor | None,
+    ) -> Tensor:
+        target_mode = self.config.distillation.target_mode
+
+        if target_mode == DistillationTargetMode.RAW:
+            return base_parent_prediction
+
+        if target_mode == DistillationTargetMode.CFG_SCALE:
+            if target is None:
+                if multi.is_master() and train_progress.global_step == 0:
+                    print("[Distillation] CFG_SCALE requested but no target available, falling back to RAW.")
+                return base_parent_prediction
+
+            cfg_scale = float(self.config.distillation.cfg_scale)
+            target_for_blend = target.to(dtype=base_parent_prediction.dtype)
+            return target_for_blend + cfg_scale * (base_parent_prediction - target_for_blend)
+
+        if target_mode == DistillationTargetMode.STEP_ROLLOUT:
+            rollout_steps = max(1, int(self.config.distillation.rollout_steps))
+            rollout_blend = float(self.config.distillation.rollout_blend)
+            rollout_blend = min(1.0, max(0.0, rollout_blend))
+
+            if rollout_steps == 1:
+                return base_parent_prediction
+
+            rolled_prediction = base_parent_prediction
+            for rollout_idx in range(rollout_steps - 1):
+                # Use a shifted global_step so each rollout pass gets a distinct but reproducible seed.
+                rollout_progress = TrainProgress(
+                    epoch=train_progress.epoch,
+                    epoch_step=train_progress.epoch_step,
+                    epoch_sample=train_progress.epoch_sample,
+                    global_step=train_progress.global_step + rollout_idx + 1,
+                )
+                rollout_output_data = self.model_setup.predict(
+                    parent_model,
+                    batch,
+                    self.config,
+                    rollout_progress,
+                    deterministic=False,
+                )
+                rollout_prediction = rollout_output_data['predicted'].to(dtype=rolled_prediction.dtype)
+                rolled_prediction = torch.lerp(rolled_prediction, rollout_prediction, rollout_blend)
+
+            return rolled_prediction
+
+        return base_parent_prediction
 
     def __save_config_to_workspace(self):
         path = path_util.canonical_join(self.config.workspace_dir, "config")
@@ -835,6 +898,14 @@ class GenericTrainer(BaseTrainer):
                                 self.config, 
                                 train_progress
                             )
+
+                            transformed_parent_prediction = self.__build_distillation_target(
+                                batch=batch,
+                                train_progress=train_progress,
+                                parent_model=parent_model if parent_model != self.model else self.model,
+                                base_parent_prediction=parent_model_output_data['predicted'],
+                                target=parent_model_output_data.get('target'),
+                            )
                         
                         # Save predictions to cache for each distillation sample
                         saved_count = 0
@@ -856,7 +927,7 @@ class GenericTrainer(BaseTrainer):
                                     timestep = train_progress.global_step
                                 
                                 prediction_dict = {
-                                    'predicted': parent_model_output_data['predicted'][idx:idx+1].detach().cpu(),
+                                    'predicted': transformed_parent_prediction[idx:idx+1].detach().cpu(),
                                     'target': parent_model_output_data.get('target', None),
                                     'prediction_type': parent_model_output_data.get('prediction_type'),
                                 }
@@ -969,13 +1040,22 @@ class GenericTrainer(BaseTrainer):
                         
                         # Get parent predictions
                         prior_model_prediction = parent_model_output_data['predicted'].to(dtype=model_output_data['target'].dtype)
+
+                        # Apply distillation target transformation before loss routing.
+                        transformed_parent_prediction = self.__build_distillation_target(
+                            batch=batch,
+                            train_progress=train_progress,
+                            parent_model=parent_model if parent_model != self.model else self.model,
+                            base_parent_prediction=prior_model_prediction,
+                            target=model_output_data.get('target'),
+                        )
                         
                         # For prior_prediction: Replace target (legacy behavior)
                         if len(prior_pred_indices) > 0:
                             model_output_data['target'][prior_pred_indices] = prior_model_prediction[prior_pred_indices]
                         
                         # Store parent prediction for masked prior preservation and distillation
-                        model_output_data['prior_target'] = prior_model_prediction
+                        model_output_data['prior_target'] = transformed_parent_prediction
                         
                         # For distillation: Store indices for loss calculation
                         if len(distillation_indices) > 0:

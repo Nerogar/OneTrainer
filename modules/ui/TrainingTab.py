@@ -7,6 +7,7 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.DistillationCacheMode import DistillationCacheMode
 from modules.util.enum.DistillationLossType import DistillationLossType
+from modules.util.enum.DistillationTargetMode import DistillationTargetMode
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
 from modules.util.enum.LearningRateScaler import LearningRateScaler
@@ -791,19 +792,42 @@ class TrainingTab:
                          tooltip="Temperature parameter for KL divergence loss. Only used when loss_type is KL_DIVERGENCE. Higher values (2.0+) make the distribution matching softer. Typical range: 1.0-5.0.")
         components.entry(frame, 8, 1, self.ui_state, "distillation.kl_temperature")
 
+        # Target Mode
+        components.label(frame, 9, 0, "Distillation Target Mode",
+                 tooltip="How parent predictions are transformed for DISTILLATION samples:\n" +
+                     "  • RAW: Use parent prediction directly (legacy behavior)\n" +
+                     "  • CFG_SCALE: Push prediction away from base target using cfg_scale\n" +
+                     "  • STEP_ROLLOUT: Blend multiple parent predictions to create a rollout target")
+        components.options(frame, 9, 1, [str(x) for x in list(DistillationTargetMode)], self.ui_state, "distillation.target_mode")
+
+        # CFG Scale
+        components.label(frame, 10, 0, "Distillation CFG Scale",
+                 tooltip="Used when target_mode is CFG_SCALE. Formula: target + cfg_scale * (parent - target). 1.0 keeps parent unchanged.")
+        components.entry(frame, 10, 1, self.ui_state, "distillation.cfg_scale")
+
+        # Rollout Steps
+        components.label(frame, 11, 0, "Distillation Rollout Steps",
+                 tooltip="Used when target_mode is STEP_ROLLOUT. Number of parent predictions to blend. Minimum is 1.")
+        components.entry(frame, 11, 1, self.ui_state, "distillation.rollout_steps")
+
+        # Rollout Blend
+        components.label(frame, 12, 0, "Distillation Rollout Blend",
+                 tooltip="Used when target_mode is STEP_ROLLOUT. Blend factor in [0,1] for each rollout update.")
+        components.entry(frame, 12, 1, self.ui_state, "distillation.rollout_blend")
+
         # Cache Mode
-        components.label(frame, 9, 0, "Cache Mode",
+        components.label(frame, 13, 0, "Cache Mode",
                          tooltip="Cache mode for distillation training:\n" +
                                  "  • DISABLED: Live parent model inference (default)\n" +
                                  "  • GENERATE_CACHE: Run parent model and save predictions to cache\n" +
                                  "  • USE_CACHE: Load cached predictions instead of running parent model\n" +
                                  "Two-step workflow: First run with GENERATE_CACHE, then train with USE_CACHE to save VRAM.")
-        components.options(frame, 9, 1, [str(x) for x in list(DistillationCacheMode)], self.ui_state, "distillation.cache_mode")
+        components.options(frame, 13, 1, [str(x) for x in list(DistillationCacheMode)], self.ui_state, "distillation.cache_mode")
 
         # Cache Directory
-        components.label(frame, 10, 0, "Cache Directory",
+        components.label(frame, 14, 0, "Cache Directory",
                          tooltip="Directory to store/load distillation cache files. Path is relative to workspace directory. Cache files contain parent model predictions for each training sample.")
-        components.entry(frame, 10, 1, self.ui_state, "distillation.cache_dir")
+        components.entry(frame, 14, 1, self.ui_state, "distillation.cache_dir")
 
     def __create_loss_frame(self, master, row, supports_vb_loss: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
