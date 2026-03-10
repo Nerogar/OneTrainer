@@ -34,9 +34,9 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 ## Installation
 
 > [!IMPORTANT]
-> Installing OneTrainer requires Python >=3.10 and <3.14.
+> Installing OneTrainer manually requires Python >=3.10 and <3.14.
 > You can download Python at https://www.python.org/downloads/windows/.
-> Then follow the below steps.
+> Then follow the below manual steps.
 
 #### Automatic installation
 
@@ -52,7 +52,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 3. Navigate into the cloned directory `cd OneTrainer`
 4. Perform the installation: `pixi install --locked -e cuda` (Replace `cuda` by `rocm` or `cpu` if needed).
 
-**Note:** We don't support ROCm on Windows yet.
+**Note:** We don't support ROCm on Windows currently.
 
 ## Updating
 
@@ -84,7 +84,7 @@ For a technically focused quick start, see the [Quick Start Guide](docs/QuickSta
 
 ### CLI Mode
 
-If you need more control or a headless approach OT also supports the command-line interface. All commands **need** to be run inside the active venv created during installation.
+If you need more control or a headless approach OT also supports the command-line interface. All commands **need** to be run inside the active pixi environment created during installation.
 
 All functionality is split into different scripts located in the `scripts` directory. This currently includes:
 
@@ -99,9 +99,15 @@ All functionality is split into different scripts located in the `scripts` direc
 -   `generate_masks.py` A utility to automatically create masks for your dataset
 -   `calculate_loss.py` A utility to calculate the training loss of every image in your dataset
 
-To learn more about the different parameters, execute `<script-name> -h`. For example `python scripts\train.py -h`
+To learn more about the different parameters, execute `<script-name> -h`. For example `python scripts\train.py -h`. An example of running training scripts on windows is:
 
-If you are on Mac or Linux, you can also read [the launch script documentation](LAUNCH-SCRIPTS.md) for detailed information about how to run OneTrainer and its various scripts on your system.
+`pixi run --locked -e cuda python "C:\repos\OneTrainer\scripts\train.py" --config-path ./config.json`
+
+You can also activate a shell, you'd select your gpu env (usually `cuda`: https://pixi.prefix.dev/latest/advanced/pixi_shell/
+
+If you are on Mac or Linux, you can also read [the launch script documentation](LAUNCH-SCRIPTS.md) for detailed information about how to run OneTrainer and its various scripts on your system. Windows users are to refer lib.include.ps1, it mostly mirrors linux launch scripts.
+
+
 
 ## Troubleshooting
 
