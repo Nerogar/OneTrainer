@@ -99,9 +99,11 @@ All functionality is split into different scripts located in the `scripts` direc
 -   `generate_masks.py` A utility to automatically create masks for your dataset
 -   `calculate_loss.py` A utility to calculate the training loss of every image in your dataset
 
-To learn more about the different parameters, execute `<script-name> -h`. For example `python scripts\train.py -h`. An example of running training scripts on windows is:
+To learn more about the different parameters, execute `./run-cmd.sh <script-name> -h`. For example `./run-cmd.sh scripts/train.py -h`. On Windows, you can do `./run-cmd.ps1 <script-name> -h`. An example of running training scripts on Windows is:
 
-`pixi run --locked -e cuda python "C:\repos\OneTrainer\scripts\train.py" --config-path ./config.json`
+```sh
+./run-cmd.ps1 train --config-path ./config.json
+```
 
 You can also activate a shell, you'd select your gpu env (usually `cuda`: https://pixi.prefix.dev/latest/advanced/pixi_shell/
 
