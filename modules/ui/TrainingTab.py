@@ -796,13 +796,14 @@ class TrainingTab:
         components.label(frame, 9, 0, "Distillation Target Mode",
                  tooltip="How parent predictions are transformed for DISTILLATION samples:\n" +
                      "  • RAW: Use parent prediction directly (legacy behavior)\n" +
-                     "  • CFG_SCALE: Push prediction away from base target using cfg_scale\n" +
+                     "  • SCALED_LOSS_WEIGHT: Apply only distillation.loss_weight scaling (no target transformation)\n" +
+                     "  • CFG_DISTILL: CFG distillation: p_cfg = empty + cfg_scale * (positive - empty)\n" +
                      "  • STEP_ROLLOUT: Blend multiple parent predictions to create a rollout target")
         components.options(frame, 9, 1, [str(x) for x in list(DistillationTargetMode)], self.ui_state, "distillation.target_mode")
 
         # CFG Scale
-        components.label(frame, 10, 0, "Distillation CFG Scale",
-                 tooltip="Used when target_mode is CFG_SCALE. Formula: target + cfg_scale * (parent - target). 1.0 keeps parent unchanged.")
+        components.label(frame, 10, 0, "CFG Factor (for CFG_DISTILL)",
+                 tooltip="Used when target_mode is CFG_DISTILL. Formula: p_cfg = empty + cfg_scale * (positive - empty). Controls the strength of classifier-free guidance.")
         components.entry(frame, 10, 1, self.ui_state, "distillation.cfg_scale")
 
         # Rollout Steps

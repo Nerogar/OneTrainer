@@ -397,7 +397,7 @@ class DistillationConfig(BaseConfig):
         data.append(("loss_type", DistillationLossType.MSE, DistillationLossType, False))
         data.append(("loss_weight", 1.0, float, False))
         data.append(("kl_temperature", 1.0, float, False))
-        data.append(("target_mode", DistillationTargetMode.RAW, DistillationTargetMode, False))
+        data.append(("target_mode", DistillationTargetMode.SCALED_LOSS_WEIGHT, DistillationTargetMode, False))
         data.append(("cfg_scale", 1.0, float, False))
         data.append(("rollout_steps", 2, int, False))
         data.append(("rollout_blend", 0.5, float, False))

@@ -166,6 +166,18 @@ class GenericTrainer(BaseTrainer):
 
         # Initialize parent model wrapper for distillation if enabled
         if self.config.distillation.enabled:
+            # Validate distillation target_mode (breaking change from CFG_SCALE)
+            valid_modes = {
+                DistillationTargetMode.RAW,
+                DistillationTargetMode.SCALED_LOSS_WEIGHT,
+                DistillationTargetMode.CFG_DISTILL,
+                DistillationTargetMode.STEP_ROLLOUT,
+            }
+            if self.config.distillation.target_mode not in valid_modes:
+                raise ValueError(
+                    f"Invalid distillation target_mode: {self.config.distillation.target_mode}\n"
+                )
+            
             # Initialize cache manager if cache mode is enabled
             if self.config.distillation.cache_mode != DistillationCacheMode.DISABLED:
                 # Resolve cache_dir path relative to workspace
@@ -232,23 +244,47 @@ class GenericTrainer(BaseTrainer):
             batch: dict,
             train_progress: TrainProgress,
             parent_model: BaseModel,
-            base_parent_prediction: Tensor,
-            target: Tensor | None,
+            parent_model_output_data: dict,
     ) -> Tensor:
+        """
+        Build distillation target based on target_mode.
+        
+        Modes:
+        - RAW: Use parent prediction directly
+        - SCALED_LOSS_WEIGHT: Use parent prediction (scaled only via loss_weight in loss calculation)
+        - CFG_DISTILL: p_cfg = predicted_empty + cfg_scale * (predicted - predicted_empty)
+        - STEP_ROLLOUT: Blend multiple parent predictions
+        """
         target_mode = self.config.distillation.target_mode
+        base_parent_prediction = parent_model_output_data['predicted']
 
         if target_mode == DistillationTargetMode.RAW:
             return base_parent_prediction
 
-        if target_mode == DistillationTargetMode.CFG_SCALE:
-            if target is None:
-                if multi.is_master() and train_progress.global_step == 0:
-                    print("[Distillation] CFG_SCALE requested but no target available, falling back to RAW.")
-                return base_parent_prediction
+        if target_mode == DistillationTargetMode.SCALED_LOSS_WEIGHT:
+            # Pure scaling via distillation.loss_weight in loss calculation
+            # No target transformation
+            return base_parent_prediction
 
+        if target_mode == DistillationTargetMode.CFG_DISTILL:
+            # CFG distillation: p_cfg = predicted_empty + cfg_scale * (predicted_pos - predicted_empty)
+            predicted_empty = parent_model_output_data.get('predicted_empty')
+            if predicted_empty is None:
+                raise ValueError(
+                    f"CFG_DISTILL target_mode requires predicted_empty from parent model, but it is None.\n"
+                    f"This typically happens when:\n"
+                    f"  1. Using cache mode without CFG_DISTILL enabled when cache was generated\n"
+                    f"  2. Model setup does not support CFG_DISTILL (only SDXL currently supported)\n"
+                    f"\nSolution: Regenerate cache with CFG_DISTILL target_mode, or use a different target_mode."
+                )
+            
             cfg_scale = float(self.config.distillation.cfg_scale)
-            target_for_blend = target.to(dtype=base_parent_prediction.dtype)
-            return target_for_blend + cfg_scale * (base_parent_prediction - target_for_blend)
+            predicted_empty_typed = predicted_empty.to(dtype=base_parent_prediction.dtype)
+            base_parent_typed = base_parent_prediction.to(dtype=base_parent_prediction.dtype)
+            
+            # p_cfg = empty + cfg_scale * (positive - empty)
+            p_cfg = predicted_empty_typed + cfg_scale * (base_parent_typed - predicted_empty_typed)
+            return p_cfg
 
         if target_mode == DistillationTargetMode.STEP_ROLLOUT:
             rollout_steps = max(1, int(self.config.distillation.rollout_steps))
@@ -896,15 +932,15 @@ class GenericTrainer(BaseTrainer):
                                 parent_model if parent_model != self.model else self.model,
                                 batch, 
                                 self.config, 
-                                train_progress
+                                train_progress,
+                                generate_distillation_empty=self.config.distillation.target_mode == DistillationTargetMode.CFG_DISTILL,
                             )
 
                             transformed_parent_prediction = self.__build_distillation_target(
                                 batch=batch,
                                 train_progress=train_progress,
                                 parent_model=parent_model if parent_model != self.model else self.model,
-                                base_parent_prediction=parent_model_output_data['predicted'],
-                                target=parent_model_output_data.get('target'),
+                                parent_model_output_data=parent_model_output_data,
                             )
                         
                         # Save predictions to cache for each distillation sample
@@ -929,6 +965,8 @@ class GenericTrainer(BaseTrainer):
                                 prediction_dict = {
                                     'predicted': transformed_parent_prediction[idx:idx+1].detach().cpu(),
                                     'target': parent_model_output_data.get('target', None),
+                                    'predicted_empty': parent_model_output_data.get('predicted_empty')[idx:idx+1].detach().cpu()
+                                        if parent_model_output_data.get('predicted_empty') is not None else None,
                                     'prediction_type': parent_model_output_data.get('prediction_type'),
                                 }
                                 
@@ -1032,7 +1070,8 @@ class GenericTrainer(BaseTrainer):
                                 parent_model if parent_model != self.model else self.model,
                                 batch, 
                                 self.config, 
-                                train_progress
+                                train_progress,
+                                generate_distillation_empty=self.config.distillation.target_mode == DistillationTargetMode.CFG_DISTILL,
                             )
                         
                         # Run student model
@@ -1046,8 +1085,7 @@ class GenericTrainer(BaseTrainer):
                             batch=batch,
                             train_progress=train_progress,
                             parent_model=parent_model if parent_model != self.model else self.model,
-                            base_parent_prediction=prior_model_prediction,
-                            target=model_output_data.get('target'),
+                            parent_model_output_data=parent_model_output_data,
                         )
                         
                         # For prior_prediction: Replace target (legacy behavior)

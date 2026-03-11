@@ -193,6 +193,7 @@ class BaseStableDiffusionXLSetup(
             train_progress: TrainProgress,
             *,
             deterministic: bool = False,
+            generate_distillation_empty: bool = False,
     ) -> dict:
         with model.autocast_context:
             batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
@@ -370,6 +371,49 @@ class BaseStableDiffusionXLSetup(
                     )
 
         model_output_data['prediction_type'] = model.noise_scheduler.config.prediction_type
+        
+        # For CFG_DISTILL: Generate empty prompt prediction
+        if generate_distillation_empty and config.distillation.enabled \
+            and config.distillation.target_mode.value == 'CFG_DISTILL':
+            with torch.no_grad():
+                # Create empty text embeddings (as unconditional guidance)
+                empty_text_encoder_output, empty_pooled_text_encoder_2_output = model.combine_text_encoder_output(
+                    *model.encode_text(
+                        train_device=self.train_device,
+                        batch_size=batch['latent_image'].shape[0],
+                        rand=rand,
+                        # Pass empty tokens (all padding tokens)
+                        tokens_1=torch.zeros_like(batch['tokens_1']),
+                        tokens_2=torch.zeros_like(batch['tokens_2']),
+                        text_encoder_1_layer_skip=config.text_encoder_layer_skip,
+                        text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
+                        text_encoder_1_output=None,
+                        text_encoder_2_output=None,
+                        pooled_text_encoder_2_output=None,
+                        text_encoder_1_dropout_probability=0.0,
+                        text_encoder_2_dropout_probability=0.0,
+                    )
+                )
+                
+                # Create latent input (same structure, but with empty conditioning)
+                if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
+                    empty_latent_input = torch.concat(
+                        [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
+                    )
+                else:
+                    empty_latent_input = scaled_noisy_latent_image
+                
+                # Run UNet with empty conditioning
+                empty_added_cond_kwargs = {"text_embeds": empty_pooled_text_encoder_2_output, "time_ids": add_time_ids}
+                predicted_latent_noise_empty = model.unet(
+                    sample=empty_latent_input.to(dtype=model.train_dtype.torch_dtype()),
+                    timestep=timestep,
+                    encoder_hidden_states=empty_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                    added_cond_kwargs=empty_added_cond_kwargs,
+                ).sample
+                
+                model_output_data['predicted_empty'] = predicted_latent_noise_empty
+        
         return model_output_data
 
     def calculate_loss(

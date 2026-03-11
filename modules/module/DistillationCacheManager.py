@@ -116,6 +116,7 @@ class DistillationCacheManager:
         cache_data = {
             'predicted': prediction_dict.get('predicted').cpu() if prediction_dict.get('predicted') is not None else None,
             'target': prediction_dict.get('target').cpu() if prediction_dict.get('target') is not None else None,
+            'predicted_empty': prediction_dict.get('predicted_empty').cpu() if prediction_dict.get('predicted_empty') is not None else None,
             'prediction_type': prediction_dict.get('prediction_type'),
             'timestep': timestep,
             'image_path': image_path,
@@ -198,6 +199,15 @@ class DistillationCacheManager:
                     f"  Expected: {self.rollout_blend}\n"
                     f"  Got: {cache_data.get('rollout_blend')}"
                 )
+            
+            # Validate predicted_empty for CFG_DISTILL mode
+            if self.target_mode == 'CFG_DISTILL':
+                if cache_data.get('predicted_empty') is None:
+                    raise ValueError(
+                        f"Cache data for CFG_DISTILL mode missing predicted_empty.\n"
+                        f"This cache was likely generated with a different target_mode.\n"
+                        f"Please regenerate the cache with target_mode='CFG_DISTILL'."
+                    )
             
             self.cache_hits += 1
             return cache_data

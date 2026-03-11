@@ -75,6 +75,7 @@ class BaseModelSetup(
             train_progress: TrainProgress,
             *,
             deterministic: bool = False,
+            generate_distillation_empty: bool = False,
     ) -> dict:
         pass
 
