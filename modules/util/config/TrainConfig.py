@@ -1,7 +1,9 @@
 import json
 import os
+import re
 import uuid
 from copy import deepcopy
+from datetime import datetime
 from typing import Any
 
 from modules.util.config.BaseConfig import BaseConfig
@@ -23,6 +25,7 @@ from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType, PeftType
 from modules.util.enum.Optimizer import Optimizer
+from modules.util.enum.TensorboardMode import TensorboardMode
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -360,15 +363,17 @@ class TrainConfig(BaseConfig):
     debug_dir: str
     workspace_dir: str
     cache_dir: str
-    tensorboard: bool
+    tensorboard_mode: TensorboardMode
     tensorboard_expose: bool
-    tensorboard_always_on: bool
     tensorboard_port: str
     validation: bool
     validate_after: float
     validate_after_unit: TimeUnit
     continue_last_backup: bool
     prevent_overwrites: bool
+    auto_correct_input: bool
+    friendly_run_names: bool
+    output_name_as_run_name: bool
     include_train_config: ConfigPart
 
     # multi-GPU
@@ -570,7 +575,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=10,
+            config_version=11,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -582,6 +587,7 @@ class TrainConfig(BaseConfig):
                 7: self.__migration_7,
                 8: self.__migration_8,
                 9: self.__migration_9,
+                10: self.__migration_10,
             }
         )
 
@@ -801,6 +807,33 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_10(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        tb_enabled = migrated_data.pop("tensorboard", True)
+        tb_always_on = migrated_data.pop("tensorboard_always_on", False)
+
+        if not tb_enabled:
+            migrated_data["tensorboard_mode"] = "OFF"
+        elif tb_always_on:
+            migrated_data["tensorboard_mode"] = "ALWAYS_ON"
+        else:
+            migrated_data["tensorboard_mode"] = "TRAIN_ONLY"
+
+        return migrated_data
+
+    @property
+    def tensorboard_enabled(self) -> bool:
+        return self.tensorboard_mode != TensorboardMode.OFF
+
+    @property
+    def tensorboard_is_always_on(self) -> bool:
+        return self.tensorboard_mode == TensorboardMode.ALWAYS_ON
+
+    @property
+    def tensorboard_is_train_only(self) -> bool:
+        return self.tensorboard_mode == TensorboardMode.TRAIN_ONLY
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
@@ -879,18 +912,39 @@ class TrainConfig(BaseConfig):
         else:
             return self.additional_embeddings
 
+    @staticmethod
+    def _extract_backup_datetime(full_path: str, name: str) -> datetime:
+        """Get timestamp from a backup so that run-name prefixing doesn't break backup ordering"""
+
+        m = re.search(r"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})", name)
+        if m:
+            try:
+                return datetime.strptime(m.group(1), "%Y-%m-%d_%H-%M-%S")
+            except ValueError:
+                pass
+        try:
+            stat = os.stat(full_path)
+            birth = getattr(stat, "st_birthtime", None) or stat.st_ctime or stat.st_mtime
+            return datetime.fromtimestamp(birth)
+        except OSError:
+            return datetime.min
+
     def get_last_backup_path(self) -> str | None:
         backups_path = os.path.join(self.workspace_dir, "backup")
         if os.path.exists(backups_path):
-            backup_paths = sorted(
-                [path for path in os.listdir(backups_path) if
-                 os.path.isdir(os.path.join(backups_path, path))],
-                reverse=True,
-            )
+            backup_dirs = [
+                name for name in os.listdir(backups_path)
+                if os.path.isdir(os.path.join(backups_path, name))
+            ]
 
-            if backup_paths:
-                last_backup_path = backup_paths[0]
-                return os.path.join(backups_path, last_backup_path)
+            if backup_dirs:
+                last = max(
+                    backup_dirs,
+                    key=lambda n: self._extract_backup_datetime(
+                        os.path.join(backups_path, n), n
+                    ),
+                )
+                return os.path.join(backups_path, last)
 
         return None
 
@@ -946,15 +1000,17 @@ class TrainConfig(BaseConfig):
         data.append(("debug_dir", "debug", str, False))
         data.append(("workspace_dir", "workspace/run", str, False))
         data.append(("cache_dir", "workspace-cache/run", str, False))
-        data.append(("tensorboard", True, bool, False))
+        data.append(("tensorboard_mode", TensorboardMode.ALWAYS_ON, TensorboardMode, False))
         data.append(("tensorboard_expose", False, bool, False))
-        data.append(("tensorboard_always_on", False, bool, False))
         data.append(("tensorboard_port", 6006, int, False))
         data.append(("validation", False, bool, False))
         data.append(("validate_after", 1, int, False))
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
         data.append(("continue_last_backup", False, bool, False))
         data.append(("prevent_overwrites", False, bool, False))
+        data.append(("auto_correct_input", True, bool, False))
+        data.append(("friendly_run_names", False, bool, False))
+        data.append(("output_name_as_run_name", False, bool, False))
         data.append(("include_train_config", ConfigPart.NONE, ConfigPart, False))
 
         #multi-GPU
