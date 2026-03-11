@@ -270,8 +270,25 @@ class TrainingTab:
         # optimizer
         components.label(frame, 0, 0, "Optimizer",
                          tooltip="The type of optimizer")
-        components.options_adv(frame, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer.optimizer",
+        opt_var, opt_d = components.options_adv(frame, 0, 1, [str(x) for x in list(Optimizer)], self.ui_state, "optimizer.optimizer",
                                command=self.__restore_optimizer_config, adv_command=self.__open_optimizer_params_window)
+        self.optimizer_comp = opt_d['component']
+
+        def update_optimizer_options(*args):
+            try:
+                if self.ui_state.get_var("use_stiefel").get():
+                    self.optimizer_comp.configure(values=[str(Optimizer.Stiefel_LoRA)])
+                    if self.ui_state.get_var("optimizer.optimizer").get() != str(Optimizer.Stiefel_LoRA):
+                        self.ui_state.get_var("optimizer.optimizer").set(str(Optimizer.Stiefel_LoRA))
+                        self.train_config.optimizer.optimizer = Optimizer.Stiefel_LoRA
+                        self.__restore_optimizer_config()
+                else:
+                    self.optimizer_comp.configure(values=[str(x) for x in list(Optimizer)])
+            except Exception:
+                pass
+
+        self.ui_state.get_var("use_stiefel").trace_add("write", update_optimizer_options)
+        update_optimizer_options()
 
         # learning rate scheduler
         # Wackiness will ensue when reloading configs if we don't check and clear this first.
