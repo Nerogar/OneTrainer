@@ -25,4 +25,4 @@ prepare_runtime_environment
 
 # Remove $1 (name of the script) and pass all remaining arguments to the script.
 shift
-run_python_in_active_env "${OT_CUSTOM_SCRIPT_FILE}" "$@"
+run_in_env python "${OT_CUSTOM_SCRIPT_FILE}" "$@"
