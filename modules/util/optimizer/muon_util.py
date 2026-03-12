@@ -43,7 +43,7 @@ def calculate_muon_n_layers(model: BaseModel) -> dict[str, int]:
     layer_counts = {}
 
     # Iterate over model components (e.g., 'unet', 'text_encoder', 'transformer')
-    for module in vars(model).values():
+    for attr_name, module in vars(model).items():
 
         # Identify the 'Ground Truth' blocks in this component.
         target_module = module
@@ -75,6 +75,9 @@ def calculate_muon_n_layers(model: BaseModel) -> dict[str, int]:
             # For standard full-finetuning, all valid blocks are active.
             active_component_blocks = valid_component_blocks
 
+        count = len(active_component_blocks)
+        if count > 0:
+            layer_counts[attr_name] = count
 
     return layer_counts
 
