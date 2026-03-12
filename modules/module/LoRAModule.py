@@ -288,7 +288,7 @@ class LoHaModule(PeftBase):
 class LoKrModule(PeftBase):
     """Implementation of LoKr from Lycoris."""
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, dim: int, alpha: float, decompose_both: bool, decompose_factor: int, use_tucker: bool, weight_decompose: bool, dora_on_output: bool, rs_lora: bool, full_matrix: bool, train_device: torch.device):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, dim: int, alpha: float, decompose_both: bool, decompose_factor: int, use_tucker: bool, weight_decompose: bool, dora_on_output: bool, rs_lora: bool, full_matrix: bool, train_device: torch.device, lokr_vec_trick: bool = False):
         super().__init__(prefix, orig_module)
         self.dim = dim  # LoKr uses 'dim' as its parameter
         self.dropout = Dropout(0)
@@ -302,11 +302,15 @@ class LoKrModule(PeftBase):
         self.train_device = train_device
         self.rs_lora = rs_lora
         self.full_matrix = full_matrix
+        self.lokr_vec_trick = lokr_vec_trick
 
         self.use_w1 = False
         self.use_w2 = False
         self.tucker = False
         self.lokr_dora_scale = None
+
+        # Cache shapes for the forward pass
+        self.in_m = self.in_n = self.out_l = self.out_k = None
 
         if orig_module is not None:
             self.initialize_weights()
@@ -324,6 +328,10 @@ class LoKrModule(PeftBase):
                 in_m, in_n = factorization(in_dim, self.decompose_factor)
                 out_l, out_k = factorization(out_dim, self.decompose_factor)
                 shape = ((out_l, out_k), (in_m, in_n))
+
+                # Store factorization shapes for the forward pass
+                self.in_m, self.in_n = in_m, in_n
+                self.out_l, self.out_k = out_l, out_k
 
                 # Create w1, or w1_a and w1_b
                 if self.decompose_both and lokr_dim < max(shape[0][0], shape[1][0]) / 2:
@@ -390,8 +398,8 @@ class LoKrModule(PeftBase):
             nn.init.kaiming_uniform_(self.lokr_w2_a, a=math.sqrt(5))
             nn.init.constant_(self.lokr_w2_b, 0)
 
-    def get_weight(self):
-        """Computes the LoKr delta weight."""
+    def _get_factors(self):
+        """Returns the two kronecker components W1 and W2."""
         # If using DoRA (weight_decompose), we want clean weights here so we can
         # apply dropout to the input 'x' later.
         # If not using DoRA, we apply dropout to the internal factors here.
@@ -408,6 +416,11 @@ class LoKrModule(PeftBase):
         else:
             w2 = d(self.lokr_w2_a) @ d(self.lokr_w2_b)
 
+        return w1, w2
+
+    def get_weight(self):
+        """Computes the full LoKr weight matrix"""
+        w1, w2 = self._get_factors()
         weight = make_kron(w1, w2.to(w1.dtype))
         weight = weight.view(self.shape)
 
@@ -458,8 +471,28 @@ class LoKrModule(PeftBase):
             # Apply dropout to the input 'x' (DoRA style)
             return self.op(self.dropout(x), wp.to(x.dtype), self.orig_module.bias, **self.layer_kwargs)
         else:
-            w = self.get_weight() * scale
-            return self.orig_forward(x) + self.op(x, w.to(x.dtype), bias=None, **self.layer_kwargs)
+            if self.lokr_vec_trick and isinstance(self.orig_module, nn.Linear):
+                # Apply W1 and W2 sequentially via einsum instead of 
+                # constructing the full Kronecker product.
+                w1, w2 = self._get_factors()
+
+                x_shape = x.shape
+                x_reshaped = x.reshape(-1, self.in_m, self.in_n)
+
+                # Calculate delta = x @ (W1 x W2).T
+                delta_output = torch.einsum(
+                    'bmn, lm, kn -> blk', 
+                    x_reshaped, w1.to(x.dtype), w2.to(x.dtype)
+                )
+
+                # Reshape back to [Batch, ..., Out_Features]
+                delta_output = delta_output.reshape(*x_shape[:-1], -1) * scale
+
+                return self.orig_forward(x) + delta_output
+            else:
+                # Fallback for Conv2d layers or when lokr_vec_trick is disabled
+                w = self.get_weight() * scale
+                return self.orig_forward(x) + self.op(x, w.to(x.dtype), bias=None, **self.layer_kwargs)
 
     def apply_to_module(self):
         # TODO
@@ -833,6 +866,7 @@ class LoRAModuleWrapper:
                 'rs_lora': config.lokr_rs_lora,
                 'full_matrix': config.lokr_full_matrix,
                 'train_device': torch.device(config.train_device),
+                'lokr_vec_trick': config.lokr_vec_trick,
             }
         self.lora_modules = self.__create_modules(orig_module, config)
 

@@ -190,6 +190,11 @@ class LoraTab:
                 ("bfloat16", DataType.BFLOAT_16),
             ], self.ui_state, "lora_weight_dtype")
 
+            # LoKr Vectorization trick
+            components.label(master, 7, 0, "Kronecker-Vec Trick",
+                             tooltip="Uses an accelerated path that bypasses the materialization of the full Kronecker product. This delivers a massive speedup to the LoKr without sacrificing precision. Highly recommended.")
+            components.switch(master, 7, 1, self.ui_state, "lokr_vec_trick")
+
             #LoKr Decomposition Settings
             components.label(master, 1, 3, "Decompose Both Matrices",
                              tooltip="Perform rank decomposition on both Kronecker product matrices (W1 and W2). Only effective for very small dimensions.")
