@@ -472,7 +472,7 @@ class LoKrModule(PeftBase):
             return self.op(self.dropout(x), wp.to(x.dtype), self.orig_module.bias, **self.layer_kwargs)
         else:
             if self.lokr_vec_trick and isinstance(self.orig_module, nn.Linear):
-                # Apply W1 and W2 sequentially via einsum instead of 
+                # Apply W1 and W2 sequentially via einsum instead of
                 # constructing the full Kronecker product.
                 w1, w2 = self._get_factors()
 
@@ -481,7 +481,7 @@ class LoKrModule(PeftBase):
 
                 # Calculate delta = x @ (W1 x W2).T
                 delta_output = torch.einsum(
-                    'bmn, lm, kn -> blk', 
+                    'bmn, lm, kn -> blk',
                     x_reshaped, w1.to(x.dtype), w2.to(x.dtype)
                 )
 
