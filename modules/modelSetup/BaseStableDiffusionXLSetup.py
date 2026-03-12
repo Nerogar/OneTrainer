@@ -382,9 +382,9 @@ class BaseStableDiffusionXLSetup(
                         train_device=self.train_device,
                         batch_size=batch['latent_image'].shape[0],
                         rand=rand,
-                        # Pass empty tokens (all padding tokens)
-                        tokens_1=torch.zeros_like(batch['tokens_1']),
-                        tokens_2=torch.zeros_like(batch['tokens_2']),
+                        text="",
+                        tokens_1=None,
+                        tokens_2=None,
                         text_encoder_1_layer_skip=config.text_encoder_layer_skip,
                         text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
                         text_encoder_1_output=None,
