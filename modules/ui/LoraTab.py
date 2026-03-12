@@ -96,23 +96,33 @@ class LoraTab:
                             tooltip=f"The alpha parameter used when creating a new {name}")
             components.entry(master, 2, 1, self.ui_state, "lora_alpha", required=True)
 
+            # TE Scale
+            components.label(master, 3, 0, f"{name} TE Scale",
+                            tooltip=f"Scale factor for Text Encoder {name} weights on load. 1.0 = no scaling. Use 0.5 to halve weights, 2.0 to double.")
+            components.entry(master, 3, 1, self.ui_state, "lora_te_scale")
+
+            # UNet Scale
+            components.label(master, 4, 0, f"{name} UNet Scale",
+                            tooltip=f"Scale factor for UNet {name} weights on load. 1.0 = no scaling. Use 0.5 to halve weights, 2.0 to double.")
+            components.entry(master, 4, 1, self.ui_state, "lora_unet_scale")
+
             # Dropout Percentage
-            components.label(master, 3, 0, "Dropout Probability",
+            components.label(master, 5, 0, "Dropout Probability",
                             tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
-            components.entry(master, 3, 1, self.ui_state, "dropout_probability")
+            components.entry(master, 5, 1, self.ui_state, "dropout_probability")
 
             # weight dtype
-            components.label(master, 4, 0, f"{name} Weight Data Type",
+            components.label(master, 6, 0, f"{name} Weight Data Type",
                             tooltip=f"The {name} weight data type used for training. This can reduce memory consumption, but reduces precision")
-            components.options_kv(master, 4, 1, [
+            components.options_kv(master, 6, 1, [
                 ("float32", DataType.FLOAT_32),
                 ("bfloat16", DataType.BFLOAT_16),
             ], self.ui_state, "lora_weight_dtype")
 
             # For use with additional embeddings.
-            components.label(master, 5, 0, "Bundle Embeddings",
+            components.label(master, 7, 0, "Bundle Embeddings",
                             tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
-            components.switch(master, 5, 1, self.ui_state, "bundle_additional_embeddings")
+            components.switch(master, 7, 1, self.ui_state, "bundle_additional_embeddings")
 
         # OFTv2
         elif peft_type == PeftType.OFT_2:
