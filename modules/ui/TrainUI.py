@@ -293,7 +293,7 @@ class TrainUI(ctk.CTk):
 
         components.label(frame, 5, 2, "Debug Directory",
                          tooltip="The directory where debug data is saved")
-        components.path_entry(frame, 4, 3, self.ui_state, "debug_dir", mode="dir", io_type=PathIOType.OUTPUT)
+        components.path_entry(frame, 5, 3, self.ui_state, "debug_dir", mode="dir", io_type=PathIOType.OUTPUT)
 
         # tensorboard
         components.label(frame, 7, 0, "Tensorboard",
