@@ -10,8 +10,8 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.image_util import load_image
 from modules.util.ui import components
-from modules.util.ui.ui_utils import DebounceTimer
 from modules.util.ui.UIState import UIState
+from modules.util.ui.validation import DebounceTimer
 
 import customtkinter as ctk
 from PIL import Image
@@ -257,6 +257,8 @@ class ConceptWidget(ctk.CTkFrame):
         concept_path = ConceptWindow.get_concept_path(getattr(self.concept, 'path', None))
         if concept_path:
             for path in pathlib.Path(concept_path).glob(glob_pattern):
+                if any(part.startswith('.') for part in path.relative_to(concept_path).parent.parts):
+                    continue
                 extension = os.path.splitext(path)[1]
                 if (path.is_file()
                         and path_util.is_supported_image_extension(extension)

@@ -1,7 +1,10 @@
-
 from modules.model.HiDreamModel import HiDreamModel
 from modules.modelSetup.BaseHiDreamSetup import BaseHiDreamSetup
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
@@ -90,9 +93,10 @@ class HiDreamEmbeddingSetup(
 
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
-        self.__setup_requires_grad(model, config)
 
-        init_model_parameters(model, self.create_parameters(model, config), self.train_device)
+        params = self.create_parameters(model, config)
+        self.__setup_requires_grad(model, config)
+        init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
             self,
@@ -137,3 +141,5 @@ class HiDreamEmbeddingSetup(
             if model.embedding_wrapper_4 is not None:
                 model.embedding_wrapper_4.normalize_embeddings()
         self.__setup_requires_grad(model, config)
+
+factory.register(BaseModelSetup, HiDreamEmbeddingSetup, ModelType.HI_DREAM_FULL, TrainingMethod.EMBEDDING)

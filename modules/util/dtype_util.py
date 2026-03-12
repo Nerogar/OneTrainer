@@ -33,9 +33,9 @@ def create_autocast_context(
 ) -> tuple[torch.autocast | nullcontext, DataType]:
     if torch.backends.mps.is_available():
         if any(train_dtype != dt for dt in weight_dtypes if dt is not None):
-            raise RuntimeError("macOS needs all dtypes to be the same.")
-
-        return nullcontext(), train_dtype
+            print("Warning: Mixed precision training is untested on macOS. Consider setting all dtypes to be the same.")
+        else:
+            return nullcontext(), train_dtype
 
     weight_dtypes = list(weight_dtypes)
     weight_dtypes = list(filter(lambda dtype: dtype != DataType.NONE and dtype is not None, weight_dtypes))

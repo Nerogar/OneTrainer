@@ -91,7 +91,6 @@ class TrainOptimizerConfig(BaseConfig):
     xi: float
     n_sma_threshold: int
     ams_bound: bool
-    r: float
     adanorm: bool
     adam_debias: bool
     slice_p: int
@@ -143,6 +142,7 @@ class TrainOptimizerConfig(BaseConfig):
     approx_mars: False
     kappa_p: float
     auto_kappa_p: False
+    compile: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -209,7 +209,6 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("xi", None, float, True))
         data.append(("n_sma_threshold", None, int, True))
         data.append(("ams_bound", False, bool, False))
-        data.append(("r", None, float, True))
         data.append(("adanorm", False, bool, False))
         data.append(("adam_debias", False, bool, False))
         data.append(("slice_p", None, int, True))
@@ -249,7 +248,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("muon_adam_lr", None, float, True))
         data.append(("muon_te1_adam_lr", None, float, True))
         data.append(("muon_te2_adam_lr", None, float, True))
-        data.append(("muon_adam_config", None, dict, True))
+        data.append(("muon_adam_config", {}, dict, True))
         data.append(("rms_rescaling", True, bool, True))
         data.append(("normuon_variant", False, bool, False))
         data.append(("beta2_normuon", None, float, True))
@@ -261,6 +260,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("approx_mars", False, bool, False))
         data.append(("kappa_p", None, float, True))
         data.append(("auto_kappa_p", False, bool, False))
+        data.append(("compile", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
@@ -273,7 +273,7 @@ class TrainModelPartConfig(BaseConfig):
     stop_training_after_unit: TimeUnit
     learning_rate: float
     weight_dtype: DataType
-    dropout_probability: float
+    dropout_probability: float #this is text encoder caption dropout!
     train_embedding: bool
     attention_mask: bool
     guidance_scale: float
@@ -368,6 +368,7 @@ class TrainConfig(BaseConfig):
     validate_after: float
     validate_after_unit: TimeUnit
     continue_last_backup: bool
+    prevent_overwrites: bool
     include_train_config: ConfigPart
 
     # multi-GPU
@@ -430,7 +431,7 @@ class TrainConfig(BaseConfig):
     vb_loss_strength: float
     loss_weight_fn: LossWeight
     loss_weight_strength: float
-    dropout_probability: float
+    dropout_probability: float #this is LoRA dropout!
     loss_scaler: LossScaler
     learning_rate_scaler: LearningRateScaler
     clip_grad_norm: float
@@ -929,7 +930,7 @@ class TrainConfig(BaseConfig):
             with open(config.sample_definition_file_name, 'r') as f:
                 samples = json.load(f)
                 for i in range(len(samples)):
-                    samples[i] = SampleConfig.default_values().from_dict(samples[i])
+                    samples[i] = SampleConfig.default_values(config.model_type).from_dict(samples[i])
                 config.samples = samples
 
         config_dict = config.to_dict()
@@ -964,6 +965,7 @@ class TrainConfig(BaseConfig):
         data.append(("validate_after", 1, int, False))
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
         data.append(("continue_last_backup", False, bool, False))
+        data.append(("prevent_overwrites", False, bool, False))
         data.append(("include_train_config", ConfigPart.NONE, ConfigPart, False))
 
         #multi-GPU
@@ -1080,6 +1082,7 @@ class TrainConfig(BaseConfig):
         text_encoder.learning_rate = None
         data.append(("text_encoder", text_encoder, TrainModelPartConfig, False))
         data.append(("text_encoder_layer_skip", 0, int, False))
+        data.append(("text_encoder_sequence_length", 512, int, True))
 
         # text encoder 2
         text_encoder_2 = TrainModelPartConfig.default_values()

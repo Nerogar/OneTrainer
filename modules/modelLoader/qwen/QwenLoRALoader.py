@@ -1,9 +1,8 @@
 from modules.model.BaseModel import BaseModel
 from modules.model.QwenModel import QwenModel
 from modules.modelLoader.mixin.LoRALoaderMixin import LoRALoaderMixin
+from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.ModelNames import ModelNames
-
-from omi_model_standards.convert.lora.convert_lora_util import LoraConversionKeySet
 
 
 class QwenLoRALoader(

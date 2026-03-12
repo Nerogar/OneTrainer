@@ -1,22 +1,23 @@
-import copy
 import os
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
+from modules.model.BaseModel import BaseModel
 from modules.model.QwenModel import (
     DEFAULT_PROMPT_TEMPLATE,
     DEFAULT_PROMPT_TEMPLATE_CROP_START,
     PROMPT_MAX_LENGTH,
     QwenModel,
 )
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.BaseQwenSetup import BaseQwenSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.torch_util import torch_gc
+from modules.util.enum.ModelType import ModelType
 from modules.util.TrainProgress import TrainProgress
 
-from mgds.MGDS import MGDS, TrainDataLoader
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
-from mgds.pipelineModules.DiskCache import DiskCache
 from mgds.pipelineModules.EncodeQwenText import EncodeQwenText
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
 from mgds.pipelineModules.RescaleImageChannels import RescaleImageChannels
@@ -25,70 +26,34 @@ from mgds.pipelineModules.SaveImage import SaveImage
 from mgds.pipelineModules.SaveText import SaveText
 from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
-from mgds.pipelineModules.VariationSorting import VariationSorting
-
-import torch
 
 
-#TODO share more code with other models
 class QwenBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
 ):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            config: TrainConfig,
-            model: QwenModel,
-            train_progress: TrainProgress,
-            is_validation: bool = False,
-    ):
-        super().__init__(
-            train_device,
-            temp_device,
-        )
-
-        if is_validation:
-            config = copy.copy(config)
-            config.batch_size = 1
-            config.multi_gpu = False
-
-        self.__ds = self.create_dataset(
-            config=config,
-            model=model,
-            train_progress=train_progress,
-            is_validation=is_validation,
-        )
-        self.__dl = TrainDataLoader(self.__ds, config.batch_size)
-
-    def get_data_set(self) -> MGDS:
-        return self.__ds
-
-    def get_data_loader(self) -> TrainDataLoader:
-        return self.__dl
-
     def _preparation_modules(self, config: TrainConfig, model: QwenModel):
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
-        tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=PROMPT_MAX_LENGTH, format_text=DEFAULT_PROMPT_TEMPLATE, additional_format_text_tokens=DEFAULT_PROMPT_TEMPLATE_CROP_START)
-        encode_prompt = EncodeQwenText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask', text_encoder=model.text_encoder, hidden_state_output_index=-1, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(), crop_start=DEFAULT_PROMPT_TEMPLATE_CROP_START)
+        tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=PROMPT_MAX_LENGTH,
+                                   format_text=DEFAULT_PROMPT_TEMPLATE, additional_format_text_tokens=DEFAULT_PROMPT_TEMPLATE_CROP_START)
+        encode_prompt = EncodeQwenText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask',
+                                       text_encoder=model.text_encoder, hidden_state_output_index=-1, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(), crop_start=DEFAULT_PROMPT_TEMPLATE_CROP_START)
 
         modules = [rescale_image, encode_image, image_sample]
-
-        modules.append(tokenize_prompt)
-
         if config.masked_training or config.model_type.has_mask_input():
             modules.append(downscale_mask)
+
+        modules.append(tokenize_prompt)
 
         if not config.train_text_encoder_or_embedding():
             modules.append(encode_prompt)
 
         return modules
 
-    def _cache_modules(self, config: TrainConfig, model: QwenModel):
+    def _cache_modules(self, config: TrainConfig, model: QwenModel, model_setup: BaseQwenSetup):
         image_split_names = ['latent_image', 'original_resolution', 'crop_offset']
 
         if config.masked_training or config.model_type.has_mask_input():
@@ -104,53 +69,19 @@ class QwenBaseDataLoader(
         ]
 
         if not config.train_text_encoder_or_embedding():
-            text_split_names.append('tokens')
-            text_split_names.append('tokens_mask')
-            text_split_names.append('text_encoder_hidden_state')
+            text_split_names += ['tokens', 'tokens_mask', 'text_encoder_hidden_state']
 
-        image_cache_dir = os.path.join(config.cache_dir, "image")
-        text_cache_dir = os.path.join(config.cache_dir, "text")
+        return self._cache_modules_from_names(
+            model, model_setup,
+            image_split_names=image_split_names,
+            image_aggregate_names=image_aggregate_names,
+            text_split_names=text_split_names,
+            sort_names=sort_names,
+            config=config,
+            text_caching=not config.train_text_encoder_or_embedding(),
+        )
 
-        #TODO share more code with other models
-        def before_cache_image_fun():
-            model.to(self.temp_device)
-            model.vae_to(self.train_device)
-            model.eval()
-            torch_gc()
-
-        def before_cache_text_fun():
-            model.to(self.temp_device)
-
-            if not config.train_text_encoder_or_embedding():
-                model.text_encoder_to(self.train_device)
-
-            model.eval()
-            torch_gc()
-
-        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
-
-        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
-
-        modules = []
-
-        if config.latent_caching:
-            modules.append(image_disk_cache)
-
-        if config.latent_caching:
-            sort_names = [x for x in sort_names if x not in image_aggregate_names]
-            sort_names = [x for x in sort_names if x not in image_split_names]
-
-            if not config.train_text_encoder_or_embedding():
-                modules.append(text_disk_cache)
-                sort_names = [x for x in sort_names if x not in text_split_names]
-
-        if len(sort_names) > 0:
-            variation_sorting = VariationSorting(names=sort_names, balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled')
-            modules.append(variation_sorting)
-
-        return modules
-
-    def _output_modules(self, config: TrainConfig, model: QwenModel):
+    def _output_modules(self, config: TrainConfig, model: QwenModel, model_setup: BaseQwenSetup):
         output_names = [
             'image_path', 'latent_image',
             'prompt',
@@ -165,16 +96,10 @@ class QwenBaseDataLoader(
         if not config.train_text_encoder_or_embedding():
             output_names.append('text_encoder_hidden_state')
 
-        def before_cache_image_fun():
-            model.to(self.temp_device)
-            model.vae_to(self.train_device)
-            model.eval()
-            torch_gc()
-
         return self._output_modules_from_out_names(
+            model, model_setup,
             output_names=output_names,
             config=config,
-            before_cache_image_fun=before_cache_image_fun,
             use_conditioning_image=False,
             vae=model.vae,
             autocast_context=[model.autocast_context],
@@ -202,59 +127,31 @@ class QwenBaseDataLoader(
         # SaveImage(image_in_name='mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1),
         # SaveImage(image_in_name='image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1),
 
-        modules = []
-
-        modules.append(decode_image)
+        modules = [decode_image]
 
         #FIXME https://github.com/Nerogar/OneTrainer/issues/1015
         #modules.append(save_image)
 
         if config.masked_training or config.model_type.has_mask_input():
-            modules.append(upscale_mask)
-            modules.append(save_mask)
+            modules += [upscale_mask, save_mask]
 
-        modules.append(decode_prompt)
-        modules.append(save_prompt)
+        modules += [decode_prompt, save_prompt]
 
         return modules
 
-    def create_dataset(
+    def _create_dataset(
             self,
             config: TrainConfig,
-            model: QwenModel,
+            model: BaseModel,
+            model_setup: BaseModelSetup,
             train_progress: TrainProgress,
             is_validation: bool = False,
     ):
-        enumerate_input = self._enumerate_input_modules(config, allow_videos=False) #don't allow video files, but...
-        load_input = self._load_input_modules(config, model.train_dtype, allow_video=True) #...Qwen has a video-capable VAE: convert images to video dimensions
-        mask_augmentation = self._mask_augmentation_modules(config)
-        aspect_bucketing_in = self._aspect_bucketing_in(config, 64)
-        crop_modules = self._crop_modules(config)
-        augmentation_modules = self._augmentation_modules(config)
-        inpainting_modules = self._inpainting_modules(config)
-        preparation_modules = self._preparation_modules(config, model)
-        cache_modules = self._cache_modules(config, model)
-        output_modules = self._output_modules(config, model)
-
-        debug_modules = self._debug_modules(config, model)
-
-        return self._create_mgds(
-            config,
-            [
-                enumerate_input,
-                load_input,
-                mask_augmentation,
-                aspect_bucketing_in,
-                crop_modules,
-                augmentation_modules,
-                inpainting_modules,
-                preparation_modules,
-                cache_modules,
-                output_modules,
-
-                debug_modules if config.debug_mode else None,
-                # inserted before output_modules, which contains a sorting operation
-            ],
-            train_progress,
-            is_validation
+        return DataLoaderText2ImageMixin._create_dataset(self,
+            config, model, model_setup, train_progress, is_validation,
+            aspect_bucketing_quantization=64,
+            allow_video_files=False, #don't allow video files, but...
+            vae_frame_dim=True,  #...Qwen has a video-capable VAE. convert images to video dimensions
         )
+
+factory.register(BaseDataLoader, QwenBaseDataLoader, ModelType.QWEN)

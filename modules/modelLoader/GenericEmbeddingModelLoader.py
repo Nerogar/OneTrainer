@@ -2,8 +2,10 @@ from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelLoader.mixin.InternalModelLoaderMixin import InternalModelLoaderMixin
 from modules.modelLoader.mixin.ModelSpecModelLoaderMixin import ModelSpecModelLoaderMixin
+from modules.util import factory
 from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 
@@ -47,4 +49,7 @@ def make_embedding_model_loader(
             embedding_loader.load(model, model_names.embedding.model_name, model_names)
 
             return model
+
+    for model_type in model_spec_map:
+        factory.register(BaseModelLoader, GenericEmbeddingModelLoader, model_type, TrainingMethod.EMBEDDING)
     return GenericEmbeddingModelLoader

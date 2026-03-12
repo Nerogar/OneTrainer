@@ -6,6 +6,7 @@
 FROM vastai/pytorch:cuda-12.8.1-auto
 
 WORKDIR /
+USER root
 RUN git clone https://github.com/Nerogar/OneTrainer
 RUN cd OneTrainer \
  && export OT_PLATFORM_REQUIREMENTS=requirements-cuda.txt \
@@ -21,10 +22,11 @@ RUN apt-get update --yes \
 	  gh \
 	  iputils-ping \
 	  nano \
+	  nethogs \
  && apt-get autoremove -y \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 RUN pip install nvitop \
  && pip cache purge \
  && rm -rf ~/.cache/pip
-RUN ln -snf /OneTrainer /workspace/OneTrainer
+RUN mkdir /workspace && ln -snf /OneTrainer /workspace/OneTrainer

@@ -1,11 +1,12 @@
 import json
+import pathlib
 
-from modules.dataLoader import StableDiffusionFineTuneDataLoader
+from modules.dataLoader import BaseDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util import create
-from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.TrainConfig import QuantizationConfig, TrainConfig
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
@@ -22,7 +23,7 @@ class GenerateLossesModel:
     temp_device: torch.device
     model_loader: BaseModelLoader
     model_setup: BaseModelSetup
-    data_loader: StableDiffusionFineTuneDataLoader
+    data_loader: BaseDataLoader
     model: BaseModel
 
     def __init__(self, config: TrainConfig, output_path: str):
@@ -38,6 +39,10 @@ class GenerateLossesModel:
         self.temp_device = torch.device(self.config.temp_device)
 
     def start(self):
+        output_dir = pathlib.Path(self.output_path).parent
+        if not output_dir.is_dir():
+            output_dir.mkdir(parents=True, exist_ok=True)
+
         if self.config.train_dtype.enable_tf():
             torch.backends.cuda.matmul.allow_tf32 = True
             torch.backends.cudnn.allow_tf32 = True
@@ -57,6 +62,7 @@ class GenerateLossesModel:
             model_type=self.config.model_type,
             model_names=model_names,
             weight_dtypes=self.config.weight_dtypes(),
+            quantization=QuantizationConfig.default_values(),
         )
         self.model.train_config = self.config
 
@@ -67,17 +73,22 @@ class GenerateLossesModel:
         torch_gc()
 
         self.data_loader = create.create_data_loader(
-            self.train_device,
-            self.temp_device,
-            self.model,
-            self.config.model_type,
-            self.config.training_method,
-            self.config,
-            self.model.train_progress,
+            train_device=self.train_device,
+            temp_device=self.temp_device,
+            model=self.model,
+            model_type=self.config.model_type,
+            model_setup=self.model_setup,
+            training_method=self.config.training_method,
+            config=self.config,
+            train_progress=self.model.train_progress,
+            is_validation=False
         )
 
-        self.data_loader.get_data_set().start_next_epoch()
-        step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step")
+        data_set = self.data_loader.get_data_set()
+        data_set.start_next_epoch()
+        approximate_num_steps = data_set.approximate_length()
+
+        step_tqdm = tqdm(self.data_loader.get_data_loader(), total=approximate_num_steps, desc="Calculating loss")
 
         self.model_setup.setup_train_device(self.model, self.config)
 

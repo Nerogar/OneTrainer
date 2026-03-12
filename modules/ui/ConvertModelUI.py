@@ -1,12 +1,13 @@
 import traceback
-from pathlib import Path
 from uuid import uuid4
 
 from modules.util import create
 from modules.util.args.ConvertModelArgs import ConvertModelArgs
+from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
+from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModelNames import EmbeddingName, ModelNames
 from modules.util.torch_util import torch_gc
@@ -65,9 +66,11 @@ class ConvertModelUI(ctk.CTkToplevel):
             ("PixArt Sigma", ModelType.PIXART_SIGMA),
             ("Flux Dev", ModelType.FLUX_DEV_1),
             ("Flux Fill Dev", ModelType.FLUX_FILL_DEV_1),
+            ("Flux 2", ModelType.FLUX_2),
             ("Hunyuan Video", ModelType.HUNYUAN_VIDEO),
             ("Chroma1", ModelType.CHROMA_1), #TODO does this just work? HiDream is not here
             ("QwenImage", ModelType.QWEN), #TODO does this just work? HiDream is not here
+            ("ZImage", ModelType.Z_IMAGE),
         ], self.ui_state, "model_type")
 
         # training method
@@ -82,9 +85,9 @@ class ConvertModelUI(ctk.CTkToplevel):
         # input name
         components.label(master, 2, 0, "Input name",
                          tooltip="Filename, directory or hugging face repository of the base model")
-        components.file_entry(
+        components.path_entry(
             master, 2, 1, self.ui_state, "input_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            mode="file", path_modifier=components.json_path_modifier
         )
 
         # output data type
@@ -107,7 +110,11 @@ class ConvertModelUI(ctk.CTkToplevel):
         # output model destination
         components.label(master, 5, 0, "Model Output Destination",
                          tooltip="Filename or directory where the output model is saved")
-        components.file_entry(master, 5, 1, self.ui_state, "output_model_destination", is_output=True)
+        components.path_entry(
+            master, 5, 1, self.ui_state, "output_model_destination",
+            mode="file",
+            io_type=PathIOType.MODEL,
+        )
 
         self.button = components.button(master, 6, 1, "Convert", self.convert_model)
 
@@ -131,17 +138,18 @@ class ConvertModelUI(ctk.CTkToplevel):
                         base_model=self.convert_model_args.input_name,
                     ),
                     weight_dtypes=self.convert_model_args.weight_dtypes(),
-                    #TODO quantization layer filter
+                    quantization=QuantizationConfig.default_values(),
                 )
             elif self.convert_model_args.training_method in [TrainingMethod.LORA, TrainingMethod.EMBEDDING]:
                 model = model_loader.load(
                     model_type=self.convert_model_args.model_type,
                     model_names=ModelNames(
+                        base_model=None,
                         lora=self.convert_model_args.input_name,
                         embedding=EmbeddingName(str(uuid4()), self.convert_model_args.input_name),
                     ),
                     weight_dtypes=self.convert_model_args.weight_dtypes(),
-                    #TODO quantization layer filter
+                    quantization=QuantizationConfig.default_values(),
                 )
             else:
                 raise Exception("could not load model: " + self.convert_model_args.input_name)

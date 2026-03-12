@@ -23,6 +23,7 @@ RUN apt-get update --yes \
 	  gh \
 	  iputils-ping \
 	  nano \
+	  nethogs \
  && apt-get autoremove -y \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*

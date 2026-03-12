@@ -1,6 +1,10 @@
 from modules.model.ChromaModel import ChromaModel
 from modules.modelSetup.BaseChromaSetup import BaseChromaSetup
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
@@ -69,9 +73,10 @@ class ChromaFineTuneSetup(
         self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
-        self.__setup_requires_grad(model, config)
 
-        init_model_parameters(model, self.create_parameters(model, config), self.train_device)
+        params = self.create_parameters(model, config)
+        self.__setup_requires_grad(model, config)
+        init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
             self,
@@ -111,3 +116,5 @@ class ChromaFineTuneSetup(
             if model.embedding_wrapper is not None:
                 model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
+
+factory.register(BaseModelSetup, ChromaFineTuneSetup, ModelType.CHROMA_1, TrainingMethod.FINE_TUNE)

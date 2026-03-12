@@ -560,6 +560,8 @@ class LayerOffloadConductor:
 
     __deferred_layers: list[int]
 
+    __config: TrainConfig
+
     def __init__(
             self,
             module: nn.Module,
@@ -609,6 +611,8 @@ class LayerOffloadConductor:
         self.__is_active = False
 
         self.__deferred_layers = []
+
+        self.__config = config
 
     def offload_activated(self) -> bool:
         return self.__offload_activations or self.__offload_layers
@@ -869,6 +873,11 @@ class LayerOffloadConductor:
                         #In Multi-GPU training, when the gradient reduction has been started during the fused back pass, but
                         #has not finished yet. The gradients are then set to None during the backward of one of the next layers.
                         #Record which layers were ready to be offloaded, and offload them later:
+                        if (not self.__config.multi_gpu or not self.__config.optimizer.fused_back_pass
+                            or not self.__config.fused_gradient_reduce or not self.__config.async_gradient_reduce):
+                            raise RuntimeError("Gradients are still active while attempting to offload a layer")
+
+                        #TODO deferring layer offloading appears to work for multi-GPU training, but there might be edge cases because offloading depends on the exact same order of layer execution. It's possible that when communication between GPU lags, more layers are deferred and this fails silently.
                         self.__deferred_layers.append(layer_index)
                         return
 

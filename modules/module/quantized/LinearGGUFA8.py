@@ -1,8 +1,8 @@
+from modules.util.mm_8bit import mm_8bit as mm_8bit
 from modules.util.quantization_util import (
     quantize_fp8_axiswise,
     quantize_int8_axiswise,
 )
-from modules.util.triton_mm_8bit import mm_8bit as triton_mm_8bit
 
 import torch
 from torch import Tensor
@@ -39,14 +39,14 @@ def fp8_forward_axiswise(x: Tensor, weight: Tensor, bias: Tensor | None, compute
 def int8_backward_axiswise(output: Tensor, weight: Tensor) -> Tensor:
     output_8, output_scale = quantize_int8_axiswise(output, dim=-1)
     w_8, w_scale = quantize_int8_axiswise(weight, dim=0)
-    mm_res = triton_mm_8bit(output_8.contiguous(), w_8)
+    mm_res = mm_8bit(output_8.contiguous(), w_8)
     return mm_res.float().mul_(w_scale).mul_(output_scale).to(output.dtype)
 
 @torch.no_grad()
 def fp8_backward_axiswise(output: Tensor, weight: Tensor) -> Tensor:
     output_8, output_scale = quantize_fp8_axiswise(output, dim=-1)
     w_8, w_scale = quantize_fp8_axiswise(weight, dim=0)
-    mm_res = triton_mm_8bit(output_8.contiguous(), w_8)
+    mm_res = mm_8bit(output_8.contiguous(), w_8)
     return mm_res.float().mul_(w_scale).mul_(output_scale).to(output.dtype)
 
 class LinearGGUFIntA8RequantFunction(torch.autograd.Function):
