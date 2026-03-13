@@ -672,19 +672,16 @@ def create_optimizer(
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
-                use_bias_correction=optimizer_config.use_bias_correction if optimizer_config.use_bias_correction is not None else True,
                 nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
-                cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
-                grams_moment=optimizer_config.grams_moment if optimizer_config.grams_moment is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
                 beta3_ema=optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999,
                 alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
-                k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
+                k_warmup_steps=(config.learning_rate_warmup_steps / config.gradient_accumulation_steps),
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
             )
 
@@ -702,8 +699,6 @@ def create_optimizer(
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
-                cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
-                grams_moment=optimizer_config.grams_moment if optimizer_config.grams_moment is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
                 beta3_ema=optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999,
@@ -711,7 +706,7 @@ def create_optimizer(
                 Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
                 alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
-                k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
+                k_warmup_steps=(config.learning_rate_warmup_steps / config.gradient_accumulation_steps),
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
             )
 
@@ -736,8 +731,6 @@ def create_optimizer(
                 prodigy_steps=optimizer_config.prodigy_steps if optimizer_config.prodigy_steps is not None else 0,
                 d_limiter=optimizer_config.d_limiter if optimizer_config.d_limiter is not None else False,
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
-                cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
-                grams_moment=optimizer_config.grams_moment if optimizer_config.grams_moment is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
                 beta3_ema=optimizer_config.beta3_ema if optimizer_config.beta3_ema is not None else 0.9999,
@@ -745,30 +738,7 @@ def create_optimizer(
                 Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
                 alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
-                k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
-                compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
-            )
-
-        # SIMPLIFIED_AdEMAMix Optimizer
-        case Optimizer.SIMPLIFIED_AdEMAMix:
-            from adv_optm import Simplified_AdEMAMix
-            optimizer = Simplified_AdEMAMix(
-                params=parameters,
-                lr=config.learning_rate,
-                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.99,
-                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
-                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
-                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
-                beta1_warmup=optimizer_config.beta1_warmup if optimizer_config.beta1_warmup is not None else None,
-                min_beta1=optimizer_config.min_beta1 if optimizer_config.min_beta1 is not None else 0.9,
-                use_bias_correction=optimizer_config.use_bias_correction if optimizer_config.use_bias_correction is not None else True,
-                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
-                cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
-                stochastic_rounding=optimizer_config.stochastic_rounding,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
-                kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
-                k_warmup_steps=optimizer_config.k_warmup_steps if optimizer_config.k_warmup_steps is not None else 0,
+                k_warmup_steps=(config.learning_rate_warmup_steps / config.gradient_accumulation_steps),
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
             )
 
@@ -804,34 +774,6 @@ def create_optimizer(
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
-                kappa_p=optimizer_config.kappa_p if optimizer_config.kappa_p is not None else 1.0,
-                auto_kappa_p=optimizer_config.auto_kappa_p if optimizer_config.auto_kappa_p is not None else False,
-                compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
-            )
-
-        # LION_PRODIGY_ADV Optimizer
-        case Optimizer.LION_PRODIGY_ADV:
-            from adv_optm import Lion_Prodigy_adv
-            optimizer = Lion_Prodigy_adv(
-                params=parameters,
-                lr=config.learning_rate,
-                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
-                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
-                beta3=optimizer_config.beta3 if optimizer_config.beta3 is not None else None,
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
-                clip_threshold=optimizer_config.clip_threshold if optimizer_config.clip_threshold is not None else 0.0,
-                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
-                cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
-                stochastic_rounding=optimizer_config.stochastic_rounding,
-                d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
-                d_coef=optimizer_config.d_coef if optimizer_config.d_coef is not None else 1.0,
-                growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
-                slice_p=optimizer_config.slice_p if optimizer_config.slice_p is not None else 1,
-                prodigy_steps=optimizer_config.prodigy_steps if optimizer_config.prodigy_steps is not None else 0,
-                d_limiter=optimizer_config.d_limiter if optimizer_config.d_limiter is not None else False,
-                cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
-                kappa_p=optimizer_config.kappa_p if optimizer_config.kappa_p is not None else 1.0,
                 auto_kappa_p=optimizer_config.auto_kappa_p if optimizer_config.auto_kappa_p is not None else False,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
             )
@@ -876,7 +818,6 @@ def create_optimizer(
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
                 normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
                 beta2_normuon=optimizer_config.beta2_normuon if optimizer_config.beta2_normuon is not None else 0.95,
-                normuon_eps=optimizer_config.normuon_eps if optimizer_config.normuon_eps is not None else 1e-8,
                 low_rank_ortho=optimizer_config.low_rank_ortho if optimizer_config.low_rank_ortho is not None else False,
                 ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
                 accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
