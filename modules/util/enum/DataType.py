@@ -17,6 +17,10 @@ class DataType(Enum):
     GGUF = 'GGUF'
     GGUF_A8_FLOAT = 'GGUF_A8_FLOAT'
     GGUF_A8_INT = 'GGUF_A8_INT'
+    FLOAT_16_A8_FLOAT = 'FLOAT_16_A8_FLOAT'
+    FLOAT_16_A8_INT = 'FLOAT_16_A8_INT'
+    BFLOAT_16_A8_FLOAT = 'BFLOAT_16_A8_FLOAT'
+    BFLOAT_16_A8_INT = 'BFLOAT_16_A8_INT'
 
     def __str__(self):
         return self.value
@@ -37,6 +41,14 @@ class DataType(Enum):
                 return torch.bfloat16
             case DataType.TFLOAT_32:
                 return torch.float32
+            case DataType.FLOAT_16_A8_FLOAT:
+                return torch.float16
+            case DataType.FLOAT_16_A8_INT:
+                return torch.float16
+            case DataType.BFLOAT_16_A8_FLOAT:
+                return torch.bfloat16
+            case DataType.BFLOAT_16_A8_INT:
+                return torch.bfloat16
             case _:
                 return None
 
@@ -56,7 +68,7 @@ class DataType(Enum):
                         DataType.GGUF_A8_INT]
 
     def quantize_fp8(self):
-        return self == DataType.FLOAT_8
+        return self == DataType.FLOAT_8 or self == DataType.FLOAT_8_SVD
 
     def quantize_int8(self):
         return self == DataType.INT_8
@@ -68,4 +80,10 @@ class DataType(Enum):
         return self == DataType.INT_W8A8
 
     def quantize_nf4(self):
-        return self == DataType.NFLOAT_4
+        return self == DataType.NFLOAT_4 or self == DataType.NFLOAT_4_SVD
+
+    def quantize_svd(self):
+        return self in [DataType.FLOAT_8_SVD,
+                        DataType.NFLOAT_4_SVD,
+                        DataType.FLOAT_W8A8_SVD,
+                        DataType.INT_W8A8_SVD]

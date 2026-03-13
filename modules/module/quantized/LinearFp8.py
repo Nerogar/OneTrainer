@@ -30,7 +30,7 @@ class LinearFp8(
         else:
             return self.weight.detach().to(dtype=dtype)
 
-    def quantize(self, device: torch.device | None = None):
+    def quantize(self, device: torch.device | None = None, **kwargs):
         if self.is_quantized:
             return
         self.is_quantized = True
