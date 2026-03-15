@@ -107,7 +107,7 @@ def convert_hunyuan_video_lora_key_sets() -> list[LoraConversionKeySet]:
 # Attribute names in OT's OMI format whose keys carry a split-index component
 # (e.g. .linear1.0., .img_attn_qkv.1.) — used to detect and merge DoRA scales
 # for QKV-split layers after the main lora_qkv_fusion step.
-_COMFYUI_QKV_SPLIT_ATTRS = ("linear1", "img_attn_qkv", "txt_attn_qkv", "self_attn_qkv")
+_COMFYUI_QKV_SPLIT_ATTRS = ("linear1", "img_attn_qkv", "txt_attn_qkv")
 
 _LORA_SUFFIXES = (".lora_down.weight", ".lora_up.weight", ".lora_A.weight", ".lora_B.weight", ".alpha", ".dora_scale")
 
@@ -169,7 +169,7 @@ def convert_hunyuan_video_lora_to_comfyui(
     main = {k: v for k, v in blocks.items() if not k.endswith(".dora_scale")}
 
     # Step 4: fuse split Q/K/V(/proj_mlp) adapters and rename paths via convert_util
-    result: dict[str, Tensor] = convert_util(main, _COMFYUI_BLOCK_PATTERNS, strict=True)
+    result: dict[str, Tensor] = convert_util(main, _COMFYUI_BLOCK_PATTERNS, strict=False)
 
     # Step 5: merge DoRA scales for QKV-split attrs; pass through others with path rename
     qkv_dora: dict[str, dict[int, Tensor]] = {}
