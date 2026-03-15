@@ -21,7 +21,6 @@ class Optimizer(Enum):
 
     AdEMAMix = 'AdEMAMix'
     AdEMAMix_8BIT = "AdEMAMix_8BIT"
-    SIMPLIFIED_AdEMAMix = "SIMPLIFIED_AdEMAMix"
 
     ADOPT = 'ADOPT'
     ADOPT_ADV = 'ADOPT_ADV'
@@ -59,7 +58,6 @@ class Optimizer(Enum):
     PRODIGY = 'PRODIGY'
     PRODIGY_PLUS_SCHEDULE_FREE = 'PRODIGY_PLUS_SCHEDULE_FREE'
     PRODIGY_ADV = 'PRODIGY_ADV'
-    LION_PRODIGY_ADV = 'LION_PRODIGY_ADV'
 
     # ADAFACTOR
     ADAFACTOR = 'ADAFACTOR'
@@ -90,7 +88,6 @@ class Optimizer(Enum):
             self.PRODIGY,
             self.PRODIGY_PLUS_SCHEDULE_FREE,
             self.PRODIGY_ADV,
-            self.LION_PRODIGY_ADV,
         ]
 
     @property
@@ -110,11 +107,9 @@ class Optimizer(Enum):
             Optimizer.ADAMW,
             Optimizer.ADAMW_ADV,
             Optimizer.ADOPT_ADV,
-            Optimizer.SIMPLIFIED_AdEMAMix,
             Optimizer.PRODIGY_PLUS_SCHEDULE_FREE,
             Optimizer.PRODIGY_ADV,
             Optimizer.LION_ADV,
-            Optimizer.LION_PRODIGY_ADV,
             Optimizer.MUON_ADV,
             Optimizer.ADAMUON_ADV,
             Optimizer.SIGNSGD_ADV,
