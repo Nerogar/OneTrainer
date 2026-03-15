@@ -216,8 +216,10 @@ def convert_hunyuan_video_lora_to_comfyui(
 
     result: dict[str, Tensor] = {}
 
-    # Step 3: combine QKV groups
+    # Step 3: combine QKV groups — only double_blocks and single_blocks (community convention)
     for base_key, components in qkv_groups.items():
+        if ".double_blocks." not in base_key and ".single_blocks." not in base_key:
+            continue
         combined = _combine_qkv(components)
         for suffix, tensor in combined.items():
             result[f"{base_key}.{suffix}"] = tensor
@@ -225,16 +227,11 @@ def convert_hunyuan_video_lora_to_comfyui(
     # Step 4: remap passthrough keys to ComfyUI naming
     for k, v in passthrough.items():
         if k.startswith("transformer."):
-            # Conditioning MLPEmbedders use in_layer/out_layer in ComfyUI (not mlp.0/mlp.2)
-            k = k.replace(".guidance_in.mlp.0.", ".guidance_in.in_layer.")
-            k = k.replace(".guidance_in.mlp.2.", ".guidance_in.out_layer.")
-            k = k.replace(".time_in.mlp.0.", ".time_in.in_layer.")
-            k = k.replace(".time_in.mlp.2.", ".time_in.out_layer.")
-            # txt_in embedders are MLPEmbedder instances — linear_1/2 (OT OMI) → in_layer/out_layer (ComfyUI)
-            k = k.replace(".txt_in.c_embedder.linear_1.", ".txt_in.c_embedder.in_layer.")
-            k = k.replace(".txt_in.c_embedder.linear_2.", ".txt_in.c_embedder.out_layer.")
-            k = k.replace(".txt_in.t_embedder.linear_1.", ".txt_in.t_embedder.in_layer.")
-            k = k.replace(".txt_in.t_embedder.linear_2.", ".txt_in.t_embedder.out_layer.")
+            # Only export double_blocks and single_blocks — conditioning/embedding layers
+            # (guidance_in, time_in, txt_in, vector_in, final_layer, etc.) are
+            # inference-setting-dependent and absent from all reference ComfyUI HYV LoRAs.
+            if ".double_blocks." not in k and ".single_blocks." not in k:
+                continue
             # TransformerBlock MLP sequential indices → ComfyUI fc1/fc2 naming
             k = k.replace(".mlp.0.", ".mlp.fc1.")
             k = k.replace(".mlp.2.", ".mlp.fc2.")
