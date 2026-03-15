@@ -1,6 +1,7 @@
 from modules.util.convert.lora.convert_clip import map_clip
 from modules.util.convert.lora.convert_llama import map_llama
 from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet, convert_to_omi, map_prefix_range
+from modules.util.convert_util import convert as convert_util, lora_qkv_fusion, lora_qkv_mlp_fusion
 
 import torch
 from torch import Tensor
@@ -103,8 +104,8 @@ def convert_hunyuan_video_lora_key_sets() -> list[LoraConversionKeySet]:
 
 
 # Attribute names in OT's OMI format whose keys carry a split-index component
-# (e.g. .linear1.0., .img_attn_qkv.1.) that must be combined before saving
-# in ComfyUI format, because ComfyUI applies LoRA to the combined weight.
+# (e.g. .linear1.0., .img_attn_qkv.1.) — used to detect and merge DoRA scales
+# for QKV-split layers after the main lora_qkv_fusion step.
 _COMFYUI_QKV_SPLIT_ATTRS = ("linear1", "img_attn_qkv", "txt_attn_qkv", "self_attn_qkv")
 
 _LORA_SUFFIXES = (".lora_down.weight", ".lora_up.weight", ".lora_A.weight", ".lora_B.weight", ".alpha", ".dora_scale")
@@ -120,58 +121,29 @@ def _remap_to_legacy(key: str, old_prefix: str, new_prefix: str) -> str | None:
     return None
 
 
-def _combine_qkv(components: dict[int, dict[str, Tensor]]) -> dict[str, Tensor]:
-    """Combine split Q/K/V/proj_mlp LoRA adapters into one block-diagonal LoRA.
-
-    OT trains separate adapters for each slice of a combined weight (Q, K, V,
-    and optionally proj_mlp for single blocks). ComfyUI applies one LoRA to the
-    combined weight. This function produces an exact lossless equivalent by:
-      - block-diagonal lora_up  (shape [sum(out_i), sum(r_i)])
-      - concatenated scaled lora_down (shape [sum(r_i), in])
-      - alpha = sum(r_i)  so  alpha/rank = 1.0 (scaling baked into down)
-    """
-    sorted_indices = sorted(components.keys())
-
-    downs: list[tuple[Tensor, float]] = []
-    ups: list[Tensor] = []
-    dora_scales: list[Tensor] = []
-
-    for i in sorted_indices:
-        comp = components[i]
-        down = comp["lora_down.weight"]
-        up = comp["lora_up.weight"]
-        rank = down.shape[0]
-        alpha_val = comp["alpha"].item() if "alpha" in comp else float(rank)
-        downs.append((down, alpha_val / rank))
-        ups.append(up)
-        if "dora_scale" in comp:
-            dora_scales.append(comp["dora_scale"])
-
-    total_rank = sum(d.shape[0] for d, _ in downs)
-
-    # Vertically concatenate scaled lora_down blocks
-    combined_down = torch.cat([d * s for d, s in downs], dim=0)
-
-    # Block-diagonal lora_up
-    out_dim = sum(u.shape[0] for u in ups)
-    combined_up = torch.zeros(out_dim, total_rank, dtype=ups[0].dtype, device=ups[0].device)
-    row, col = 0, 0
-    for up, (down, _) in zip(ups, downs, strict=True):
-        r = down.shape[0]
-        combined_up[row:row + up.shape[0], col:col + r] = up
-        row += up.shape[0]
-        col += r
-
-    # Use lora_A/lora_B naming (ComfyUI diffusers-pipe convention) with no alpha —
-    # scaling is already baked into lora_A so ComfyUI applies the delta at scale 1.0.
-    result: dict[str, Tensor] = {
-        "lora_A.weight": combined_down,
-        "lora_B.weight": combined_up,
-    }
-    if dora_scales:
-        result["dora_scale"] = torch.cat(dora_scales, dim=0)
-
-    return result
+# Conversion patterns: OT OMI → ComfyUI native HunyuanVideo paths.
+# lora_qkv_fusion fuses split Q/K/V adapters (requires equal alpha per group,
+# which holds for OT since rank/alpha are set per-layer, not per-component).
+# lora_qkv_mlp_fusion additionally fuses proj_mlp for single blocks.
+_COMFYUI_BLOCK_PATTERNS = [
+    ("transformer.double_blocks.{i}", "transformer.double_blocks.{i}",
+     lora_qkv_fusion("img_attn_qkv.0", "img_attn_qkv.1", "img_attn_qkv.2", "img_attn_qkv") +
+     lora_qkv_fusion("txt_attn_qkv.0", "txt_attn_qkv.1", "txt_attn_qkv.2", "txt_attn_qkv") + [
+         ("img_attn_proj",  "img_attn_proj"),
+         ("img_mlp.fc0",    "img_mlp.fc1"),
+         ("img_mlp.fc2",    "img_mlp.fc2"),
+         ("img_mod.linear", "img_mod.linear"),
+         ("txt_attn_proj",  "txt_attn_proj"),
+         ("txt_mlp.fc0",    "txt_mlp.fc1"),
+         ("txt_mlp.fc2",    "txt_mlp.fc2"),
+         ("txt_mod.linear", "txt_mod.linear"),
+     ]),
+    ("transformer.single_blocks.{i}", "transformer.single_blocks.{i}",
+     lora_qkv_mlp_fusion("linear1.0", "linear1.1", "linear1.2", "linear1.3", "linear1") + [
+         ("linear2",           "linear2"),
+         ("modulation.linear", "modulation.linear"),
+     ]),
+]
 
 
 def convert_hunyuan_video_lora_to_comfyui(
@@ -179,23 +151,28 @@ def convert_hunyuan_video_lora_to_comfyui(
 ) -> dict[str, Tensor]:
     """Convert an OT HunyuanVideo LoRA state dict to ComfyUI-compatible format.
 
-    ComfyUI uses native HunyuanVideo weight names (OMI paths) for the transformer
-    and legacy underscore format for CLIP-L. Split Q/K/V adapters are merged into
-    a single block-diagonal adapter matching ComfyUI's combined weight layout.
+    Only double_blocks and single_blocks are exported (community convention;
+    conditioning/embedding layers are inference-setting-dependent and absent
+    from all reference ComfyUI HYV LoRAs). Split Q/K/V adapters are fused
+    into a single block-diagonal adapter via convert_util.lora_qkv_fusion.
     """
     # Step 1: normalize to OMI (native HunyuanVideo attribute paths)
     omi = convert_to_omi(state_dict, convert_hunyuan_video_lora_key_sets())
 
-    # Step 2: separate split QKV keys (need combining) from everything else
-    # qkv_groups[base_key][component_idx][lora_suffix] = tensor
-    qkv_groups: dict[str, dict[int, dict[str, Tensor]]] = {}
-    passthrough: dict[str, Tensor] = {}
+    # Step 2: filter to double_blocks and single_blocks only
+    blocks = {k: v for k, v in omi.items()
+              if ".double_blocks." in k or ".single_blocks." in k}
 
-    for k, v in omi.items():
-        if not k.startswith("transformer."):
-            passthrough[k] = v
-            continue
+    # Step 3: separate DoRA scales — lora_qkv_fusion only handles lora_up/lora_down/alpha
+    dora_scales = {k: v for k, v in blocks.items() if k.endswith(".dora_scale")}
+    main = {k: v for k, v in blocks.items() if not k.endswith(".dora_scale")}
 
+    # Step 4: fuse split Q/K/V(/proj_mlp) adapters and rename paths via convert_util
+    result: dict[str, Tensor] = convert_util(main, _COMFYUI_BLOCK_PATTERNS, strict=True)
+
+    # Step 5: merge DoRA scales for QKV-split attrs; pass through others with path rename
+    qkv_dora: dict[str, dict[int, Tensor]] = {}
+    for k, v in dora_scales.items():
         matched = False
         for attr in _COMFYUI_QKV_SPLIT_ATTRS:
             pattern = f".{attr}."
@@ -204,51 +181,30 @@ def convert_hunyuan_video_lora_to_comfyui(
             p = k.index(pattern)
             idx_start = p + len(pattern)
             dot_pos = k.index(".", idx_start)
-            base_key = k[:p + len(pattern) - 1]  # up to and including attr name
+            base_key = k[:p + len(pattern) - 1]
             component_idx = int(k[idx_start:dot_pos])
-            suffix = k[dot_pos + 1:]
-            qkv_groups.setdefault(base_key, {}).setdefault(component_idx, {})[suffix] = v
+            qkv_dora.setdefault(base_key, {})[component_idx] = v
             matched = True
             break
-
         if not matched:
-            passthrough[k] = v
-
-    result: dict[str, Tensor] = {}
-
-    # Step 3: combine QKV groups — only double_blocks and single_blocks (community convention)
-    for base_key, components in qkv_groups.items():
-        if ".double_blocks." not in base_key and ".single_blocks." not in base_key:
-            continue
-        combined = _combine_qkv(components)
-        for suffix, tensor in combined.items():
-            result[f"{base_key}.{suffix}"] = tensor
-
-    # Step 4: remap passthrough keys to ComfyUI naming
-    for k, v in passthrough.items():
-        if k.startswith("transformer."):
-            # Only export double_blocks and single_blocks — conditioning/embedding layers
-            # (guidance_in, time_in, txt_in, vector_in, final_layer, etc.) are
-            # inference-setting-dependent and absent from all reference ComfyUI HYV LoRAs.
-            if ".double_blocks." not in k and ".single_blocks." not in k:
-                continue
-            # TransformerBlock MLP sequential indices → ComfyUI fc1/fc2 naming
-            k = k.replace(".mlp.0.", ".mlp.fc1.")
-            k = k.replace(".mlp.2.", ".mlp.fc2.")
-            # OT OMI uses fc0 for first MLP linear; ComfyUI key_map uses fc1
-            k = k.replace(".fc0.", ".fc1.")
+            k = k.replace(".img_mlp.fc0.", ".img_mlp.fc1.")
+            k = k.replace(".txt_mlp.fc0.", ".txt_mlp.fc1.")
             result[k] = v
-        elif k.startswith("clip_l."):
-            # ComfyUI expects legacy underscore format under lora_te1_ prefix
+
+    for base_key, components in qkv_dora.items():
+        result[f"{base_key}.dora_scale"] = torch.cat(
+            [components[i] for i in sorted(components.keys())], dim=0,
+        )
+
+    # Step 6: text encoders — legacy underscore format (convert_util doesn't handle dot→underscore)
+    for k, v in omi.items():
+        if k.startswith("clip_l."):
             new_k = _remap_to_legacy(k, "clip_l.", "lora_te1")
             if new_k:
                 result[new_k] = v
         elif k.startswith("llama."):
-            # No explicit ComfyUI support; use lora_llama_ to avoid collision
             new_k = _remap_to_legacy(k, "llama.", "lora_llama")
             if new_k:
                 result[new_k] = v
-        else:
-            result[k] = v  # bundle_emb and anything else — pass through
 
     return result
