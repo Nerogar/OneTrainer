@@ -1,7 +1,8 @@
 from modules.util.convert.lora.convert_clip import map_clip
 from modules.util.convert.lora.convert_llama import map_llama
 from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet, convert_to_omi, map_prefix_range
-from modules.util.convert_util import convert as convert_util, lora_qkv_fusion, lora_qkv_mlp_fusion
+from modules.util.convert_util import convert as convert_util
+from modules.util.convert_util import lora_qkv_fusion, lora_qkv_mlp_fusion
 
 import torch
 from torch import Tensor
