@@ -726,7 +726,7 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_status("Training ...")
 
                 with (
-                    TorchMemoryRecorder(enabled=False, filename=f"memory-step{train_progress.global_step}.json"),
+                    TorchMemoryRecorder(enabled=False, filename=f"memory-step{train_progress.global_step}.pickle"),
                     TorchProfiler      (enabled=False, filename=f"profile-step{train_progress.global_step}.json"),
                 ):
                     step_seed = train_progress.global_step
