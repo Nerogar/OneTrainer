@@ -80,9 +80,13 @@ class LoRASaverMixin(
         state_dict = self._get_state_dict(model)
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
 
-        key_sets = self._get_comfyui_convert_key_sets(model)
-        if key_sets is not None:
-            save_state_dict = convert_to_diffusers(save_state_dict, key_sets)
+        standard_key_sets = self._get_convert_key_sets(model)
+        comfyui_key_sets = self._get_comfyui_convert_key_sets(model)
+        if standard_key_sets is not None and comfyui_key_sets is not None:
+            save_state_dict = convert_to_omi(save_state_dict, standard_key_sets)
+            save_state_dict = convert_to_diffusers(save_state_dict, comfyui_key_sets)
+        elif comfyui_key_sets is not None:
+            save_state_dict = convert_to_diffusers(save_state_dict, comfyui_key_sets)
 
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
