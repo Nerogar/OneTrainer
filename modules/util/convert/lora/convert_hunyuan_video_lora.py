@@ -225,7 +225,17 @@ def convert_hunyuan_video_lora_to_comfyui(
     # Step 4: remap passthrough keys to ComfyUI naming
     for k, v in passthrough.items():
         if k.startswith("transformer."):
-            # ComfyUI normalizes mlp.0/2 sequential indices to fc1/fc2 in its key_map
+            # Conditioning MLPEmbedders use in_layer/out_layer in ComfyUI (not mlp.0/mlp.2)
+            k = k.replace(".guidance_in.mlp.0.", ".guidance_in.in_layer.")
+            k = k.replace(".guidance_in.mlp.2.", ".guidance_in.out_layer.")
+            k = k.replace(".time_in.mlp.0.", ".time_in.in_layer.")
+            k = k.replace(".time_in.mlp.2.", ".time_in.out_layer.")
+            # txt_in embedders are MLPEmbedder instances — linear_1/2 (OT OMI) → in_layer/out_layer (ComfyUI)
+            k = k.replace(".txt_in.c_embedder.linear_1.", ".txt_in.c_embedder.in_layer.")
+            k = k.replace(".txt_in.c_embedder.linear_2.", ".txt_in.c_embedder.out_layer.")
+            k = k.replace(".txt_in.t_embedder.linear_1.", ".txt_in.t_embedder.in_layer.")
+            k = k.replace(".txt_in.t_embedder.linear_2.", ".txt_in.t_embedder.out_layer.")
+            # TransformerBlock MLP sequential indices → ComfyUI fc1/fc2 naming
             k = k.replace(".mlp.0.", ".mlp.fc1.")
             k = k.replace(".mlp.2.", ".mlp.fc2.")
             # OT OMI uses fc0 for first MLP linear; ComfyUI key_map uses fc1
