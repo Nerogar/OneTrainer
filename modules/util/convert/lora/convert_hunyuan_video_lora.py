@@ -97,3 +97,14 @@ def convert_hunyuan_video_lora_key_sets() -> list[LoraConversionKeySet]:
     keys += map_clip(LoraConversionKeySet("clip_l", "lora_te2"))
 
     return keys
+
+
+def convert_hunyuan_video_lora_comfyui_key_sets() -> list[LoraConversionKeySet]:
+    keys = []
+
+    keys += [LoraConversionKeySet("bundle_emb", "bundle_emb")]
+    keys += __map_transformer(LoraConversionKeySet("transformer", "transformer"))
+    keys += map_llama(LoraConversionKeySet("llama", "lora_llama"))
+    keys += map_clip(LoraConversionKeySet("clip_l", "lora_te1"))
+
+    return keys
