@@ -33,6 +33,7 @@ from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer.adafactor_extensions import patch_adafactor
 from modules.util.optimizer.adam_extensions import patch_adam
 from modules.util.optimizer.adamw_extensions import patch_adamw
+from modules.util.optimizer.depth_calculator import inject_depth_into_param_groups
 from modules.util.optimizer.muon_util import calculate_muon_n_layers, split_parameters_for_muon
 from modules.util.TrainProgress import TrainProgress
 from modules.zluda import ZLUDA
@@ -139,6 +140,10 @@ def create_optimizer(
             raise RuntimeError('layer offloading can only be used for fine tuning when using an optimizer that supports "fused_back_pass"')
 
     parameters = parameter_group_collection.parameters_for_optimizer(config)
+
+    if optimizer_config.scaled_optm or optimizer_config.spectral_normalization:
+        # _adv optimizers O(1) depth scaling.
+        inject_depth_into_param_groups(model, parameters)
 
     match config.optimizer.optimizer:
 
