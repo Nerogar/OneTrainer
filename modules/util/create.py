@@ -34,7 +34,7 @@ from modules.util.optimizer.adafactor_extensions import patch_adafactor
 from modules.util.optimizer.adam_extensions import patch_adam
 from modules.util.optimizer.adamw_extensions import patch_adamw
 from modules.util.optimizer.depth_calculator import inject_depth_into_param_groups
-from modules.util.optimizer.muon_util import calculate_muon_n_layers, split_parameters_for_muon
+from modules.util.optimizer.muon_util import split_parameters_for_muon
 from modules.util.TrainProgress import TrainProgress
 from modules.zluda import ZLUDA
 
@@ -875,16 +875,6 @@ def create_optimizer(
 
             params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(model, parameters, config)
 
-            if optimizer_config.spectral_normalization:
-                # Calculate n_layers for spectral normalization
-                n_layers_map = calculate_muon_n_layers(model)
-
-                for group in params_for_optimizer:
-                    group_name = group.get('name')
-                    if group_name in n_layers_map:
-                        group['n_layers'] = n_layers_map[group_name]
-                    else:
-                        group['n_layers'] = n_layers_map.get('default', 1)
 
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}
@@ -939,16 +929,6 @@ def create_optimizer(
 
             params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(model, parameters, config)
 
-            if optimizer_config.spectral_normalization:
-                # Calculate n_layers for spectral normalization
-                n_layers_map = calculate_muon_n_layers(model)
-
-                for group in params_for_optimizer:
-                    group_name = group.get('name')
-                    if group_name in n_layers_map:
-                        group['n_layers'] = n_layers_map[group_name]
-                    else:
-                        group['n_layers'] = n_layers_map.get('default', 1)
 
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}
