@@ -48,7 +48,7 @@ def encode_clip(
     return text_encoder_output, pooled_text_encoder_output
 
 
-def get_num_clip_chunks(tokens: Tensor, chunk_size: int, split_on_comma: bool = False, tokenizer: Any | None = None) -> int:
+def get_num_clip_chunks(tokens: Tensor, chunk_size: int, split_on_comma: bool = False, tokenizer: Any | None = None, max_chunks: int | None = None) -> int:
     content_tokens = tokens[0, 1:-1]
     if tokenizer is not None:
         pad_token_id = tokenizer.pad_token_id
@@ -58,7 +58,8 @@ def get_num_clip_chunks(tokens: Tensor, chunk_size: int, split_on_comma: bool = 
                 content_tokens = content_tokens[:indices[0].item()]
 
     if not split_on_comma or tokenizer is None:
-        return (len(content_tokens) + chunk_size - 1) // chunk_size if len(content_tokens) > 0 else 1
+        num_chunks = (len(content_tokens) + chunk_size - 1) // chunk_size if len(content_tokens) > 0 else 1
+        return min(num_chunks, max_chunks) if max_chunks is not None else num_chunks
 
     comma_id = tokenizer.convert_tokens_to_ids(",")
     if isinstance(comma_id, list):
@@ -80,7 +81,9 @@ def get_num_clip_chunks(tokens: Tensor, chunk_size: int, split_on_comma: bool = 
             if found_comma != -1:
                 end = found_comma + 1
         start = end
-    return max(num_chunks, 1)
+
+    num_chunks = max(num_chunks, 1)
+    return min(num_chunks, max_chunks) if max_chunks is not None else num_chunks
 
 
 def encode_clip_chunked(
@@ -99,6 +102,7 @@ def encode_clip_chunked(
         min_chunks: int = 1,
         pooled_output_handling: PooledOutputHandling = PooledOutputHandling.FIRST,
         split_on_comma: bool = False,
+        max_chunks: int | None = None,
 ) -> tuple[Tensor, Tensor]:
     if (add_output and text_encoder_output is None) \
             or (add_pooled_output and pooled_text_encoder_output is None) \
@@ -161,11 +165,16 @@ def encode_clip_chunked(
             all_element_mask_chunks = []
             for b in range(batch_size):
                 t_splits, m_splits = get_splits(content_tokens[b], content_mask[b] if content_mask is not None else None, chunk_size, comma_token_id)
+                if max_chunks is not None:
+                    t_splits = t_splits[:max_chunks]
+                    m_splits = m_splits[:max_chunks]
                 all_element_chunks.append(t_splits)
                 all_element_mask_chunks.append(m_splits)
 
             num_chunks = max(len(chunks) for chunks in all_element_chunks)
             num_chunks = max(num_chunks, min_chunks)
+            if max_chunks is not None:
+                num_chunks = min(num_chunks, max_chunks)
 
             # pad chunk lists with empty chunks
             for b in range(batch_size):

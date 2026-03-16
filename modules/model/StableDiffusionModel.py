@@ -216,6 +216,7 @@ class StableDiffusionModel(BaseModel):
         text_encoder_kwargs = {}
         if use_chunking:
             text_encoder_kwargs['min_chunks'] = min_chunks
+            text_encoder_kwargs['max_chunks'] = max_chunks
             text_encoder_kwargs['pooled_output_handling'] = self.train_config.clip_chunk_pooled_output_handling
             text_encoder_kwargs['split_on_comma'] = self.train_config.clip_chunk_split_on_comma
             text_encoder_kwargs['tokenizer'] = self.tokenizer

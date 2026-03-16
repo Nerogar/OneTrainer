@@ -91,8 +91,8 @@ class StableDiffusionSampler(BaseModelSampler):
                 ).input_ids
                 chunk_size = tokenizer.model_max_length - 2
                 split_on_comma = self.model.train_config.clip_chunk_split_on_comma if self.model.train_config else False
-                min_chunks_pos = get_num_clip_chunks(prompt_tokens, chunk_size, split_on_comma, tokenizer)
-                min_chunks_neg = get_num_clip_chunks(negative_prompt_tokens, chunk_size, split_on_comma, tokenizer)
+                min_chunks_pos = get_num_clip_chunks(prompt_tokens, chunk_size, split_on_comma, tokenizer, max_chunks=max_chunks)
+                min_chunks_neg = get_num_clip_chunks(negative_prompt_tokens, chunk_size, split_on_comma, tokenizer, max_chunks=max_chunks)
                 min_chunks = max(min_chunks_pos, min_chunks_neg)
 
             prompt_embedding = self.model.encode_text(
@@ -326,8 +326,8 @@ class StableDiffusionSampler(BaseModelSampler):
                 ).input_ids
                 chunk_size = tokenizer.model_max_length - 2
                 split_on_comma = self.model.train_config.clip_chunk_split_on_comma if self.model.train_config else False
-                min_chunks_pos = get_num_clip_chunks(prompt_tokens, chunk_size, split_on_comma, tokenizer)
-                min_chunks_neg = get_num_clip_chunks(negative_prompt_tokens, chunk_size, split_on_comma, tokenizer)
+                min_chunks_pos = get_num_clip_chunks(prompt_tokens, chunk_size, split_on_comma, tokenizer, max_chunks=max_chunks)
+                min_chunks_neg = get_num_clip_chunks(negative_prompt_tokens, chunk_size, split_on_comma, tokenizer, max_chunks=max_chunks)
                 min_chunks = max(min_chunks_pos, min_chunks_neg)
 
             prompt_embedding = self.model.encode_text(

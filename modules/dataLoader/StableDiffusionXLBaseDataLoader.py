@@ -44,11 +44,11 @@ class StableDiffusionXLBaseDataLoader(
         encode_prompt_1 = EncodeClipText(in_name='tokens_1', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_1_hidden_state', pooled_out_name=None, add_layer_norm=False,
                                          text_encoder=model.text_encoder_1, hidden_state_output_index=-(2 + config.text_encoder_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(),
                                          chunk_if_needed=config.use_clip_token_chunks, chunk_size=config.clip_chunk_size, pooled_output_handling=config.clip_chunk_pooled_output_handling,
-                                         tokenizer=model.tokenizer_1, split_on_comma=config.clip_chunk_split_on_comma)
+                                         tokenizer=model.tokenizer_1, split_on_comma=config.clip_chunk_split_on_comma, max_chunks=config.clip_max_chunks)
         encode_prompt_2 = EncodeClipText(in_name='tokens_2', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_2_hidden_state', pooled_out_name='text_encoder_2_pooled_state', add_layer_norm=False,
                                          text_encoder=model.text_encoder_2, hidden_state_output_index=-(2 + config.text_encoder_2_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(),
                                          chunk_if_needed=config.use_clip_token_chunks, chunk_size=config.clip_chunk_size, pooled_output_handling=config.clip_chunk_pooled_output_handling,
-                                         tokenizer=model.tokenizer_2, split_on_comma=config.clip_chunk_split_on_comma)
+                                         tokenizer=model.tokenizer_2, split_on_comma=config.clip_chunk_split_on_comma, max_chunks=config.clip_max_chunks)
 
         modules = [rescale_image, encode_image, image_sample]
 

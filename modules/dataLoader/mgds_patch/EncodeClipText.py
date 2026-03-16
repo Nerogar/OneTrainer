@@ -29,6 +29,7 @@ class EncodeClipText(
             pooled_output_handling: str = 'FIRST',
             tokenizer: Any | None = None,
             split_on_comma: bool = False,
+            max_chunks: int | None = None,
     ):
         super().__init__()
         self.in_name = in_name
@@ -47,6 +48,7 @@ class EncodeClipText(
         self.pooled_output_handling = pooled_output_handling
         self.tokenizer = tokenizer
         self.split_on_comma = split_on_comma
+        self.max_chunks = max_chunks
 
     def length(self) -> int:
         return self._get_previous_length(self.in_name)
@@ -158,6 +160,10 @@ class EncodeClipText(
                 comma_id = comma_id[0]
 
         input_id_chunks, attention_mask_chunks = get_splits(tokens, tokens_attention_mask, chunk_size, comma_id)
+
+        if self.max_chunks is not None:
+            input_id_chunks = input_id_chunks[:self.max_chunks]
+            attention_mask_chunks = attention_mask_chunks[:self.max_chunks]
 
         # pad each chunk with EOS
         new_input_id_chunks = []

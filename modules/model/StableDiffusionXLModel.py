@@ -247,13 +247,15 @@ class StableDiffusionXLModel(BaseModel):
             chunk_size_2 = self.text_encoder_2.config.max_position_embeddings - 2
 
             split_on_comma = self.train_config.clip_chunk_split_on_comma if self.train_config else False
-            min_chunks_1 = get_num_clip_chunks(tokens_1, chunk_size_1, split_on_comma, self.tokenizer_1)
-            min_chunks_2 = get_num_clip_chunks(tokens_2, chunk_size_2, split_on_comma, self.tokenizer_2)
+            min_chunks_1 = get_num_clip_chunks(tokens_1, chunk_size_1, split_on_comma, self.tokenizer_1, max_chunks=max_chunks)
+            min_chunks_2 = get_num_clip_chunks(tokens_2, chunk_size_2, split_on_comma, self.tokenizer_2, max_chunks=max_chunks)
 
             min_chunks = max(min_chunks, min_chunks_1, min_chunks_2)
 
             text_encoder_1_kwargs['min_chunks'] = min_chunks
+            text_encoder_1_kwargs['max_chunks'] = max_chunks
             text_encoder_2_kwargs['min_chunks'] = min_chunks
+            text_encoder_2_kwargs['max_chunks'] = max_chunks
             text_encoder_1_kwargs['pooled_output_handling'] = self.train_config.clip_chunk_pooled_output_handling
             text_encoder_2_kwargs['pooled_output_handling'] = self.train_config.clip_chunk_pooled_output_handling
             text_encoder_1_kwargs['split_on_comma'] = self.train_config.clip_chunk_split_on_comma

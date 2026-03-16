@@ -83,12 +83,13 @@ class StableDiffusionXLSampler(BaseModelSampler):
         chunk_size_2 = max_pos_2 - 2
 
         split_on_comma = self.model.train_config.clip_chunk_split_on_comma if self.model.train_config else False
+        max_chunks = self.model.train_config.clip_max_chunks if self.model.train_config else 1
 
-        min_chunks_1 = get_num_clip_chunks(prompt_1_tokens, chunk_size_1, split_on_comma, self.model.tokenizer_1)
-        min_chunks_1_neg = get_num_clip_chunks(negative_prompt_1_tokens, chunk_size_1, split_on_comma, self.model.tokenizer_1)
+        min_chunks_1 = get_num_clip_chunks(prompt_1_tokens, chunk_size_1, split_on_comma, self.model.tokenizer_1, max_chunks=max_chunks)
+        min_chunks_1_neg = get_num_clip_chunks(negative_prompt_1_tokens, chunk_size_1, split_on_comma, self.model.tokenizer_1, max_chunks=max_chunks)
 
-        min_chunks_2 = get_num_clip_chunks(prompt_2_tokens, chunk_size_2, split_on_comma, self.model.tokenizer_2)
-        min_chunks_2_neg = get_num_clip_chunks(negative_prompt_2_tokens, chunk_size_2, split_on_comma, self.model.tokenizer_2)
+        min_chunks_2 = get_num_clip_chunks(prompt_2_tokens, chunk_size_2, split_on_comma, self.model.tokenizer_2, max_chunks=max_chunks)
+        min_chunks_2_neg = get_num_clip_chunks(negative_prompt_2_tokens, chunk_size_2, split_on_comma, self.model.tokenizer_2, max_chunks=max_chunks)
 
         return max(min_chunks_1, min_chunks_1_neg, min_chunks_2, min_chunks_2_neg)
 
