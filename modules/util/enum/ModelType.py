@@ -154,7 +154,11 @@ class ModelType(Enum):
             or self.is_qwen() \
             or self.is_sana() \
             or self.is_hunyuan_video() \
-            or self.is_hi_dream()
+            or self.is_hi_dream() \
+            or self.is_z_image()
+
+    def is_video_model(self) -> bool:
+        return self.is_hunyuan_video() #incase we add more video models in the future
 
 
 class PeftType(Enum):

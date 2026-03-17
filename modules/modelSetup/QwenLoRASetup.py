@@ -88,9 +88,9 @@ class QwenLoRASetup(
         model.transformer_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
         model.transformer_lora.hook_to_module()
 
+        params = self.create_parameters(model, config)
         self.__setup_requires_grad(model, config)
-
-        init_model_parameters(model, self.create_parameters(model, config), self.train_device)
+        init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
             self,

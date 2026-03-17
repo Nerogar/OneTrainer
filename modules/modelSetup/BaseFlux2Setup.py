@@ -36,7 +36,7 @@ class BaseFlux2Setup(
     metaclass=ABCMeta
 ):
     LAYER_PRESETS = {
-        "blocks": ["transformer_block"],
+        "blocks": ["transformer_blocks"],
         "full": [],
     }
 

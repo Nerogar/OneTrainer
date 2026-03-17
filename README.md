@@ -34,7 +34,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 ## Installation
 
 > [!IMPORTANT]
-> Installing OneTrainer requires Python >=3.10 and <3.13.
+> Installing OneTrainer requires Python >=3.10 and <3.14.
 > You can download Python at https://www.python.org/downloads/windows/.
 > Then follow the below steps.
 

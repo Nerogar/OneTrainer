@@ -118,10 +118,7 @@ class TrainOptimizerConfig(BaseConfig):
     beta1_warmup: int
     min_beta1: float
     Simplified_AdEMAMix: False
-    cautious_mask: False
-    grams_moment: False
     kourkoutas_beta: False
-    k_warmup_steps: int
     schedulefree_c: float
     ns_steps: int
     MuonWithAuxAdam: False
@@ -134,13 +131,11 @@ class TrainOptimizerConfig(BaseConfig):
     rms_rescaling: True
     normuon_variant: False
     beta2_normuon: float
-    normuon_eps: float
     low_rank_ortho: False
     ortho_rank: int
     accelerated_ns: False
     cautious_wd: False
     approx_mars: False
-    kappa_p: float
     auto_kappa_p: False
     compile: False
 
@@ -236,10 +231,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("beta1_warmup", None, int, True))
         data.append(("min_beta1", None, float, True))
         data.append(("Simplified_AdEMAMix", False, bool, False))
-        data.append(("cautious_mask", False, bool, False))
-        data.append(("grams_moment", False, bool, False))
         data.append(("kourkoutas_beta", False, bool, False))
-        data.append(("k_warmup_steps", None, int, True))
         data.append(("schedulefree_c", None, float, True))
         data.append(("ns_steps", None, int, True))
         data.append(("MuonWithAuxAdam", False, bool, False))
@@ -248,17 +240,15 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("muon_adam_lr", None, float, True))
         data.append(("muon_te1_adam_lr", None, float, True))
         data.append(("muon_te2_adam_lr", None, float, True))
-        data.append(("muon_adam_config", None, dict, True))
+        data.append(("muon_adam_config", {}, dict, True))
         data.append(("rms_rescaling", True, bool, True))
         data.append(("normuon_variant", False, bool, False))
         data.append(("beta2_normuon", None, float, True))
-        data.append(("normuon_eps", None, float, True))
         data.append(("low_rank_ortho", False, bool, False))
         data.append(("ortho_rank", None, int, True))
         data.append(("accelerated_ns", False, bool, False))
         data.append(("cautious_wd", False, bool, False))
         data.append(("approx_mars", False, bool, False))
-        data.append(("kappa_p", None, float, True))
         data.append(("auto_kappa_p", False, bool, False))
         data.append(("compile", False, bool, False))
 
@@ -368,6 +358,7 @@ class TrainConfig(BaseConfig):
     validate_after: float
     validate_after_unit: TimeUnit
     continue_last_backup: bool
+    prevent_overwrites: bool
     include_train_config: ConfigPart
 
     # multi-GPU
@@ -925,7 +916,7 @@ class TrainConfig(BaseConfig):
             with open(config.sample_definition_file_name, 'r') as f:
                 samples = json.load(f)
                 for i in range(len(samples)):
-                    samples[i] = SampleConfig.default_values().from_dict(samples[i])
+                    samples[i] = SampleConfig.default_values(config.model_type).from_dict(samples[i])
                 config.samples = samples
 
         config_dict = config.to_dict()
@@ -960,6 +951,7 @@ class TrainConfig(BaseConfig):
         data.append(("validate_after", 1, int, False))
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
         data.append(("continue_last_backup", False, bool, False))
+        data.append(("prevent_overwrites", False, bool, False))
         data.append(("include_train_config", ConfigPart.NONE, ConfigPart, False))
 
         #multi-GPU
