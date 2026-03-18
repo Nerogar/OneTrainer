@@ -19,6 +19,48 @@ class LoRALoaderMixin(metaclass=ABCMeta):
     def _get_convert_key_sets(self, model: BaseModel) -> list[LoraConversionKeySet] | None:
         pass
 
+    @staticmethod
+    def scale_lora_state_dict(
+            state_dict: dict,
+            te_scale: float = 1.0,
+            unet_scale: float = 1.0,
+    ) -> dict:
+        """
+        Scales LoRA weights for Text Encoder and main component (UNet/Transformer) separately.
+        
+        Args:
+            state_dict: The LoRA state dict to scale
+            te_scale: Scale factor for Text Encoder LoRA weights (default 1.0, applies to lora_te*)
+            unet_scale: Scale factor for main component LoRA weights (default 1.0, applies to everything else)
+            
+        Returns:
+            The scaled state dict
+        """
+        scaled_dict = {}
+        
+        weight_suffixes = (
+            ".weight",
+            "hada_w1_a",
+            "hada_w1_b",
+            "hada_w2_a",
+            "hada_w2_b",
+            "lokr_w1",
+            "lokr_w2",
+            "lokr_t1",
+            "lokr_t2",
+        )
+
+        for key, value in state_dict.items():
+            is_weight = isinstance(value, torch.Tensor) and key.endswith(weight_suffixes)
+            if key.startswith("lora_te"):
+                # Text Encoder LoRA (matches lora_te, lora_te1, lora_te2, etc.)
+                scaled_dict[key] = value * te_scale if is_weight else value
+            else:
+                # Other components: unet, transformer, prior, decoder, etc.
+                scaled_dict[key] = value * unet_scale if is_weight else value
+        
+        return scaled_dict
+
     def __load_safetensors(
             self,
             model: BaseModel,

@@ -1,6 +1,7 @@
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseStableDiffusionXLSetup import BaseStableDiffusionXLSetup
+from modules.modelLoader.mixin.LoRALoaderMixin import LoRALoaderMixin
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
@@ -76,8 +77,8 @@ class StableDiffusionXLLoRASetup(
             model: StableDiffusionXLModel,
             config: TrainConfig,
     ):
-        create_te1 = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te1")
-        create_te2 = config.text_encoder_2.train or state_dict_has_prefix(model.lora_state_dict, "lora_te2")
+        create_te1 = config.text_encoder.train
+        create_te2 = config.text_encoder_2.train
 
         model.text_encoder_1_lora = LoRAModuleWrapper(
             model.text_encoder_1, "lora_te1", config
@@ -92,6 +93,13 @@ class StableDiffusionXLLoRASetup(
         )
 
         if model.lora_state_dict:
+            # Apply scaling factors to LoRA weights before loading
+            model.lora_state_dict = LoRALoaderMixin.scale_lora_state_dict(
+                model.lora_state_dict,
+                te_scale=config.lora_te_scale,
+                unet_scale=config.lora_unet_scale,
+            )
+            
             if create_te1:
                 model.text_encoder_1_lora.load_state_dict(model.lora_state_dict)
             if create_te2:
