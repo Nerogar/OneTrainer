@@ -3,8 +3,8 @@ import datetime
 import json
 import os
 import platform
+import shutil
 import subprocess
-import sys
 import threading
 import time
 import traceback
@@ -812,7 +812,7 @@ class TrainUI(ctk.CTk):
         if self.always_on_tensorboard_subprocess:
             self._stop_always_on_tensorboard()
 
-        tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
+        tensorboard_executable = shutil.which("tensorboard")
         tensorboard_log_dir = os.path.join(self.train_config.workspace_dir, "tensorboard")
 
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)

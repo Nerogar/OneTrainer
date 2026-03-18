@@ -793,25 +793,38 @@ class SoftwareInfo:
     def get_python_info() -> dict[str, Any]:
         """
         Retrieve Python environment information including version, executable path,
-        pip freeze output, and PyTorch info.
+        pixi package list, and PyTorch info.
         """
         info: dict[str, Any] = {
             "PythonVersion": sys.version.split()[0],
             "PythonPath": sys.executable,
-            "PipFreeze": "Unavailable",
+            "PackageList": "Unavailable",
             "PyTorchInfo": "PyTorch not detected",
         }
-        cmd = [sys.executable, "-m", "pip", "freeze"]
-        pip_out = Utility.run_command(cmd)
-        if pip_out:
-            info["PipFreeze"] = "\n".join(
-                f"    {line}" for line in pip_out.splitlines()
-            )
-            for line in pip_out.splitlines():
-                if line.startswith("torch=="):
-                    info["PyTorchInfo"] = line.strip()
+
+        # Determine the pixi environment name from OT_PLATFORM (set by our scripts)
+        platform_env = os.environ["OT_PLATFORM"]
+        cmd = ["pixi", "list", "--locked", "-e", platform_env, "--json"]
+        pkg_out = Utility.run_command(cmd)
+        if pkg_out:
+            try:
+                packages = json.loads(pkg_out)
+                lines = [
+                    f"    {pkg['name']}=={pkg['version']} (source: {pkg.get('source', 'unknown')})"
+                    for pkg in packages
+                ]
+                info["PackageList"] = "\n".join(lines)
+
+                for pkg in packages:
+                    if pkg.get("name") == "torch":
+                        info["PyTorchInfo"] = (
+                            f"torch=={pkg['version']} (source: {pkg.get('source', 'unknown')})"
+                        )
+                        break
+            except json.JSONDecodeError:
+                info["PackageList"] = "Unable to parse pixi list output"
         else:
-            info["PipFreeze"] = "Unable to run pip freeze"
+            info["PackageList"] = "Unable to run pixi list"
         return info
 
     @staticmethod
@@ -977,8 +990,8 @@ class ReportBuilder:
                 f"Global Python Version: {python_info.get('PythonVersion', 'Unavailable')}",
                 f"Python Executable Path: {Utility.anonymize_path(python_info.get('PythonPath'))}",
                 f"PyTorch Info: {python_info.get('PyTorchInfo', 'Unavailable')}",
-                "pip freeze output:",
-                python_info.get("PipFreeze", "Unavailable"),
+                "Installed packages (pixi list):",
+                python_info.get("PackageList", "Unavailable"),
                 "",
                 "=== Git Information ===",
                 git_info,
