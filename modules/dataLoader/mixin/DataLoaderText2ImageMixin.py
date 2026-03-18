@@ -349,11 +349,11 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
         def before_cache_text_fun():
             model_setup.prepare_text_caching(model, config)
 
-        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations',
+        image_disk_cache = DiskCache(cache_dir=image_cache_dir, persistent_key_in_name='image_path', split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations',
                                      balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'],
                                      group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
 
-        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',
+        text_disk_cache = DiskCache(cache_dir=text_cache_dir, persistent_key_in_name='image_path', split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',
                                     variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
 
         modules = []
