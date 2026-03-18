@@ -16,6 +16,7 @@ from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
 from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 from modules.util.enum.ImageFormat import ImageFormat
+from modules.util.enum.ImagePreprocessing import ImagePreprocessing
 from modules.util.enum.LearningRateScaler import LearningRateScaler
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossScaler import LossScaler
@@ -384,7 +385,7 @@ class TrainConfig(BaseConfig):
     # data settings
     concept_file_name: str
     concepts: list[ConceptConfig]
-    aspect_ratio_bucketing: bool
+    image_preprocessing: ImagePreprocessing
     latent_caching: bool
     clear_cache_before_training: bool
 
@@ -560,7 +561,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=10,
+            config_version=11,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -572,6 +573,7 @@ class TrainConfig(BaseConfig):
                 7: self.__migration_7,
                 8: self.__migration_8,
                 9: self.__migration_9,
+                10: self.__migration_10,
             }
         )
 
@@ -791,6 +793,17 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_10(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        aspect_ratio_bucketing = migrated_data.pop("aspect_ratio_bucketing", True)
+        if aspect_ratio_bucketing:
+            migrated_data["image_preprocessing"] = ImagePreprocessing.ASPECT_RATIO_BUCKETING
+        else:
+            migrated_data["image_preprocessing"] = ImagePreprocessing.SQUARE_CENTER_CROP
+
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
@@ -970,7 +983,7 @@ class TrainConfig(BaseConfig):
         # data settings
         data.append(("concept_file_name", "training_concepts/concepts.json", str, False))
         data.append(("concepts", None, list[ConceptConfig], True))
-        data.append(("aspect_ratio_bucketing", True, bool, False))
+        data.append(("image_preprocessing", ImagePreprocessing.ASPECT_RATIO_BUCKETING, ImagePreprocessing, False))
         data.append(("latent_caching", True, bool, False))
         data.append(("clear_cache_before_training", True, bool, False))
 

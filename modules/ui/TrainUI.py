@@ -35,6 +35,7 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 from modules.util.enum.ImageFormat import ImageFormat
+from modules.util.enum.ImagePreprocessing import ImagePreprocessing
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -353,10 +354,16 @@ class TrainUI(ctk.CTk):
         frame.grid_columnconfigure(3, weight=0)
         frame.grid_columnconfigure(4, weight=1)
 
-        # aspect ratio bucketing
-        components.label(frame, 0, 0, "Aspect Ratio Bucketing",
-                         tooltip="Aspect ratio bucketing enables training on images with different aspect ratios")
-        components.switch(frame, 0, 1, self.ui_state, "aspect_ratio_bucketing")
+        # image preprocessing
+        components.label(frame, 0, 0, "Image Preprocessing",
+                         tooltip="Square Center Crop: Crop images at the center to resolution^2.\n\n"
+                                 "Aspect Ratio Bucketing: Enables training on images with vastly different aspect ratios. Images are scaled to roughly resolution^2 pixels and cropped to fit into generalised aspect ratio buckets.\n\n"
+                                 "Keep Aspect Ratio: Images are only downscaled to roughly resolution^2 pixels while preserving the original aspect ratio. If necessary, both width and height are cropped down to multiples of a model-specific value (typically 64). Set the resolution to a high value to train on the original image sizes but make sure to provide enough images with the same size to fill at least one batch.")
+        components.options_kv(frame, 0, 1, [
+            ("Square Center Crop", ImagePreprocessing.SQUARE_CENTER_CROP),
+            ("Aspect Ratio Bucketing", ImagePreprocessing.ASPECT_RATIO_BUCKETING),
+            ("Keep Aspect Ratio", ImagePreprocessing.KEEP_ASPECT_RATIO),
+        ], self.ui_state, "image_preprocessing")
 
         # latent caching
         components.label(frame, 1, 0, "Latent Caching",
