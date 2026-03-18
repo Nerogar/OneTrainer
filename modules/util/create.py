@@ -289,33 +289,6 @@ def create_optimizer(
                 is_paged=optimizer_config.is_paged if optimizer_config.is_paged is not None else False,
             )
 
-        # ADAGRAD Optimizer
-        case Optimizer.ADAGRAD:
-            import bitsandbytes as bnb
-            optimizer = bnb.optim.Adagrad(
-                params=parameters,
-                lr=config.learning_rate,
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
-                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-10,
-                lr_decay=optimizer_config.lr_decay if optimizer_config.lr_decay is not None else 0,
-                initial_accumulator_value=optimizer_config.initial_accumulator_value if optimizer_config.initial_accumulator_value is not None else 0,
-            )
-
-        # ADAGRAD_8BIT Optimizer
-        case Optimizer.ADAGRAD_8BIT:
-            import bitsandbytes as bnb
-            optimizer = bnb.optim.Adagrad8bit(
-                params=parameters,
-                lr=config.learning_rate,
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
-                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-10,
-                lr_decay=optimizer_config.lr_decay if optimizer_config.lr_decay is not None else 0,
-                initial_accumulator_value=optimizer_config.initial_accumulator_value if optimizer_config.initial_accumulator_value is not None else 0,
-                min_8bit_size=optimizer_config.min_8bit_size if optimizer_config.min_8bit_size is not None else 4096,
-                percentile_clipping=optimizer_config.percentile_clipping if optimizer_config.percentile_clipping is not None else 100,
-                block_wise=optimizer_config.block_wise if optimizer_config.block_wise is not None else True,
-            )
-
         # RMSPROP Optimizer
         case Optimizer.RMSPROP:
             import bitsandbytes as bnb
@@ -471,83 +444,6 @@ def create_optimizer(
                 r=optimizer_config.r if optimizer_config.r is not None else 0,
                 weight_lr_power=optimizer_config.weight_lr_power if optimizer_config.weight_lr_power is not None else 2.0,
                 foreach=optimizer_config.foreach if optimizer_config.foreach is not None else False
-            )
-
-        # DADAPT_SGD Optimizer
-        case Optimizer.DADAPT_SGD:
-            import dadaptation as da
-            optimizer = da.DAdaptSGD(
-                params=parameters,
-                lr=config.learning_rate,
-                momentum=optimizer_config.momentum if optimizer_config.momentum is not None else 0.0,
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
-                log_every=optimizer_config.log_every if optimizer_config.log_every is not None else 0,
-                d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
-                growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
-                fsdp_in_use=optimizer_config.fsdp_in_use if optimizer_config.fsdp_in_use is not None else False,
-            )
-
-        # DADAPT_ADAM Optimizer
-        case Optimizer.DADAPT_ADAM:
-            import dadaptation as da
-            optimizer = da.DAdaptAdam(
-                params=parameters,
-                lr=config.learning_rate,
-                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
-                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
-                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
-                log_every=optimizer_config.log_every if optimizer_config.log_every is not None else 0,
-                decouple=optimizer_config.decouple if optimizer_config.decouple is not None else False,
-                use_bias_correction=optimizer_config.use_bias_correction if optimizer_config.use_bias_correction is not None else False,
-                d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
-                growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
-                fsdp_in_use=optimizer_config.fsdp_in_use if optimizer_config.fsdp_in_use is not None else False,
-            )
-
-        # DADAPT_ADAN Optimizer
-        case Optimizer.DADAPT_ADAN:
-            import dadaptation as da
-            optimizer = da.DAdaptAdan(
-                params=parameters,
-                lr=config.learning_rate,
-                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.98,
-                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.92,
-                       optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.99),
-                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.02,
-                no_prox=optimizer_config.no_prox if optimizer_config.no_prox is not None else False,
-                log_every=optimizer_config.log_every if optimizer_config.log_every is not None else 0,
-                d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
-                growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
-            )
-
-        # DADAPT_ADA_GRAD Optimizer
-        case Optimizer.DADAPT_ADA_GRAD:
-            import dadaptation as da
-            optimizer = da.DAdaptAdaGrad(
-                params=parameters,
-                lr=config.learning_rate,
-                momentum=optimizer_config.momentum if optimizer_config.momentum is not None else 0,
-                log_every=optimizer_config.log_every if optimizer_config.log_every is not None else 0,
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
-                eps=optimizer_config.eps if optimizer_config.eps is not None else 0.0,
-                d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
-                growth_rate=optimizer_config.growth_rate if optimizer_config.growth_rate is not None else float('inf'),
-            )
-
-        # DADAPT_LION Optimizer
-        case Optimizer.DADAPT_LION:
-            import dadaptation as da
-            optimizer = da.DAdaptLion(
-                params=parameters,
-                lr=config.learning_rate,
-                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
-                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
-                log_every=optimizer_config.log_every if optimizer_config.log_every is not None else 0,
-                d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
-                fsdp_in_use=optimizer_config.fsdp_in_use if optimizer_config.fsdp_in_use is not None else False,
             )
 
         # PRODIGY Optimizer
@@ -951,18 +847,6 @@ def create_optimizer(
                 degenerated_to_sgd=optimizer_config.degenerated_to_sgd if optimizer_config.degenerated_to_sgd is not None else True,
             )
 
-        # TIGER Optimizer
-        case Optimizer.TIGER:
-            from pytorch_optimizer.optimizer.tiger import Tiger
-            optimizer = Tiger(
-                params=parameters,
-                lr=config.learning_rate if config.learning_rate is not None else 0,
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
-                beta=optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
-                weight_decouple=optimizer_config.decoupled_decay if optimizer_config.decoupled_decay is not None else True,
-                fixed_decay=optimizer_config.fixed_decay if optimizer_config.fixed_decay is not None else False,
-            )
-
         # AIDA Optimizer
         case Optimizer.AIDA:
             from pytorch_optimizer.optimizer.aida import Aida
@@ -999,24 +883,6 @@ def create_optimizer(
                 fixed_decay=optimizer_config.fixed_decay if optimizer_config.fixed_decay is not None else False,
                 cautious=optimizer_config.cautious if optimizer_config.cautious is not None else False,
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-6,
-            )
-
-        # YOGI Optimizer
-        case Optimizer.YOGI:
-            from pytorch_optimizer.optimizer.yogi import Yogi
-            optimizer = Yogi(
-                params=parameters,
-                lr=config.learning_rate,
-                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
-                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
-                weight_decouple=optimizer_config.decoupled_decay if optimizer_config.decoupled_decay is not None else True,
-                fixed_decay=optimizer_config.fixed_decay if optimizer_config.fixed_decay is not None else False,
-                r=optimizer_config.r if optimizer_config.r is not None else 0.95,
-                adanorm=optimizer_config.adanorm if optimizer_config.adanorm is not None else False,
-                adam_debias=optimizer_config.adam_debias if optimizer_config.adam_debias is not None else False,
-                initial_accumulator=optimizer_config.initial_accumulator if optimizer_config.initial_accumulator is not None else 1e-6,
-                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-3,
             )
 
     if state_dict is not None and optimizer is not None:
