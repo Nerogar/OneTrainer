@@ -33,7 +33,8 @@ class SampleWindow(ctk.CTkToplevel):
     def __init__(
             self,
             parent,
-            train_config: TrainConfig | None = None,
+            train_config: TrainConfig,
+            use_external_model: bool,
             callbacks: TrainCallbacks | None = None,
             commands: TrainCommands | None = None,
             *args, **kwargs
@@ -44,7 +45,7 @@ class SampleWindow(ctk.CTkToplevel):
         self.geometry("1200x800")
         self.resizable(True, True)
 
-        if train_config is not None:
+        if not use_external_model:
             self.initial_train_config = TrainConfig.default_values().from_dict(train_config.to_dict())
             # remove some settings to speed up model loading for sampling
             self.initial_train_config.optimizer.optimizer = None
@@ -52,16 +53,17 @@ class SampleWindow(ctk.CTkToplevel):
         else:
             self.initial_train_config = None
 
+        #TODO why is there a current_train_config and an initial_train_config?
+        #current_train_config doesn't seem to ever change
         self.current_train_config = train_config
         self.callbacks = callbacks
         self.commands = commands
 
         # get model specific defaults
-        model_type = train_config.model_type if train_config is not None else None
+        model_type = train_config.model_type
         self.sample = SampleConfig.default_values(model_type)
         self.ui_state = UIState(self, self.sample)
 
-        use_external_model = self.initial_train_config is None
         if use_external_model:
             self.callbacks.set_on_sample_custom(self.__update_preview)
             self.callbacks.set_on_update_sample_custom_progress(self.__update_progress)
