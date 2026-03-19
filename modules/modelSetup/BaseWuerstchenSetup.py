@@ -250,6 +250,14 @@ class BaseWuerstchenSetup(
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability,
             )
 
+            if config.cep_enabled:
+                text_embedding = self._apply_conditional_embedding_perturbation(
+                    text_embedding, config.cep_gamma, generator
+                )
+                pooled_text_text_embedding = self._apply_conditional_embedding_perturbation(
+                    pooled_text_text_embedding, config.cep_gamma, generator
+                )
+
             latent_input = scaled_noisy_latent_image
 
             if model.model_type.is_wuerstchen_v2():
