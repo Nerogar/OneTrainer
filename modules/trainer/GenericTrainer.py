@@ -609,6 +609,12 @@ class GenericTrainer(BaseTrainer):
             self.model.optimizer.eval()
 
     def train(self):
+
+
+        transfer_step1 = False
+        transfer_step2 = False
+        transfer_guidance = 3.0
+
         train_device = torch.device(self.config.train_device)
 
         train_progress = self.model.train_progress
@@ -747,7 +753,33 @@ class GenericTrainer(BaseTrainer):
                         model_output_data['target'][prior_pred_indices] = prior_model_prediction[prior_pred_indices]
                         model_output_data['prior_target'] = prior_model_prediction
                     else:
-                        model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                        transfer_filename = f"transfer-{train_progress.global_step}.pt"
+                        if transfer_step1:
+                            with torch.no_grad():
+                                with self.model_setup.prior_model(self.model, self.config):
+                                    model_output_data_without_lora = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                                model_output_data_with_lora = self.model_setup.predict(self.model, batch, self.config, train_progress)
+
+                                torch.save((
+                                    model_output_data_without_lora['predicted'],
+                                    model_output_data_with_lora['predicted'],
+                                    batch['image_path'],
+                                    model_output_data_with_lora['timestep'],
+                                ), transfer_filename)
+
+                            train_progress.next_step(self.config.batch_size)
+                            self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
+                            continue
+                        if transfer_step2:
+                            base_without_lora, base_with_lora, image_path, timestep = torch.load(transfer_filename, map_location=train_device)
+                            with self.model_setup.prior_model(self.model, self.config), torch.no_grad():
+                                model_output_data_prior = self.model_setup.predict(self.model, batch, self.config, train_progress)
+
+                            model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                            assert image_path == batch['image_path'] and model_output_data['timestep'] == timestep, "transfer step 1 data does not match"
+                            model_output_data['target'] = model_output_data_prior['predicted'] + transfer_guidance * (base_with_lora - base_without_lora)
+                        else:
+                            model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 
                     loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
 
