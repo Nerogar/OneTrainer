@@ -1,11 +1,30 @@
-# Note: AMD requirements might be outdated. If you can provide information about running OneTrainer on AMD,
-# please open an issue or pull request on github
+# AMD ROCm requirements - TheRock nightly builds
+# https://github.com/ROCm/TheRock
+#
+# IMPORTANT: ROCm 6.x wheels (rocm6.3) only exist for Linux (manylinux).
+# On Windows, PyTorch for ROCm is only available via AMD's TheRock nightly builds.
+#
+# Uncomment the --find-links line that matches your GPU architecture:
+#
+#   RDNA2 (gfx103X) - RX 6000 series:
+# --find-links https://therock-nightly-python.s3.us-east-2.amazonaws.com/gfx103X-all/index.html
+#
+#   RDNA3 (gfx110X) - RX 7000 series:
+# --find-links https://therock-nightly-python.s3.us-east-2.amazonaws.com/gfx110X-all/index.html
+#
+#   RDNA4 (gfx120X) - RX 9000 series:
+# --find-links https://therock-nightly-python.s3.us-east-2.amazonaws.com/gfx120X-all/index.html
 
-# pytorch
---extra-index-url https://download.pytorch.org/whl/rocm6.3
-torch==2.9.1+rocm6.3
-torchvision==0.24.1+rocm6.3
-onnxruntime==1.23.2
+# pytorch - uncomment ONE of the above --find-links lines for your GPU, then:
+--pre
+torch
+torchvision
+torchaudio
+
+# onnxruntime: ROCm Execution Provider was removed in ORT 1.23
+# ROCm 7.0 was the last supported version. Use CPU runtime for ROCm 7.x+
+# See: https://onnxruntime.ai/docs/execution-providers/ROCm-ExecutionProvider.html
+onnxruntime
 
 # optimizers
 # TODO
