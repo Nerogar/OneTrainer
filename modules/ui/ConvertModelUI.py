@@ -71,7 +71,7 @@ class ConvertModelUI(ctk.CTkToplevel):
             ("Chroma1", ModelType.CHROMA_1), #TODO does this just work? HiDream is not here
             ("QwenImage", ModelType.QWEN), #TODO does this just work? HiDream is not here
             ("ZImage", ModelType.Z_IMAGE),
-        ], self.ui_state, "model_type")
+        ], self.ui_state, "model_type", command=self._on_model_type_changed)
 
         # training method
         components.label(master, 1, 0, "Model Type",
@@ -102,10 +102,12 @@ class ConvertModelUI(ctk.CTkToplevel):
         # output format
         components.label(master, 4, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
-        components.options_kv(master, 4, 1, [
+        self._format_widget = components.options_kv(master, 4, 1, [
             ("Safetensors", ModelFormat.SAFETENSORS),
             ("Diffusers", ModelFormat.DIFFUSERS),
+            ("ComfyUI LoRA", ModelFormat.COMFY_LORA),
         ], self.ui_state, "output_model_format")
+        self._on_model_type_changed(self.convert_model_args.model_type)
 
         # output model destination
         components.label(master, 5, 0, "Model Output Destination",
@@ -117,6 +119,17 @@ class ConvertModelUI(ctk.CTkToplevel):
         )
 
         self.button = components.button(master, 6, 1, "Convert", self.convert_model)
+
+    def _on_model_type_changed(self, model_type):
+        if not hasattr(self, '_format_widget') or not self._format_widget.winfo_exists():
+            return
+        is_hyv = (model_type == ModelType.HUNYUAN_VIDEO)
+        format_options = ["Safetensors", "Diffusers"]
+        if is_hyv:
+            format_options.append("ComfyUI LoRA")
+        self._format_widget.configure(values=format_options)
+        if not is_hyv and self.convert_model_args.output_model_format == ModelFormat.COMFY_LORA:
+            self.ui_state.get_var("output_model_format").set(ModelFormat.SAFETENSORS)
 
     def convert_model(self):
         try:

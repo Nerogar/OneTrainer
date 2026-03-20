@@ -1,11 +1,19 @@
+import os
+from pathlib import Path
+
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
-from modules.util.convert.lora.convert_hunyuan_video_lora import convert_hunyuan_video_lora_key_sets
+from modules.util.convert.lora.convert_hunyuan_video_lora import (
+    convert_hunyuan_video_lora_key_sets,
+    convert_hunyuan_video_lora_to_comfyui,
+)
 from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
 from torch import Tensor
+
+from safetensors.torch import save_file
 
 
 class HunyuanVideoLoRASaver(
@@ -53,4 +61,11 @@ class HunyuanVideoLoRASaver(
             output_model_destination: str,
             dtype: torch.dtype | None,
     ):
-        self._save(model, output_model_format, output_model_destination, dtype)
+        if output_model_format == ModelFormat.COMFY_LORA:
+            state_dict = self._get_state_dict(model)
+            save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
+            save_state_dict = convert_hunyuan_video_lora_to_comfyui(save_state_dict)
+            os.makedirs(Path(output_model_destination).parent.absolute(), exist_ok=True)
+            save_file(save_state_dict, output_model_destination, self._create_safetensors_header(model, save_state_dict))
+        else:
+            self._save(model, output_model_format, output_model_destination, dtype)
