@@ -1,5 +1,4 @@
 from abc import ABCMeta
-from random import Random
 
 import modules.util.multi_gpu_util as multi
 from modules.model.Flux2Model import Flux2Model
@@ -86,6 +85,11 @@ class BaseFlux2Setup(
         quantize_layers(model.vae, self.train_device, model.train_dtype, config)
         quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
 
+        model.text_encoder_to(self.train_device)
+        model.text_encoder.eval()
+        model.cache_unconditional(text_encoder_sequence_length=config.text_encoder_sequence_length)
+        model.text_encoder_to(self.temp_device)
+
     def predict(
             self,
             model: Flux2Model,
@@ -99,12 +103,9 @@ class BaseFlux2Setup(
             batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
             generator = torch.Generator(device=config.train_device)
             generator.manual_seed(batch_seed)
-            rand = Random(batch_seed)
 
             text_encoder_output = model.encode_text(
-                train_device=self.train_device,
-                batch_size=batch['latent_image'].shape[0],
-                rand=rand,
+                generator=generator,
                 tokens=batch.get("tokens"),
                 tokens_mask=batch.get("tokens_mask"),
                 text_encoder_sequence_length=config.text_encoder_sequence_length,

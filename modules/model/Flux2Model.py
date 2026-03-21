@@ -1,6 +1,5 @@
 import math
 from contextlib import nullcontext
-from random import Random
 
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
@@ -90,6 +89,8 @@ class Flux2Model(BaseModel):
     transformer_lora: LoRAModuleWrapper | None
     lora_state_dict: dict | None
 
+    _cached_unconditional: Tensor | None
+
     def __init__(
             self,
             model_type: ModelType,
@@ -111,6 +112,8 @@ class Flux2Model(BaseModel):
 
         self.transformer_lora = None
         self.lora_state_dict = None
+
+        self._cached_unconditional = None
 
     def adapters(self) -> list[LoRAModuleWrapper]:
         return [a for a in [
@@ -161,16 +164,14 @@ class Flux2Model(BaseModel):
 
     def encode_text(
             self,
-            train_device: torch.device,
-            batch_size: int = 1, #TODO unused
-            rand: Random | None = None,
-            text: str = None,
+            text_encoder_sequence_length: int,
+            generator: torch.Generator | None = None,
+            text: str | list[str] | None = None,
             tokens: Tensor = None,
             tokens_mask: Tensor = None,
-            text_encoder_sequence_length: int | None = None,
             text_encoder_dropout_probability: float | None = None,
             text_encoder_output: Tensor = None,
-    ) -> tuple[Tensor, Tensor]:
+    ) -> Tensor:
 
         if tokens is None and text is not None:
             if isinstance(text, str):
@@ -213,7 +214,7 @@ class Flux2Model(BaseModel):
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
             tokens_mask = tokenizer_output.attention_mask.to(self.text_encoder.device)
 
-        if text_encoder_output is None and self.text_encoder is not None:
+        if text_encoder_output is None:
             with self.text_encoder_autocast_context:
                 text_encoder_output = self.text_encoder(
                     tokens,
@@ -225,9 +226,17 @@ class Flux2Model(BaseModel):
                                                    for k in (MISTRAL_HIDDEN_STATES_LAYERS if self.is_dev() else QWEN3_HIDDEN_STATES_LAYERS)], dim=2)
 
         if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
-            raise NotImplementedError #https://github.com/Nerogar/OneTrainer/issues/957
+            dropout_mask = torch.rand(text_encoder_output.shape[0], generator=generator, device=generator.device) < text_encoder_dropout_probability
+            text_encoder_output[dropout_mask] = self._cached_unconditional
 
         return text_encoder_output
+
+    @torch.no_grad()
+    def cache_unconditional(self, text_encoder_sequence_length: int):
+        self._cached_unconditional = self.encode_text(
+            text="",
+            text_encoder_sequence_length=text_encoder_sequence_length
+        )
 
     def is_dev(self) -> bool:
         return self.transformer.config.num_attention_heads == 48
