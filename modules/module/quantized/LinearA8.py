@@ -58,11 +58,11 @@ def fp8_backward_weight_axiswise(output: Tensor, x: Tensor) -> Tensor:
     return mm_res.to(x.dtype).mul_(output_scale.T).mul_(x_scale)
 
 
-class LinearW16IntA8Function(torch.autograd.Function):
+class LinearIntA8Function(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x: Tensor, weight: Tensor, bias: Tensor | None) -> Tensor:
+    def forward(ctx, x: Tensor, weight: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
         ctx.save_for_backward(x, weight)
-        return int8_forward_axiswise(x, weight, bias)
+        return int8_forward_axiswise(x, weight, bias, compute_dtype)
 
     @staticmethod
     def backward(ctx, grad_output: Tensor):
@@ -78,13 +78,13 @@ class LinearW16IntA8Function(torch.autograd.Function):
         if ctx.needs_input_grad[2]:
             grad_bias = grad_output.sum(0)
 
-        return grad_x, grad_weight, grad_bias
+        return grad_x, grad_weight, grad_bias, None
 
-class LinearW16FpA8Function(torch.autograd.Function):
+class LinearFpA8Function(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x: Tensor, weight: Tensor, bias: Tensor | None) -> Tensor:
+    def forward(ctx, x: Tensor, weight: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
         ctx.save_for_backward(x, weight)
-        return fp8_forward_axiswise(x, weight, bias)
+        return fp8_forward_axiswise(x, weight, bias, compute_dtype)
 
     @staticmethod
     def backward(ctx, grad_output: Tensor):
@@ -100,22 +100,23 @@ class LinearW16FpA8Function(torch.autograd.Function):
         if ctx.needs_input_grad[2]:
             grad_bias = grad_output.sum(0)
 
-        return grad_x, grad_weight, grad_bias
+        return grad_x, grad_weight, grad_bias, None
 
-class LinearW16A8(torch.nn.Linear):
+class LinearA8(torch.nn.Linear):
     def __init__(self, dtype, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         assert dtype in [torch.int8, torch.float8_e4m3fn]
         self._dtype = dtype
+        self.compute_dtype = None
 
     def forward(self, x_orig: torch.Tensor) -> torch.Tensor:
         x = x_orig.to(self.weight.dtype).reshape(-1, x_orig.shape[-1])
         if x.shape[0] > 16:
             if self._dtype == torch.int8:
-                y = LinearW16IntA8Function.apply(x, self.weight, self.bias)
+                y = LinearIntA8Function.apply(x, self.weight, self.bias, self.compute_dtype)
             else:
-                y = LinearW16FpA8Function.apply(x, self.weight, self.bias)
+                y = LinearFpA8Function.apply(x, self.weight, self.bias, self.compute_dtype)
             return y.reshape(x_orig.shape[:-1] + (y.shape[-1], ))
         else:
             return super().forward(x_orig)
