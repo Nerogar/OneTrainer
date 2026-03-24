@@ -21,7 +21,7 @@ tensorboard==2.20.0
 pytorch-lightning==2.6.1
 
 # diffusion models
--e git+https://github.com/huggingface/diffusers.git@99daaa8#egg=diffusers
+-e git+https://github.com/huggingface/diffusers.git@da6718f#egg=diffusers
 gguf==0.17.1
 transformers==4.57.6
 sentencepiece==0.2.1 # transitive dependency of transformers for tokenizer loading
@@ -33,7 +33,7 @@ pooch==1.8.2
 open-clip-torch==2.32.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@5bbafa5#egg=mgds
+-e git+https://github.com/Nerogar/mgds.git@a25b59f#egg=mgds
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers

@@ -16,6 +16,8 @@ from mgds.pipelineModules.DecodeVAE import DecodeVAE
 from mgds.pipelineModules.EncodeT5Text import EncodeT5Text
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
 from mgds.pipelineModules.MapData import MapData
+from mgds.pipelineModules.PadMaskedTokens import PadMaskedTokens
+from mgds.pipelineModules.PruneMaskedTokens import PruneMaskedTokens
 from mgds.pipelineModules.RescaleImageChannels import RescaleImageChannels
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.SaveImage import SaveImage
@@ -38,6 +40,7 @@ class ChromaBaseDataLoader(
         encode_prompt = EncodeT5Text(tokens_in_name='tokens', tokens_attention_mask_in_name="tokens_mask", hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, add_layer_norm=True,
                                      text_encoder=model.text_encoder, hidden_state_output_index=-(1 + config.text_encoder_layer_skip), autocast_contexts=[model.autocast_context, model.text_encoder_autocast_context],
                                      dtype=model.text_encoder_train_dtype.torch_dtype())
+        prune_masked_tokens = PruneMaskedTokens(tokens_name='tokens', tokens_mask_name='tokens_mask', hidden_state_name='text_encoder_hidden_state')
 
         modules = [rescale_image, encode_image, image_sample]
         if config.masked_training or config.model_type.has_mask_input():
@@ -46,6 +49,9 @@ class ChromaBaseDataLoader(
         modules += [add_embeddings_to_prompt, tokenize_prompt]
         if not config.train_text_encoder_or_embedding():
             modules.append(encode_prompt)
+
+        if config.latent_caching and not config.train_text_encoder_or_embedding():
+            modules.append(prune_masked_tokens)
 
         return modules
 
@@ -78,6 +84,8 @@ class ChromaBaseDataLoader(
         )
 
     def _output_modules(self, config: TrainConfig, model: ChromaModel, model_setup: BaseChromaSetup):
+        pad_masked_tokens = PadMaskedTokens(tokens_name='tokens', tokens_mask_name='tokens_mask', hidden_state_name='text_encoder_hidden_state', max_length=model.tokenizer.model_max_length)
+
         output_names = [
             'image_path', 'latent_image',
             'prompt',
@@ -92,7 +100,7 @@ class ChromaBaseDataLoader(
         if not config.train_text_encoder_or_embedding():
             output_names.append('text_encoder_hidden_state')
 
-        return self._output_modules_from_out_names(
+        output_module_list = self._output_modules_from_out_names(
             model, model_setup,
             output_names=output_names,
             config=config,
@@ -101,6 +109,11 @@ class ChromaBaseDataLoader(
             autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
         )
+
+        if config.latent_caching and not config.train_text_encoder_or_embedding():
+            output_module_list = [pad_masked_tokens] + output_module_list
+
+        return output_module_list
 
     def _debug_modules(self, config: TrainConfig, model: ChromaModel): #TODO clean up
         debug_dir = os.path.join(config.debug_dir, "dataloader")

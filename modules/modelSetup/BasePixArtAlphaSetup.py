@@ -16,7 +16,6 @@ from modules.util.checkpointing_util import (
     enable_checkpointing_for_t5_encoder_layers,
 )
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.quantization_util import quantize_layers
@@ -58,12 +57,6 @@ class BasePixArtAlphaSetup(
                 enable_checkpointing_for_basic_transformer_blocks(model.transformer, config, offload_enabled=True)
             model.text_encoder_offload_conductor = \
                 enable_checkpointing_for_t5_encoder_layers(model.text_encoder, config)
-
-        if config.force_circular_padding:
-            apply_circular_padding_to_conv2d(model.vae)
-            apply_circular_padding_to_conv2d(model.transformer)
-            if model.transformer_lora is not None:
-                apply_circular_padding_to_conv2d(model.transformer_lora)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
