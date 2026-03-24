@@ -11,8 +11,8 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.VideoFormat import VideoFormat
 
 import torch
-from torchvision.io import write_video
 
+#from torchvision.io import write_video
 from PIL import Image
 
 
@@ -95,6 +95,6 @@ class BaseModelSampler(metaclass=ABCMeta):
         elif sampler_output.file_type == FileType.VIDEO:
             if video_format is None:
                 raise ValueError("Video format required for sampling a video")
-            write_video(destination + video_format.extension(), options={"crf": "17"}, video_array=sampler_output.data, fps=24)
+            #write_video(destination + video_format.extension(), options={"crf": "17"}, video_array=sampler_output.data, fps=24) #FIXME
         elif sampler_output.file_type == FileType.AUDIO:
             pass # TODO
