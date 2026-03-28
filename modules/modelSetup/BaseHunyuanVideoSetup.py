@@ -225,8 +225,8 @@ class BaseHunyuanVideoSetup(
                     if 'text_encoder_1_hidden_state' in batch and not config.train_text_encoder_or_embedding() else None,
                 pooled_text_encoder_2_output=batch['text_encoder_2_pooled_state'] \
                     if 'text_encoder_2_pooled_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
-                text_encoder_1_dropout_probability=config.text_encoder.dropout_probability,
-                text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability,
+                text_encoder_1_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
+                text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability if not deterministic else None,
             )
 
             latent_image = batch['latent_image']

@@ -175,7 +175,7 @@ class BasePixArtAlphaSetup(
                 text_encoder_output=batch[
                     'text_encoder_hidden_state'] if not config.train_text_encoder_or_embedding() else None,
                 attention_mask=batch['tokens_mask'],
-                text_encoder_dropout_probability=config.text_encoder.dropout_probability,
+                text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
 
             latent_image = batch['latent_image']
