@@ -40,7 +40,7 @@ class BaseChromaSetup(
     LAYER_PRESETS = {
         "attn-mlp": ["attn", "ff.net"],
         "attn-only": ["attn"],
-        "blocks": ["transformer_blocks"],
+        "blocks": ["transformer_block"],
         "full": [],
     }
 
