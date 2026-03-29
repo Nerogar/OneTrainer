@@ -81,7 +81,7 @@ class SanaBaseDataLoader(
             text_caching=not config.train_text_encoder_or_embedding(),
         )
 
-    def _output_modules(self, config: TrainConfig, model: SanaModel, model_setup: BaseSanaSetup):
+    def _output_modules(self, config: TrainConfig, model: SanaModel, model_setup: BaseSanaSetup, is_validation: bool = False):
         output_names = [
             'image_path', 'latent_image',
             'prompt',
@@ -106,6 +106,7 @@ class SanaBaseDataLoader(
             vae=model.vae,
             autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
+            is_validation=is_validation,
         )
 
     def _debug_modules(self, config: TrainConfig, model: SanaModel):

@@ -7,6 +7,7 @@ import random
 import threading
 import time
 import traceback
+from contextlib import suppress
 
 from modules.util import concept_stats, path_util
 from modules.util.config.ConceptConfig import ConceptConfig
@@ -92,6 +93,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.image_preview_file_index = 0
         self.preview_augmentations = ctk.BooleanVar(self, True)
         self.bucket_fig = None
+        self._dpo_control_widgets = []
 
         self.title("Concept")
         self.geometry("800x700")
@@ -107,6 +109,9 @@ class ConceptWindow(ctk.CTkToplevel):
         self.image_augmentation_tab = self.__image_augmentation_tab(tabview.add("image augmentation"))
         self.text_augmentation_tab = self.__text_augmentation_tab(tabview.add("text augmentation"))
         self.concept_stats_tab = self.__concept_stats_tab(tabview.add("statistics"))
+
+        self.ui_state.add_var_trace("type", lambda: self._apply_dpo_control_state())
+        self._apply_dpo_control_state()
 
         #automatic concept scan
         self.scan_thread = threading.Thread(target=self.__auto_update_concept_stats, daemon=True)
@@ -137,13 +142,16 @@ class ConceptWindow(ctk.CTkToplevel):
 
         # concept type
         components.label(frame, 2, 0, "Concept Type",
-                         tooltip="STANDARD: Standard finetuning with the sample as training target\n"
-                                 "VALIDATION: Use concept for validation instead of training\n"
-                                 "PRIOR_PREDICTION: Use the sample to make a prediction using the model as it was before training. This prediction is then used as the training target "
-                                 "for the model in training. This can be used as regularisation and to preserve prior model knowledge while finetuning the model on other concepts. "
-                                 "Only implemented for LoRA.",
+                         tooltip="STANDARD: Standard finetuning with the sample as the training target\n"
+                                 "VALIDATION: Use the concept for validation instead of training\n"
+                                 "PRIOR_PREDICTION: Use the model before training to make a target for regularization. Only implemented for LoRA.\n"
+                                 "DPO (Chosen): The sample you prefer in a comparison pair\n"
+                                 "DPO (Rejected): The sample you do not prefer in a comparison pair\n"
+                                 "DPO (Chosen Val): Chosen sample used only for DPO validation\n"
+                                 "DPO (Rejected Val): Rejected sample used only for DPO validation\n"
+                                 "DPO pairs stay identical except for the quality difference you're teaching.",
                          wide_tooltip=True)
-        components.options(frame, 2, 1, [str(x) for x in list(ConceptType)], self.ui_state, "type")
+        components.options_kv(frame, 2, 1, self._concept_type_options(), self.ui_state, "type")
 
         # path
         components.label(frame, 3, 0, "Path",
@@ -180,12 +188,14 @@ class ConceptWindow(ctk.CTkToplevel):
         # image variations
         components.label(frame, 6, 0, "Image Variations",
                          tooltip="The number of different image versions to cache if latent caching is enabled.")
-        components.entry(frame, 6, 1, self.ui_state, "image_variations")
+        image_variations = components.entry(frame, 6, 1, self.ui_state, "image_variations")
+        self._dpo_control_widgets.append(image_variations)
 
         # text variations
         components.label(frame, 7, 0, "Text Variations",
                          tooltip="The number of different text versions to cache if latent caching is enabled.")
-        components.entry(frame, 7, 1, self.ui_state, "text_variations")
+        text_variations = components.entry(frame, 7, 1, self.ui_state, "text_variations")
+        self._dpo_control_widgets.append(text_variations)
 
         # balancing
         components.label(frame, 8, 0, "Balancing",
@@ -217,64 +227,74 @@ class ConceptWindow(ctk.CTkToplevel):
         # crop jitter
         components.label(frame, 1, 0, "Crop Jitter",
                          tooltip="Enables random cropping of samples")
-        components.switch(frame, 1, 1, self.image_ui_state, "enable_crop_jitter")
+        crop_jitter = components.switch(frame, 1, 1, self.image_ui_state, "enable_crop_jitter")
+        self._dpo_control_widgets.append(crop_jitter)
 
         # random flip
         components.label(frame, 2, 0, "Random Flip",
                          tooltip="Randomly flip the sample during training")
-        components.switch(frame, 2, 1, self.image_ui_state, "enable_random_flip")
-        components.switch(frame, 2, 2, self.image_ui_state, "enable_fixed_flip")
+        random_flip = components.switch(frame, 2, 1, self.image_ui_state, "enable_random_flip")
+        fixed_flip = components.switch(frame, 2, 2, self.image_ui_state, "enable_fixed_flip")
+        self._dpo_control_widgets.extend([random_flip, fixed_flip])
 
         # random rotation
         components.label(frame, 3, 0, "Random Rotation",
                          tooltip="Randomly rotates the sample during training")
-        components.switch(frame, 3, 1, self.image_ui_state, "enable_random_rotate")
-        components.switch(frame, 3, 2, self.image_ui_state, "enable_fixed_rotate")
-        components.entry(frame, 3, 3, self.image_ui_state, "random_rotate_max_angle")
+        random_rotate = components.switch(frame, 3, 1, self.image_ui_state, "enable_random_rotate")
+        fixed_rotate = components.switch(frame, 3, 2, self.image_ui_state, "enable_fixed_rotate")
+        rotate_angle = components.entry(frame, 3, 3, self.image_ui_state, "random_rotate_max_angle")
+        self._dpo_control_widgets.extend([random_rotate, fixed_rotate, rotate_angle])
 
         # random brightness
         components.label(frame, 4, 0, "Random Brightness",
                          tooltip="Randomly adjusts the brightness of the sample during training")
-        components.switch(frame, 4, 1, self.image_ui_state, "enable_random_brightness")
-        components.switch(frame, 4, 2, self.image_ui_state, "enable_fixed_brightness")
-        components.entry(frame, 4, 3, self.image_ui_state, "random_brightness_max_strength")
+        random_brightness = components.switch(frame, 4, 1, self.image_ui_state, "enable_random_brightness")
+        fixed_brightness = components.switch(frame, 4, 2, self.image_ui_state, "enable_fixed_brightness")
+        brightness_strength = components.entry(frame, 4, 3, self.image_ui_state, "random_brightness_max_strength")
+        self._dpo_control_widgets.extend([random_brightness, fixed_brightness, brightness_strength])
 
         # random contrast
         components.label(frame, 5, 0, "Random Contrast",
                          tooltip="Randomly adjusts the contrast of the sample during training")
-        components.switch(frame, 5, 1, self.image_ui_state, "enable_random_contrast")
-        components.switch(frame, 5, 2, self.image_ui_state, "enable_fixed_contrast")
-        components.entry(frame, 5, 3, self.image_ui_state, "random_contrast_max_strength")
+        random_contrast = components.switch(frame, 5, 1, self.image_ui_state, "enable_random_contrast")
+        fixed_contrast = components.switch(frame, 5, 2, self.image_ui_state, "enable_fixed_contrast")
+        contrast_strength = components.entry(frame, 5, 3, self.image_ui_state, "random_contrast_max_strength")
+        self._dpo_control_widgets.extend([random_contrast, fixed_contrast, contrast_strength])
 
         # random saturation
         components.label(frame, 6, 0, "Random Saturation",
                          tooltip="Randomly adjusts the saturation of the sample during training")
-        components.switch(frame, 6, 1, self.image_ui_state, "enable_random_saturation")
-        components.switch(frame, 6, 2, self.image_ui_state, "enable_fixed_saturation")
-        components.entry(frame, 6, 3, self.image_ui_state, "random_saturation_max_strength")
+        random_saturation = components.switch(frame, 6, 1, self.image_ui_state, "enable_random_saturation")
+        fixed_saturation = components.switch(frame, 6, 2, self.image_ui_state, "enable_fixed_saturation")
+        saturation_strength = components.entry(frame, 6, 3, self.image_ui_state, "random_saturation_max_strength")
+        self._dpo_control_widgets.extend([random_saturation, fixed_saturation, saturation_strength])
 
         # random hue
         components.label(frame, 7, 0, "Random Hue",
                          tooltip="Randomly adjusts the hue of the sample during training")
-        components.switch(frame, 7, 1, self.image_ui_state, "enable_random_hue")
-        components.switch(frame, 7, 2, self.image_ui_state, "enable_fixed_hue")
-        components.entry(frame, 7, 3, self.image_ui_state, "random_hue_max_strength")
+        random_hue = components.switch(frame, 7, 1, self.image_ui_state, "enable_random_hue")
+        fixed_hue = components.switch(frame, 7, 2, self.image_ui_state, "enable_fixed_hue")
+        hue_strength = components.entry(frame, 7, 3, self.image_ui_state, "random_hue_max_strength")
+        self._dpo_control_widgets.extend([random_hue, fixed_hue, hue_strength])
 
         # random circular mask shrink
         components.label(frame, 8, 0, "Circular Mask Generation",
                          tooltip="Automatically create circular masks for masked training")
-        components.switch(frame, 8, 1, self.image_ui_state, "enable_random_circular_mask_shrink")
+        circular_mask = components.switch(frame, 8, 1, self.image_ui_state, "enable_random_circular_mask_shrink")
+        self._dpo_control_widgets.append(circular_mask)
 
         # random rotate and crop
         components.label(frame, 9, 0, "Random Rotate and Crop",
                          tooltip="Randomly rotate the training samples and crop to the masked region")
-        components.switch(frame, 9, 1, self.image_ui_state, "enable_random_mask_rotate_crop")
+        random_mask_rotate_crop = components.switch(frame, 9, 1, self.image_ui_state, "enable_random_mask_rotate_crop")
+        self._dpo_control_widgets.append(random_mask_rotate_crop)
 
         # circular mask generation
         components.label(frame, 10, 0, "Resolution Override",
                          tooltip="Override the resolution for this concept. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format <width>x<height>")
-        components.switch(frame, 10, 2, self.image_ui_state, "enable_resolution_override")
-        components.entry(frame, 10, 3, self.image_ui_state, "resolution_override")
+        resolution_override = components.switch(frame, 10, 2, self.image_ui_state, "enable_resolution_override")
+        resolution_entry = components.entry(frame, 10, 3, self.image_ui_state, "resolution_override")
+        self._dpo_control_widgets.extend([resolution_override, resolution_entry])
 
         # image
         image_preview, filename_preview, caption_preview = self.__get_preview_image()
@@ -320,62 +340,157 @@ class ConceptWindow(ctk.CTkToplevel):
         # tag shuffling
         components.label(frame, 0, 0, "Tag Shuffling",
                          tooltip="Enables tag shuffling")
-        components.switch(frame, 0, 1, self.text_ui_state, "enable_tag_shuffling")
+        tag_shuffling = components.switch(frame, 0, 1, self.text_ui_state, "enable_tag_shuffling")
+        self._dpo_control_widgets.append(tag_shuffling)
 
         # keep tag count
         components.label(frame, 1, 0, "Tag Delimiter",
                          tooltip="The delimiter between tags")
-        components.entry(frame, 1, 1, self.text_ui_state, "tag_delimiter")
+        tag_delimiter = components.entry(frame, 1, 1, self.text_ui_state, "tag_delimiter")
+        self._dpo_control_widgets.append(tag_delimiter)
 
         # keep tag count
         components.label(frame, 2, 0, "Keep Tag Count",
                          tooltip="The number of tags at the start of the caption that are not shuffled or dropped")
-        components.entry(frame, 2, 1, self.text_ui_state, "keep_tags_count")
+        keep_tags_count = components.entry(frame, 2, 1, self.text_ui_state, "keep_tags_count")
+        self._dpo_control_widgets.append(keep_tags_count)
 
         # tag dropout
         components.label(frame, 3, 0, "Tag Dropout",
                          tooltip="Enables random dropout for tags in the captions.")
-        components.switch(frame, 3, 1, self.text_ui_state, "tag_dropout_enable")
+        tag_dropout_enable = components.switch(frame, 3, 1, self.text_ui_state, "tag_dropout_enable")
+        self._dpo_control_widgets.append(tag_dropout_enable)
         components.label(frame, 4, 0, "Dropout Mode",
                          tooltip="Method used to drop captions. 'Full' will drop the entire caption past the 'kept' tags with a certain probability, 'Random' will drop individual tags with the set probability, and 'Random Weighted' will linearly increase the probability of dropping tags, more likely to preseve tags near the front with full probability to drop at the end.")
-        components.options_kv(frame, 4, 1, [
+        tag_dropout_mode = components.options_kv(frame, 4, 1, [
             ("Full", 'FULL'),
             ("Random", 'RANDOM'),
             ("Random Weighted", 'RANDOM WEIGHTED'),
         ], self.text_ui_state, "tag_dropout_mode", None)
+        self._dpo_control_widgets.append(tag_dropout_mode)
         components.label(frame, 4, 2, "Probability",
                          tooltip="Probability to drop tags, from 0 to 1.")
-        components.entry(frame, 4, 3, self.text_ui_state, "tag_dropout_probability")
+        tag_dropout_probability = components.entry(frame, 4, 3, self.text_ui_state, "tag_dropout_probability")
+        self._dpo_control_widgets.append(tag_dropout_probability)
 
         components.label(frame, 5, 0, "Special Dropout Tags",
                          tooltip="List of tags which will be whitelisted/blacklisted by dropout. 'Whitelist' tags will never be dropped but all others may be, 'Blacklist' tags may be dropped but all others will never be, 'None' may drop any tags. Can specify either a delimiter-separated list in the field, or a file path to a .txt or .csv file with entries separated by newlines.")
-        components.options_kv(frame, 5, 1, [
+        tag_dropout_special_tags_mode = components.options_kv(frame, 5, 1, [
             ("None", 'NONE'),
             ("Blacklist", 'BLACKLIST'),
             ("Whitelist", 'WHITELIST'),
         ], self.text_ui_state, "tag_dropout_special_tags_mode", None)
-        components.entry(frame, 5, 2, self.text_ui_state, "tag_dropout_special_tags")
+        self._dpo_control_widgets.append(tag_dropout_special_tags_mode)
+        tag_dropout_special_tags = components.entry(frame, 5, 2, self.text_ui_state, "tag_dropout_special_tags")
+        self._dpo_control_widgets.append(tag_dropout_special_tags)
         components.label(frame, 6, 0, "Special Tags Regex",
                          tooltip="Interpret special tags with regex, such as 'photo.*' to match 'photo, photograph, photon' but not 'telephoto'. Includes exception for '/(' and '/)' syntax found in many booru/e6 tags.")
-        components.switch(frame, 6, 1, self.text_ui_state, "tag_dropout_special_tags_regex")
+        tag_dropout_regex = components.switch(frame, 6, 1, self.text_ui_state, "tag_dropout_special_tags_regex")
+        self._dpo_control_widgets.append(tag_dropout_regex)
 
         #capitalization randomization
         components.label(frame, 7, 0, "Randomize Capitalization",
                          tooltip="Enables randomization of capitalization for tags in the caption.")
-        components.switch(frame, 7, 1, self.text_ui_state, "caps_randomize_enable")
+        caps_randomize_enable = components.switch(frame, 7, 1, self.text_ui_state, "caps_randomize_enable")
+        self._dpo_control_widgets.append(caps_randomize_enable)
         components.label(frame, 7, 2, "Force Lowercase",
                          tooltip="If enabled, converts the caption to lowercase before any further processing.")
-        components.switch(frame, 7, 3, self.text_ui_state, "caps_randomize_lowercase")
+        caps_randomize_lowercase = components.switch(frame, 7, 3, self.text_ui_state, "caps_randomize_lowercase")
+        self._dpo_control_widgets.append(caps_randomize_lowercase)
 
         components.label(frame, 8, 0, "Captialization Mode",
                          tooltip="Comma-separated list of types of capitalization randomization to perform. 'capslock' for ALL CAPS, 'title' for First Letter Of Every Word, 'first' for First word only, 'random' for rAndOMiZeD lEtTERs.")
-        components.entry(frame, 8, 1, self.text_ui_state, "caps_randomize_mode")
+        caps_randomize_mode = components.entry(frame, 8, 1, self.text_ui_state, "caps_randomize_mode")
+        self._dpo_control_widgets.append(caps_randomize_mode)
         components.label(frame, 8, 2, "Probability",
                          tooltip="Probability to randomize capitialization of each tag, from 0 to 1.")
-        components.entry(frame, 8, 3, self.text_ui_state, "caps_randomize_probability")
+        caps_randomize_probability = components.entry(frame, 8, 3, self.text_ui_state, "caps_randomize_probability")
+        self._dpo_control_widgets.append(caps_randomize_probability)
 
         frame.pack(fill="both", expand=1)
         return frame
+
+    @staticmethod
+    def _dpo_type_name(concept_type) -> str:
+        return concept_type.value if hasattr(concept_type, "value") else str(concept_type)
+
+    def _is_dpo_concept(self) -> bool:
+        return self._dpo_type_name(self.concept.type).startswith("DPO_")
+
+    def _concept_type_options(self):
+        return [
+            ("Standard", ConceptType.STANDARD),
+            ("Validation", ConceptType.VALIDATION),
+            ("Prior Prediction", ConceptType.PRIOR_PREDICTION),
+            ("DPO (Chosen)", ConceptType.DPO_CHOSEN),
+            ("DPO (Rejected)", ConceptType.DPO_REJECTED),
+            ("DPO (Chosen Val)", ConceptType.DPO_CHOSEN_VAL),
+            ("DPO (Rejected Val)", ConceptType.DPO_REJECTED_VAL),
+        ]
+
+    def _set_widget_state(self, state: str):
+        for widget in self._dpo_control_widgets:
+            if widget is None:
+                continue
+            with suppress(Exception):
+                if widget.winfo_exists():
+                    widget.configure(state=state)
+
+    def _apply_dpo_control_state(self):
+        if self._is_dpo_concept():
+            for name in ("image_variations", "text_variations"):
+                with suppress(Exception):
+                    self.ui_state.get_var(name).set(1)
+            for name in (
+                "enable_crop_jitter",
+                "enable_random_flip",
+                "enable_fixed_flip",
+                "enable_random_rotate",
+                "enable_fixed_rotate",
+                "enable_random_brightness",
+                "enable_fixed_brightness",
+                "enable_random_contrast",
+                "enable_fixed_contrast",
+                "enable_random_saturation",
+                "enable_fixed_saturation",
+                "enable_random_hue",
+                "enable_fixed_hue",
+                "enable_random_circular_mask_shrink",
+                "enable_random_mask_rotate_crop",
+                "enable_tag_shuffling",
+                "tag_dropout_enable",
+                "caps_randomize_enable",
+                "caps_randomize_lowercase",
+            ):
+                with suppress(Exception):
+                    target_state = self.text_ui_state if name in {
+                        "enable_tag_shuffling",
+                        "tag_dropout_enable",
+                        "caps_randomize_enable",
+                        "caps_randomize_lowercase",
+                    } else self.image_ui_state
+                    target_state.get_var(name).set(False)
+            for name in (
+                "random_rotate_max_angle",
+                "random_brightness_max_strength",
+                "random_contrast_max_strength",
+                "random_saturation_max_strength",
+                "random_hue_max_strength",
+                "tag_dropout_probability",
+                "caps_randomize_probability",
+            ):
+                with suppress(Exception):
+                    target_state = self.image_ui_state if name.startswith("random_") else self.text_ui_state
+                    target_state.get_var(name).set(0.0)
+            with suppress(Exception):
+                self.text_ui_state.get_var("tag_dropout_mode").set("FULL")
+                self.text_ui_state.get_var("tag_dropout_special_tags_mode").set("NONE")
+                self.text_ui_state.get_var("caps_randomize_mode").set("capslock, title, first, random")
+            self._set_widget_state("disabled")
+        else:
+            self._set_widget_state("normal")
+        if hasattr(self, "preview_augmentations"):
+            self.__update_image_preview()
 
     def __concept_stats_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")

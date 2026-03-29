@@ -24,6 +24,7 @@ from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
 from modules.util.enum.ConceptType import ConceptType
+from modules.util.enum.DPOPatienceMode import DPOPatienceMode
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
@@ -143,6 +144,9 @@ class GenericTrainer(BaseTrainer):
         self.model.eval()
         torch_gc()
 
+        if self.config.rlhf_enabled and self.config.training_method != TrainingMethod.LORA:
+            raise NotImplementedError("RLHF DPO is currently implemented for adapter training in the LoRA tab only.")
+
         self.callbacks.on_update_status("creating the data loader/caching")
 
         self.data_loader = self.create_data_loader(
@@ -156,10 +160,14 @@ class GenericTrainer(BaseTrainer):
 
         self.parameters = self.model.parameters.parameters()
 
-        if self.config.validation:
+        if self.config.validation or self.config.rlhf_dpo_validation:
             self.validation_data_loader = self.create_data_loader(
                 self.model, self.model_setup, self.model.train_progress, is_validation=True
             )
+
+        self._dpo_patience_counter = 0
+        self._dpo_best_accuracy = float('-inf')
+        self._dpo_best_chosen_reward = float('-inf')
 
     def __save_config_to_workspace(self):
         path = path_util.canonical_join(self.config.workspace_dir, "config")
@@ -359,6 +367,42 @@ class GenericTrainer(BaseTrainer):
                 desc="validation_step",
                 total=current_epoch_length_validation)
 
+            if self.config.rlhf_dpo_validation:
+                dpo_val_loss = []
+                dpo_val_accuracy = []
+                dpo_val_chosen_reward = []
+                dpo_val_rejected_reward = []
+
+                for validation_batch in step_tqdm_validation:
+                    if self.__needs_gc(train_progress):
+                        torch_gc()
+
+                    with torch.no_grad():
+                        self.model_setup.calculate_dpo_loss(
+                            self.model, validation_batch, self.config, train_progress
+                        )
+                    dpo_metrics = self.model_setup.get_last_dpo_metrics()
+                    dpo_val_loss.append(dpo_metrics["dpo_loss"])
+                    dpo_val_accuracy.append(dpo_metrics["accuracy"])
+                    dpo_val_chosen_reward.append(dpo_metrics["chosen_reward"])
+                    dpo_val_rejected_reward.append(dpo_metrics["rejected_reward"])
+
+                if dpo_val_loss:
+                    val_loss = sum(dpo_val_loss) / len(dpo_val_loss)
+                    val_accuracy = sum(dpo_val_accuracy) / len(dpo_val_accuracy)
+                    val_chosen_reward = sum(dpo_val_chosen_reward) / len(dpo_val_chosen_reward)
+                    val_rejected_reward = sum(dpo_val_rejected_reward) / len(dpo_val_rejected_reward)
+
+                    self.tensorboard.add_scalar("dpo/val_loss", val_loss, train_progress.global_step)
+                    self.tensorboard.add_scalar("dpo/val_accuracy", val_accuracy, train_progress.global_step)
+                    self.tensorboard.add_scalar("dpo/val_chosen_reward", val_chosen_reward, train_progress.global_step)
+                    self.tensorboard.add_scalar("dpo/val_rejected_reward", val_rejected_reward, train_progress.global_step)
+                    self.__check_dpo_patience(val_accuracy, val_chosen_reward, train_progress)
+
+                # DPO validation uses a different data pipeline (paired samples) than
+                # standard validation, so they cannot share the same data loader.
+                return
+
             accumulated_loss_per_concept = {}
             concept_counts = {}
             mapping_seed_to_label = {}
@@ -374,14 +418,12 @@ class GenericTrainer(BaseTrainer):
                     loss_validation = self.model_setup.calculate_loss(
                         self.model, validation_batch, model_output_data, self.config)
 
-                # since validation batch size = 1
                 concept_name = validation_batch["concept_name"][0]
                 concept_path = validation_batch["concept_path"][0]
                 concept_seed = validation_batch["concept_seed"].item()
                 loss = loss_validation.item()
 
                 label = concept_name if concept_name else os.path.basename(concept_path)
-                # check and fix collision to display both graphs in tensorboard
                 if label in mapping_label_to_seed and mapping_label_to_seed[label] != concept_seed:
                     suffix = 1
                     new_label = f"{label}({suffix})"
@@ -399,8 +441,9 @@ class GenericTrainer(BaseTrainer):
 
             for concept_seed, total_loss in accumulated_loss_per_concept.items():
                 average_loss = total_loss / concept_counts[concept_seed]
+                label = mapping_seed_to_label[concept_seed]
 
-                self.tensorboard.add_scalar(f"loss/validation_step/{mapping_seed_to_label[concept_seed]}",
+                self.tensorboard.add_scalar(f"loss/validation_step/{label}",
                                             average_loss,
                                             train_progress.global_step)
 
@@ -412,6 +455,33 @@ class GenericTrainer(BaseTrainer):
                 self.tensorboard.add_scalar("loss/validation_step/total_average",
                                             total_average_loss,
                                             train_progress.global_step)
+
+    def __check_dpo_patience(self, val_accuracy: float, val_chosen_reward: float, train_progress: TrainProgress):
+        if not self.config.rlhf_dpo_patience_enabled:
+            return
+
+        accuracy_stalled = val_accuracy <= self._dpo_best_accuracy
+        chosen_reward_stalled = val_chosen_reward <= self._dpo_best_chosen_reward
+
+        if self.config.rlhf_dpo_patience_mode == DPOPatienceMode.EITHER:
+            patience_triggered = accuracy_stalled or chosen_reward_stalled
+        else:
+            patience_triggered = accuracy_stalled and chosen_reward_stalled
+
+        self._dpo_best_accuracy = max(self._dpo_best_accuracy, val_accuracy)
+        self._dpo_best_chosen_reward = max(self._dpo_best_chosen_reward, val_chosen_reward)
+
+        if patience_triggered:
+            self._dpo_patience_counter += 1
+        else:
+            self._dpo_patience_counter = 0
+
+        self.tensorboard.add_scalar("dpo/patience_counter", self._dpo_patience_counter, train_progress.global_step)
+
+        if self._dpo_patience_counter >= self.config.rlhf_dpo_patience_value:
+            print(f"DPO early stopping triggered: patience exhausted after {self._dpo_patience_counter} "
+                  f"consecutive checks without improvement.")
+            self.commands.stop()
 
     def __save_backup_config(self, backup_path):
         config_path = os.path.join(backup_path, "onetrainer_config")
@@ -732,24 +802,30 @@ class GenericTrainer(BaseTrainer):
                     step_seed = train_progress.global_step
                     bf16_stochastic_rounding_set_seed(step_seed, train_device)
 
-                    prior_pred_indices = [i for i in range(self.config.batch_size)
-                                          if ConceptType(batch['concept_type'][i]) == ConceptType.PRIOR_PREDICTION]
-                    if len(prior_pred_indices) > 0 \
-                            or (self.config.masked_training
-                                and self.config.masked_prior_preservation_weight > 0
-                                and self.config.training_method == TrainingMethod.LORA):
-                        with self.model_setup.prior_model(self.model, self.config), torch.no_grad():
-                            #do NOT create a subbatch using the indices, even though it would be more efficient:
-                            #different timesteps are used for a smaller subbatch by predict(), but the conditioning must match exactly:
-                            prior_model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
-                        model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
-                        prior_model_prediction = prior_model_output_data['predicted'].to(dtype=model_output_data['target'].dtype)
-                        model_output_data['target'][prior_pred_indices] = prior_model_prediction[prior_pred_indices]
-                        model_output_data['prior_target'] = prior_model_prediction
+                    if self.config.rlhf_enabled:
+                        loss = self.model_setup.calculate_dpo_loss(
+                            self.model, batch, self.config, train_progress
+                        )
                     else:
-                        model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                        # Standard training path
+                        prior_pred_indices = [i for i in range(self.config.batch_size)
+                                              if ConceptType(batch['concept_type'][i]) == ConceptType.PRIOR_PREDICTION]
+                        if len(prior_pred_indices) > 0 \
+                                or (self.config.masked_training
+                                    and self.config.masked_prior_preservation_weight > 0
+                                    and self.config.training_method == TrainingMethod.LORA):
+                            with self.model_setup.prior_model(self.model, self.config), torch.no_grad():
+                                #do NOT create a subbatch using the indices, even though it would be more efficient:
+                                #different timesteps are used for a smaller subbatch by predict(), but the conditioning must match exactly:
+                                prior_model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                            model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                            prior_model_prediction = prior_model_output_data['predicted'].to(dtype=model_output_data['target'].dtype)
+                            model_output_data['target'][prior_pred_indices] = prior_model_prediction[prior_pred_indices]
+                            model_output_data['prior_target'] = prior_model_prediction
+                        else:
+                            model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 
-                    loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
+                        loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
 
                     loss = loss / self.config.gradient_accumulation_steps
                     if scaler:
@@ -796,6 +872,13 @@ class GenericTrainer(BaseTrainer):
                                 raise RuntimeError("Training loss became NaN. This may be due to invalid parameters, precision issues, or a bug in the loss computation.")
 
                             self.tensorboard.add_scalar("loss/train_step",accumulated_loss_cpu , train_progress.global_step)
+                            if self.config.rlhf_enabled:
+                                dpo_metrics = self.model_setup.get_last_dpo_metrics()
+                                self.tensorboard.add_scalar("loss/dpo", dpo_metrics['loss'], train_progress.global_step)
+                                self.tensorboard.add_scalar("dpo/raw_loss", dpo_metrics['dpo_loss'], train_progress.global_step)
+                                self.tensorboard.add_scalar("dpo/chosen_reward", dpo_metrics['chosen_reward'], train_progress.global_step)
+                                self.tensorboard.add_scalar("dpo/rejected_reward", dpo_metrics['rejected_reward'], train_progress.global_step)
+                                self.tensorboard.add_scalar("dpo/accuracy", dpo_metrics['accuracy'], train_progress.global_step)
                             ema_loss = ema_loss or accumulated_loss_cpu
                             ema_loss_steps += 1
                             ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
@@ -824,7 +907,7 @@ class GenericTrainer(BaseTrainer):
 
                         self.one_step_trained = True
 
-                if self.config.validation and multi.is_master():
+                if (self.config.validation or self.config.rlhf_dpo_validation) and multi.is_master():
                     self.__validate(train_progress)
 
                 train_progress.next_step(self.config.batch_size)

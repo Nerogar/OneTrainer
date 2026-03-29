@@ -1,14 +1,18 @@
+import json
 import os
 import re
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable
 
 import modules.util.multi_gpu_util as multi
+from modules.dataLoader.dpo.PairByFilename import PairByFilename
 from modules.model.BaseModel import BaseModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.util import path_util
+from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.dpo_curation_util import dpo_concept_pairs
 from modules.util.enum.DataType import DataType
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
@@ -56,6 +60,26 @@ from diffusers import AutoencoderKL
 
 
 class DataLoaderText2ImageMixin(metaclass=ABCMeta):
+    @staticmethod
+    def __as_output_mapping(name: str | tuple[str, str]) -> tuple[str, str]:
+        return name if isinstance(name, tuple) else (name, name)
+
+    @staticmethod
+    def __is_dpo_rejected_name(name: str) -> bool:
+        return name == 'image_path' \
+            or name.startswith('latent_') \
+            or name.endswith(('_resolution', '_offset'))
+
+    def __load_concepts(self, config: TrainConfig) -> list[ConceptConfig]:
+        concepts = config.concepts
+        if concepts is None:
+            with open(config.concept_file_name, 'r') as f:
+                concepts = [ConceptConfig.default_values().from_dict(c) for c in json.load(f)]
+        return concepts
+
+    def __dpo_concept_pairs(self, config: TrainConfig, is_validation: bool = False) -> list[tuple[str, str]]:
+        return dpo_concept_pairs(self.__load_concepts(config), is_validation=is_validation)
+
     def _enumerate_input_modules(self, config: TrainConfig, allow_videos: bool = False) -> list:
         supported_extensions = set()
         supported_extensions |= path_util.supported_image_extensions()
@@ -271,6 +295,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             vae: AutoencoderKL | None = None,
             autocast_context: list[torch.autocast | None] = None,
             train_dtype: DataType | None = None,
+            is_validation: bool = False,
     ):
         if before_cache_image_fun is None:
             def prepare_vae():
@@ -280,9 +305,9 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
                 torch_gc()
             before_cache_image_fun = prepare_vae
 
-        sort_names = output_names + ['concept']
+        resolved_output_names = [self.__as_output_mapping(name) for name in output_names]
 
-        output_names = output_names + [
+        output_names = resolved_output_names + [
             ('concept.loss_weight', 'loss_weight'),
             ('concept.type', 'concept_type'),
         ]
@@ -292,6 +317,9 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             output_names.append(('concept.path', 'concept_path'))
             output_names.append(('concept.seed', 'concept_seed'))
 
+        final_output_names = [out_name for _, out_name in output_names]
+        sort_names = final_output_names + ['concept']
+
         mask_remove = RandomLatentMaskRemove(
             latent_mask_name='latent_mask', latent_conditioning_image_name='latent_conditioning_image' if use_conditioning_image else None,
             replace_probability=config.unmasked_probability, vae=vae,
@@ -299,6 +327,25 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             autocast_contexts=autocast_context, dtype=train_dtype.torch_dtype(),
             before_cache_fun=before_cache_image_fun,
         )
+
+        modules = []
+
+        if config.model_type.has_mask_input():
+            modules.append(mask_remove)
+
+        if config.rlhf_enabled:
+            rejected_names = [
+                (in_name, out_name + "_rejected")
+                for in_name, out_name in resolved_output_names
+                if self.__is_dpo_rejected_name(out_name)
+            ]
+            modules.append(PairByFilename(
+                concept_pairs=self.__dpo_concept_pairs(config, is_validation),
+                chosen_names=output_names + [('concept', 'concept')],
+                rejected_names=rejected_names,
+            ))
+            final_output_names += [out_name for _, out_name in rejected_names]
+            sort_names = final_output_names + ['concept']
 
         world_size = multi.world_size() if config.multi_gpu else 1  #world_size can be 1 for validation dataloader, even if multi.world_size() returns > 1
         if config.latent_caching:
@@ -308,12 +355,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             batch_sorting = InlineAspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size * world_size)
             distributed_sampler = InlineDistributedSampler(names=sort_names, world_size=world_size, rank=multi.rank())
 
-        output = OutputPipelineModule(names=output_names)
-
-        modules = []
-
-        if config.model_type.has_mask_input():
-            modules.append(mask_remove)
+        output = OutputPipelineModule(names=final_output_names if config.rlhf_enabled else output_names)
 
         modules.append(batch_sorting)
         if world_size > 1:
@@ -400,7 +442,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             inpainting_modules = self._inpainting_modules(config)
         preparation_modules = self._preparation_modules(config, model)
         cache_modules = self._cache_modules(config, model, model_setup)
-        output_modules = self._output_modules(config, model, model_setup)
+        output_modules = self._output_modules(config, model, model_setup, is_validation=is_validation)
 
         debug_modules = self._debug_modules(config, model)
 
@@ -434,7 +476,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def _output_modules(self, config: TrainConfig, model: BaseModel, model_setup: BaseModelSetup):
+    def _output_modules(self, config: TrainConfig, model: BaseModel, model_setup: BaseModelSetup, is_validation: bool = False):
         pass
 
     @abstractmethod
