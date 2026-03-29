@@ -288,7 +288,7 @@ class LoHaModule(PeftBase):
 class LoKrModule(PeftBase):
     """Implementation of LoKr from Lycoris."""
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, dim: int, alpha: float, decompose_both: bool, decompose_factor: int, use_tucker: bool, weight_decompose: bool, dora_on_output: bool, rs_lora: bool, full_matrix: bool, train_device: torch.device, lokr_vec_trick: bool = False):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, dim: int, alpha: float, decompose_both: bool, decompose_factor: int, use_tucker: bool, weight_decompose: bool, dora_on_output: bool, full_matrix: bool, train_device: torch.device, lokr_vec_trick: bool = False):
         super().__init__(prefix, orig_module)
         self.dim = dim  # LoKr uses 'dim' as its parameter
         self.dropout = Dropout(0)
@@ -300,7 +300,6 @@ class LoKrModule(PeftBase):
         self.weight_decompose = weight_decompose
         self.dora_on_output = dora_on_output
         self.train_device = train_device
-        self.rs_lora = rs_lora
         self.full_matrix = full_matrix
         self.lokr_vec_trick = lokr_vec_trick
 
@@ -429,10 +428,7 @@ class LoKrModule(PeftBase):
     def forward(self, x, *args, **kwargs):
         self.check_initialized()
 
-        r_factor = self.dim
-        if self.rs_lora:
-            r_factor = math.sqrt(r_factor)
-        scale = self.alpha / r_factor
+        scale = self.alpha / self.dim
 
         # DoRA for LoKr
         if self.weight_decompose:
@@ -863,7 +859,6 @@ class LoRAModuleWrapper:
                 'use_tucker': config.lokr_use_tucker,
                 'weight_decompose': config.lokr_weight_decompose,
                 'dora_on_output': config.lokr_dora_on_output,
-                'rs_lora': config.lokr_rs_lora,
                 'full_matrix': config.lokr_full_matrix,
                 'train_device': torch.device(config.train_device),
                 'lokr_vec_trick': config.lokr_vec_trick,

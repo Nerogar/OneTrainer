@@ -172,28 +172,23 @@ class LoraTab:
                             tooltip=f"The alpha parameter used when creating a new {name}")
             components.entry(master, 3, 1, self.ui_state, "lora_alpha")
 
-            # RS scaling
-            components.label(master, 4, 0, "Use RS-LoKr Scaling",
-                             tooltip="Root-Squared LoKr scaling. Changes the scaling factor from alpha/dim to alpha/sqrt(dim). Experimental.")
-            components.switch(master, 4, 1, self.ui_state, "lokr_rs_lora")
-
             # Dropout Percentage
-            components.label(master, 5, 0, "Dropout Probability",
+            components.label(master, 4, 0, "Dropout Probability",
                             tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
-            components.entry(master, 5, 1, self.ui_state, "dropout_probability")
+            components.entry(master, 4, 1, self.ui_state, "dropout_probability")
 
             # LoKr weight dtype
-            components.label(master, 6, 0, f"{name} Weight Data Type",
+            components.label(master, 5, 0, f"{name} Weight Data Type",
                             tooltip=f"The {name} weight data type used for training. This can reduce memory consumption, but reduces precision")
-            components.options_kv(master, 6, 1, [
+            components.options_kv(master, 5, 1, [
                 ("float32", DataType.FLOAT_32),
                 ("bfloat16", DataType.BFLOAT_16),
             ], self.ui_state, "lora_weight_dtype")
 
             # LoKr Vectorization trick
-            components.label(master, 7, 0, "Kronecker-Vec Trick",
+            components.label(master, 6, 0, "Kronecker-Vec Trick",
                              tooltip="Uses an accelerated path that bypasses the materialization of the full Kronecker product. This delivers a massive speedup to the LoKr without sacrificing precision. Highly recommended.")
-            components.switch(master, 7, 1, self.ui_state, "lokr_vec_trick")
+            components.switch(master, 6, 1, self.ui_state, "lokr_vec_trick")
 
             #LoKr Decomposition Settings
             components.label(master, 1, 3, "Decompose Both Matrices",
