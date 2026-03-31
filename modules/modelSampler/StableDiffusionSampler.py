@@ -2,7 +2,7 @@ import inspect
 from collections.abc import Callable
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
-from modules.model.util.clip_util import get_num_clip_chunks
+from modules.model.util.clip_util import get_max_clip_chunks
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
 from modules.util import create, factory
 from modules.util.config.SampleConfig import SampleConfig
@@ -35,6 +35,36 @@ class StableDiffusionSampler(BaseModelSampler):
         self.model = model
         self.model_type = model_type
         self.pipeline = model.create_pipeline()
+
+    def __get_min_chunks(self, prompt: str, negative_prompt: str) -> int:
+        use_chunking = self.model.train_config.use_clip_token_chunks if self.model.train_config else False
+        if not use_chunking:
+            return 1
+
+        tokenizer = self.model.tokenizer
+        max_chunks = self.model.train_config.clip_max_chunks if self.model.train_config else 1
+        chunk_size = tokenizer.model_max_length - 2
+        max_length = max(tokenizer.model_max_length, max_chunks * chunk_size + 2)
+        split_on_comma = self.model.train_config.clip_chunk_split_on_comma if self.model.train_config else False
+
+        prompt_tokens = tokenizer(
+            self.model.add_text_encoder_embeddings_to_prompt(prompt),
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt",
+        ).input_ids
+        negative_prompt_tokens = tokenizer(
+            self.model.add_text_encoder_embeddings_to_prompt(negative_prompt),
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt",
+        ).input_ids
+
+        return get_max_clip_chunks(
+            [(prompt_tokens, chunk_size, tokenizer), (negative_prompt_tokens, chunk_size, tokenizer)],
+            split_on_comma=split_on_comma,
+            max_chunks=max_chunks,
+        )
 
     @torch.no_grad()
     def __sample_base(
@@ -69,31 +99,7 @@ class StableDiffusionSampler(BaseModelSampler):
             # prepare prompt
             self.model.text_encoder_to(self.train_device)
 
-            use_chunking = self.model.train_config.use_clip_token_chunks if self.model.train_config else False
-            min_chunks = 1
-            if use_chunking:
-                tokenizer = self.model.tokenizer
-                max_chunks = self.model.train_config.clip_max_chunks if self.model.train_config else 1
-                chunk_size = self.model.train_config.clip_chunk_size if self.model.train_config else 75
-                max_length = max(tokenizer.model_max_length, max_chunks * chunk_size + 2)
-
-                prompt_tokens = tokenizer(
-                    self.model.add_text_encoder_embeddings_to_prompt(prompt),
-                    truncation=True,
-                    max_length=max_length,
-                    return_tensors="pt",
-                ).input_ids
-                negative_prompt_tokens = tokenizer(
-                    self.model.add_text_encoder_embeddings_to_prompt(negative_prompt),
-                    truncation=True,
-                    max_length=max_length,
-                    return_tensors="pt",
-                ).input_ids
-                chunk_size = tokenizer.model_max_length - 2
-                split_on_comma = self.model.train_config.clip_chunk_split_on_comma if self.model.train_config else False
-                min_chunks_pos = get_num_clip_chunks(prompt_tokens, chunk_size, split_on_comma, tokenizer, max_chunks=max_chunks)
-                min_chunks_neg = get_num_clip_chunks(negative_prompt_tokens, chunk_size, split_on_comma, tokenizer, max_chunks=max_chunks)
-                min_chunks = max(min_chunks_pos, min_chunks_neg)
+            min_chunks = self.__get_min_chunks(prompt, negative_prompt)
 
             prompt_embedding = self.model.encode_text(
                 text=prompt,
@@ -304,31 +310,7 @@ class StableDiffusionSampler(BaseModelSampler):
             # prepare prompt
             self.model.text_encoder_to(self.train_device)
 
-            use_chunking = self.model.train_config.use_clip_token_chunks if self.model.train_config else False
-            min_chunks = 1
-            if use_chunking:
-                tokenizer = self.model.tokenizer
-                max_chunks = self.model.train_config.clip_max_chunks if self.model.train_config else 1
-                chunk_size = self.model.train_config.clip_chunk_size if self.model.train_config else 75
-                max_length = max(tokenizer.model_max_length, max_chunks * chunk_size + 2)
-
-                prompt_tokens = tokenizer(
-                    self.model.add_text_encoder_embeddings_to_prompt(prompt),
-                    truncation=True,
-                    max_length=max_length,
-                    return_tensors="pt",
-                ).input_ids
-                negative_prompt_tokens = tokenizer(
-                    self.model.add_text_encoder_embeddings_to_prompt(negative_prompt),
-                    truncation=True,
-                    max_length=max_length,
-                    return_tensors="pt",
-                ).input_ids
-                chunk_size = tokenizer.model_max_length - 2
-                split_on_comma = self.model.train_config.clip_chunk_split_on_comma if self.model.train_config else False
-                min_chunks_pos = get_num_clip_chunks(prompt_tokens, chunk_size, split_on_comma, tokenizer, max_chunks=max_chunks)
-                min_chunks_neg = get_num_clip_chunks(negative_prompt_tokens, chunk_size, split_on_comma, tokenizer, max_chunks=max_chunks)
-                min_chunks = max(min_chunks_pos, min_chunks_neg)
+            min_chunks = self.__get_min_chunks(prompt, negative_prompt)
 
             prompt_embedding = self.model.encode_text(
                 text=prompt,

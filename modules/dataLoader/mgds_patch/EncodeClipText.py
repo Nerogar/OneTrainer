@@ -25,7 +25,6 @@ class EncodeClipText(
             autocast_contexts: list[torch.autocast | None] = None,
             dtype: torch.dtype | None = None,
             chunk_if_needed: bool = False,
-            chunk_size: int = 75,
             pooled_output_handling: str = 'FIRST',
             tokenizer: Any | None = None,
             split_on_comma: bool = False,
@@ -44,7 +43,7 @@ class EncodeClipText(
         self.dtype = dtype
 
         self.chunk_if_needed = chunk_if_needed
-        self.chunk_size = chunk_size
+        self.chunk_size = text_encoder.config.max_position_embeddings - 2
         self.pooled_output_handling = pooled_output_handling
         self.tokenizer = tokenizer
         self.split_on_comma = split_on_comma
@@ -70,7 +69,7 @@ class EncodeClipText(
         else:
             tokens_attention_mask = None
 
-        if self.chunk_if_needed and tokens.shape[0] > 77:
+        if self.chunk_if_needed and tokens.shape[0] > self.chunk_size + 2:
             return self._get_item_chunked(tokens, tokens_attention_mask, self.chunk_size)
         else:
             return self._get_item_single(tokens, tokens_attention_mask)
@@ -216,12 +215,10 @@ class EncodeClipText(
             handling = str(self.pooled_output_handling)
             if handling == 'FIRST':
                 pooled_state = pooled_states[0]
-            elif handling == 'LAST':
-                pooled_state = pooled_states[-1]
             elif handling == 'AVERAGE':
                 pooled_state = torch.mean(torch.stack(pooled_states), dim=0)
             else:
-                pooled_state = pooled_states[-1]
+                pooled_state = pooled_states[0]
         else:
             pooled_state = None
 

@@ -463,7 +463,6 @@ class TrainConfig(BaseConfig):
     text_encoder: TrainModelPartConfig
     text_encoder_layer_skip: int
     use_clip_token_chunks: bool
-    clip_chunk_size: int
     clip_max_chunks: int
     clip_chunk_pooled_output_handling: PooledOutputHandling
     clip_chunk_split_on_comma: bool
@@ -1069,7 +1068,6 @@ class TrainConfig(BaseConfig):
         data.append(("text_encoder_layer_skip", 0, int, False))
         data.append(("text_encoder_sequence_length", 512, int, True))
         data.append(("use_clip_token_chunks", False, bool, False))
-        data.append(("clip_chunk_size", 75, int, False))
         data.append(("clip_max_chunks", 3, int, False))
         data.append(("clip_chunk_pooled_output_handling", PooledOutputHandling.FIRST, PooledOutputHandling, False))
         data.append(("clip_chunk_split_on_comma", False, bool, False))

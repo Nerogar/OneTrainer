@@ -38,11 +38,11 @@ class StableDiffusionBaseDataLoader(
         encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
         downscale_depth = ScaleImage(in_name='depth', out_name='latent_depth', factor=0.125)
-        max_token_length = config.clip_chunk_size * config.clip_max_chunks + 2 if config.use_clip_token_chunks else model.tokenizer.model_max_length
+        max_token_length = (model.text_encoder.config.max_position_embeddings - 2) * config.clip_max_chunks + 2 if config.use_clip_token_chunks else model.tokenizer.model_max_length
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=max_token_length)
         encode_prompt = EncodeClipText(in_name='tokens', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_hidden_state', pooled_out_name=None, add_layer_norm=True,
                                        text_encoder=model.text_encoder, hidden_state_output_index=-(1 + config.text_encoder_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(),
-                                       chunk_if_needed=config.use_clip_token_chunks, chunk_size=config.clip_chunk_size, pooled_output_handling=config.clip_chunk_pooled_output_handling,
+                                       chunk_if_needed=config.use_clip_token_chunks, pooled_output_handling=config.clip_chunk_pooled_output_handling,
                                        tokenizer=model.tokenizer, split_on_comma=config.clip_chunk_split_on_comma, max_chunks=config.clip_max_chunks)
 
         modules = [rescale_image, encode_image, image_sample]

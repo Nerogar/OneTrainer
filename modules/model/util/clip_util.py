@@ -21,8 +21,8 @@ def encode_clip(
         attention_mask: Tensor | None = None,
         add_layer_norm: bool = True,
 ) -> tuple[Tensor, Tensor]:
-    if (add_output and text_encoder_output is None) \
-            or (add_pooled_output and pooled_text_encoder_output is None) \
+    if ((add_output and text_encoder_output is None)
+            or (add_pooled_output and pooled_text_encoder_output is None)) \
             and text_encoder is not None:
 
         text_encoder_output = text_encoder(
@@ -48,42 +48,76 @@ def encode_clip(
     return text_encoder_output, pooled_text_encoder_output
 
 
-def get_num_clip_chunks(tokens: Tensor, chunk_size: int, split_on_comma: bool = False, tokenizer: Any | None = None, max_chunks: int | None = None) -> int:
-    content_tokens = tokens[0, 1:-1]
-    if tokenizer is not None:
-        pad_token_id = tokenizer.pad_token_id
-        if pad_token_id is not None:
-            indices = (content_tokens == pad_token_id).nonzero()
-            if len(indices) > 0:
-                content_tokens = content_tokens[:indices[0].item()]
-
-    if not split_on_comma or tokenizer is None:
-        num_chunks = (len(content_tokens) + chunk_size - 1) // chunk_size if len(content_tokens) > 0 else 1
-        return min(num_chunks, max_chunks) if max_chunks is not None else num_chunks
-
+def _get_comma_token_id(tokenizer: Any | None) -> int | None:
+    if tokenizer is None:
+        return None
     comma_id = tokenizer.convert_tokens_to_ids(",")
     if isinstance(comma_id, list):
         comma_id = comma_id[0]
+    return comma_id
 
-    num_chunks = 0
+
+def _split_tokens_into_chunks(
+        tokens_row: Tensor,
+        mask_row: Tensor | None,
+        chunk_size: int,
+        comma_id: int | None = None,
+        pad_token_id: int | None = None,
+) -> tuple[list[Tensor], list[Tensor]]:
+    if pad_token_id is not None:
+        indices = (tokens_row == pad_token_id).nonzero()
+        if len(indices) > 0:
+            tokens_row = tokens_row[:indices[0].item()]
+            if mask_row is not None:
+                mask_row = mask_row[:indices[0].item()]
+
+    tokens_splits = []
+    mask_splits = []
     start = 0
-    while start < len(content_tokens):
-        num_chunks += 1
-        if len(content_tokens) - start <= chunk_size:
+    while start < len(tokens_row):
+        if len(tokens_row) - start <= chunk_size:
+            tokens_splits.append(tokens_row[start:])
+            if mask_row is not None:
+                mask_splits.append(mask_row[start:])
             break
         end = start + chunk_size
         if comma_id is not None:
             found_comma = -1
             for i in range(end - 1, start - 1, -1):
-                if content_tokens[i] == comma_id:
+                if tokens_row[i] == comma_id:
                     found_comma = i
                     break
             if found_comma != -1:
                 end = found_comma + 1
+        tokens_splits.append(tokens_row[start:end])
+        if mask_row is not None:
+            mask_splits.append(mask_row[start:end])
         start = end
+    return tokens_splits, mask_splits
 
-    num_chunks = max(num_chunks, 1)
+
+def get_num_clip_chunks(tokens: Tensor, chunk_size: int, split_on_comma: bool = False, tokenizer: Any | None = None, max_chunks: int | None = None) -> int:
+    content_tokens = tokens[0, 1:-1]
+    pad_token_id = tokenizer.pad_token_id if tokenizer is not None else None
+
+    comma_id = _get_comma_token_id(tokenizer) if split_on_comma else None
+
+    splits, _ = _split_tokens_into_chunks(content_tokens, None, chunk_size, comma_id=comma_id, pad_token_id=pad_token_id)
+
+    num_chunks = max(len(splits), 1) if splits else 1
     return min(num_chunks, max_chunks) if max_chunks is not None else num_chunks
+
+
+def get_max_clip_chunks(
+        tokenized_sets: list[tuple[Tensor, int, Any]],
+        split_on_comma: bool = False,
+        max_chunks: int | None = None,
+) -> int:
+    result = 1
+    for tokens, chunk_size, tokenizer in tokenized_sets:
+        n = get_num_clip_chunks(tokens, chunk_size, split_on_comma, tokenizer, max_chunks=max_chunks)
+        result = max(result, n)
+    return result
 
 
 def encode_clip_chunked(
@@ -104,8 +138,8 @@ def encode_clip_chunked(
         split_on_comma: bool = False,
         max_chunks: int | None = None,
 ) -> tuple[Tensor, Tensor]:
-    if (add_output and text_encoder_output is None) \
-            or (add_pooled_output and pooled_text_encoder_output is None) \
+    if ((add_output and text_encoder_output is None)
+            or (add_pooled_output and pooled_text_encoder_output is None)) \
             and text_encoder is not None:
 
         max_length = text_encoder.config.max_position_embeddings
@@ -121,50 +155,20 @@ def encode_clip_chunked(
             if use_attention_mask and attention_mask is not None:
                 content_mask = attention_mask[:, 1:-1]
 
-            def get_splits(tokens_row, mask_row, chunk_size, comma_id=None):
-                if tokenizer is not None:
-                    pad_token_id = tokenizer.pad_token_id
-                    if pad_token_id is not None:
-                        indices = (tokens_row == pad_token_id).nonzero()
-                        if len(indices) > 0:
-                            tokens_row = tokens_row[:indices[0].item()]
-                            if mask_row is not None:
-                                mask_row = mask_row[:indices[0].item()]
+            pad_token_id = tokenizer.pad_token_id if tokenizer is not None else None
 
-                tokens_splits = []
-                mask_splits = []
-                start = 0
-                while start < len(tokens_row):
-                    if len(tokens_row) - start <= chunk_size:
-                        tokens_splits.append(tokens_row[start:])
-                        if mask_row is not None:
-                            mask_splits.append(mask_row[start:])
-                        break
-                    end = start + chunk_size
-                    if comma_id is not None:
-                        found_comma = -1
-                        for i in range(end - 1, start - 1, -1):
-                            if tokens_row[i] == comma_id:
-                                found_comma = i
-                                break
-                        if found_comma != -1:
-                            end = found_comma + 1
-                    tokens_splits.append(tokens_row[start:end])
-                    if mask_row is not None:
-                        mask_splits.append(mask_row[start:end])
-                    start = end
-                return tokens_splits, mask_splits
-
-            comma_token_id = None
-            if split_on_comma and tokenizer is not None:
-                comma_token_id = tokenizer.convert_tokens_to_ids(",")
-                if isinstance(comma_token_id, list):
-                    comma_token_id = comma_token_id[0]
+            comma_token_id = _get_comma_token_id(tokenizer) if split_on_comma else None
 
             all_element_chunks = []
             all_element_mask_chunks = []
             for b in range(batch_size):
-                t_splits, m_splits = get_splits(content_tokens[b], content_mask[b] if content_mask is not None else None, chunk_size, comma_token_id)
+                t_splits, m_splits = _split_tokens_into_chunks(
+                    content_tokens[b],
+                    content_mask[b] if content_mask is not None else None,
+                    chunk_size,
+                    comma_id=comma_token_id,
+                    pad_token_id=pad_token_id,
+                )
                 if max_chunks is not None:
                     t_splits = t_splits[:max_chunks]
                     m_splits = m_splits[:max_chunks]
@@ -233,12 +237,10 @@ def encode_clip_chunked(
             if add_pooled_output:
                 if pooled_output_handling == PooledOutputHandling.FIRST:
                     pooled_text_encoder_output = pooled_outputs[0]
-                elif pooled_output_handling == PooledOutputHandling.LAST:
-                    pooled_text_encoder_output = pooled_outputs[-1]
                 elif pooled_output_handling == PooledOutputHandling.AVERAGE:
                     pooled_text_encoder_output = torch.mean(torch.stack(pooled_outputs), dim=0)
                 else:
-                    pooled_text_encoder_output = pooled_outputs[-1]
+                    pooled_text_encoder_output = pooled_outputs[0]
             else:
                 pooled_text_encoder_output = None
         else:

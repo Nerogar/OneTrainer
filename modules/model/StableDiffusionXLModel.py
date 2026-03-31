@@ -217,7 +217,7 @@ class StableDiffusionXLModel(BaseModel):
         encode_fn = encode_clip_chunked if use_chunking else encode_clip
 
         max_chunks = self.train_config.clip_max_chunks if self.train_config else 1
-        chunk_size = self.train_config.clip_chunk_size if self.train_config else 75
+        chunk_size = self.text_encoder_1.config.max_position_embeddings - 2
         max_length = max_chunks * chunk_size + 2
 
         if tokens_1 is None and text is not None:
@@ -295,7 +295,6 @@ class StableDiffusionXLModel(BaseModel):
             text_encoder_1_output,
             use_clip_token_chunks=use_chunking,
             clip_max_chunks=max_chunks,
-            clip_chunk_size=chunk_size,
         )
 
         text_encoder_2_output = self._apply_output_embeddings(
@@ -305,7 +304,6 @@ class StableDiffusionXLModel(BaseModel):
             text_encoder_2_output,
             use_clip_token_chunks=use_chunking,
             clip_max_chunks=max_chunks,
-            clip_chunk_size=chunk_size,
         )
 
         # apply dropout

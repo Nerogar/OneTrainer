@@ -556,25 +556,21 @@ class TrainingTab:
                          tooltip="Enables processing long prompts by splitting them into chunks.")
         components.switch(frame, 0, 1, self.ui_state, "use_clip_token_chunks")
 
-        # clip chunk size
-        components.label(frame, 1, 0, "Clip Chunk Size",
-                         tooltip="The size of each chunk (excluding BOS and EOS tokens).")
-        components.entry(frame, 1, 1, self.ui_state, "clip_chunk_size")
-
         # clip max chunks
-        components.label(frame, 2, 0, "Clip Max Chunks",
+        components.label(frame, 1, 0, "Clip Max Chunks",
                          tooltip="The maximum number of chunks to process.")
-        components.entry(frame, 2, 1, self.ui_state, "clip_max_chunks")
+        components.entry(frame, 1, 1, self.ui_state, "clip_max_chunks",
+                         extra_validate=check_range(lower=1, message="Max chunks must be at least 1"))
 
         # clip chunk split on comma
-        components.label(frame, 3, 0, "Split on Comma",
+        components.label(frame, 2, 0, "Split on Comma",
                          tooltip="If enabled, attempts to split text at commas to avoid splitting words between chunks.")
-        components.switch(frame, 3, 1, self.ui_state, "clip_chunk_split_on_comma")
+        components.switch(frame, 2, 1, self.ui_state, "clip_chunk_split_on_comma")
 
         # pooled output handling
-        components.label(frame, 4, 0, "Pooled Output Handling",
+        components.label(frame, 3, 0, "Pooled Output Handling",
                          tooltip="How to combine pooled outputs from multiple chunks.")
-        components.options(frame, 4, 1, [str(x) for x in list(PooledOutputHandling)], self.ui_state, "clip_chunk_pooled_output_handling")
+        components.options(frame, 3, 1, [str(x) for x in list(PooledOutputHandling)], self.ui_state, "clip_chunk_pooled_output_handling")
 
     def __create_unet_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
