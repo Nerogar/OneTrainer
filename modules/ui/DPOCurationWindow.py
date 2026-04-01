@@ -176,10 +176,10 @@ class DPOCurationWindow(ctk.CTkToplevel):
         suggested = self._elo_suggested_comparisons()
 
         # Header
+        self._build_prompt_expander(self, group['prompt'])
+
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=10, pady=5)
-        ctk.CTkLabel(header, text=f"Prompt: {group['prompt'][:80]}...",
-                     font=("", 12), anchor="w").pack(side="left", padx=5)
         ctk.CTkLabel(header, text=f"AR: {group['aspectratio']}",
                      font=("", 12)).pack(side="left", padx=15)
         ctk.CTkLabel(header, text=f"Group {self.current_group_index + 1}/{len(self.groups)}",
@@ -267,10 +267,10 @@ class DPOCurationWindow(ctk.CTkToplevel):
         group = self.groups[self.current_group_index]
 
         # Header
+        self._build_prompt_expander(self, group['prompt'])
+
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=10, pady=5)
-        ctk.CTkLabel(header, text=f"Prompt: {group['prompt'][:80]}...",
-                     font=("", 12), anchor="w").pack(side="left", padx=5)
         ctk.CTkLabel(header, text=f"AR: {group['aspectratio']}",
                      font=("", 12)).pack(side="left", padx=15)
         ctk.CTkLabel(header, text=f"Group {self.current_group_index + 1}/{len(self.groups)}",
@@ -309,7 +309,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         thumb_size = 250
         try:
             pil_img = Image.open(path)
-            pil_img.thumbnail((thumb_size, thumb_size), Image.Resampling.LANCZOS)
+            pil_img = self._fit_image(pil_img, thumb_size, thumb_size)
             ctk_img = ctk.CTkImage(light_image=pil_img, size=pil_img.size)
 
             label = ctk.CTkLabel(master, text="", image=ctk_img)
@@ -330,7 +330,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         try:
             pil_img = Image.open(path)
             sw, sh = preview.winfo_screenwidth(), preview.winfo_screenheight()
-            pil_img.thumbnail((sw, sh - 50), Image.Resampling.LANCZOS)
+            pil_img = self._fit_image(pil_img, sw, sh - 50)
             ctk_img = ctk.CTkImage(light_image=pil_img, size=pil_img.size)
 
             label = ctk.CTkLabel(preview, text="", image=ctk_img)
@@ -380,6 +380,40 @@ class DPOCurationWindow(ctk.CTkToplevel):
         else:
             self._start_group_round()
 
+    def _fit_image(self, pil_img: Image.Image, max_w: int, max_h: int) -> Image.Image:
+        scale = min(max_w / pil_img.width, max_h / pil_img.height)
+        new_w = max(1, int(pil_img.width * scale))
+        new_h = max(1, int(pil_img.height * scale))
+        return pil_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+    def _build_prompt_expander(self, parent, prompt: str):
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
+        frame.pack(fill="x", padx=10, pady=(5, 0))
+
+        truncated = prompt[:100] + ("..." if len(prompt) > 100 else "")
+        expanded = ctk.BooleanVar(value=False)
+
+        toggle_btn = ctk.CTkButton(frame, text="Prompt [+]", width=90, height=24,
+                                    font=("", 11), fg_color="gray30",
+                                    command=lambda: _toggle())
+        toggle_btn.pack(side="left", padx=(0, 8))
+
+        text_label = ctk.CTkLabel(frame, text=truncated, font=("", 12),
+                                   anchor="w", wraplength=0)
+        text_label.pack(side="left", fill="x", expand=True)
+
+        def _toggle():
+            if expanded.get():
+                expanded.set(False)
+                toggle_btn.configure(text="Prompt [+]")
+                text_label.configure(text=truncated, wraplength=0)
+            else:
+                expanded.set(True)
+                toggle_btn.configure(text="Prompt [-]")
+                text_label.configure(text=prompt, wraplength=max(200, frame.winfo_width() - 110))
+
+        return frame
+
     def _display_image(self, master, path: str, row: int, col: int):
         try:
             pil_img = Image.open(path)
@@ -388,7 +422,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
             win_h = self.winfo_height() or self.winfo_screenheight()
             max_w = max(400, win_w // 2 - 40)
             max_h = max(400, win_h - 200)
-            pil_img.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
+            pil_img = self._fit_image(pil_img, max_w, max_h)
             ctk_img = ctk.CTkImage(light_image=pil_img, size=pil_img.size)
 
             label = ctk.CTkLabel(master, text="", image=ctk_img)
