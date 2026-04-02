@@ -601,6 +601,7 @@ class TrainConfig(BaseConfig):
                 11: self.__migration_11,
                 12: self.__migration_12,
                 13: self.__migration_13,
+                14: self.__migration_14,
             }
         )
 
@@ -847,6 +848,14 @@ class TrainConfig(BaseConfig):
     def __migration_13(self, data: dict) -> dict:
         migrated_data = data.copy()
         migrated_data.setdefault("rlhf_dpo_execution_mode", "SEQUENTIAL")
+        return migrated_data
+
+    def __migration_14(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        migrated_data.setdefault("transfer_step1", False)
+        migrated_data.setdefault("transfer_step2", False)
+        migrated_data.setdefault("transfer_guidance", 3.0)
+        migrated_data.setdefault("transfer_train_lora", False)
         return migrated_data
 
     def effective_dpo_ref_mode(self) -> DPORefMode:

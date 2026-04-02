@@ -308,8 +308,8 @@ class DPOCurationWindow(ctk.CTkToplevel):
     def _display_thumbnail(self, master, path: str, row: int, col: int):
         thumb_size = 250
         try:
-            pil_img = Image.open(path)
-            pil_img = self._fit_image(pil_img, thumb_size, thumb_size)
+            with Image.open(path) as _raw:
+                pil_img = self._fit_image(_raw, thumb_size, thumb_size).copy()
             ctk_img = ctk.CTkImage(light_image=pil_img, size=pil_img.size)
 
             label = ctk.CTkLabel(master, text="", image=ctk_img)
@@ -328,9 +328,9 @@ class DPOCurationWindow(ctk.CTkToplevel):
         preview.focus_set()
 
         try:
-            pil_img = Image.open(path)
             sw, sh = preview.winfo_screenwidth(), preview.winfo_screenheight()
-            pil_img = self._fit_image(pil_img, sw, sh - 50)
+            with Image.open(path) as _raw:
+                pil_img = self._fit_image(_raw, sw, sh - 50).copy()
             ctk_img = ctk.CTkImage(light_image=pil_img, size=pil_img.size)
 
             label = ctk.CTkLabel(preview, text="", image=ctk_img)
@@ -416,13 +416,13 @@ class DPOCurationWindow(ctk.CTkToplevel):
 
     def _display_image(self, master, path: str, row: int, col: int):
         try:
-            pil_img = Image.open(path)
             self.update_idletasks()
             win_w = self.winfo_width() or self.winfo_screenwidth()
             win_h = self.winfo_height() or self.winfo_screenheight()
             max_w = max(400, win_w // 2 - 40)
             max_h = max(400, win_h - 200)
-            pil_img = self._fit_image(pil_img, max_w, max_h)
+            with Image.open(path) as _raw:
+                pil_img = self._fit_image(_raw, max_w, max_h).copy()
             ctk_img = ctk.CTkImage(light_image=pil_img, size=pil_img.size)
 
             label = ctk.CTkLabel(master, text="", image=ctk_img)

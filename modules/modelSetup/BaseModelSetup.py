@@ -313,10 +313,7 @@ class BaseModelSetup(
         if len(adapters) == 0:
             raise RuntimeError("RLHF DPO requires active adapters, but no trainable adapters are attached to the current model.")
 
-        if hasattr(config, "effective_dpo_ref_mode"):
-            ref_mode = config.effective_dpo_ref_mode()
-        else:
-            ref_mode = DPORefMode.EXISTING_ADAPTER if config.lora_model_name else DPORefMode.NEW_ADAPTER
+        ref_mode = config.effective_dpo_ref_mode()
 
         if ref_mode == DPORefMode.NEW_ADAPTER:
             for adapter in adapters:
@@ -349,6 +346,8 @@ class BaseModelSetup(
                 for adapter, policy_ptrs in zip(adapters, policy_data, strict=True):
                     for param, policy_ptr in zip(adapter.parameters(), policy_ptrs, strict=True):
                         param.data = policy_ptr
+        else:
+            raise ValueError(f"Unsupported DPO reference mode: {ref_mode}")
 
     def _create_model_part_parameters(
         self,

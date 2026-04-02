@@ -53,8 +53,11 @@ def strip_angle_bracket_segments(prompt: str) -> str:
 
 def _extract_raw_metadata(path: str) -> dict:
     """Scan raw file bytes for plaintext metadata (JPEG, WebP, etc.)."""
+    CHUNK = 256 * 1024  # 256 KB covers metadata in most formats
     with open(path, 'rb') as f:
-        raw = f.read()
+        raw = f.read(CHUNK)
+        if b'"sui_image_params"' not in raw and b'"prompt"' not in raw:
+            raw = raw + f.read()  # fall back to full read
     # Preserve non-ASCII bytes instead of silently dropping them.
     text = raw.decode('utf-8', errors='surrogateescape')
 
