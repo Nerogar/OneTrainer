@@ -114,6 +114,11 @@ class LoraTab:
                             tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
             components.switch(master, 5, 1, self.ui_state, "bundle_additional_embeddings")
 
+            # Riemannian Preconditioning
+            components.label(master, 4, 3, "Riemannian Preconditioning",
+                             tooltip="Applies a preconditioning transformation to LoRA gradients based on the geometry of the weight matrices. This can significantly speed up convergence and improve the final performance by accounting for the dependency between the A and B matrices, essentially acting as a specialized second-order optimizer for low-rank adapters.")
+            components.switch(master, 4, 4, self.ui_state, "precondition_lora")
+
         # OFTv2
         elif peft_type == PeftType.OFT_2:
             # Block Size

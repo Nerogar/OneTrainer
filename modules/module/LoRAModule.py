@@ -290,12 +290,13 @@ class LoRAModule(PeftBase):
     rank: int
     alpha: torch.Tensor
     dropout: Dropout
+    precondition_lora: bool
 
     # Note there's a few times in this class where we assert the existence of
     # optional members. This is because these members might not exist at
     # construction, but definitely exist by the time those methods are called.
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, rank: int, alpha: float, precondition_lora: bool):
         super().__init__(prefix, orig_module)
 
         self.rank = rank
@@ -309,11 +310,21 @@ class LoRAModule(PeftBase):
             self.alpha = self.alpha.to(orig_module.weight.device)
         self.alpha.requires_grad_(False)
 
+        self.precondition_lora = precondition_lora
+
     def initialize_weights(self):
         self._initialized = True
         self.lora_down, self.lora_up = self.create_layer()
         nn.init.kaiming_uniform_(self.lora_down.weight, a=math.sqrt(5))
         nn.init.zeros_(self.lora_up.weight)
+
+        if self.precondition_lora:
+            self.lora_down.weight._is_lora_A = True
+            self.lora_up.weight._is_lora_B = True
+            # Cross-link the pair so we can retrieve the partner tensor
+            # via getattr(p, '_lora_pair', None)
+            self.lora_down.weight._lora_pair = self.lora_up.weight
+            self.lora_up.weight._lora_pair = self.lora_down.weight
 
     def check_initialized(self):
         super().check_initialized()
@@ -613,7 +624,7 @@ class LoRAModuleWrapper:
             else:
                 self.klass = LoRAModule
                 self.dummy_klass = DummyLoRAModule
-                self.additional_args = [self.rank, self.alpha]
+                self.additional_args = [self.rank, self.alpha, config.precondition_lora]
                 self.additional_kwargs = {}
         elif self.peft_type == PeftType.LOHA:
             self.klass = LoHaModule
