@@ -56,18 +56,27 @@ def _extract_raw_metadata(path: str) -> dict:
     CHUNK = 256 * 1024  # 256 KB covers metadata in most formats
     with open(path, 'rb') as f:
         raw = f.read(CHUNK)
-        if b'"sui_image_params"' not in raw and b'"prompt"' not in raw:
+        # Check for metadata markers in UTF-8 or UTF-16LE encoding
+        has_marker = (b'"sui_image_params"' in raw or b'"prompt"' in raw
+                      or b'"\x00p\x00r\x00o\x00m\x00p\x00t\x00"' in raw)
+        if not has_marker:
             raw = raw + f.read()  # fall back to full read
-    # Preserve non-ASCII bytes instead of silently dropping them.
-    text = raw.decode('utf-8', errors='surrogateescape')
 
-    prompt, aspectratio = _try_json_block(text)
-    if prompt is not None:
-        return {'prompt': prompt, 'aspectratio': aspectratio or ''}
+    # Try UTF-8 first, then UTF-16 variants for generators that embed
+    # metadata in wide-character encoding (e.g. SwarmUI WebP EXIF).
+    for encoding in ('utf-8', 'utf-16-le', 'utf-16-be'):
+        text = raw.decode(encoding, errors='surrogateescape' if encoding == 'utf-8' else 'ignore')
 
-    prompt = _find_json_string(text, 'prompt')
-    aspectratio = _find_json_string(text, 'aspectratio')
-    return {'prompt': prompt or '', 'aspectratio': aspectratio or ''}
+        prompt, aspectratio = _try_json_block(text)
+        if prompt is not None:
+            return {'prompt': prompt, 'aspectratio': aspectratio or ''}
+
+        prompt = _find_json_string(text, 'prompt')
+        if prompt:
+            aspectratio = _find_json_string(text, 'aspectratio')
+            return {'prompt': prompt, 'aspectratio': aspectratio or ''}
+
+    return {'prompt': '', 'aspectratio': ''}
 
 
 def _try_json_block(text: str) -> tuple[str | None, str | None]:
