@@ -1,8 +1,9 @@
 import torch
 
+
 def precondition_lora_grad(p: torch.Tensor, grad: torch.Tensor, delta: float = 1e-6) -> torch.Tensor:
     """
-    Applies Riemannian preconditioning to LoRA gradients as described in 
+    Applies Riemannian preconditioning to LoRA gradients as described in
     "Riemannian Preconditioned LoRA for Fine-Tuning Foundation Models" (arXiv:2402.02347v3).
     """
     pair = getattr(p, '_lora_pair', None)

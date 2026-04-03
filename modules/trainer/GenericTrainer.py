@@ -29,11 +29,11 @@ from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.lora_util import precondition_lora_grad
 from modules.util.profiling_util import TorchMemoryRecorder, TorchProfiler
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
-from modules.util.lora_util import precondition_lora_grad
 
 import torch
 from torch import Tensor, nn
@@ -575,7 +575,7 @@ class GenericTrainer(BaseTrainer):
                             scaler.unscale_parameter_(tensor, self.model.optimizer)
                             if self.config.precondition_lora:
                                 tensor.grad = precondition_lora_grad(tensor, tensor.grad)
-                                
+
                             if self.config.clip_grad_norm is not None:
                                 nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
                             scaler.maybe_opt_step_parameter(tensor, param_group, i, self.model.optimizer)
@@ -584,7 +584,7 @@ class GenericTrainer(BaseTrainer):
                         def __optimizer_step(tensor: Tensor, param_group=param_group, i=i):
                             if self.config.precondition_lora:
                                 tensor.grad = precondition_lora_grad(tensor, tensor.grad)
-                                
+
                             if self.config.clip_grad_norm is not None:
                                 nn.utils.clip_grad_norm_(tensor, self.config.clip_grad_norm)
                             self.model.optimizer.step_parameter(tensor, param_group, i)
@@ -781,7 +781,7 @@ class GenericTrainer(BaseTrainer):
                                 for p in self.parameters:
                                     if p.grad is not None:
                                         p.grad = precondition_lora_grad(p, p.grad)
-                                        
+
                             if self.config.clip_grad_norm is not None:
                                 nn.utils.clip_grad_norm_(self.parameters, self.config.clip_grad_norm)
                             scaler.step(self.model.optimizer)
@@ -791,7 +791,7 @@ class GenericTrainer(BaseTrainer):
                                 for p in self.parameters:
                                     if p.grad is not None:
                                         p.grad = precondition_lora_grad(p, p.grad)
-                                        
+
                             if self.config.clip_grad_norm is not None:
                                 nn.utils.clip_grad_norm_(self.parameters, self.config.clip_grad_norm)
                             self.model.optimizer.step()

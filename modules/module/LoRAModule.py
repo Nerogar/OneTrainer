@@ -304,13 +304,12 @@ class LoRAModule(PeftBase):
         self.register_buffer("alpha", torch.tensor(alpha))
         self.lora_down = None
         self.lora_up = None
+        self.precondition_lora = precondition_lora
 
         if orig_module is not None:
             self.initialize_weights()
             self.alpha = self.alpha.to(orig_module.weight.device)
         self.alpha.requires_grad_(False)
-
-        self.precondition_lora = precondition_lora
 
     def initialize_weights(self):
         self._initialized = True

@@ -116,7 +116,7 @@ class LoraTab:
 
             # Riemannian Preconditioning
             components.label(master, 4, 3, "Riemannian Preconditioning",
-                             tooltip="Applies a preconditioning transformation to LoRA gradients based on the geometry of the weight matrices. This can significantly speed up convergence and improve the final performance by accounting for the dependency between the A and B matrices, essentially acting as a specialized second-order optimizer for low-rank adapters.")
+                             tooltip="Applies a geometric transformation to LoRA gradients that accounts for the coupling between the A and B matrices. By normalizing the update steps, it makes the optimizer LoRA-aware and robust to a much wider range of learning rates and ensures both low-rank factors learn at an effective, balanced pace. Preventing one matrix from collapsing or lagging behind the other.")
             components.switch(master, 4, 4, self.ui_state, "precondition_lora")
 
         # OFTv2
