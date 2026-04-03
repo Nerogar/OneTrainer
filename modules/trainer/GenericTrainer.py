@@ -573,7 +573,7 @@ class GenericTrainer(BaseTrainer):
                     if scaler:
                         def __optimizer_step(tensor: Tensor, param_group=param_group, i=i):
                             scaler.unscale_parameter_(tensor, self.model.optimizer)
-                            if getattr(self.config, 'precondition_lora', False):
+                            if self.config.precondition_lora:
                                 tensor.grad = precondition_lora_grad(tensor, tensor.grad)
                                 
                             if self.config.clip_grad_norm is not None:
@@ -582,7 +582,7 @@ class GenericTrainer(BaseTrainer):
                             tensor.grad = None
                     else:
                         def __optimizer_step(tensor: Tensor, param_group=param_group, i=i):
-                            if getattr(self.config, 'precondition_lora', False):
+                            if self.config.precondition_lora:
                                 tensor.grad = precondition_lora_grad(tensor, tensor.grad)
                                 
                             if self.config.clip_grad_norm is not None:
@@ -777,7 +777,7 @@ class GenericTrainer(BaseTrainer):
                             scaler.update()
                         elif scaler:
                             scaler.unscale_(self.model.optimizer)
-                            if getattr(self.config, 'precondition_lora', False):
+                            if self.config.precondition_lora:
                                 for p in self.parameters:
                                     if p.grad is not None:
                                         p.grad = precondition_lora_grad(p, p.grad)
@@ -787,7 +787,7 @@ class GenericTrainer(BaseTrainer):
                             scaler.step(self.model.optimizer)
                             scaler.update()
                         else:
-                            if getattr(self.config, 'precondition_lora', False):
+                            if self.config.precondition_lora:
                                 for p in self.parameters:
                                     if p.grad is not None:
                                         p.grad = precondition_lora_grad(p, p.grad)
