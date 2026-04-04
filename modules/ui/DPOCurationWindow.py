@@ -5,7 +5,9 @@ from collections import defaultdict
 from tkinter import filedialog, messagebox
 
 from modules.util import path_util
-from modules.util.dpo_curation_util import export_curated_pairs, has_existing_exports
+from modules.util.dpo_curation_util import (
+    export_single_pair, finalize_export, load_manifest, manifest_pair_counts,
+)
 from modules.util.image_metadata_util import extract_metadata
 from modules.util.ui.ui_utils import set_window_icon
 
@@ -23,10 +25,15 @@ class DPOCurationWindow(ctk.CTkToplevel):
 
         self.groups: list[dict] = []
         self.current_group_index = 0
-        self.results: dict[int, list[dict]] = {}  # group_index -> [{chosen, rejected}, ...]
         self.current_remaining_images: list[str] = []
         self.pairs_per_group = 1
         self.pairs_created_in_group = 0
+
+        self.source_folder: str | None = None
+        self.output_dir: str | None = None
+        self.manifest: dict = {"pairs": []}
+        self.source_path_var = ctk.StringVar(value="(none selected)")
+        self.output_path_var = ctk.StringVar(value="(none selected)")
 
         # ELO state
         self.elo_ratings: dict[str, float] = {}
@@ -56,14 +63,35 @@ class DPOCurationWindow(ctk.CTkToplevel):
         frame.pack(expand=True, fill="both", padx=20, pady=20)
 
         ctk.CTkLabel(frame, text="DPO Pair Tool", font=("", 24, "bold")).pack(pady=(0, 20))
-        ctk.CTkLabel(frame, text="Select a folder of generated images.\n"
+        ctk.CTkLabel(frame, text="Select a source folder of generated images and an output folder.\n"
                      "Prompt and aspect ratio will be extracted from image metadata (SwarmUI format).\n"
                      "Images are grouped by (prompt, aspect ratio) for comparison.\n"
-                     "The tool exports chosen/rejected folders for DPO training.",
+                     "Pairs are exported immediately as you pick them.",
                      justify="center").pack(pady=(0, 20))
 
+        # Source folder
+        src_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        src_frame.pack(fill="x", pady=5)
+        ctk.CTkButton(src_frame, text="Source Folder", width=150,
+                      command=self._select_source).pack(side="left", padx=(0, 10))
+        ctk.CTkLabel(src_frame, textvariable=self.source_path_var, anchor="w").pack(
+            side="left", fill="x", expand=True)
+
+        # Output folder
+        out_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        out_frame.pack(fill="x", pady=5)
+        ctk.CTkButton(out_frame, text="Output Folder", width=150,
+                      command=self._select_output).pack(side="left", padx=(0, 10))
+        ctk.CTkLabel(out_frame, textvariable=self.output_path_var, anchor="w").pack(
+            side="left", fill="x", expand=True)
+
+        # Resume info
+        self.resume_label = ctk.CTkLabel(frame, text="", font=("", 12), text_color="green")
+        self.resume_label.pack(pady=5)
+
+        # Pairs per group
         pair_count_frame = ctk.CTkFrame(frame, fg_color="transparent")
-        pair_count_frame.pack(pady=(0, 20))
+        pair_count_frame.pack(pady=(10, 20))
         ctk.CTkLabel(pair_count_frame, text="Pairs per group:").pack(side="left", padx=(0, 10))
         ctk.CTkEntry(pair_count_frame, textvariable=self.pairs_per_group_var, width=60).pack(side="left")
         ctk.CTkLabel(pair_count_frame, text="How many pairs to collect before moving on.", anchor="w").pack(side="left", padx=(10, 0))
@@ -71,18 +99,40 @@ class DPOCurationWindow(ctk.CTkToplevel):
         btn_frame = ctk.CTkFrame(frame, fg_color="transparent")
         btn_frame.pack(pady=10)
 
-        ctk.CTkButton(btn_frame, text="Select Folder & Start (ELO)", width=250,
-                      command=lambda: self._select_folder("elo")).pack(side="left", padx=10)
-        ctk.CTkButton(btn_frame, text="Select Folder & Start (Selection)", width=250,
-                      command=lambda: self._select_folder("selection")).pack(side="left", padx=10)
+        ctk.CTkButton(btn_frame, text="Start (ELO)", width=250,
+                      command=lambda: self._start("elo")).pack(side="left", padx=10)
+        ctk.CTkButton(btn_frame, text="Start (Selection)", width=250,
+                      command=lambda: self._start("selection")).pack(side="left", padx=10)
 
-    def _select_folder(self, mode: str):
+    def _select_source(self):
         folder = filedialog.askdirectory(title="Select folder of generated images")
-        if not folder:
+        if folder:
+            self.source_folder = folder
+            self.source_path_var.set(folder)
+
+    def _select_output(self):
+        folder = filedialog.askdirectory(title="Select output directory for exports")
+        if folder:
+            self.output_dir = folder
+            self.output_path_var.set(folder)
+            self.manifest = load_manifest(folder)
+            existing = len(self.manifest.get("pairs", []))
+            if existing:
+                self.resume_label.configure(
+                    text=f"Found {existing} existing pairs \u2014 completed groups will be skipped.")
+            else:
+                self.resume_label.configure(text="")
+
+    def _start(self, mode: str):
+        if not self.source_folder:
+            messagebox.showwarning("No Source", "Select a source folder first.")
+            return
+        if not self.output_dir:
+            messagebox.showwarning("No Output", "Select an output folder first.")
             return
 
         self.mode = mode
-        self._scan_and_group(folder)
+        self._scan_and_group(self.source_folder)
 
         if not self.groups:
             messagebox.showwarning("No Groups", "No images with extractable prompt metadata found.")
@@ -90,12 +140,37 @@ class DPOCurationWindow(ctk.CTkToplevel):
 
         self.pairs_per_group = self._parse_pairs_per_group()
         self.current_group_index = 0
-        self.results = {}
+        self._start_group_round()
 
-        if mode == "elo":
-            self._start_group_round()
-        else:
-            self._start_group_round()
+    @staticmethod
+    def _dhash(path: str, hash_size: int = 8) -> int:
+        """Compute a difference hash for duplicate detection."""
+        with Image.open(path) as img:
+            img = img.convert('L').resize((hash_size + 1, hash_size), Image.Resampling.LANCZOS)
+            pixels = list(img.getdata())
+        bits = 0
+        for row in range(hash_size):
+            for col in range(hash_size):
+                idx = row * (hash_size + 1) + col
+                if pixels[idx] < pixels[idx + 1]:
+                    bits |= 1 << (row * hash_size + col)
+        return bits
+
+    @staticmethod
+    def _dedup_by_dhash(images: list[str]) -> list[str]:
+        """Remove visually identical images from a list, keeping the first of each."""
+        seen: dict[int, str] = {}
+        unique = []
+        for path in images:
+            try:
+                h = DPOCurationWindow._dhash(path)
+            except Exception:
+                unique.append(path)
+                continue
+            if h not in seen:
+                seen[h] = path
+                unique.append(path)
+        return unique
 
     def _scan_and_group(self, folder: str):
         groups_dict: dict[tuple[str, str], list[str]] = defaultdict(list)
@@ -112,14 +187,23 @@ class DPOCurationWindow(ctk.CTkToplevel):
                 if prompt:
                     groups_dict[(prompt, ar)].append(path)
 
+        total_dupes = 0
         self.groups = []
         for (prompt, ar), images in sorted(groups_dict.items()):
-            if len(images) >= 2:
+            deduped = self._dedup_by_dhash(images)
+            total_dupes += len(images) - len(deduped)
+            if len(deduped) >= 2:
                 self.groups.append({
                     'prompt': prompt,
                     'aspectratio': ar,
-                    'images': images,
+                    'images': deduped,
                 })
+
+        random.shuffle(self.groups)
+
+        if total_dupes > 0:
+            messagebox.showinfo("Duplicates Removed",
+                                f"Removed {total_dupes} visually identical images (dhash).")
 
     def _parse_pairs_per_group(self) -> int:
         try:
@@ -134,8 +218,11 @@ class DPOCurationWindow(ctk.CTkToplevel):
             return
 
         group = self.groups[self.current_group_index]
+        existing_counts = manifest_pair_counts(self.manifest)
+        group_key = (group['prompt'], group['aspectratio'])
+        self.pairs_created_in_group = existing_counts.get(group_key, 0)
+
         self.current_remaining_images = list(group['images'])
-        self.pairs_created_in_group = len(self.results.get(self.current_group_index, []))
         if len(self.current_remaining_images) < 2 or self.pairs_created_in_group >= self.pairs_per_group:
             self._advance_group()
             return
@@ -358,7 +445,12 @@ class DPOCurationWindow(ctk.CTkToplevel):
     # ---- Common ----
 
     def _register_pair(self, chosen: str, rejected: str):
-        self.results.setdefault(self.current_group_index, []).append({'chosen': chosen, 'rejected': rejected})
+        group = self.groups[self.current_group_index]
+        export_single_pair(
+            self.output_dir, self.manifest,
+            chosen, rejected,
+            group['prompt'], group['aspectratio'],
+        )
         self.current_remaining_images = [image for image in self.current_remaining_images if image not in {chosen, rejected}]
         self.pairs_created_in_group += 1
 
@@ -439,14 +531,20 @@ class DPOCurationWindow(ctk.CTkToplevel):
         frame = ctk.CTkFrame(self, fg_color="transparent")
         frame.pack(expand=True, fill="both", padx=20, pady=20)
 
-        total_pairs = sum(len(pairs) for pairs in self.results.values())
-        groups_with_pairs = len(self.results)
-        skipped = len(self.groups) - groups_with_pairs
+        total_pairs = len(self.manifest.get("pairs", []))
+        unique_groups = len(set(
+            (e["prompt"], e.get("aspectratio", ""))
+            for e in self.manifest.get("pairs", [])
+        ))
+        skipped = len(self.groups) - unique_groups
+
         ctk.CTkLabel(frame, text="Scoring Complete!", font=("", 24, "bold")).pack(pady=(0, 20))
-        summary = f"{total_pairs} chosen/rejected pairs from {groups_with_pairs} prompt groups ready to export."
+        summary = f"{total_pairs} chosen/rejected pairs from {unique_groups} prompt groups exported."
         if skipped > 0:
             summary += f" ({skipped} groups skipped)"
-        ctk.CTkLabel(frame, text=summary, font=("", 14)).pack(pady=(0, 20))
+        ctk.CTkLabel(frame, text=summary, font=("", 14)).pack(pady=(0, 10))
+        ctk.CTkLabel(frame, text=f"Pairs saved to: {self.output_dir}",
+                     font=("", 12)).pack(pady=(0, 20))
 
         val_frame = ctk.CTkFrame(frame, fg_color="transparent")
         val_frame.pack(pady=(0, 20))
@@ -455,36 +553,21 @@ class DPOCurationWindow(ctk.CTkToplevel):
         ctk.CTkEntry(val_frame, textvariable=self.val_percentage_var, width=60).pack(side="left")
         ctk.CTkLabel(val_frame, text="(0 = no validation split)").pack(side="left", padx=(10, 0))
 
-        ctk.CTkButton(frame, text="Export Chosen/Rejected Folders", width=300,
-                      command=self._export).pack(pady=10)
+        ctk.CTkButton(frame, text="Finalize (Train/Val Split + Concepts)", width=350,
+                      command=self._finalize).pack(pady=10)
+        ctk.CTkButton(frame, text="Close (Pairs Already Saved)", width=350,
+                      fg_color="gray", command=self.destroy).pack(pady=10)
 
-    def _export(self):
-        output_dir = filedialog.askdirectory(title="Select output directory for chosen/rejected folders")
-        if not output_dir:
-            return
-
-        if has_existing_exports(output_dir):
-            if not messagebox.askyesno("Overwrite?",
-                                       "The selected directory already contains exported chosen/rejected pairs.\n"
-                                       "Existing files with the same names will be overwritten.\n\n"
-                                       "Continue?"):
-                return
-
+    def _finalize(self):
         try:
             val_pct = float(self.val_percentage_var.get())
         except (ValueError, AttributeError):
             val_pct = 0.0
         val_pct = max(0.0, min(100.0, val_pct))
 
-        result = export_curated_pairs(self.groups, self.results, output_dir, val_percentage=val_pct)
-        chosen_train, rejected_train, chosen_val, rejected_val, skipped, val_count, train_count = result
-        total_pairs = sum(len(pairs) for pairs in self.results.values())
-        msg = f"Exported {total_pairs} pairs ({train_count} train, {val_count} val)"
-        if skipped > 0:
-            msg += f", {skipped} groups skipped"
-        msg += f"\n\nTrain:\n  {chosen_train}\n  {rejected_train}"
-        if val_count > 0:
-            msg += f"\n\nVal:\n  {chosen_val}\n  {rejected_val}"
-        msg += f"\n\nConcept config saved to:\n  {os.path.join(output_dir, 'concepts.json')}"
-        messagebox.showinfo("Export Complete", msg)
+        train_count, val_count = finalize_export(self.output_dir, self.manifest, val_percentage=val_pct)
+        total_pairs = len(self.manifest.get("pairs", []))
+        msg = f"Finalized {total_pairs} pairs ({train_count} train, {val_count} val)"
+        msg += f"\n\nConcept config saved to:\n  {os.path.join(self.output_dir, 'concepts.json')}"
+        messagebox.showinfo("Finalize Complete", msg)
         self.destroy()

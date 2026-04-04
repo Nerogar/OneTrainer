@@ -37,6 +37,142 @@ def dpo_concept_pairs(concepts: list[ConceptConfig], is_validation: bool = False
     return [(chosen_concept.path, rejected_concept.path) for chosen_concept, rejected_concept in zip(chosen, rejected, strict=True)]
 
 
+def load_manifest(output_dir: str) -> dict:
+    manifest_path = os.path.join(output_dir, "manifest.json")
+    if os.path.isfile(manifest_path):
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {"pairs": []}
+
+
+def save_manifest(output_dir: str, manifest: dict):
+    manifest_path = os.path.join(output_dir, "manifest.json")
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2)
+
+
+def manifest_pair_counts(manifest: dict) -> dict[tuple[str, str], int]:
+    counts: dict[tuple[str, str], int] = {}
+    for entry in manifest.get("pairs", []):
+        key = (entry["prompt"], entry.get("aspectratio", ""))
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _next_pair_id(manifest: dict) -> int:
+    pairs = manifest.get("pairs", [])
+    if not pairs:
+        return 0
+    return max(entry["pair_id"] for entry in pairs) + 1
+
+
+def export_single_pair(
+    output_dir: str,
+    manifest: dict,
+    chosen_path: str,
+    rejected_path: str,
+    prompt: str,
+    aspectratio: str,
+):
+    chosen_dir = os.path.join(output_dir, "chosen")
+    rejected_dir = os.path.join(output_dir, "rejected")
+    os.makedirs(chosen_dir, exist_ok=True)
+    os.makedirs(rejected_dir, exist_ok=True)
+
+    pair_id = _next_pair_id(manifest)
+    safe_name = f"pair_{pair_id:04d}"
+    caption = strip_angle_bracket_segments(prompt)
+
+    chosen_ext = os.path.splitext(chosen_path)[1].lower()
+    rejected_ext = os.path.splitext(rejected_path)[1].lower()
+
+    _copy_image(chosen_path, os.path.join(chosen_dir, safe_name + chosen_ext))
+    _copy_image(rejected_path, os.path.join(rejected_dir, safe_name + rejected_ext))
+    for subdir in (chosen_dir, rejected_dir):
+        with open(os.path.join(subdir, safe_name + ".txt"), "w", encoding="utf-8") as f:
+            f.write(caption)
+
+    manifest.setdefault("pairs", []).append({
+        "pair_id": pair_id,
+        "prompt": prompt,
+        "aspectratio": aspectratio,
+        "chosen_file": safe_name + chosen_ext,
+        "rejected_file": safe_name + rejected_ext,
+    })
+    save_manifest(output_dir, manifest)
+
+
+def _find_exported_file(base_dir: str, filename: str) -> str | None:
+    for subdir in ("", "train", "val"):
+        path = os.path.join(base_dir, subdir, filename) if subdir else os.path.join(base_dir, filename)
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def finalize_export(output_dir: str, manifest: dict, val_percentage: float = 0.0) -> tuple[int, int]:
+    chosen_dir = os.path.join(output_dir, "chosen")
+    rejected_dir = os.path.join(output_dir, "rejected")
+    chosen_train = os.path.join(chosen_dir, "train")
+    chosen_val = os.path.join(chosen_dir, "val")
+    rejected_train = os.path.join(rejected_dir, "train")
+    rejected_val = os.path.join(rejected_dir, "val")
+    for d in (chosen_train, chosen_val, rejected_train, rejected_val):
+        os.makedirs(d, exist_ok=True)
+
+    pairs = manifest.get("pairs", [])
+    indices = list(range(len(pairs)))
+    random.shuffle(indices)
+    val_count_target = int(len(indices) * (val_percentage / 100.0))
+    val_indices = set(indices[:val_count_target])
+
+    val_count = 0
+    train_count = 0
+
+    for i, entry in enumerate(pairs):
+        is_val = i in val_indices
+        target_chosen = chosen_val if is_val else chosen_train
+        target_rejected = rejected_val if is_val else rejected_train
+
+        for filename_key, base_dir, target_dir in [
+            ("chosen_file", chosen_dir, target_chosen),
+            ("rejected_file", rejected_dir, target_rejected),
+        ]:
+            src = _find_exported_file(base_dir, entry[filename_key])
+            dst = os.path.join(target_dir, entry[filename_key])
+            if src and os.path.normpath(src) != os.path.normpath(dst):
+                shutil.move(src, dst)
+            txt_name = os.path.splitext(entry[filename_key])[0] + ".txt"
+            txt_src = _find_exported_file(base_dir, txt_name)
+            txt_dst = os.path.join(target_dir, txt_name)
+            if txt_src and os.path.normpath(txt_src) != os.path.normpath(txt_dst):
+                shutil.move(txt_src, txt_dst)
+
+        if is_val:
+            val_count += 1
+        else:
+            train_count += 1
+
+    abs_output = os.path.abspath(output_dir)
+    concept_entries = [
+        (os.path.join(abs_output, "chosen", "train"), ConceptType.DPO_CHOSEN),
+        (os.path.join(abs_output, "rejected", "train"), ConceptType.DPO_REJECTED),
+        (os.path.join(abs_output, "chosen", "val"), ConceptType.DPO_CHOSEN_VAL),
+        (os.path.join(abs_output, "rejected", "val"), ConceptType.DPO_REJECTED_VAL),
+    ]
+    concepts = []
+    for path, concept_type in concept_entries:
+        cfg = ConceptConfig.default_values()
+        cfg.path = path
+        cfg.type = concept_type
+        cfg.enabled = True
+        concepts.append(cfg.to_dict())
+    with open(os.path.join(abs_output, "concepts.json"), "w", encoding="utf-8") as f:
+        json.dump(concepts, f, indent=2)
+
+    return train_count, val_count
+
+
 def has_existing_exports(output_dir: str) -> bool:
     for subdir in ("chosen", "rejected"):
         d = os.path.join(output_dir, subdir)
