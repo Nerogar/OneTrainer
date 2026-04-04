@@ -1,7 +1,9 @@
 import math
 import os
 import random
+import threading
 from collections import defaultdict
+from queue import Queue, Empty, Full
 from tkinter import filedialog, messagebox
 
 from modules.util import path_util
@@ -23,8 +25,6 @@ class DPOCurationWindow(ctk.CTkToplevel):
         self.resizable(True, True)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
-        self.groups: list[dict] = []
-        self.current_group_index = 0
         self.current_remaining_images: list[str] = []
         self.pairs_per_group = 1
         self.pairs_created_in_group = 0
@@ -34,6 +34,16 @@ class DPOCurationWindow(ctk.CTkToplevel):
         self.manifest: dict = {"pairs": []}
         self.source_path_var = ctk.StringVar(value="(none selected)")
         self.output_path_var = ctk.StringVar(value="(none selected)")
+
+        # Background worker state
+        self._ready_queue: Queue = Queue(maxsize=10)
+        self._worker_thread: threading.Thread | None = None
+        self._worker_stop = threading.Event()
+        self._scan_count = 0
+        self._groups_queued = 0
+        self._groups_shown = 0
+        self._worker_finished = False
+        self._current_group: dict | None = None
 
         # ELO state
         self.elo_ratings: dict[str, float] = {}
@@ -53,6 +63,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         self.focus_set()
 
     def _on_close(self):
+        self._worker_stop.set()
         self.destroy()
 
     def _build_start_ui(self):
@@ -132,15 +143,21 @@ class DPOCurationWindow(ctk.CTkToplevel):
             return
 
         self.mode = mode
-        self._scan_and_group(self.source_folder)
-
-        if not self.groups:
-            messagebox.showwarning("No Groups", "No images with extractable prompt metadata found.")
-            return
-
         self.pairs_per_group = self._parse_pairs_per_group()
-        self.current_group_index = 0
-        self._start_group_round()
+        self._groups_shown = 0
+        self._groups_queued = 0
+        self._scan_count = 0
+        self._worker_finished = False
+        self._ready_queue = Queue(maxsize=10)
+        self._worker_stop = threading.Event()
+
+        self._worker_thread = threading.Thread(
+            target=self._background_scan_and_dedup,
+            args=(self.source_folder,),
+            daemon=True,
+        )
+        self._worker_thread.start()
+        self._show_scanning_ui()
 
     @staticmethod
     def _dhash(path: str, hash_size: int = 8) -> int:
@@ -172,13 +189,16 @@ class DPOCurationWindow(ctk.CTkToplevel):
                 unique.append(path)
         return unique
 
-    def _scan_and_group(self, folder: str):
-        groups_dict: dict[tuple[str, str], list[str]] = defaultdict(list)
+    def _background_scan_and_dedup(self, folder: str):
+        supported = path_util.supported_image_extensions()
+        groups_dict: defaultdict[tuple[str, str], list[str]] = defaultdict(list)
 
         for root, _, files in os.walk(folder):
             for filename in sorted(files):
+                if self._worker_stop.is_set():
+                    return
                 ext = os.path.splitext(filename)[1].lower()
-                if ext not in path_util.supported_image_extensions():
+                if ext not in supported:
                     continue
                 path = os.path.join(root, filename)
                 meta = extract_metadata(path)
@@ -186,24 +206,68 @@ class DPOCurationWindow(ctk.CTkToplevel):
                 ar = meta.get('aspectratio', '').strip()
                 if prompt:
                     groups_dict[(prompt, ar)].append(path)
+                self._scan_count += 1
 
-        total_dupes = 0
-        self.groups = []
-        for (prompt, ar), images in sorted(groups_dict.items()):
-            deduped = self._dedup_by_dhash(images)
-            total_dupes += len(images) - len(deduped)
+        raw_groups = [
+            {'prompt': prompt, 'aspectratio': ar, 'images': images}
+            for (prompt, ar), images in groups_dict.items()
+            if len(images) >= 2
+        ]
+        random.shuffle(raw_groups)
+
+        existing_counts = manifest_pair_counts(self.manifest)
+
+        for group in raw_groups:
+            if self._worker_stop.is_set():
+                return
+
+            group_key = (group['prompt'], group['aspectratio'])
+            if existing_counts.get(group_key, 0) >= self.pairs_per_group:
+                continue
+
+            deduped = self._dedup_by_dhash(group['images'])
             if len(deduped) >= 2:
-                self.groups.append({
-                    'prompt': prompt,
-                    'aspectratio': ar,
-                    'images': deduped,
-                })
+                group['images'] = deduped
+                self._groups_queued += 1
+                while not self._worker_stop.is_set():
+                    try:
+                        self._ready_queue.put(group, timeout=0.5)
+                        break
+                    except Full:
+                        continue
 
-        random.shuffle(self.groups)
+        self._worker_finished = True
 
-        if total_dupes > 0:
-            messagebox.showinfo("Duplicates Removed",
-                                f"Removed {total_dupes} visually identical images (dhash).")
+    def _show_scanning_ui(self):
+        for widget in self.winfo_children():
+            widget.destroy()
+
+        frame = ctk.CTkFrame(self, fg_color="transparent")
+        frame.pack(expand=True)
+
+        ctk.CTkLabel(frame, text="Scanning...", font=("", 20, "bold")).pack(pady=(0, 10))
+        self._scan_label = ctk.CTkLabel(frame, text="0 files scanned", font=("", 14))
+        self._scan_label.pack()
+
+        self._poll_scan()
+
+    def _poll_scan(self):
+        if self._worker_stop.is_set():
+            return
+
+        self._scan_label.configure(text=f"{self._scan_count} files scanned")
+
+        if not self._ready_queue.empty():
+            self._next_group()
+        elif self._worker_finished:
+            if self._groups_queued == 0:
+                messagebox.showwarning("No Groups",
+                                       "No images with extractable prompt metadata found.")
+                self._build_start_ui()
+            else:
+                self._show_export()
+        else:
+            self.after(100, self._poll_scan)
 
     def _parse_pairs_per_group(self) -> int:
         try:
@@ -212,25 +276,51 @@ class DPOCurationWindow(ctk.CTkToplevel):
             return 1
         return max(1, value)
 
-    def _start_group_round(self):
-        if self.current_group_index >= len(self.groups):
-            self._show_export()
+    def _next_group(self):
+        while True:
+            try:
+                group = self._ready_queue.get_nowait()
+            except Empty:
+                if self._worker_finished:
+                    self._show_export()
+                    return
+                self._show_waiting_ui()
+                return
+
+            existing_counts = manifest_pair_counts(self.manifest)
+            group_key = (group['prompt'], group['aspectratio'])
+            pairs_done = existing_counts.get(group_key, 0)
+            if pairs_done >= self.pairs_per_group:
+                continue
+
+            self._current_group = group
+            self._groups_shown += 1
+            self.pairs_created_in_group = pairs_done
+            self.current_remaining_images = list(group['images'])
+
+            if self.mode == "elo":
+                self._start_elo_round()
+            else:
+                self._start_selection_round()
             return
 
-        group = self.groups[self.current_group_index]
-        existing_counts = manifest_pair_counts(self.manifest)
-        group_key = (group['prompt'], group['aspectratio'])
-        self.pairs_created_in_group = existing_counts.get(group_key, 0)
+    def _show_waiting_ui(self):
+        for widget in self.winfo_children():
+            widget.destroy()
 
-        self.current_remaining_images = list(group['images'])
-        if len(self.current_remaining_images) < 2 or self.pairs_created_in_group >= self.pairs_per_group:
-            self._advance_group()
+        frame = ctk.CTkFrame(self, fg_color="transparent")
+        frame.pack(expand=True)
+
+        ctk.CTkLabel(frame, text="Preparing next group...", font=("", 18)).pack()
+        self._poll_waiting()
+
+    def _poll_waiting(self):
+        if self._worker_stop.is_set():
             return
-
-        if self.mode == "elo":
-            self._start_elo_round()
+        if not self._ready_queue.empty() or self._worker_finished:
+            self._next_group()
         else:
-            self._start_selection_round()
+            self.after(100, self._poll_waiting)
 
     # ---- ELO Mode ----
 
@@ -259,7 +349,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         for widget in self.winfo_children():
             widget.destroy()
 
-        group = self.groups[self.current_group_index]
+        group = self._current_group
         suggested = self._elo_suggested_comparisons()
 
         # Header
@@ -269,7 +359,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         header.pack(fill="x", padx=10, pady=5)
         ctk.CTkLabel(header, text=f"AR: {group['aspectratio']}",
                      font=("", 12)).pack(side="left", padx=15)
-        ctk.CTkLabel(header, text=f"Group {self.current_group_index + 1}/{len(self.groups)}",
+        ctk.CTkLabel(header, text=f"Group {self._groups_shown} / {self._groups_queued}",
                      font=("", 12)).pack(side="left", padx=15)
         ctk.CTkLabel(header, text=f"Comparisons: {self.elo_comparisons_done}/{suggested} suggested",
                      font=("", 12)).pack(side="left", padx=15)
@@ -351,7 +441,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         for widget in self.winfo_children():
             widget.destroy()
 
-        group = self.groups[self.current_group_index]
+        group = self._current_group
 
         # Header
         self._build_prompt_expander(self, group['prompt'])
@@ -360,7 +450,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         header.pack(fill="x", padx=10, pady=5)
         ctk.CTkLabel(header, text=f"AR: {group['aspectratio']}",
                      font=("", 12)).pack(side="left", padx=15)
-        ctk.CTkLabel(header, text=f"Group {self.current_group_index + 1}/{len(self.groups)}",
+        ctk.CTkLabel(header, text=f"Group {self._groups_shown} / {self._groups_queued}",
                      font=("", 12)).pack(side="left", padx=15)
 
         ctk.CTkButton(header, text="Skip Group", width=120, fg_color="#8B4513",
@@ -445,7 +535,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
     # ---- Common ----
 
     def _register_pair(self, chosen: str, rejected: str):
-        group = self.groups[self.current_group_index]
+        group = self._current_group
         export_single_pair(
             self.output_dir, self.manifest,
             chosen, rejected,
@@ -466,11 +556,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         self._advance_group()
 
     def _advance_group(self):
-        self.current_group_index += 1
-        if self.current_group_index >= len(self.groups):
-            self._show_export()
-        else:
-            self._start_group_round()
+        self._next_group()
 
     def _fit_image(self, pil_img: Image.Image, max_w: int, max_h: int) -> Image.Image:
         scale = min(max_w / pil_img.width, max_h / pil_img.height)
@@ -536,7 +622,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
             (e["prompt"], e.get("aspectratio", ""))
             for e in self.manifest.get("pairs", [])
         ))
-        skipped = len(self.groups) - unique_groups
+        skipped = max(0, self._groups_queued - unique_groups)
 
         ctk.CTkLabel(frame, text="Scoring Complete!", font=("", 24, "bold")).pack(pady=(0, 20))
         summary = f"{total_pairs} chosen/rejected pairs from {unique_groups} prompt groups exported."
