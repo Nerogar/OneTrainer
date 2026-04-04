@@ -423,12 +423,29 @@ class DPOCurationWindow(ctk.CTkToplevel):
         worst_rating = self.elo_ratings[worst]
         best_name = os.path.basename(best)
         worst_name = os.path.basename(worst)
-        if not messagebox.askyesno("Accept Pair",
-                                    f"Best: {best_name} (ELO {best_rating:.0f})\n"
-                                    f"Worst: {worst_name} (ELO {worst_rating:.0f})\n\n"
-                                    f"Accept this pair?"):
-            return
-        self._register_pair(best, worst)
+
+        remaining_after = [img for img in self.current_remaining_images if img not in {best, worst}]
+        can_continue = len(remaining_after) >= 2
+
+        if can_continue:
+            result = messagebox.askyesnocancel(
+                "Accept Pair",
+                f"Best: {best_name} (ELO {best_rating:.0f})\n"
+                f"Worst: {worst_name} (ELO {worst_rating:.0f})\n\n"
+                f"Yes = Accept & keep scoring this prompt\n"
+                f"No = Accept & move to next group\n"
+                f"Cancel = Don't accept")
+            if result is None:
+                return
+            self._register_pair(best, worst, continue_scoring=result)
+        else:
+            if not messagebox.askyesno(
+                    "Accept Pair",
+                    f"Best: {best_name} (ELO {best_rating:.0f})\n"
+                    f"Worst: {worst_name} (ELO {worst_rating:.0f})\n\n"
+                    f"Accept this pair?"):
+                return
+            self._register_pair(best, worst)
 
     # ---- Selection Mode ----
 
@@ -530,11 +547,27 @@ class DPOCurationWindow(ctk.CTkToplevel):
             self.selection_phase = "worst"
             self._build_selection_ui()
         else:
-            self._register_pair(self.selected_best, path)
+            remaining_after = [img for img in self.current_remaining_images
+                               if img not in {self.selected_best, path}]
+            can_continue = len(remaining_after) >= 2
+
+            if can_continue:
+                result = messagebox.askyesnocancel(
+                    "Pair Selected",
+                    f"Best: {os.path.basename(self.selected_best)}\n"
+                    f"Worst: {os.path.basename(path)}\n\n"
+                    f"Yes = Accept & keep scoring this prompt\n"
+                    f"No = Accept & move to next group\n"
+                    f"Cancel = Don't accept")
+                if result is None:
+                    return
+                self._register_pair(self.selected_best, path, continue_scoring=result)
+            else:
+                self._register_pair(self.selected_best, path)
 
     # ---- Common ----
 
-    def _register_pair(self, chosen: str, rejected: str):
+    def _register_pair(self, chosen: str, rejected: str, continue_scoring: bool = False):
         group = self._current_group
         export_single_pair(
             self.output_dir, self.manifest,
@@ -544,7 +577,8 @@ class DPOCurationWindow(ctk.CTkToplevel):
         self.current_remaining_images = [image for image in self.current_remaining_images if image not in {chosen, rejected}]
         self.pairs_created_in_group += 1
 
-        if self.pairs_created_in_group < self.pairs_per_group and len(self.current_remaining_images) >= 2:
+        keep_going = continue_scoring or self.pairs_created_in_group < self.pairs_per_group
+        if keep_going and len(self.current_remaining_images) >= 2:
             if self.mode == "elo":
                 self._start_elo_round()
             else:
