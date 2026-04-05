@@ -175,7 +175,7 @@ class TestPatienceCheckpointSaveRestore(unittest.TestCase):
             param.data.copy_(saved)
 
         # Verify restored values match the best
-        for original, restored in zip(best_values, params):
+        for original, restored in zip(best_values, params, strict=True):
             self.assertTrue(torch.equal(original, restored.data))
 
     def test_checkpoint_overwritten_on_new_best(self):
@@ -193,11 +193,11 @@ class TestPatienceCheckpointSaveRestore(unittest.TestCase):
 
         # The checkpoint should contain the NEW (step 20) values, not step 10
         saved = torch.load(state._patience_best_backup_path, weights_only=True)
-        for current, loaded in zip(params, saved):
+        for current, loaded in zip(params, saved, strict=True):
             self.assertTrue(torch.equal(current.data, loaded))
 
         # First values should NOT match (they were overwritten)
-        for first, loaded in zip(first_values, saved):
+        for first, loaded in zip(first_values, saved, strict=True):
             self.assertFalse(torch.equal(first, loaded))
 
 
