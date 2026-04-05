@@ -24,7 +24,6 @@ from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
 from modules.util.enum.ConceptType import ConceptType
-from modules.util.enum.DPOPatienceMode import DPOPatienceMode
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
@@ -167,7 +166,7 @@ class GenericTrainer(BaseTrainer):
 
         self._dpo_patience_counter = 0
         self._dpo_best_accuracy = float('-inf')
-        self._dpo_best_chosen_reward = float('-inf')
+        self._dpo_best_backup_path: str | None = None
 
     def __save_config_to_workspace(self):
         path = path_util.canonical_join(self.config.workspace_dir, "config")
@@ -397,7 +396,7 @@ class GenericTrainer(BaseTrainer):
                     self.tensorboard.add_scalar("dpo/val_accuracy", val_accuracy, train_progress.global_step)
                     self.tensorboard.add_scalar("dpo/val_chosen_reward", val_chosen_reward, train_progress.global_step)
                     self.tensorboard.add_scalar("dpo/val_rejected_reward", val_rejected_reward, train_progress.global_step)
-                    self.__check_dpo_patience(val_accuracy, val_chosen_reward, train_progress)
+                    self.__check_dpo_patience(val_accuracy, train_progress)
 
                 # DPO validation uses a different data pipeline (paired samples) than
                 # standard validation, so they cannot share the same data loader.
@@ -456,25 +455,22 @@ class GenericTrainer(BaseTrainer):
                                             total_average_loss,
                                             train_progress.global_step)
 
-    def __check_dpo_patience(self, val_accuracy: float, val_chosen_reward: float, train_progress: TrainProgress):
+    def __check_dpo_patience(self, val_accuracy: float, train_progress: TrainProgress):
+        is_new_best = val_accuracy > self._dpo_best_accuracy
+
+        if is_new_best and self.config.rlhf_dpo_save_best:
+            self._dpo_best_backup_path = self.__save_dpo_best(train_progress)
+
         if not self.config.rlhf_dpo_patience_enabled:
+            self._dpo_best_accuracy = max(self._dpo_best_accuracy, val_accuracy)
             return
 
-        accuracy_stalled = val_accuracy <= self._dpo_best_accuracy
-        chosen_reward_stalled = val_chosen_reward <= self._dpo_best_chosen_reward
-
-        if self.config.rlhf_dpo_patience_mode == DPOPatienceMode.EITHER:
-            patience_triggered = accuracy_stalled or chosen_reward_stalled
+        if is_new_best:
+            self._dpo_patience_counter = 0
         else:
-            patience_triggered = accuracy_stalled and chosen_reward_stalled
+            self._dpo_patience_counter += 1
 
         self._dpo_best_accuracy = max(self._dpo_best_accuracy, val_accuracy)
-        self._dpo_best_chosen_reward = max(self._dpo_best_chosen_reward, val_chosen_reward)
-
-        if patience_triggered:
-            self._dpo_patience_counter += 1
-        else:
-            self._dpo_patience_counter = 0
 
         self.tensorboard.add_scalar("dpo/patience_counter", self._dpo_patience_counter, train_progress.global_step)
 
@@ -482,6 +478,19 @@ class GenericTrainer(BaseTrainer):
             print(f"DPO early stopping triggered: patience exhausted after {self._dpo_patience_counter} "
                   f"consecutive checks without improvement.")
             self.commands.stop()
+
+    def __save_dpo_best(self, train_progress: TrainProgress) -> str:
+        best_path = os.path.join(self.config.workspace_dir, "backup", "dpo-best.pt")
+        os.makedirs(os.path.dirname(best_path), exist_ok=True)
+        try:
+            state = [p.data.clone().cpu() for p in self.parameters]
+            torch.save(state, best_path)
+            print(f"Saved DPO best checkpoint (val_accuracy improved) to {best_path}")
+        except Exception:
+            traceback.print_exc()
+            print("Could not save DPO best checkpoint.")
+            return self._dpo_best_backup_path or ""
+        return best_path
 
     def __save_backup_config(self, backup_path):
         config_path = os.path.join(backup_path, "onetrainer_config")
@@ -939,6 +948,18 @@ class GenericTrainer(BaseTrainer):
 
                 if self.model.ema:
                     self.model.ema.copy_ema_to(self.parameters, store_temp=False)
+
+                # Restore DPO best AFTER EMA copy so it takes precedence
+                if (self.config.rlhf_enabled
+                        and self.config.rlhf_dpo_save_best
+                        and self._dpo_best_backup_path
+                        and os.path.isfile(self._dpo_best_backup_path)):
+                    print(f"Restoring DPO best checkpoint from {self._dpo_best_backup_path}")
+                    self.callbacks.on_update_status("Restoring best DPO checkpoint")
+                    best_state = torch.load(self._dpo_best_backup_path, map_location=self.temp_device)
+                    for param, saved in zip(self.parameters, best_state, strict=True):
+                        param.data.copy_(saved)
+                    del best_state
                 if os.path.isdir(self.config.output_model_destination) and self.config.output_model_format.is_single_file():
                     save_path = os.path.join(
                         self.config.output_model_destination,

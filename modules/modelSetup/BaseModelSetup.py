@@ -183,7 +183,7 @@ class BaseModelSetup(
             return ((pred - target) ** 2).mean(dim=list(range(1, pred.ndim)))
 
         beta = config.rlhf_dpo_beta
-        execution_mode = getattr(config, "rlhf_dpo_execution_mode", DPOExecutionMode.SEQUENTIAL)
+        execution_mode = getattr(config, "rlhf_dpo_execution_mode", DPOExecutionMode.FULL_CONCURRENT)
         supervised_loss = None
 
         if execution_mode == DPOExecutionMode.FULL_CONCURRENT:

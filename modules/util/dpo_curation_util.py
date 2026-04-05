@@ -102,12 +102,41 @@ def export_single_pair(
     save_manifest(output_dir, manifest)
 
 
-def _find_exported_file(base_dir: str, filename: str) -> str | None:
+def find_exported_file(base_dir: str, filename: str) -> str | None:
     for subdir in ("", "train", "val"):
         path = os.path.join(base_dir, subdir, filename) if subdir else os.path.join(base_dir, filename)
         if os.path.isfile(path):
             return path
     return None
+
+
+def find_orphaned_pairs(output_dir: str, manifest: dict) -> list[dict]:
+    chosen_dir = os.path.join(output_dir, "chosen")
+    rejected_dir = os.path.join(output_dir, "rejected")
+    orphans = []
+    for entry in manifest.get("pairs", []):
+        chosen = find_exported_file(chosen_dir, entry["chosen_file"])
+        rejected = find_exported_file(rejected_dir, entry["rejected_file"])
+        if not chosen or not rejected:
+            orphans.append(entry)
+    return orphans
+
+
+def remove_pair(output_dir: str, manifest: dict, pair_entry: dict):
+    chosen_dir = os.path.join(output_dir, "chosen")
+    rejected_dir = os.path.join(output_dir, "rejected")
+
+    for filename_key, base_dir in [("chosen_file", chosen_dir), ("rejected_file", rejected_dir)]:
+        filename = pair_entry[filename_key]
+        txt_name = os.path.splitext(filename)[0] + ".txt"
+        for f in (filename, txt_name):
+            path = find_exported_file(base_dir, f)
+            if path and os.path.isfile(path):
+                os.remove(path)
+
+    pairs = manifest.get("pairs", [])
+    manifest["pairs"] = [p for p in pairs if p.get("pair_id") != pair_entry.get("pair_id")]
+    save_manifest(output_dir, manifest)
 
 
 def finalize_export(output_dir: str, manifest: dict, val_percentage: float = 0.0) -> tuple[int, int]:
@@ -138,12 +167,12 @@ def finalize_export(output_dir: str, manifest: dict, val_percentage: float = 0.0
             ("chosen_file", chosen_dir, target_chosen),
             ("rejected_file", rejected_dir, target_rejected),
         ]:
-            src = _find_exported_file(base_dir, entry[filename_key])
+            src = find_exported_file(base_dir, entry[filename_key])
             dst = os.path.join(target_dir, entry[filename_key])
             if src and os.path.normpath(src) != os.path.normpath(dst):
                 shutil.move(src, dst)
             txt_name = os.path.splitext(entry[filename_key])[0] + ".txt"
-            txt_src = _find_exported_file(base_dir, txt_name)
+            txt_src = find_exported_file(base_dir, txt_name)
             txt_dst = os.path.join(target_dir, txt_name)
             if txt_src and os.path.normpath(txt_src) != os.path.normpath(txt_dst):
                 shutil.move(txt_src, txt_dst)

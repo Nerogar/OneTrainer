@@ -6,7 +6,6 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dpo_curation_util import check_dpo_pairs, dpo_concept_pairs
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.DPOExecutionMode import DPOExecutionMode
-from modules.util.enum.DPOPatienceMode import DPOPatienceMode
 from modules.util.enum.RLHFMode import RLHFMode
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -82,9 +81,8 @@ class RLHFTab:
             ("Full Concurrent", DPOExecutionMode.FULL_CONCURRENT),
         ]
         components.label(self.scroll_frame, 5, 0, "Execution Mode",
-                         tooltip="Controls the VRAM and speed trade-off for DPO. Full Concurrent is the fastest and uses the most VRAM. "
-                                 "Policy Concurrent is the middle ground for both speed and VRAM use. Sequential is the slowest and uses the least VRAM. "
-                                 "Most users should leave this on Sequential.")
+                         tooltip="Controls the VRAM and speed trade-off for DPO. Full Concurrent is fastest with slightly higher VRAM (~1 GB more). "
+                                 "Sequential uses the least VRAM — use it if you're tight on memory.")
         components.options_kv(self.scroll_frame, 5, 1, execution_options, self.ui_state, "rlhf_dpo_execution_mode")
 
         components.label(self.scroll_frame, 4, 3, "Early Stopping",
@@ -95,13 +93,10 @@ class RLHFTab:
                          tooltip="How many validation checks can pass without improvement before training stops.")
         components.entry(self.scroll_frame, 5, 4, self.ui_state, "rlhf_dpo_patience_value")
 
-        patience_mode_options = [
-            ("Either", DPOPatienceMode.EITHER),
-            ("Both", DPOPatienceMode.BOTH),
-        ]
-        components.label(self.scroll_frame, 6, 3, "Patience Mode",
-                         tooltip="Either: stop when accuracy or chosen reward stalls. Both: stop only when both stall.")
-        components.options_kv(self.scroll_frame, 6, 4, patience_mode_options, self.ui_state, "rlhf_dpo_patience_mode")
+        components.label(self.scroll_frame, 6, 3, "Save Best",
+                         tooltip="Saves a checkpoint when validation accuracy hits a new high. "
+                                 "The best checkpoint is restored at the end of training.")
+        components.switch(self.scroll_frame, 6, 4, self.ui_state, "rlhf_dpo_save_best")
 
         components.button(self.scroll_frame, 7, 0, "Check Pairs", command=self._check_pairs,
                           tooltip="Check that your chosen and rejected concept folders line up before training.")

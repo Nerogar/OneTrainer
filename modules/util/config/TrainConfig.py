@@ -548,6 +548,7 @@ class TrainConfig(BaseConfig):
     rlhf_dpo_patience_enabled: bool
     rlhf_dpo_patience_value: int
     rlhf_dpo_patience_mode: DPOPatienceMode
+    rlhf_dpo_save_best: bool
 
     # optimizer
     optimizer: TrainOptimizerConfig
@@ -585,7 +586,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=14,
+            config_version=15,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -602,6 +603,7 @@ class TrainConfig(BaseConfig):
                 12: self.__migration_12,
                 13: self.__migration_13,
                 14: self.__migration_14,
+                15: self.__migration_15,
             }
         )
 
@@ -856,6 +858,11 @@ class TrainConfig(BaseConfig):
         migrated_data.setdefault("transfer_step2", False)
         migrated_data.setdefault("transfer_guidance", 3.0)
         migrated_data.setdefault("transfer_train_lora", False)
+        return migrated_data
+
+    def __migration_15(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        migrated_data.setdefault("rlhf_dpo_save_best", True)
         return migrated_data
 
     def effective_dpo_ref_mode(self) -> DPORefMode:
@@ -1236,7 +1243,7 @@ class TrainConfig(BaseConfig):
         data.append(("rlhf_dpo_beta", 5000.0, float, False))
         data.append(("rlhf_dpo_label_smoothing", 0.0, float, False))
         data.append(("rlhf_dpo_ref_mode", DPORefMode.NEW_ADAPTER, DPORefMode, False))
-        data.append(("rlhf_dpo_execution_mode", DPOExecutionMode.SEQUENTIAL, DPOExecutionMode, False))
+        data.append(("rlhf_dpo_execution_mode", DPOExecutionMode.FULL_CONCURRENT, DPOExecutionMode, False))
         data.append(("rlhf_supervised_mix", 0.0, float, False))
         data.append(("rlhf_dpo_shared_noise", True, bool, False))
         data.append(("rlhf_dpo_validation", False, bool, False))
@@ -1244,6 +1251,7 @@ class TrainConfig(BaseConfig):
         data.append(("rlhf_dpo_patience_enabled", False, bool, False))
         data.append(("rlhf_dpo_patience_value", 5, int, False))
         data.append(("rlhf_dpo_patience_mode", DPOPatienceMode.EITHER, DPOPatienceMode, False))
+        data.append(("rlhf_dpo_save_best", True, bool, False))
 
         # optimizer
         data.append(("optimizer", TrainOptimizerConfig.default_values(), TrainOptimizerConfig, False))

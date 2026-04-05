@@ -3,12 +3,18 @@ import os
 import random
 import threading
 from collections import defaultdict
-from queue import Queue, Empty, Full
+from queue import Empty, Full, Queue
 from tkinter import filedialog, messagebox
 
 from modules.util import path_util
 from modules.util.dpo_curation_util import (
-    export_single_pair, finalize_export, load_manifest, manifest_pair_counts,
+    export_single_pair,
+    finalize_export,
+    find_exported_file,
+    find_orphaned_pairs,
+    load_manifest,
+    manifest_pair_counts,
+    remove_pair,
 )
 from modules.util.image_metadata_util import extract_metadata
 from modules.util.ui.ui_utils import set_window_icon
@@ -23,6 +29,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         self.title("DPO Pair Tool")
         self.geometry("1400x900")
         self.resizable(True, True)
+        self.transient(parent)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.current_remaining_images: list[str] = []
@@ -57,13 +64,20 @@ class DPOCurationWindow(ctk.CTkToplevel):
         self.mode = "selection"  # "elo" or "selection"
         self.pairs_per_group_var = ctk.StringVar(value="1")
 
+        # Review mode state
+        self._review_pairs: list[dict] = []
+        self._review_index = 0
+        self._review_removed = 0
+
         self._build_start_ui()
 
         self.after(200, lambda: set_window_icon(self))
+        self.grab_set()
         self.focus_set()
 
     def _on_close(self):
         self._worker_stop.set()
+        self.grab_release()
         self.destroy()
 
     def _build_start_ui(self):
@@ -71,58 +85,70 @@ class DPOCurationWindow(ctk.CTkToplevel):
             widget.destroy()
 
         frame = ctk.CTkFrame(self, fg_color="transparent")
-        frame.pack(expand=True, fill="both", padx=20, pady=20)
+        frame.pack(expand=True, fill="both", padx=40, pady=30)
 
-        ctk.CTkLabel(frame, text="DPO Pair Tool", font=("", 24, "bold")).pack(pady=(0, 20))
-        ctk.CTkLabel(frame, text="Select a source folder of generated images and an output folder.\n"
-                     "Prompt and aspect ratio will be extracted from image metadata (SwarmUI format).\n"
-                     "Images are grouped by (prompt, aspect ratio) for comparison.\n"
-                     "Pairs are exported immediately as you pick them.",
-                     justify="center").pack(pady=(0, 20))
+        ctk.CTkLabel(frame, text="DPO Pair Tool", font=("", 28, "bold")).pack(pady=(0, 10))
+        ctk.CTkLabel(frame, text="Curate chosen/rejected pairs from generated images.",
+                     font=("", 13), text_color="gray").pack(pady=(0, 25))
 
-        # Source folder
-        src_frame = ctk.CTkFrame(frame, fg_color="transparent")
-        src_frame.pack(fill="x", pady=5)
+        # Folders section
+        folder_card = ctk.CTkFrame(frame, border_width=1, border_color="gray30", corner_radius=8)
+        folder_card.pack(fill="x", pady=(0, 15), padx=20)
+
+        ctk.CTkLabel(folder_card, text="Folders", font=("", 13, "bold")).pack(
+            anchor="w", padx=15, pady=(12, 8))
+
+        src_frame = ctk.CTkFrame(folder_card, fg_color="transparent")
+        src_frame.pack(fill="x", padx=15, pady=(0, 8))
         ctk.CTkButton(src_frame, text="Source Folder", width=150,
                       command=self._select_source).pack(side="left", padx=(0, 10))
         ctk.CTkLabel(src_frame, textvariable=self.source_path_var, anchor="w").pack(
             side="left", fill="x", expand=True)
 
-        # Output folder
-        out_frame = ctk.CTkFrame(frame, fg_color="transparent")
-        out_frame.pack(fill="x", pady=5)
+        out_frame = ctk.CTkFrame(folder_card, fg_color="transparent")
+        out_frame.pack(fill="x", padx=15, pady=(0, 12))
         ctk.CTkButton(out_frame, text="Output Folder", width=150,
                       command=self._select_output).pack(side="left", padx=(0, 10))
         ctk.CTkLabel(out_frame, textvariable=self.output_path_var, anchor="w").pack(
             side="left", fill="x", expand=True)
 
-        # Resume info
         self.resume_label = ctk.CTkLabel(frame, text="", font=("", 12), text_color="green")
-        self.resume_label.pack(pady=5)
+        self.resume_label.pack(pady=(0, 10))
 
-        # Pairs per group
-        pair_count_frame = ctk.CTkFrame(frame, fg_color="transparent")
-        pair_count_frame.pack(pady=(10, 20))
+        # Settings section
+        settings_card = ctk.CTkFrame(frame, border_width=1, border_color="gray30", corner_radius=8)
+        settings_card.pack(fill="x", pady=(0, 20), padx=20)
+
+        pair_count_frame = ctk.CTkFrame(settings_card, fg_color="transparent")
+        pair_count_frame.pack(padx=15, pady=12)
         ctk.CTkLabel(pair_count_frame, text="Pairs per group:").pack(side="left", padx=(0, 10))
         ctk.CTkEntry(pair_count_frame, textvariable=self.pairs_per_group_var, width=60).pack(side="left")
-        ctk.CTkLabel(pair_count_frame, text="How many pairs to collect before moving on.", anchor="w").pack(side="left", padx=(10, 0))
+        ctk.CTkLabel(pair_count_frame, text="How many pairs to collect before moving on.",
+                     anchor="w", text_color="gray").pack(side="left", padx=(10, 0))
 
+        # Action buttons
         btn_frame = ctk.CTkFrame(frame, fg_color="transparent")
-        btn_frame.pack(pady=10)
-
+        btn_frame.pack(pady=(0, 10))
         ctk.CTkButton(btn_frame, text="Start (ELO)", width=250,
                       command=lambda: self._start("elo")).pack(side="left", padx=10)
         ctk.CTkButton(btn_frame, text="Start (Selection)", width=250,
                       command=lambda: self._start("selection")).pack(side="left", padx=10)
 
+        ctk.CTkButton(frame, text="Review Pairs", width=250, fg_color="gray40",
+                      command=self._start_review).pack(pady=(5, 0))
+
     def _select_source(self):
+        self.grab_release()
         folder = filedialog.askdirectory(title="Select folder of generated images")
+        self.grab_set()
         if folder:
             self.source_folder = folder
             self.source_path_var.set(folder)
 
     def _select_output(self):
+        self.grab_release()
         folder = filedialog.askdirectory(title="Select output directory for exports")
+        self.grab_set()
         if folder:
             self.output_dir = folder
             self.output_path_var.set(folder)
@@ -245,7 +271,10 @@ class DPOCurationWindow(ctk.CTkToplevel):
         frame = ctk.CTkFrame(self, fg_color="transparent")
         frame.pack(expand=True)
 
-        ctk.CTkLabel(frame, text="Scanning...", font=("", 20, "bold")).pack(pady=(0, 10))
+        ctk.CTkLabel(frame, text="Scanning...", font=("", 20, "bold")).pack(pady=(0, 15))
+        self._scan_progress = ctk.CTkProgressBar(frame, width=300, mode="indeterminate")
+        self._scan_progress.pack(pady=(0, 15))
+        self._scan_progress.start()
         self._scan_label = ctk.CTkLabel(frame, text="0 files scanned", font=("", 14))
         self._scan_label.pack()
 
@@ -519,6 +548,8 @@ class DPOCurationWindow(ctk.CTkToplevel):
         preview = ctk.CTkToplevel(self)
         preview.title("Preview — Right-click to select")
         preview.attributes("-fullscreen", True)
+        preview.transient(self)
+        preview.grab_set()
         preview.focus_set()
 
         try:
@@ -649,29 +680,35 @@ class DPOCurationWindow(ctk.CTkToplevel):
             widget.destroy()
 
         frame = ctk.CTkFrame(self, fg_color="transparent")
-        frame.pack(expand=True, fill="both", padx=20, pady=20)
+        frame.pack(expand=True, fill="both", padx=40, pady=30)
 
         total_pairs = len(self.manifest.get("pairs", []))
-        unique_groups = len(set(
+        unique_groups = len({
             (e["prompt"], e.get("aspectratio", ""))
             for e in self.manifest.get("pairs", [])
-        ))
+        })
         skipped = max(0, self._groups_queued - unique_groups)
 
-        ctk.CTkLabel(frame, text="Scoring Complete!", font=("", 24, "bold")).pack(pady=(0, 20))
+        ctk.CTkLabel(frame, text="Scoring Complete", font=("", 28, "bold")).pack(pady=(0, 20))
+
+        # Summary card
+        summary_card = ctk.CTkFrame(frame, border_width=1, border_color="gray30", corner_radius=8)
+        summary_card.pack(fill="x", pady=(0, 20), padx=20)
+
         summary = f"{total_pairs} chosen/rejected pairs from {unique_groups} prompt groups exported."
         if skipped > 0:
-            summary += f" ({skipped} groups skipped)"
-        ctk.CTkLabel(frame, text=summary, font=("", 14)).pack(pady=(0, 10))
-        ctk.CTkLabel(frame, text=f"Pairs saved to: {self.output_dir}",
-                     font=("", 12)).pack(pady=(0, 20))
+            summary += f"  ({skipped} groups skipped)"
+        ctk.CTkLabel(summary_card, text=summary, font=("", 14)).pack(padx=15, pady=(12, 5))
+        ctk.CTkLabel(summary_card, text=self.output_dir, font=("", 11),
+                     text_color="gray").pack(padx=15, pady=(0, 12))
 
         val_frame = ctk.CTkFrame(frame, fg_color="transparent")
         val_frame.pack(pady=(0, 20))
         ctk.CTkLabel(val_frame, text="Validation %:").pack(side="left", padx=(0, 10))
         self.val_percentage_var = ctk.StringVar(value="10")
         ctk.CTkEntry(val_frame, textvariable=self.val_percentage_var, width=60).pack(side="left")
-        ctk.CTkLabel(val_frame, text="(0 = no validation split)").pack(side="left", padx=(10, 0))
+        ctk.CTkLabel(val_frame, text="(0 = no validation split)",
+                     text_color="gray").pack(side="left", padx=(10, 0))
 
         ctk.CTkButton(frame, text="Finalize (Train/Val Split + Concepts)", width=350,
                       command=self._finalize).pack(pady=10)
@@ -691,3 +728,138 @@ class DPOCurationWindow(ctk.CTkToplevel):
         msg += f"\n\nConcept config saved to:\n  {os.path.join(self.output_dir, 'concepts.json')}"
         messagebox.showinfo("Finalize Complete", msg)
         self.destroy()
+
+    # ---- Review Pairs Mode ----
+
+    def _start_review(self):
+        if not self.output_dir:
+            messagebox.showwarning("No Output", "Select an output folder first.")
+            return
+
+        self.manifest = load_manifest(self.output_dir)
+        pairs = self.manifest.get("pairs", [])
+        if not pairs:
+            messagebox.showinfo("No Pairs", "No pairs found in the manifest.")
+            return
+
+        orphans = find_orphaned_pairs(self.output_dir, self.manifest)
+        if orphans:
+            result = messagebox.askyesno(
+                "Orphaned Pairs Found",
+                f"Found {len(orphans)} pair(s) with missing files.\n\n"
+                f"Remove them from the manifest?")
+            if result:
+                for entry in orphans:
+                    remove_pair(self.output_dir, self.manifest, entry)
+                pairs = self.manifest.get("pairs", [])
+                if not pairs:
+                    messagebox.showinfo("No Pairs", "All pairs were orphaned and removed.")
+                    return
+
+        self._review_pairs = list(pairs)
+        self._review_index = 0
+        self._review_removed = 0
+        self._build_review_ui()
+
+    def _build_review_ui(self):
+        for widget in self.winfo_children():
+            widget.destroy()
+
+        if self._review_index >= len(self._review_pairs):
+            self._show_review_summary()
+            return
+
+        entry = self._review_pairs[self._review_index]
+        total = len(self._review_pairs)
+
+        # Header
+        self._build_prompt_expander(self, entry.get("prompt", ""))
+
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=10, pady=5)
+        ctk.CTkLabel(header, text=f"Pair {self._review_index + 1} / {total}",
+                     font=("", 14, "bold")).pack(side="left", padx=15)
+        ctk.CTkLabel(header, text=f"AR: {entry.get('aspectratio', '')}",
+                     font=("", 12)).pack(side="left", padx=15)
+        ctk.CTkLabel(header, text=f"Removed: {self._review_removed}",
+                     font=("", 12), text_color="red").pack(side="left", padx=15)
+
+        # Images side by side
+        img_frame = ctk.CTkFrame(self, fg_color="transparent")
+        img_frame.pack(expand=True, fill="both", padx=10, pady=5)
+        img_frame.grid_columnconfigure(0, weight=1)
+        img_frame.grid_columnconfigure(1, weight=1)
+        img_frame.grid_rowconfigure(0, weight=0)
+        img_frame.grid_rowconfigure(1, weight=1)
+
+        ctk.CTkLabel(img_frame, text="Chosen", font=("", 14, "bold"),
+                     text_color="green").grid(row=0, column=0, pady=(0, 5))
+        ctk.CTkLabel(img_frame, text="Rejected", font=("", 14, "bold"),
+                     text_color="red").grid(row=0, column=1, pady=(0, 5))
+
+        chosen_dir = os.path.join(self.output_dir, "chosen")
+        rejected_dir = os.path.join(self.output_dir, "rejected")
+        chosen_path = find_exported_file(chosen_dir, entry["chosen_file"])
+        rejected_path = find_exported_file(rejected_dir, entry["rejected_file"])
+
+        if chosen_path:
+            self._display_image(img_frame, chosen_path, row=1, col=0)
+        else:
+            ctk.CTkLabel(img_frame, text="(missing)", font=("", 14),
+                         text_color="gray").grid(row=1, column=0)
+        if rejected_path:
+            self._display_image(img_frame, rejected_path, row=1, col=1)
+        else:
+            ctk.CTkLabel(img_frame, text="(missing)", font=("", 14),
+                         text_color="gray").grid(row=1, column=1)
+
+        # Buttons
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=10, pady=10)
+
+        ctk.CTkButton(btn_frame, text="← Back", width=150,
+                      command=lambda: self._review_advance(-1),
+                      state="normal" if self._review_index > 0 else "disabled").pack(side="left", padx=10)
+        ctk.CTkButton(btn_frame, text="Remove", width=150, fg_color="#B22222",
+                      command=self._review_remove).pack(side="left", padx=10, expand=True)
+        ctk.CTkButton(btn_frame, text="Keep →", width=150,
+                      command=lambda: self._review_advance(1)).pack(side="right", padx=10)
+
+        # Keyboard bindings
+        self.bind("<Left>", lambda e: self._review_advance(-1) if self._review_index > 0 else None)
+        self.bind("<Right>", lambda e: self._review_advance(1))
+        self.bind("<Delete>", lambda e: self._review_remove())
+
+    def _review_advance(self, delta: int):
+        self._review_index += delta
+        if self._review_index < 0:
+            self._review_index = 0
+        self._build_review_ui()
+
+    def _review_remove(self):
+        entry = self._review_pairs[self._review_index]
+        remove_pair(self.output_dir, self.manifest, entry)
+        self._review_pairs.pop(self._review_index)
+        self._review_removed += 1
+        if self._review_index >= len(self._review_pairs):
+            self._review_index = max(0, len(self._review_pairs) - 1)
+        self._build_review_ui()
+
+    def _show_review_summary(self):
+        for widget in self.winfo_children():
+            widget.destroy()
+
+        frame = ctk.CTkFrame(self, fg_color="transparent")
+        frame.pack(expand=True, fill="both", padx=20, pady=20)
+
+        ctk.CTkLabel(frame, text="Review Complete", font=("", 24, "bold")).pack(pady=(0, 20))
+
+        remaining = len(self.manifest.get("pairs", []))
+        ctk.CTkLabel(frame, text=f"Kept: {remaining} pairs", font=("", 14)).pack(pady=5)
+        ctk.CTkLabel(frame, text=f"Removed: {self._review_removed} pairs",
+                     font=("", 14), text_color="red").pack(pady=5)
+
+        ctk.CTkButton(frame, text="Back to Start", width=250,
+                      command=self._build_start_ui).pack(pady=20)
+        ctk.CTkButton(frame, text="Close", width=250, fg_color="gray",
+                      command=self.destroy).pack(pady=5)
