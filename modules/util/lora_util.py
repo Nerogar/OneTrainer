@@ -13,7 +13,7 @@ def precondition_lora_grad(p: torch.Tensor, grad: torch.Tensor, delta: float = 1
     is_lora_B = getattr(p, '_is_lora_B', False)
     is_lora_A = getattr(p, '_is_lora_A', False)
 
-    if not (is_lora_A or is_lora_B):
+    if not (is_lora_A or is_lora_B) or p.norm() < 1e-6:
         return grad
 
     if is_lora_B:
