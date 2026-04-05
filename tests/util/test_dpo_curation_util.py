@@ -78,7 +78,9 @@ class DPOCurationUtilExportTest(unittest.TestCase):
 
     def test_export_single_pair_saves_immediately_and_updates_manifest(self):
         from modules.util.dpo_curation_util import (
-            export_single_pair, load_manifest, manifest_pair_counts,
+            export_single_pair,
+            load_manifest,
+            manifest_pair_counts,
         )
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -149,7 +151,9 @@ class DPOCurationUtilExportTest(unittest.TestCase):
 
     def test_finalize_export_creates_train_val_split(self):
         from modules.util.dpo_curation_util import (
-            export_single_pair, finalize_export, load_manifest,
+            export_single_pair,
+            finalize_export,
+            load_manifest,
         )
 
         with tempfile.TemporaryDirectory() as temp_dir:
