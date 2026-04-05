@@ -76,7 +76,10 @@ def strip_angle_bracket_segments(prompt: str) -> str:
     cleaned = re.sub(r",\s*,+", ", ", cleaned)
     cleaned = re.sub(r" {2,}", " ", cleaned)
     cleaned = re.sub(r"^\s*,\s*|\s*,\s*$", "", cleaned)
-    return cleaned.strip()
+    cleaned = cleaned.strip()
+    # Flatten multi-line prompts to a single line (e.g. SwarmUI "line1\nline2" style)
+    cleaned = re.sub(r"\s*\n\s*", ", ", cleaned)
+    return cleaned
 
 
 def _extract_a1111_prompt(text: str) -> str:
