@@ -304,9 +304,25 @@ class TrainUI(ctk.CTk):
                          tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
         components.entry(frame, 10, 1, self.ui_state, "dataloader_threads", required=True)
 
+        components.label(frame, 10, 2, "Patience",
+                         tooltip="Enable early stopping based on validation loss. "
+                                 "Training stops when validation loss has not improved "
+                                 "for a set number of consecutive validation checks. "
+                                 "Automatically enables Validation when turned on.")
+        components.switch(frame, 10, 3, self.ui_state, "patience",
+                          command=self._on_patience_toggle)
+
         components.label(frame, 11, 0, "Train Device",
                          tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\". Must be \"cuda\" for multi-GPU training.")
         components.entry(frame, 11, 1, self.ui_state, "train_device", required=True)
+
+        components.label(frame, 11, 2, "Early Stop After",
+                         tooltip="Number of consecutive validation checks without improvement "
+                                 "before training stops. You control how often validation runs "
+                                 "with the 'Validate after' setting above. The best checkpoint "
+                                 "(lowest validation loss) is automatically saved and restored "
+                                 "as the final output model.")
+        components.entry(frame, 11, 3, self.ui_state, "patience_epochs")
 
         components.label(frame, 12, 0, "Multi-GPU",
                          tooltip="Enable multi-GPU training")
@@ -870,6 +886,11 @@ class TrainUI(ctk.CTk):
         else:
             if not (self.training_thread and self.train_config.tensorboard):
                 self._stop_always_on_tensorboard()
+
+    def _on_patience_toggle(self):
+        if self.train_config.patience and not self.train_config.validation:
+            self.train_config.validation = True
+            self.ui_state.get_var("validation").set(True)
 
     def _set_training_button_style(self, mode: str):
         if not self.training_button:
