@@ -21,8 +21,8 @@ def precondition_lora_grad(p: torch.Tensor, grad: torch.Tensor, delta: float = 1
         d_out = p.shape[0]
         rank = p.numel() // d_out
 
-        A = pair.detach().view(rank, -1).float()
-        grad_f = grad.view(d_out, rank).float()
+        A = pair.detach().reshape(rank, -1).float()
+        grad_f = grad.reshape(d_out, rank).float()
 
         # Preconditioner for B: (A @ A.T + delta * I)^-1
         AAt = A @ A.mT
@@ -34,8 +34,8 @@ def precondition_lora_grad(p: torch.Tensor, grad: torch.Tensor, delta: float = 1
     else:
         # p is A [rank, d_in], pair is B [d_out, rank]
         rank = p.shape[0]
-        B = pair.detach().view(-1, rank).float()
-        grad_f = grad.view(rank, -1).float()
+        B = pair.detach().reshape(-1, rank).float()
+        grad_f = grad.reshape(rank, -1).float()
 
         # Preconditioner for A: (B.T @ B + delta * I)^-1
         BtB = B.mT @ B
@@ -45,4 +45,4 @@ def precondition_lora_grad(p: torch.Tensor, grad: torch.Tensor, delta: float = 1
         grad_scaled = torch.linalg.solve(BtB + delta * eye, grad_f)
 
     # Return the scaled gradient in the original shape and dtype
-    return grad_scaled.view_as(grad).to(grad.dtype)
+    return grad_scaled.reshape(grad.shape).to(grad.dtype)
