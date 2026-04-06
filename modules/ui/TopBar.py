@@ -4,6 +4,7 @@ import traceback
 import webbrowser
 from collections.abc import Callable
 from contextlib import suppress
+from tkinter import filedialog
 
 from modules.util import path_util
 from modules.util.config.SecretsConfig import SecretsConfig
@@ -62,6 +63,9 @@ class TopBar:
         # remove button
         # TODO
         # components.icon_button(self.frame, 0, 2, "-", self.__remove_config)
+
+        # Load custom config button
+        components.button(self.frame, 0, 2, "Load Custom Config", self.__load_custom_config, width=120)
 
         # Wiki button
         components.button(self.frame, 0, 4, "Wiki", self.open_wiki, width=50)
@@ -248,6 +252,14 @@ class TopBar:
             pass
         except Exception:
             print(traceback.format_exc())
+
+    def __load_custom_config(self):
+        selected_config = filedialog.askopenfilename(
+            filetypes=[("JSON files", "*.json")],
+            initialdir=self.dir,
+        )
+        if selected_config:
+            self.__load_current_config(selected_config)
 
     def __remove_config(self):
         # TODO
