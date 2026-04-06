@@ -116,6 +116,7 @@ class TrainUI(ctk.CTk):
         self.eta_label = None
         self.training_button = None
         self.export_button = None
+        self.clean_button = None
         self.tabview = None
 
         self.model_tab = None
@@ -376,7 +377,7 @@ class TrainUI(ctk.CTk):
         # clean cache
         components.label(frame, 3, 3, "Clean Cache",
                          tooltip="Remove orphaned cache files from datasets that have been edited. Shows a preview before deleting anything")
-        components.button(frame, 3, 4, "Clean", self.__clean_cache)
+        self.clean_button = components.button(frame, 3, 4, "Clean", self.__clean_cache)
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -799,6 +800,8 @@ class TrainUI(ctk.CTk):
                 return
 
             self._set_training_button_running()
+            if self.clean_button:
+                self.clean_button.configure(state="disabled")
 
             if self.train_config.tensorboard and not self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
                 self._stop_always_on_tensorboard()
@@ -919,6 +922,8 @@ class TrainUI(ctk.CTk):
 
     def _set_training_button_idle(self):
         self._set_training_button_style("idle")
+        if self.clean_button:
+            self.clean_button.configure(state="normal")
 
     def _set_training_button_running(self):
         self._set_training_button_style("running")
