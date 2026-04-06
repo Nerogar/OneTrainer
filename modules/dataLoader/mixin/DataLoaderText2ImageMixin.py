@@ -351,7 +351,8 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
 
         sourceless = config.sourceless_training and config.latent_caching
 
-        stop_check = lambda: self.stop_check_fun()
+        def stop_check():
+            return self.stop_check_fun()
 
         image_disk_cache = SmartDiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations',
                                          balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'],

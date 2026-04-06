@@ -9,7 +9,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 import modules.util.multi_gpu_util as multi
-from mgds.pipelineModules.SmartDiskCache import CachingStoppedException
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
@@ -34,6 +33,8 @@ from modules.util.profiling_util import TorchMemoryRecorder, TorchProfiler
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
+
+from mgds.pipelineModules.SmartDiskCache import CachingStoppedException
 
 import torch
 from torch import Tensor, nn
