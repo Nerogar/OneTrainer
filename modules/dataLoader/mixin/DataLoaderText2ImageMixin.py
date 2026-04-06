@@ -351,14 +351,16 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
 
         sourceless = config.sourceless_training and config.latent_caching
 
+        stop_check = lambda: self.stop_check_fun()
+
         image_disk_cache = SmartDiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations',
                                          balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'],
-                                         group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun,
+                                         group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun, stop_check_fun=stop_check,
                                          modeltype=config.model_type.value, source_path_in_name='image_path', sourceless=sourceless)
 
         text_disk_cache = SmartDiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',
-                                        variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun,
-                                        modeltype=config.model_type.value, source_path_in_name='prompt_path', sourceless=sourceless)
+                                        variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun, stop_check_fun=stop_check,
+                                        modeltype=config.model_type.value, source_path_in_name='image_path', sourceless=sourceless)
 
         modules = []
 

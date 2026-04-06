@@ -9,6 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import modules.util.multi_gpu_util as multi
+from mgds.pipelineModules.SmartDiskCache import CachingStoppedException
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
@@ -148,6 +149,7 @@ class GenericTrainer(BaseTrainer):
         self.data_loader = self.create_data_loader(
             self.model, self.model_setup, self.model.train_progress
         )
+        self.data_loader.stop_check_fun = self.commands.get_stop_command
         self.model_saver = self.create_model_saver()
 
         self.model_sampler = self.create_model_sampler(self.model)
@@ -641,14 +643,16 @@ class GenericTrainer(BaseTrainer):
                 return
             self.callbacks.on_update_status("Starting epoch/caching")
 
-            #call start_next_epoch with only one process at first, because it might write to the cache. All subsequent processes can read in parallel:
-            for _ in multi.master_first():
-                if self.config.latent_caching:
-                    self.data_loader.get_data_set().start_next_epoch()
-                    self.model_setup.setup_train_device(self.model, self.config)
-                else:
-                    self.model_setup.setup_train_device(self.model, self.config)
-                    self.data_loader.get_data_set().start_next_epoch()
+            try:
+                for _ in multi.master_first():
+                    if self.config.latent_caching:
+                        self.data_loader.get_data_set().start_next_epoch()
+                        self.model_setup.setup_train_device(self.model, self.config)
+                    else:
+                        self.model_setup.setup_train_device(self.model, self.config)
+                        self.data_loader.get_data_set().start_next_epoch()
+            except CachingStoppedException:
+                return
 
             if self.config.debug_mode:
                 multi.warn_parameter_divergence(self.parameters, train_device)

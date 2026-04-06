@@ -31,6 +31,7 @@ class BaseDataLoader(
 
         self.train_device = train_device
         self.temp_device = temp_device
+        self.stop_check_fun = lambda: False
 
         if is_validation:
             config = copy.copy(config)
