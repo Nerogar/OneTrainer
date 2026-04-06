@@ -19,7 +19,6 @@ from mgds.pipelineModules.AspectBucketing import AspectBucketing
 from mgds.pipelineModules.CalcAspect import CalcAspect
 from mgds.pipelineModules.CapitalizeTags import CapitalizeTags
 from mgds.pipelineModules.CollectPaths import CollectPaths
-from mgds.pipelineModules.SmartDiskCache import SmartDiskCache
 from mgds.pipelineModules.DistributedSampler import DistributedSampler
 from mgds.pipelineModules.DownloadHuggingfaceDatasets import DownloadHuggingfaceDatasets
 from mgds.pipelineModules.DropTags import DropTags
@@ -48,6 +47,7 @@ from mgds.pipelineModules.SelectInput import SelectInput
 from mgds.pipelineModules.SelectRandomText import SelectRandomText
 from mgds.pipelineModules.ShuffleTags import ShuffleTags
 from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
+from mgds.pipelineModules.SmartDiskCache import SmartDiskCache
 from mgds.pipelineModules.VariationSorting import VariationSorting
 
 import torch

@@ -17,7 +17,6 @@ from mgds.pipelineModules.AspectBucketing import AspectBucketing
 from mgds.pipelineModules.CalcAspect import CalcAspect
 from mgds.pipelineModules.CollectPaths import CollectPaths
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
-from mgds.pipelineModules.SmartDiskCache import SmartDiskCache
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
 from mgds.pipelineModules.InlineAspectBatchSorting import InlineAspectBatchSorting
 from mgds.pipelineModules.LoadImage import LoadImage
@@ -34,6 +33,7 @@ from mgds.pipelineModules.SaveImage import SaveImage
 from mgds.pipelineModules.ScaleCropImage import ScaleCropImage
 from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
+from mgds.pipelineModules.SmartDiskCache import SmartDiskCache
 from mgds.pipelineModules.VariationSorting import VariationSorting
 
 import torch
