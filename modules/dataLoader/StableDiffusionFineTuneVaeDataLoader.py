@@ -17,7 +17,7 @@ from mgds.pipelineModules.AspectBucketing import AspectBucketing
 from mgds.pipelineModules.CalcAspect import CalcAspect
 from mgds.pipelineModules.CollectPaths import CollectPaths
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
-from mgds.pipelineModules.DiskCache import DiskCache
+from mgds.pipelineModules.SmartDiskCache import SmartDiskCache
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
 from mgds.pipelineModules.InlineAspectBatchSorting import InlineAspectBatchSorting
 from mgds.pipelineModules.LoadImage import LoadImage
@@ -190,8 +190,10 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         def before_cache_fun():
             self._setup_cache_device(model, self.train_device, self.temp_device, config)
 
-        disk_cache = DiskCache(cache_dir=config.cache_dir, split_names=split_names, aggregate_names=aggregate_names, variations_in_name='concept.image_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',
-                               variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
+        disk_cache = SmartDiskCache(cache_dir=config.cache_dir, split_names=split_names, aggregate_names=aggregate_names, variations_in_name='concept.image_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',
+                                   variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun,
+                                   modeltype=config.model_type.value, source_path_in_name='image_path',
+                                   sourceless=config.sourceless_training and config.latent_caching)
         variation_sorting = VariationSorting(names=sort_names, balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'],
                                group_enabled_in_name='concept.enabled')
 
@@ -263,6 +265,17 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             train_progress: TrainProgress,
             is_validation: bool = False,
     ):
+        cache_modules = self.__cache_modules(config, model)
+        output_modules = self.__output_modules(config)
+
+        if config.sourceless_training and config.latent_caching:
+            return self._create_mgds(
+                config,
+                [cache_modules, output_modules],
+                train_progress,
+                is_validation,
+            )
+
         enumerate_input = self.__enumerate_input_modules(config)
         load_input = self.__load_input_modules(config)
         mask_augmentation = self.__mask_augmentation_modules(config)
@@ -270,8 +283,6 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         crop_modules = self.__crop_modules(config)
         augmentation_modules = self.__augmentation_modules(config)
         preparation_modules = self.__preparation_modules(config, model)
-        cache_modules = self.__cache_modules(config, model)
-        output_modules = self.__output_modules(config)
 
         debug_modules = self.__debug_modules(config, model)
 

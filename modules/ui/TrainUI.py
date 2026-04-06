@@ -368,6 +368,16 @@ class TrainUI(ctk.CTk):
                          tooltip="Clears the cache directory before starting to train. Only disable this if you want to continue using the same cached data. Disabling this can lead to errors, if other settings are changed during a restart")
         components.switch(frame, 2, 1, self.ui_state, "clear_cache_before_training")
 
+        # sourceless training
+        components.label(frame, 3, 0, "Sourceless Training",
+                         tooltip="Train from cached data only, without source images or text files. Requires a cache built with the latest version. Useful for sharing datasets without distributing original files")
+        components.switch(frame, 3, 1, self.ui_state, "sourceless_training")
+
+        # clean cache
+        components.label(frame, 3, 3, "Clean Cache",
+                         tooltip="Remove orphaned cache files from datasets that have been edited. Shows a preview before deleting anything")
+        components.button(frame, 3, 4, "Clean", self.__clean_cache)
+
         frame.pack(fill="both", expand=1)
         return frame
 
@@ -700,6 +710,34 @@ class TrainUI(ctk.CTk):
             )
             self.wait_window(window)
             training_callbacks.set_on_sample_custom()
+
+    def __clean_cache(self):
+        cache_dir = self.train_config.cache_dir
+        if not os.path.isdir(cache_dir):
+            messagebox.showinfo("Clean Cache", "No cache directory found.")
+            return
+
+        from mgds.pipelineModules.SmartDiskCache import SmartDiskCache
+        text_stats = SmartDiskCache.gc_preview(os.path.join(cache_dir, "text"))
+        image_stats = SmartDiskCache.gc_preview(os.path.join(cache_dir, "image"))
+
+        total_files = text_stats['orphan_count'] + image_stats['orphan_count']
+        total_mb = (text_stats['orphan_bytes'] + image_stats['orphan_bytes']) / (1024 * 1024)
+
+        if total_files == 0:
+            messagebox.showinfo("Clean Cache", "No orphaned cache files found.")
+            return
+
+        msg = (
+            f"Will remove {text_stats['orphan_count']} orphaned text cache files "
+            f"({text_stats['orphan_bytes'] / (1024*1024):.1f} MB), "
+            f"{image_stats['orphan_count']} orphaned image cache files "
+            f"({image_stats['orphan_bytes'] / (1024*1024):.1f} MB).\n\nProceed?"
+        )
+        if messagebox.askyesno("Clean Cache", msg):
+            SmartDiskCache.gc_clean(os.path.join(cache_dir, "text"))
+            SmartDiskCache.gc_clean(os.path.join(cache_dir, "image"))
+            messagebox.showinfo("Clean Cache", f"Removed {total_files} orphaned files ({total_mb:.1f} MB).")
 
     def __training_thread_function(self):
         error_caught = False

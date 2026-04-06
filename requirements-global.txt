@@ -34,6 +34,7 @@ open-clip-torch==2.32.0
 
 # data loader
 -e git+https://github.com/Nerogar/mgds.git@a25b59f#egg=mgds
+xxhash
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers

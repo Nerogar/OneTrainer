@@ -171,7 +171,8 @@ class GenericTrainer(BaseTrainer):
     def __clear_cache(self):
         print(
             f'Clearing cache directory {self.config.cache_dir}! '
-            f'You can disable this if you want to continue using the same cache.'
+            f'SmartCache validates files incrementally, so this is usually unnecessary. '
+            f'Disable "Clear cache before training" to keep your validated cache.'
         )
         if os.path.isdir(self.config.cache_dir):
             for filename in os.listdir(self.config.cache_dir):
