@@ -398,6 +398,11 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
         output_modules = self._output_modules(config, model, model_setup)
 
         if config.sourceless_training and config.latent_caching:
+            if hasattr(config, 'train_text_encoder_or_embedding') and config.train_text_encoder_or_embedding():
+                raise RuntimeError(
+                    "Sourceless training cannot be used with text encoder training. "
+                    "Disable sourceless_training or disable text encoder training."
+                )
             return self._create_mgds(
                 config,
                 [cache_modules, output_modules],
