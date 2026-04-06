@@ -365,7 +365,7 @@ class TrainUI(ctk.CTk):
 
         # clear cache before training
         components.label(frame, 2, 0, "Clear cache before training",
-                         tooltip="Clears the cache directory before starting to train. Only disable this if you want to continue using the same cached data. Disabling this can lead to errors, if other settings are changed during a restart")
+                         tooltip="Clears the cache directory before starting to train. SmartCache validates files incrementally, so this is usually unnecessary. Model type changes are detected automatically")
         components.switch(frame, 2, 1, self.ui_state, "clear_cache_before_training")
 
         # sourceless training
