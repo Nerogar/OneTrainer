@@ -72,6 +72,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         self._build_start_ui()
 
         self.after(200, lambda: set_window_icon(self))
+        self.wait_visibility()
         self.grab_set()
         self.focus_set()
 
@@ -79,6 +80,13 @@ class DPOCurationWindow(ctk.CTkToplevel):
         self._worker_stop.set()
         self.grab_release()
         self.destroy()
+
+    def _safe_grab(self):
+        try:
+            self.grab_set()
+            self.focus_set()
+        except Exception:
+            pass
 
     def _build_start_ui(self):
         for widget in self.winfo_children():
@@ -140,7 +148,11 @@ class DPOCurationWindow(ctk.CTkToplevel):
     def _select_source(self):
         self.grab_release()
         folder = filedialog.askdirectory(title="Select folder of generated images")
-        self.grab_set()
+        try:
+            self.grab_set()
+        except Exception:
+            self.after(100, self._safe_grab)
+        self.focus_set()
         if folder:
             self.source_folder = folder
             self.source_path_var.set(folder)
@@ -148,7 +160,11 @@ class DPOCurationWindow(ctk.CTkToplevel):
     def _select_output(self):
         self.grab_release()
         folder = filedialog.askdirectory(title="Select output directory for exports")
-        self.grab_set()
+        try:
+            self.grab_set()
+        except Exception:
+            self.after(100, self._safe_grab)
+        self.focus_set()
         if folder:
             self.output_dir = folder
             self.output_path_var.set(folder)
@@ -549,6 +565,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         preview.title("Preview — Right-click to select")
         preview.attributes("-fullscreen", True)
         preview.transient(self)
+        preview.wait_visibility()
         preview.grab_set()
         preview.focus_set()
 

@@ -3,7 +3,7 @@ import os
 from tkinter import messagebox
 
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.dpo_curation_util import check_dpo_pairs, dpo_concept_pairs
+from modules.util.dpo_curation_util import check_dpo_pairs, dpo_concept_pairs, remove_finalized_pair
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.DPOExecutionMode import DPOExecutionMode
 from modules.util.enum.RLHFMode import RLHFMode
@@ -100,6 +100,8 @@ class RLHFTab:
 
         components.button(self.scroll_frame, 7, 0, "Check Pairs", command=self._check_pairs,
                           tooltip="Check that your chosen and rejected concept folders line up before training.")
+        components.button(self.scroll_frame, 7, 1, "Review Pairs", command=self._review_pairs,
+                          tooltip="Visually review your chosen/rejected image pairs. Remove bad pairs and their counterparts.")
 
         components.label(self.scroll_frame, 8, 0, "Training Type:",
                          tooltip="Shows whether DPO is starting from a fresh adapter or refining a loaded adapter. The output is always an adapter file.")
@@ -145,9 +147,95 @@ class RLHFTab:
                          f"Chosen stray: {chosen_stray}, "
                          f"Rejected stray: {rejected_stray}")
 
-        messagebox.showinfo("Check Pairs Results", "\n".join(lines))
+        has_strays = total_chosen_stray > 0 or total_rejected_stray > 0
+        if has_strays:
+            lines.append(f"\nTotal strays: {total_chosen_stray + total_rejected_stray}")
+            messagebox.showinfo("Check Pairs Results", "\n".join(lines))
+
+            remove = messagebox.askyesno(
+                "Remove Strays?",
+                f"Found {total_chosen_stray + total_rejected_stray} stray file(s) with no matching pair.\n\n"
+                f"Remove them and their caption files?",
+            )
+            if remove:
+                removed = self._remove_strays(concept_pairs, result)
+                messagebox.showinfo("Strays Removed", f"Removed {removed} stray file(s) and their captions.")
+        else:
+            messagebox.showinfo("Check Pairs Results", "\n".join(lines))
+
+    def _remove_strays(self, concept_pairs, result) -> int:
+        from modules.util.dpo_curation_util import dpo_pair_key
+        from modules.util.path_util import supported_image_extensions
+        exts = supported_image_extensions()
+        removed = 0
+
+        for i, (chosen_path, rejected_path) in enumerate(concept_pairs):
+            pair_info = result['pairs'][i]
+            if pair_info.get('chosen_stray', 0) == 0 and pair_info.get('rejected_stray', 0) == 0:
+                continue
+
+            chosen_keys: dict[str, str] = {}
+            rejected_keys: dict[str, str] = {}
+
+            for root, _dirs, files in os.walk(chosen_path):
+                for fname in files:
+                    ext = os.path.splitext(fname)[1].lower()
+                    if ext in exts:
+                        full = os.path.join(root, fname)
+                        chosen_keys[dpo_pair_key(full, chosen_path)] = full
+
+            for root, _dirs, files in os.walk(rejected_path):
+                for fname in files:
+                    ext = os.path.splitext(fname)[1].lower()
+                    if ext in exts:
+                        full = os.path.join(root, fname)
+                        rejected_keys[dpo_pair_key(full, rejected_path)] = full
+
+            matched = set(chosen_keys) & set(rejected_keys)
+
+            for key, path in chosen_keys.items():
+                if key not in matched:
+                    remove_finalized_pair(path, None)
+                    removed += 1
+            for key, path in rejected_keys.items():
+                if key not in matched:
+                    remove_finalized_pair(None, path)
+                    removed += 1
+
+        return removed
+
+    def _review_pairs(self):
+        try:
+            concept_pairs = self._load_all_concept_pairs()
+        except Exception as ex:
+            messagebox.showerror("Review Pairs Error", str(ex))
+            return
+
+        from modules.ui.DPOReviewWindow import DPOReviewWindow
+        DPOReviewWindow(self.master.winfo_toplevel(), concept_pairs)
 
     def _load_concept_pairs(self):
+        concepts = self._load_concepts()
+        concept_types = {ConceptType(concept.type) for concept in concepts if concept.enabled}
+        if ConceptType.DPO_CHOSEN in concept_types or ConceptType.DPO_REJECTED in concept_types:
+            return dpo_concept_pairs(concepts, is_validation=False)
+        if ConceptType.DPO_CHOSEN_VAL in concept_types or ConceptType.DPO_REJECTED_VAL in concept_types:
+            return dpo_concept_pairs(concepts, is_validation=True)
+        raise RuntimeError("Need explicit chosen/rejected DPO concepts for training or validation.")
+
+    def _load_all_concept_pairs(self):
+        concepts = self._load_concepts()
+        concept_types = {ConceptType(concept.type) for concept in concepts if concept.enabled}
+        pairs = []
+        if ConceptType.DPO_CHOSEN in concept_types or ConceptType.DPO_REJECTED in concept_types:
+            pairs.extend(dpo_concept_pairs(concepts, is_validation=False))
+        if ConceptType.DPO_CHOSEN_VAL in concept_types or ConceptType.DPO_REJECTED_VAL in concept_types:
+            pairs.extend(dpo_concept_pairs(concepts, is_validation=True))
+        if not pairs:
+            raise RuntimeError("Need explicit chosen/rejected DPO concepts for training or validation.")
+        return pairs
+
+    def _load_concepts(self):
         concepts = self.train_config.concepts
         if concepts is None:
             concept_file = self.train_config.concept_file_name
@@ -156,9 +244,4 @@ class RLHFTab:
             from modules.util.config.ConceptConfig import ConceptConfig
             with open(concept_file, 'r') as f:
                 concepts = [ConceptConfig.default_values().from_dict(c) for c in json.load(f)]
-        concept_types = {ConceptType(concept.type) for concept in concepts if concept.enabled}
-        if ConceptType.DPO_CHOSEN in concept_types or ConceptType.DPO_REJECTED in concept_types:
-            return dpo_concept_pairs(concepts, is_validation=False)
-        if ConceptType.DPO_CHOSEN_VAL in concept_types or ConceptType.DPO_REJECTED_VAL in concept_types:
-            return dpo_concept_pairs(concepts, is_validation=True)
-        raise RuntimeError("Need explicit chosen/rejected DPO concepts for training or validation.")
+        return concepts

@@ -345,3 +345,48 @@ def check_dpo_pairs(concept_pairs: list[tuple[str, str]]) -> dict:
 
 def _copy_image(source_path: str, target_path: str):
     shutil.copy2(source_path, target_path)
+
+
+def scan_finalized_pairs(concept_pairs: list[tuple[str, str]]) -> list[dict]:
+    exts = supported_image_extensions()
+    all_pairs: dict[str, dict] = {}
+
+    for chosen_path, rejected_path in concept_pairs:
+        chosen_keys: dict[str, str] = {}
+        rejected_keys: dict[str, str] = {}
+
+        for root, _dirs, files in os.walk(chosen_path):
+            for fname in files:
+                ext = os.path.splitext(fname)[1].lower()
+                if ext in exts:
+                    full = os.path.join(root, fname)
+                    chosen_keys[dpo_pair_key(full, chosen_path)] = full
+
+        for root, _dirs, files in os.walk(rejected_path):
+            for fname in files:
+                ext = os.path.splitext(fname)[1].lower()
+                if ext in exts:
+                    full = os.path.join(root, fname)
+                    rejected_keys[dpo_pair_key(full, rejected_path)] = full
+
+        all_key_set = set(chosen_keys) | set(rejected_keys)
+        for key in sorted(all_key_set):
+            c = chosen_keys.get(key)
+            r = rejected_keys.get(key)
+            all_pairs[key] = {
+                'key': key,
+                'chosen_path': c,
+                'rejected_path': r,
+                'is_orphan': c is None or r is None,
+            }
+
+    return list(all_pairs.values())
+
+
+def remove_finalized_pair(chosen_path: str | None, rejected_path: str | None):
+    for path in (chosen_path, rejected_path):
+        if path and os.path.isfile(path):
+            os.remove(path)
+            txt = os.path.splitext(path)[0] + ".txt"
+            if os.path.isfile(txt):
+                os.remove(txt)
