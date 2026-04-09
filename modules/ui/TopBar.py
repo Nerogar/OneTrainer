@@ -161,7 +161,7 @@ class TopBar:
         if self.configs_dropdown is not None:
             self.configs_dropdown.grid_forget()
 
-        self.configs_dropdown = components.options_kv(
+        self.configs_dropdown = components.searchable_options_kv(
             self.frame, 0, 1, self.configs, self.config_ui_state, "config_name", self.__load_current_config
         )
 

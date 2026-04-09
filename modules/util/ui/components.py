@@ -545,3 +545,77 @@ def double_progress(master, row, column, label_1, label_2):
         description_2_component.configure(text=f"{value}/{max_value}")
 
     return set_1, set_2
+
+
+def searchable_options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: UIState, var_name: str,
+                          command: Callable[[Any], None] | None = None):
+    """
+    Custom widget with search functionality for dropdown.
+    The dropdown supports filtering - type to search through options.
+    Includes a clear button (X) to reset the filter.
+    """
+    var = ui_state.get_var(var_name)
+    keys = [key for key, _ in values]
+
+    frame = ctk.CTkFrame(master=master, fg_color="transparent")
+    frame.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
+    frame.grid_columnconfigure(0, weight=1)
+
+    def update_component(text):
+        for key, value in values:
+            if text == key:
+                var.set(value)
+                if command:
+                    command(value)
+                break
+
+    component = ctk.CTkComboBox(
+        master=frame,
+        values=keys,
+        command=update_component,
+        width=200,
+    )
+    component.grid(row=0, column=0, padx=(0, 5), pady=0, sticky="ew")
+
+    component._original_values = keys  # type: ignore
+
+    def clear_filter():
+        component.set("")
+        component.configure(values=component._original_values)
+
+    clear_button = ctk.CTkButton(
+        master=frame,
+        text="✕",
+        command=clear_filter,
+        width=25,
+        height=25,
+        corner_radius=5,
+    )
+    ToolTip(clear_button, "Clear filter")
+    clear_button.grid(row=0, column=1, padx=0, pady=0, sticky="e")
+
+    def on_text_change(event=None):
+        current_text = component._entry.get().lower()
+
+        if current_text:
+            filtered = [k for k in keys if current_text in k.lower()]
+            component.configure(values=filtered)
+        else:
+            component.configure(values=component._original_values)
+
+    component._entry.bind("<KeyRelease>", on_text_change)
+
+    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2246 is merged
+    def create_destroy(component):
+        orig_destroy = component.destroy
+
+        def destroy(self):
+            orig_destroy()
+            CTkScalingBaseClass.destroy(self)
+
+        return destroy
+
+    destroy = create_destroy(component)
+    component.destroy = lambda: destroy(component)  # type: ignore[assignment]
+
+    return component
