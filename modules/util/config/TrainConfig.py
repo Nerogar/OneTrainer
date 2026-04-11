@@ -151,6 +151,7 @@ class TrainOptimizerConfig(BaseConfig):
     centered_wd_mode: str
     factored_2nd: False
     fisher_wd: False
+    state_precision: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -277,6 +278,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("centered_wd_mode", "float8", str, False))
         data.append(("factored_2nd", False, bool, False))
         data.append(("fisher_wd", False, bool, False))
+        data.append(("state_precision", "float8", str, False))
 
         return TrainOptimizerConfig(data)
 

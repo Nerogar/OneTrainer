@@ -696,6 +696,7 @@ def create_optimizer(
                 scaled_optm=optimizer_config.scaled_optm if optimizer_config.scaled_optm is not None else False,
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
+                state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
             )
 
         # ADOPT_ADV Optimizer
@@ -728,6 +729,7 @@ def create_optimizer(
                 scaled_optm=optimizer_config.scaled_optm if optimizer_config.scaled_optm is not None else False,
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
+                state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
             )
 
         # PRODIGY_ADV Optimizer
@@ -813,6 +815,7 @@ def create_optimizer(
                 l1_adaptive=optimizer_config.l1_adaptive if optimizer_config.l1_adaptive is not None else False,
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
+                state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
             )
 
         # LION_ADV Optimizer
