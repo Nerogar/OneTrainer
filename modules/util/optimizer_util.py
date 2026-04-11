@@ -446,7 +446,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "momentum": 0,
         "cautious_wd": False,
         "weight_decay": 0.0,
-        "sinkhorn": False,
         "stochastic_rounding": True,
         "compile": False,
         "fused_back_pass": False,
