@@ -443,7 +443,8 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "quant_block_size": 2048
     },
     Optimizer.SGD_ADV: {
-        "momentum": 0,
+        "momentum": 0.95,
+        "nesterov": True,
         "cautious_wd": False,
         "weight_decay": 0.0,
         "stochastic_rounding": True,
