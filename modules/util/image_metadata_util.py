@@ -1,8 +1,7 @@
 import json
 import os
 import re
-
-from PIL import Image
+import zlib
 
 _ANGLE_BRACKET_SEGMENT_PATTERN = re.compile(r"<[^<>]*>")
 
@@ -37,11 +36,7 @@ def extract_metadata(path: str) -> dict:
 
 
 def _extract_png_metadata(path: str) -> dict:
-    img = Image.open(path)
-    try:
-        info = img.info
-    finally:
-        img.close()
+    info = _read_png_text_chunks(path)
 
     for key in ("sui_image_params", "parameters", "Comment", "prompt"):
         if key not in info:
@@ -68,6 +63,60 @@ def _extract_png_metadata(path: str) -> dict:
         "prompt": info.get("prompt", ""),
         "aspectratio": info.get("aspectratio", ""),
     }
+
+
+_PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
+
+
+def _read_png_text_chunks(path: str) -> dict[str, str]:
+    """Read text metadata from PNG tEXt/zTXt/iTXt chunks without decoding image data."""
+    info: dict[str, str] = {}
+    try:
+        with open(path, "rb") as f:
+            if f.read(8) != _PNG_SIGNATURE:
+                return info
+            while True:
+                header = f.read(8)
+                if len(header) < 8:
+                    break
+                length = int.from_bytes(header[:4], "big")
+                chunk_type = header[4:8]
+                if chunk_type == b"IEND":
+                    break
+                if chunk_type in (b"tEXt", b"zTXt", b"iTXt"):
+                    data = f.read(length)
+                    f.seek(4, 1)  # skip CRC
+                    _parse_png_text_chunk(chunk_type, data, info)
+                else:
+                    f.seek(length + 4, 1)  # skip data + CRC
+    except Exception:
+        pass
+    return info
+
+
+def _parse_png_text_chunk(chunk_type: bytes, data: bytes, info: dict[str, str]):
+    """Parse a single PNG text chunk into the info dict."""
+    try:
+        sep = data.index(b"\x00")
+        if chunk_type == b"tEXt":
+            info[data[:sep].decode("latin-1")] = data[sep + 1:].decode("latin-1")
+        elif chunk_type == b"zTXt":
+            # format: keyword \x00 compression_method compressed_text
+            info[data[:sep].decode("latin-1")] = zlib.decompress(data[sep + 2:]).decode("latin-1")
+        elif chunk_type == b"iTXt":
+            key = data[:sep].decode("utf-8")
+            compression_flag = data[sep + 1]
+            rest = data[sep + 3:]  # skip compression_flag + compression_method
+            sep2 = rest.index(b"\x00")  # end of language tag
+            rest = rest[sep2 + 1:]
+            sep3 = rest.index(b"\x00")  # end of translated keyword
+            text_data = rest[sep3 + 1:]
+            if compression_flag:
+                info[key] = zlib.decompress(text_data).decode("utf-8")
+            else:
+                info[key] = text_data.decode("utf-8")
+    except Exception:
+        pass
 
 
 def strip_angle_bracket_segments(prompt: str) -> str:

@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import re
 import shutil
 
 from modules.util.config.ConceptConfig import ConceptConfig
@@ -120,6 +121,18 @@ def find_orphaned_pairs(output_dir: str, manifest: dict) -> list[dict]:
         if not chosen or not rejected:
             orphans.append(entry)
     return orphans
+
+
+def prune_orphaned_pairs(output_dir: str, manifest: dict) -> int:
+    """Remove manifest entries whose image files no longer exist on disk.
+    Returns the number of pruned entries."""
+    orphans = find_orphaned_pairs(output_dir, manifest)
+    if not orphans:
+        return 0
+    orphan_ids = {entry.get("pair_id") for entry in orphans}
+    manifest["pairs"] = [p for p in manifest.get("pairs", []) if p.get("pair_id") not in orphan_ids]
+    save_manifest(output_dir, manifest)
+    return len(orphan_ids)
 
 
 def remove_pair(output_dir: str, manifest: dict, pair_entry: dict):
@@ -293,6 +306,7 @@ def check_dpo_pairs(concept_pairs: list[tuple[str, str]]) -> dict:
     all_matched = 0
     all_chosen_stray = 0
     all_rejected_stray = 0
+    multiline_captions = 0
     format_stats: dict[str, int] = {}
     pairs_info = []
 
@@ -323,6 +337,20 @@ def check_dpo_pairs(concept_pairs: list[tuple[str, str]]) -> dict:
                 ext = os.path.splitext(img_path)[1].lower().lstrip('.')
                 format_stats[ext] = format_stats.get(ext, 0) + 1
 
+        # Check caption files for multiline content
+        for concept_path in (chosen_path, rejected_path):
+            for root, _dirs, files in os.walk(concept_path):
+                for fname in files:
+                    if fname.endswith('.txt'):
+                        full = os.path.join(root, fname)
+                        try:
+                            with open(full, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                            if '\n' in content.rstrip('\n'):
+                                multiline_captions += 1
+                        except OSError:
+                            pass
+
         all_matched += len(matched_keys)
         all_chosen_stray += chosen_stray
         all_rejected_stray += rejected_stray
@@ -338,9 +366,35 @@ def check_dpo_pairs(concept_pairs: list[tuple[str, str]]) -> dict:
         'total_matched': all_matched,
         'total_chosen_stray': all_chosen_stray,
         'total_rejected_stray': all_rejected_stray,
+        'multiline_captions': multiline_captions,
         'format_stats': format_stats,
         'pairs': pairs_info,
     }
+
+
+def fix_multiline_captions(concept_pairs: list[tuple[str, str]]) -> int:
+    """Replace newlines in caption .txt files with ', ' to make them single-line."""
+    fixed = 0
+    for chosen_path, rejected_path in concept_pairs:
+        for concept_path in (chosen_path, rejected_path):
+            for root, _dirs, files in os.walk(concept_path):
+                for fname in files:
+                    if not fname.endswith('.txt'):
+                        continue
+                    full = os.path.join(root, fname)
+                    try:
+                        with open(full, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                    except OSError:
+                        continue
+                    stripped = content.rstrip('\n')
+                    if '\n' not in stripped:
+                        continue
+                    fixed_content = re.sub(r'\s*\n\s*', ', ', stripped)
+                    with open(full, 'w', encoding='utf-8') as f:
+                        f.write(fixed_content)
+                    fixed += 1
+    return fixed
 
 
 def _copy_image(source_path: str, target_path: str):

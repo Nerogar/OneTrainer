@@ -14,6 +14,7 @@ from modules.util.dpo_curation_util import (
     find_orphaned_pairs,
     load_manifest,
     manifest_pair_counts,
+    prune_orphaned_pairs,
     remove_pair,
 )
 from modules.util.image_metadata_util import extract_metadata
@@ -169,12 +170,19 @@ class DPOCurationWindow(ctk.CTkToplevel):
             self.output_dir = folder
             self.output_path_var.set(folder)
             self.manifest = load_manifest(folder)
+            pruned = prune_orphaned_pairs(folder, self.manifest)
             existing = len(self.manifest.get("pairs", []))
             if existing:
-                self.resume_label.configure(
-                    text=f"Found {existing} existing pairs \u2014 completed groups will be skipped.")
+                msg = f"Found {existing} existing pairs \u2014 completed groups will be skipped."
+                if pruned:
+                    msg += f"\n(Removed {pruned} orphaned entries with missing files.)"
+                self.resume_label.configure(text=msg)
             else:
-                self.resume_label.configure(text="")
+                if pruned:
+                    self.resume_label.configure(
+                        text=f"Removed {pruned} orphaned entries with missing files.")
+                else:
+                    self.resume_label.configure(text="")
 
     def _start(self, mode: str):
         if not self.source_folder:

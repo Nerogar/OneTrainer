@@ -3,7 +3,7 @@ import os
 from tkinter import messagebox
 
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.dpo_curation_util import check_dpo_pairs, dpo_concept_pairs, remove_finalized_pair
+from modules.util.dpo_curation_util import check_dpo_pairs, dpo_concept_pairs, fix_multiline_captions, remove_finalized_pair
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.DPOExecutionMode import DPOExecutionMode
 from modules.util.enum.RLHFMode import RLHFMode
@@ -147,11 +147,17 @@ class RLHFTab:
                          f"Chosen stray: {chosen_stray}, "
                          f"Rejected stray: {rejected_stray}")
 
+        multiline = result.get("multiline_captions", 0)
+        if multiline:
+            lines.append(f"\nMultiline captions: {multiline}")
+
         has_strays = total_chosen_stray > 0 or total_rejected_stray > 0
         if has_strays:
             lines.append(f"\nTotal strays: {total_chosen_stray + total_rejected_stray}")
-            messagebox.showinfo("Check Pairs Results", "\n".join(lines))
 
+        messagebox.showinfo("Check Pairs Results", "\n".join(lines))
+
+        if has_strays:
             remove = messagebox.askyesno(
                 "Remove Strays?",
                 f"Found {total_chosen_stray + total_rejected_stray} stray file(s) with no matching pair.\n\n"
@@ -160,8 +166,17 @@ class RLHFTab:
             if remove:
                 removed = self._remove_strays(concept_pairs, result)
                 messagebox.showinfo("Strays Removed", f"Removed {removed} stray file(s) and their captions.")
-        else:
-            messagebox.showinfo("Check Pairs Results", "\n".join(lines))
+
+        if multiline:
+            fix = messagebox.askyesno(
+                "Fix Multiline Captions?",
+                f"Found {multiline} caption file(s) with newlines.\n\n"
+                f"Newlines are treated as separate captions by OneTrainer, which can "
+                f"sabotage training. Flatten them to single-line captions?",
+            )
+            if fix:
+                fixed = fix_multiline_captions(concept_pairs)
+                messagebox.showinfo("Captions Fixed", f"Flattened {fixed} caption file(s) to single lines.")
 
     def _remove_strays(self, concept_pairs, result) -> int:
         from modules.util.dpo_curation_util import dpo_pair_key
