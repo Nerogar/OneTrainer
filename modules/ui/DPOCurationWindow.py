@@ -17,7 +17,7 @@ from modules.util.dpo_curation_util import (
     prune_orphaned_pairs,
     remove_pair,
 )
-from modules.util.image_metadata_util import extract_metadata
+from modules.util.image_metadata_util import extract_metadata, strip_angle_bracket_segments
 from modules.util.ui.ui_utils import set_window_icon
 
 import customtkinter as ctk
@@ -254,6 +254,8 @@ class DPOCurationWindow(ctk.CTkToplevel):
                 meta = extract_metadata(path)
                 prompt = meta.get('prompt', '').strip()
                 ar = meta.get('aspectratio', '').strip()
+                if prompt:
+                    prompt = strip_angle_bracket_segments(prompt)
                 if not prompt:
                     prompt = "UNCONDITIONAL"
                 groups_dict[(prompt, ar)].append(path)

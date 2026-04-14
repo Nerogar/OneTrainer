@@ -55,7 +55,7 @@ def save_manifest(output_dir: str, manifest: dict):
 def manifest_pair_counts(manifest: dict) -> dict[tuple[str, str], int]:
     counts: dict[tuple[str, str], int] = {}
     for entry in manifest.get("pairs", []):
-        key = (entry["prompt"], entry.get("aspectratio", ""))
+        key = (strip_angle_bracket_segments(entry["prompt"]), entry.get("aspectratio", ""))
         counts[key] = counts.get(key, 0) + 1
     return counts
 
