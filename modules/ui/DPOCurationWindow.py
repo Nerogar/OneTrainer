@@ -225,9 +225,9 @@ class DPOCurationWindow(ctk.CTkToplevel):
 
     @staticmethod
     def _dedup_by_dhash(images: list[str]) -> list[str]:
-        """Remove visually identical images from a list, keeping the first of each."""
-        seen: dict[int, str] = {}
-        unique = []
+        """Remove visually identical images from a list, keeping the latest mtime of each."""
+        seen: dict[int, int] = {}
+        unique: list[str] = []
         for path in images:
             try:
                 h = DPOCurationWindow._dhash(path)
@@ -235,8 +235,15 @@ class DPOCurationWindow(ctk.CTkToplevel):
                 unique.append(path)
                 continue
             if h not in seen:
-                seen[h] = path
+                seen[h] = len(unique)
                 unique.append(path)
+            else:
+                idx = seen[h]
+                try:
+                    if os.path.getmtime(path) > os.path.getmtime(unique[idx]):
+                        unique[idx] = path
+                except OSError:
+                    continue
         return unique
 
     def _background_scan_and_dedup(self, folder: str):
