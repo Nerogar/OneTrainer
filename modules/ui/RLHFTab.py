@@ -3,7 +3,12 @@ import os
 from tkinter import messagebox
 
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.dpo_curation_util import check_dpo_pairs, dpo_concept_pairs, fix_multiline_captions, remove_finalized_pair
+from modules.util.dpo_curation_util import (
+    check_dpo_pairs,
+    dpo_concept_pairs,
+    fix_multiline_captions,
+    remove_finalized_pair,
+)
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.DPOExecutionMode import DPOExecutionMode
 from modules.util.enum.RLHFMode import RLHFMode
