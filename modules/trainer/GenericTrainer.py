@@ -725,6 +725,7 @@ class GenericTrainer(BaseTrainer):
 
         lr_scheduler = None
         accumulated_loss = torch.tensor(0.0, device=train_device)
+        accumulated_dpo_metrics: dict[str, float] | None = None
         ema_loss = None
         ema_loss_steps = 0
         epochs = range(train_progress.epoch, self.config.epochs, 1)
@@ -831,6 +832,16 @@ class GenericTrainer(BaseTrainer):
                         loss = self.model_setup.calculate_dpo_loss(
                             self.model, batch, self.config, train_progress
                         )
+                        # Accumulate per-micro-batch DPO metrics across the grad-accum window.
+                        # Without this, only the final micro-batch's metric reaches TensorBoard —
+                        # which produces 0.0/1.0 accuracy when batch_size=1 regardless of effective batch.
+                        micro_dpo_metrics = self.model_setup.get_last_dpo_metrics()
+                        if accumulated_dpo_metrics is None:
+                            accumulated_dpo_metrics = {k: 0.0 for k in micro_dpo_metrics}
+                            accumulated_dpo_metrics['_count'] = 0
+                        for _k, _v in micro_dpo_metrics.items():
+                            accumulated_dpo_metrics[_k] += _v
+                        accumulated_dpo_metrics['_count'] += 1
                     else:
                         # Standard training path
                         prior_pred_indices = [i for i in range(self.config.batch_size)
@@ -897,8 +908,9 @@ class GenericTrainer(BaseTrainer):
                                 raise RuntimeError("Training loss became NaN. This may be due to invalid parameters, precision issues, or a bug in the loss computation.")
 
                             self.tensorboard.add_scalar("loss/train_step",accumulated_loss_cpu , train_progress.global_step)
-                            if self.config.rlhf_enabled:
-                                dpo_metrics = self.model_setup.get_last_dpo_metrics()
+                            if self.config.rlhf_enabled and accumulated_dpo_metrics is not None:
+                                count = accumulated_dpo_metrics.pop('_count')
+                                dpo_metrics = {k: v / count for k, v in accumulated_dpo_metrics.items()}
                                 self.tensorboard.add_scalar("loss/dpo", dpo_metrics['loss'], train_progress.global_step)
                                 self.tensorboard.add_scalar("dpo/raw_loss", dpo_metrics['dpo_loss'], train_progress.global_step)
                                 self.tensorboard.add_scalar("dpo/chosen_reward", dpo_metrics['chosen_reward'], train_progress.global_step)
@@ -915,6 +927,7 @@ class GenericTrainer(BaseTrainer):
                             self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, train_progress.global_step)
 
                         accumulated_loss = 0.0
+                        accumulated_dpo_metrics = None
                         self.model_setup.after_optimizer_step(self.model, self.config, train_progress)
 
                         if self.model.ema:
