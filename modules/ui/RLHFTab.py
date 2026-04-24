@@ -102,6 +102,8 @@ class RLHFTab:
                           tooltip="Check that your chosen and rejected concept folders line up before training.")
         components.button(self.scroll_frame, 7, 1, "Review Pairs", command=self._review_pairs,
                           tooltip="Visually review your chosen/rejected image pairs. Remove bad pairs and their counterparts.")
+        components.button(self.scroll_frame, 7, 3, "DPO Bucket Analysis", command=self._bucket_analysis,
+                          tooltip="Show per-aspect-bucket pair counts and what to add or remove for clean batches at a given batch size.")
 
         components.label(self.scroll_frame, 8, 0, "Training Type:",
                          tooltip="Shows whether DPO is starting from a fresh adapter or refining a loaded adapter. The output is always an adapter file.")
@@ -228,6 +230,10 @@ class RLHFTab:
 
         from modules.ui.DPOReviewWindow import DPOReviewWindow
         DPOReviewWindow(self.master.winfo_toplevel(), concept_pairs)
+
+    def _bucket_analysis(self):
+        from modules.ui.DPOBucketAnalysisWindow import DPOBucketAnalysisWindow
+        DPOBucketAnalysisWindow(self.master.winfo_toplevel(), self.train_config)
 
     def _load_concept_pairs(self):
         concepts = self._load_concepts()
