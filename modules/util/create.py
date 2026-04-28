@@ -667,10 +667,10 @@ def create_optimizer(
                 quant_block_size=optimizer_config.quant_block_size if optimizer_config.quant_block_size is not None else 2048
             )
 
-        # SGD_ADV Optimizer
-        case Optimizer.SGD_ADV:
-            from adv_optm import SGD_adv
-            optimizer = SGD_adv(
+        # SINKSGD_ADV Optimizer
+        case Optimizer.SINKSGD_ADV:
+            from adv_optm import SinkSGD_adv
+            optimizer = SinkSGD_adv(
                 params=parameters,
                 lr=config.learning_rate,
                 momentum=optimizer_config.momentum if optimizer_config.beta1 is not None else 0,
@@ -680,7 +680,7 @@ def create_optimizer(
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
-                sinkhorn=optimizer_config.sinkhorn if optimizer_config.sinkhorn is not None else False,
+                orthogonal_sinkhorn=optimizer_config.orthogonal_sinkhorn if optimizer_config.orthogonal_sinkhorn is not None else False,
                 sinkhorn_iterations=optimizer_config.sinkhorn_iterations if optimizer_config.sinkhorn_iterations is not None else 5,
                 spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,

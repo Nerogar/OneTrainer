@@ -151,7 +151,7 @@ class TrainOptimizerConfig(BaseConfig):
     factored_2nd: False
     fisher_wd: False
     state_precision: str
-    sinkhorn: False
+    orthogonal_sinkhorn: False
     sinkhorn_iterations: int
 
     def __init__(self, data: list[(str, Any, type, bool)]):
@@ -279,7 +279,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("factored_2nd", False, bool, False))
         data.append(("fisher_wd", False, bool, False))
         data.append(("state_precision", "float8", str, False))
-        data.append(("sinkhorn", False, bool, False))
+        data.append(("orthogonal_sinkhorn", False, bool, False))
         data.append(("sinkhorn_iterations", None, int, True))
 
         return TrainOptimizerConfig(data)

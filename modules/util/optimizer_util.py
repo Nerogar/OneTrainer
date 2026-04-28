@@ -442,17 +442,17 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "min_8bit_size": 16384,
         "quant_block_size": 2048
     },
-    Optimizer.SGD_ADV: {
+    Optimizer.SINKSGD_ADV: {
         "momentum": 0.95,
         "nesterov": True,
+        "sinkhorn_iterations": 5,
         "cautious_wd": False,
         "weight_decay": 0.0,
         "stochastic_rounding": True,
         "compile": False,
         "fused_back_pass": False,
+        "orthogonal_sinkhorn": False,
         "orthogonal_gradient": False,
-        "sinkhorn": False,
-        "sinkhorn_iterations": 5,
         "spectral_normalization": False,
         "centered_wd": 0.0,
         "centered_wd_mode": "float8",
