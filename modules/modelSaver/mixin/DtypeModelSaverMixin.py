@@ -53,7 +53,7 @@ class DtypeModelSaverMixin:
 
         ordered_state_dict = OrderedDict(sorted(state_dict.items()))
         for tensor in ordered_state_dict.values():
-            data = tensor.contiguous().cpu().view(torch.uint8).numpy().tobytes()
+            data = tensor.contiguous().cpu().flatten().view(torch.uint8).numpy().tobytes()
             sha256_hash.update(data)
 
         return f"0x{sha256_hash.hexdigest()}"
