@@ -37,7 +37,7 @@ def lr_lambda_cosine(
         min_factor: float = 1.0,
 ):
     def lr_lambda(current_step: int):
-        progress = float(current_step) / float(scheduler_steps)
+        progress = float(current_step) / float(scheduler_steps + 1)
         cos_val = 0.5 * (1.0 + math.cos(0.5 * progress * math.pi))
         factor = max(0.0, cos_val)
         factor = apply_min_factor(factor, min_factor)
@@ -52,7 +52,7 @@ def lr_lambda_cosine_with_restarts(
         min_factor: float = 1.0,
 ):
     def lr_lambda(current_step: int):
-        progress = float(current_step) / float(scheduler_steps)
+        progress = float(current_step) / float(scheduler_steps + 1)
         cos_val = cos_val = 0.5 * (1.0 + math.cos((2.0 * num_cycles + 1.0) * progress * math.pi))
         factor = max(0.0, cos_val)
         factor = apply_min_factor(factor, min_factor)
