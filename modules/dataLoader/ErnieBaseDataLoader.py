@@ -2,7 +2,7 @@ import os
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
-from modules.model.ErnieModel import HIDDEN_STATES_LAYERS, PROMPT_MAX_LENGTH, ErnieModel
+from modules.model.ErnieModel import HIDDEN_STATES_LAYER, PROMPT_MAX_LENGTH, ErnieModel
 from modules.modelSetup.BaseErnieSetup import BaseErnieSetup
 from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
@@ -35,7 +35,7 @@ class ErnieBaseDataLoader(
         if config.dataloader_threads > 1:
             apply_thread_safe_forward(model.text_encoder)  # workaround for transformers#42673, unclear if Mistral is affected
         encode_prompt = EncodeMistralText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask',
-                                          text_encoder=model.text_encoder, hidden_state_output_index=HIDDEN_STATES_LAYERS, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+                                          text_encoder=model.text_encoder, hidden_state_output_index=HIDDEN_STATES_LAYER, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
 
         modules = [rescale_image, encode_image, image_sample]
         if config.masked_training or config.model_type.has_mask_input():

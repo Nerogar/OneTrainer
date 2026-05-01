@@ -3,7 +3,7 @@ from contextlib import nullcontext
 from random import Random
 
 PROMPT_MAX_LENGTH = 512
-HIDDEN_STATES_LAYERS = -2
+HIDDEN_STATES_LAYER = -2
 
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
@@ -126,6 +126,7 @@ class ErnieModel(BaseModel):
             tokenizer_output = self.tokenizer(
                 text,
                 padding='max_length',
+                max_length=PROMPT_MAX_LENGTH,
                 truncation=True,
                 return_tensors='pt',
                 add_special_tokens=True,
@@ -134,6 +135,9 @@ class ErnieModel(BaseModel):
             tokens_mask = tokenizer_output.attention_mask.to(self.text_encoder.device)
 
         if text_encoder_output is None and self.text_encoder is not None:
+            #this is different from the diffusers pipeline.
+            #they accumulate the embeddings for each sample without padding or an attention mask. we use padded with an attention mask, because the dataloader pipeline does the same
+            #It has been tested that this is identical.
             with self.text_encoder_autocast_context:
                 output = self.text_encoder(
                     tokens,
@@ -141,14 +145,13 @@ class ErnieModel(BaseModel):
                     output_hidden_states=True,
                     use_cache=False,
                 )
-                text_encoder_output = output.hidden_states[-2]  # [B, T, H]
+                text_encoder_output = output.hidden_states[HIDDEN_STATES_LAYER]  # [B, T, H]
 
         if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
             raise NotImplementedError  # needs empty-caption conditioning, not zero-out
 
         text_lengths = tokens_mask.sum(dim=1).long()
         text_encoder_output = text_encoder_output[:, :text_lengths.max().item(), :]
-
         return text_encoder_output, text_lengths
 
     @staticmethod
