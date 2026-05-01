@@ -9,6 +9,61 @@ from modules.util.enum.ConceptType import ConceptType
 from modules.util.image_metadata_util import strip_angle_bracket_segments
 from modules.util.path_util import supported_image_extensions
 
+UNCONDITIONAL_PROMPT = "UNCONDITIONAL"
+
+
+def _has_meaningful_content(prompt: str) -> bool:
+    """A prompt is 'meaningful' only if at least one alphanumeric character or
+    CJK/letter-like glyph survives. Stray punctuation (commas, dots, dashes)
+    left behind by bracket stripping does not count — such prompts produce no
+    real textual guidance and should be treated as unconditional."""
+    return bool(re.search(r"[^\W\d_]|\d", prompt))
+
+
+def normalize_prompt_for_grouping(prompt: str) -> str:
+    """Return the cleaned prompt or UNCONDITIONAL when nothing meaningful
+    survives bracket stripping. Use this everywhere we group/key by prompt.
+
+    Stripping is iterated so nested/malformed brackets like ``<a<b>>`` collapse
+    fully — a single regex pass removes only the inner ``<b>`` and leaves
+    ``<a>`` behind, which the next pass also removes."""
+    cleaned = prompt or ""
+    while True:
+        next_cleaned = strip_angle_bracket_segments(cleaned)
+        if next_cleaned == cleaned:
+            break
+        cleaned = next_cleaned
+    if _has_meaningful_content(cleaned):
+        return cleaned
+    return UNCONDITIONAL_PROMPT
+
+
+def _normalize_source_path(path: str | None) -> str | None:
+    if not path:
+        return None
+    try:
+        return os.path.normcase(os.path.abspath(path))
+    except (OSError, ValueError):
+        return path
+
+
+def manifest_used_sources(manifest: dict) -> set[str]:
+    """Set of source-image paths recorded in any manifest entry. Use this to
+    avoid re-presenting an image that was already committed as chosen or
+    rejected — preventing the same file ending up on both sides of a pair."""
+    used: set[str] = set()
+    for entry in manifest.get("pairs", []):
+        for key in ("chosen_source", "rejected_source"):
+            normed = _normalize_source_path(entry.get(key))
+            if normed:
+                used.add(normed)
+    return used
+
+
+def is_source_used(used_sources: set[str], path: str) -> bool:
+    normed = _normalize_source_path(path)
+    return normed is not None and normed in used_sources
+
 
 def is_dpo_concept_type(concept_type: ConceptType) -> bool:
     return concept_type in {
@@ -55,7 +110,7 @@ def save_manifest(output_dir: str, manifest: dict):
 def manifest_pair_counts(manifest: dict) -> dict[tuple[str, str], int]:
     counts: dict[tuple[str, str], int] = {}
     for entry in manifest.get("pairs", []):
-        key = (strip_angle_bracket_segments(entry["prompt"]), entry.get("aspectratio", ""))
+        key = (normalize_prompt_for_grouping(entry["prompt"]), entry.get("aspectratio", ""))
         counts[key] = counts.get(key, 0) + 1
     return counts
 
@@ -99,6 +154,12 @@ def export_single_pair(
         "aspectratio": aspectratio,
         "chosen_file": safe_name + chosen_ext,
         "rejected_file": safe_name + rejected_ext,
+        # Source paths let us filter already-used images out of future groups,
+        # so the same file can't be picked again on the opposite side of a
+        # pair (especially relevant for unconditional groups, which have no
+        # pairs-per-group cap to skip them on resume).
+        "chosen_source": _normalize_source_path(chosen_path),
+        "rejected_source": _normalize_source_path(rejected_path),
     })
     save_manifest(output_dir, manifest)
 

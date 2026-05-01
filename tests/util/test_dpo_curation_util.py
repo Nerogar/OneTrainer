@@ -118,9 +118,11 @@ class DPOCurationUtilExportTest(unittest.TestCase):
             self.assertEqual(len(reloaded["pairs"]), 1)
             self.assertEqual(reloaded["pairs"][0]["prompt"], "portrait, <wildcard:hair>, sharp focus")
 
-            # Pair counts work
+            # Pair counts work — keyed by the normalized prompt so manifest
+            # entries (which keep the raw prompt) and live group keys (which
+            # are bracket-stripped during scan) both look up to the same slot.
             counts = manifest_pair_counts(reloaded)
-            self.assertEqual(counts[("portrait, <wildcard:hair>, sharp focus", "1:1")], 1)
+            self.assertEqual(counts[("portrait, sharp focus", "1:1")], 1)
 
     def test_export_single_pair_increments_pair_id(self):
         from modules.util.dpo_curation_util import export_single_pair, load_manifest

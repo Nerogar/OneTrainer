@@ -12,12 +12,15 @@ from modules.util.dpo_curation_util import (
     finalize_export,
     find_exported_file,
     find_orphaned_pairs,
+    is_source_used,
     load_manifest,
     manifest_pair_counts,
+    manifest_used_sources,
+    normalize_prompt_for_grouping,
     prune_orphaned_pairs,
     remove_pair,
 )
-from modules.util.image_metadata_util import extract_metadata, strip_angle_bracket_segments
+from modules.util.image_metadata_util import extract_metadata
 from modules.util.ui.ui_utils import set_window_icon
 
 import customtkinter as ctk
@@ -259,12 +262,8 @@ class DPOCurationWindow(ctk.CTkToplevel):
                     continue
                 path = os.path.join(root, filename)
                 meta = extract_metadata(path)
-                prompt = meta.get('prompt', '').strip()
                 ar = meta.get('aspectratio', '').strip()
-                if prompt:
-                    prompt = strip_angle_bracket_segments(prompt)
-                if not prompt:
-                    prompt = "UNCONDITIONAL"
+                prompt = normalize_prompt_for_grouping(meta.get('prompt', ''))
                 groups_dict[(prompt, ar)].append(path)
                 self._scan_count += 1
 
@@ -276,6 +275,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         random.shuffle(raw_groups)
 
         existing_counts = manifest_pair_counts(self.manifest)
+        used_sources = manifest_used_sources(self.manifest)
 
         for group in raw_groups:
             if self._worker_stop.is_set():
@@ -286,7 +286,13 @@ class DPOCurationWindow(ctk.CTkToplevel):
             if not is_unconditional and existing_counts.get(group_key, 0) >= self.pairs_per_group:
                 continue
 
-            deduped = self._dedup_by_dhash(group['images'])
+            # Drop images already committed in any prior pair before dedup so
+            # the dhash check doesn't waste work on sources we'll discard.
+            fresh = [i for i in group['images'] if not is_source_used(used_sources, i)]
+            if len(fresh) < 2:
+                continue
+
+            deduped = self._dedup_by_dhash(fresh)
             if len(deduped) >= 2:
                 group['images'] = deduped
                 self._groups_queued += 1
@@ -358,10 +364,20 @@ class DPOCurationWindow(ctk.CTkToplevel):
             if not is_unconditional and pairs_done >= self.pairs_per_group:
                 continue
 
+            # Re-filter against the manifest at present-time. The scan-time
+            # filter is best-effort (the manifest may have grown since), and
+            # for groups already partway through pairs_per_group we need to
+            # drop any sources that were committed in earlier passes so the
+            # same image cannot end up on both sides of a future pair.
+            used_sources = manifest_used_sources(self.manifest)
+            available = [i for i in group['images'] if not is_source_used(used_sources, i)]
+            if len(available) < 2:
+                continue
+
             self._current_group = group
             self._groups_shown += 1
             self.pairs_created_in_group = pairs_done
-            self.current_remaining_images = list(group['images'])
+            self.current_remaining_images = available
 
             if self.mode == "elo":
                 self._start_elo_round()
@@ -615,6 +631,12 @@ class DPOCurationWindow(ctk.CTkToplevel):
             self.selection_phase = "worst"
             self._build_selection_ui()
         else:
+            # Defensive: never let the same image land on both sides of a
+            # pair. The grid filters the best out of the worst-pick UI, but
+            # any future regression there shouldn't be able to corrupt the
+            # exported pair.
+            if path == self.selected_best:
+                return
             remaining_after = [img for img in self.current_remaining_images
                                if img not in {self.selected_best, path}]
             can_continue = len(remaining_after) >= 2
