@@ -214,30 +214,39 @@ class DPOCurationWindow(ctk.CTkToplevel):
         self._show_scanning_ui()
 
     @staticmethod
-    def _dhash(path: str, hash_size: int = 8) -> int:
-        """Compute a difference hash for duplicate detection."""
-        with Image.open(path) as img:
-            img = img.convert('L').resize((hash_size + 1, hash_size), Image.Resampling.LANCZOS)
-            pixels = list(img.getdata())
-        bits = 0
-        for row in range(hash_size):
-            for col in range(hash_size):
-                idx = row * (hash_size + 1) + col
-                if pixels[idx] < pixels[idx + 1]:
-                    bits |= 1 << (row * hash_size + col)
-        return bits
+    def _dedup_by_content_hash(images: list[str]) -> list[str]:
+        """Drop byte-identical files within a group, keeping the latest mtime
+        copy. DPO is *meant* to discriminate between near-duplicates from
+        different seeds, so we use BLAKE3 on raw file bytes — only literal
+        copies (re-runs writing the same file twice, manual duplicates) get
+        collapsed; perceptually similar but byte-different generations stay
+        as separate candidates. Memory-mapped read keeps this fast even on
+        large PNGs."""
+        import blake3
 
-    @staticmethod
-    def _dedup_by_dhash(images: list[str]) -> list[str]:
-        """Remove visually identical images from a list, keeping the latest mtime of each."""
-        seen: dict[int, int] = {}
+        seen: dict[str, int] = {}
         unique: list[str] = []
         for path in images:
             try:
-                h = DPOCurationWindow._dhash(path)
-            except Exception:
-                unique.append(path)
-                continue
+                hasher = blake3.blake3()
+                hasher.update_mmap(path)
+                h = hasher.hexdigest()
+            except (OSError, ValueError):
+                # mmap fails on empty files; fall back to streaming read so a
+                # zero-byte placeholder still gets a stable hash rather than
+                # being silently passed through unduped.
+                try:
+                    hasher = blake3.blake3()
+                    with open(path, "rb") as f:
+                        while True:
+                            chunk = f.read(1 << 20)
+                            if not chunk:
+                                break
+                            hasher.update(chunk)
+                    h = hasher.hexdigest()
+                except OSError:
+                    unique.append(path)
+                    continue
             if h not in seen:
                 seen[h] = len(unique)
                 unique.append(path)
@@ -293,12 +302,12 @@ class DPOCurationWindow(ctk.CTkToplevel):
                 continue
 
             # Drop images already committed in any prior pair before dedup so
-            # the dhash check doesn't waste work on sources we'll discard.
+            # the content-hash pass doesn't waste work on sources we'll discard.
             fresh = [i for i in group['images'] if not is_source_used(used_sources, i)]
             if len(fresh) < 2:
                 continue
 
-            deduped = self._dedup_by_dhash(fresh)
+            deduped = self._dedup_by_content_hash(fresh)
             if len(deduped) >= 2:
                 group['images'] = deduped
                 self._groups_queued += 1
