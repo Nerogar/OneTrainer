@@ -387,6 +387,7 @@ class TrainConfig(BaseConfig):
     aspect_ratio_bucketing: bool
     latent_caching: bool
     clear_cache_before_training: bool
+    sourceless_training: bool
 
     # training settings
     learning_rate_scheduler: LearningRateScheduler
@@ -560,7 +561,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=10,
+            config_version=11,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -572,6 +573,7 @@ class TrainConfig(BaseConfig):
                 7: self.__migration_7,
                 8: self.__migration_8,
                 9: self.__migration_9,
+                10: self.__migration_10,
             }
         )
 
@@ -791,6 +793,11 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_10(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        migrated_data.setdefault("sourceless_training", False)
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
@@ -972,7 +979,8 @@ class TrainConfig(BaseConfig):
         data.append(("concepts", None, list[ConceptConfig], True))
         data.append(("aspect_ratio_bucketing", True, bool, False))
         data.append(("latent_caching", True, bool, False))
-        data.append(("clear_cache_before_training", True, bool, False))
+        data.append(("clear_cache_before_training", False, bool, False))
+        data.append(("sourceless_training", False, bool, False))
 
         # training settings
         data.append(("learning_rate_scheduler", LearningRateScheduler.CONSTANT, LearningRateScheduler, False))

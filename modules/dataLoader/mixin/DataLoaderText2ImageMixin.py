@@ -19,7 +19,6 @@ from mgds.pipelineModules.AspectBucketing import AspectBucketing
 from mgds.pipelineModules.CalcAspect import CalcAspect
 from mgds.pipelineModules.CapitalizeTags import CapitalizeTags
 from mgds.pipelineModules.CollectPaths import CollectPaths
-from mgds.pipelineModules.DiskCache import DiskCache
 from mgds.pipelineModules.DistributedSampler import DistributedSampler
 from mgds.pipelineModules.DownloadHuggingfaceDatasets import DownloadHuggingfaceDatasets
 from mgds.pipelineModules.DropTags import DropTags
@@ -48,6 +47,7 @@ from mgds.pipelineModules.SelectInput import SelectInput
 from mgds.pipelineModules.SelectRandomText import SelectRandomText
 from mgds.pipelineModules.ShuffleTags import ShuffleTags
 from mgds.pipelineModules.SingleAspectCalculation import SingleAspectCalculation
+from mgds.pipelineModules.SmartDiskCache import SmartDiskCache
 from mgds.pipelineModules.VariationSorting import VariationSorting
 
 import torch
@@ -349,12 +349,19 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
         def before_cache_text_fun():
             model_setup.prepare_text_caching(model, config)
 
-        image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations',
-                                     balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'],
-                                     group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
+        sourceless = config.sourceless_training and config.latent_caching
 
-        text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',
-                                    variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
+        def stop_check():
+            return self.stop_check_fun()
+
+        image_disk_cache = SmartDiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations',
+                                         balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'],
+                                         group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun, stop_check_fun=stop_check,
+                                         modeltype=config.model_type.value, source_path_in_name='image_path', sourceless=sourceless)
+
+        text_disk_cache = SmartDiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',
+                                        variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun, stop_check_fun=stop_check,
+                                        modeltype=config.model_type.value, source_path_in_name='sample_prompt_path', sourceless=sourceless)
 
         modules = []
 
@@ -390,6 +397,22 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             vae_frame_dim: bool=False,
             supports_inpainting: bool=True, #TODO many models probably don't support inpainting, but this has been enabled in most dataloaders before refactoring, too
     ):
+        cache_modules = self._cache_modules(config, model, model_setup)
+        output_modules = self._output_modules(config, model, model_setup)
+
+        if config.sourceless_training and config.latent_caching:
+            if hasattr(config, 'train_text_encoder_or_embedding') and config.train_text_encoder_or_embedding():
+                raise RuntimeError(
+                    "Sourceless training cannot be used with text encoder training. "
+                    "Disable sourceless_training or disable text encoder training."
+                )
+            return self._create_mgds(
+                config,
+                [cache_modules, output_modules],
+                train_progress,
+                is_validation,
+            )
+
         enumerate_input = self._enumerate_input_modules(config, allow_videos=allow_video_files)
         load_input = self._load_input_modules(config, model.train_dtype, vae_frame_dim=vae_frame_dim)
         mask_augmentation = self._mask_augmentation_modules(config)
@@ -399,8 +422,6 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
         if supports_inpainting:
             inpainting_modules = self._inpainting_modules(config)
         preparation_modules = self._preparation_modules(config, model)
-        cache_modules = self._cache_modules(config, model, model_setup)
-        output_modules = self._output_modules(config, model, model_setup)
 
         debug_modules = self._debug_modules(config, model)
 
@@ -419,7 +440,6 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
                 output_modules,
 
                 debug_modules if config.debug_mode else None,
-                # inserted before output_modules, which contains a sorting operation
             ],
             train_progress,
             is_validation

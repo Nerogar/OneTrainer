@@ -34,6 +34,8 @@ from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
+from mgds.pipelineModules.SmartDiskCache import CachingStoppedException
+
 import torch
 from torch import Tensor, nn
 from torch.nn import Parameter
@@ -148,6 +150,7 @@ class GenericTrainer(BaseTrainer):
         self.data_loader = self.create_data_loader(
             self.model, self.model_setup, self.model.train_progress
         )
+        self.data_loader.stop_check_fun = self.commands.get_stop_command
         self.model_saver = self.create_model_saver()
 
         self.model_sampler = self.create_model_sampler(self.model)
@@ -171,7 +174,8 @@ class GenericTrainer(BaseTrainer):
     def __clear_cache(self):
         print(
             f'Clearing cache directory {self.config.cache_dir}! '
-            f'You can disable this if you want to continue using the same cache.'
+            f'SmartCache validates files incrementally, so this is usually unnecessary. '
+            f'Disable "Clear cache before training" to keep your validated cache.'
         )
         if os.path.isdir(self.config.cache_dir):
             for filename in os.listdir(self.config.cache_dir):
@@ -640,14 +644,16 @@ class GenericTrainer(BaseTrainer):
                 return
             self.callbacks.on_update_status("Starting epoch/caching")
 
-            #call start_next_epoch with only one process at first, because it might write to the cache. All subsequent processes can read in parallel:
-            for _ in multi.master_first():
-                if self.config.latent_caching:
-                    self.data_loader.get_data_set().start_next_epoch()
-                    self.model_setup.setup_train_device(self.model, self.config)
-                else:
-                    self.model_setup.setup_train_device(self.model, self.config)
-                    self.data_loader.get_data_set().start_next_epoch()
+            try:
+                for _ in multi.master_first():
+                    if self.config.latent_caching:
+                        self.data_loader.get_data_set().start_next_epoch()
+                        self.model_setup.setup_train_device(self.model, self.config)
+                    else:
+                        self.model_setup.setup_train_device(self.model, self.config)
+                        self.data_loader.get_data_set().start_next_epoch()
+            except CachingStoppedException:
+                return
 
             if self.config.debug_mode:
                 multi.warn_parameter_divergence(self.parameters, train_device)
