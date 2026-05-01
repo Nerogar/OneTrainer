@@ -3,6 +3,7 @@ import os
 import random
 import re
 import shutil
+from math import gcd
 
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.enum.ConceptType import ConceptType
@@ -10,6 +11,39 @@ from modules.util.image_metadata_util import strip_angle_bracket_segments
 from modules.util.path_util import supported_image_extensions
 
 UNCONDITIONAL_PROMPT = "UNCONDITIONAL"
+
+
+def _aspect_ratio_from_dimensions(width: int, height: int) -> str:
+    """Reduced ``W:H`` string for the given pixel dimensions. Returns ``""``
+    for non-positive inputs so the caller can fall through to its own
+    handling. Two images of the same shape (e.g. 1024x768 and 4096x3072)
+    both reduce to ``4:3`` and group together — matching the bucketing
+    semantics the trainer applies during DPO."""
+    if width <= 0 or height <= 0:
+        return ""
+    divisor = gcd(width, height)
+    return f"{width // divisor}:{height // divisor}"
+
+
+def resolve_aspect_ratio(meta_aspectratio: str, image_path: str) -> str:
+    """Return ``meta_aspectratio`` if non-empty, otherwise derive a reduced
+    ``W:H`` string from the image's actual pixel dimensions. Necessary
+    because most non-SwarmUI generators don't write an ``aspectratio``
+    metadata field — without this, every such image would collapse into a
+    single empty-AR bucket and produce tensor-shape mismatches at train
+    time. PIL ``Image.open`` is lazy and only reads the header, so the
+    extra I/O is per-file but cheap."""
+    cleaned = (meta_aspectratio or "").strip()
+    if cleaned:
+        return cleaned
+    try:
+        from PIL import Image
+
+        with Image.open(image_path) as img:
+            width, height = img.size
+    except Exception:
+        return ""
+    return _aspect_ratio_from_dimensions(width, height)
 
 
 def _has_meaningful_content(prompt: str) -> bool:

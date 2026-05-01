@@ -19,6 +19,7 @@ from modules.util.dpo_curation_util import (
     normalize_prompt_for_grouping,
     prune_orphaned_pairs,
     remove_pair,
+    resolve_aspect_ratio,
 )
 from modules.util.image_metadata_util import extract_metadata
 from modules.util.ui.ui_utils import set_window_icon
@@ -262,7 +263,12 @@ class DPOCurationWindow(ctk.CTkToplevel):
                     continue
                 path = os.path.join(root, filename)
                 meta = extract_metadata(path)
-                ar = meta.get('aspectratio', '').strip()
+                # Most non-SwarmUI generators don't write an aspectratio
+                # metadata field, so fall back to the file's actual pixel
+                # dimensions. Without this, every such image collapses into
+                # the same empty-AR bucket and pairs end up shape-mismatched
+                # at train time.
+                ar = resolve_aspect_ratio(meta.get('aspectratio', ''), path)
                 prompt = normalize_prompt_for_grouping(meta.get('prompt', ''))
                 groups_dict[(prompt, ar)].append(path)
                 self._scan_count += 1
