@@ -18,7 +18,6 @@ setuptools==81.0.0
 accelerate==1.12.0
 safetensors==0.8.0rc0
 tensorboard==2.20.0
-pytorch-lightning==2.6.1
 
 # diffusion models
 -e git+https://github.com/huggingface/diffusers.git@0f1abc4#egg=diffusers
