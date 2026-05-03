@@ -535,10 +535,7 @@ class DoRAOFTModule(OFTModule):
         # Remove the original bias temporarily
         bias = self.orig_module.bias
         if bias is not None:
-            if isinstance(self.orig_module, nn.Conv2d):
-                bias_view = bias.view(1, -1, 1, 1)
-            else:
-                bias_view = bias
+            bias_view = bias.view(1, -1, 1, 1) if isinstance(self.orig_module, nn.Conv2d) else bias
             result = result - bias_view
 
         # Apply DoRA Scaling
