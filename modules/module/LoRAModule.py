@@ -713,7 +713,7 @@ class LoRAModuleWrapper:
             else:
                  self.klass = OFTModule
                  self.dummy_klass = DummyOFTModule
-                 
+
             self.additional_args = [
                 config.oft_block_size,
                 config.oft_coft,
