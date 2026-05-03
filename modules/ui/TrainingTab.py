@@ -642,60 +642,84 @@ class TrainingTab:
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
 
+        row = 0
+
         # offset noise weight
-        components.label(frame, 0, 0, "Offset Noise Weight",
+        components.label(frame, row, 0, "Offset Noise Weight",
                          tooltip="The weight of offset noise added to each training step")
-        components.entry(frame, 0, 1, self.ui_state, "offset_noise_weight")
+        components.entry(frame, row, 1, self.ui_state, "offset_noise_weight")
+        row += 1
 
         if supports_generalized_offset_noise:
             # generalized offset noise weight
-            generalised_offset_label = components.label(frame, 1, 0, "Generalized Offset Noise",
+            generalised_offset_label = components.label(frame, row, 0, "Generalized Offset Noise",
                             tooltip="Per-timestep 'brightness knob' instead of a fixed offset - steadier training, better starts, and improved very dark/bright images. Compatible with V-pred and Eps-pred. Start with 0.02 and adjust as needed.")
             generalised_offset_label.configure(wraplength=130, justify="left")
-            components.switch(frame, 1, 1, self.ui_state, "generalized_offset_noise")
+            components.switch(frame, row, 1, self.ui_state, "generalized_offset_noise")
+            row += 1
 
         # perturbation noise weight
-        components.label(frame, 2, 0, "Perturbation Noise Weight",
+        components.label(frame, row, 0, "Perturbation Noise Weight",
                          tooltip="The weight of perturbation noise added to each training step")
-        components.entry(frame, 2, 1, self.ui_state, "perturbation_noise_weight")
+        components.entry(frame, row, 1, self.ui_state, "perturbation_noise_weight")
+        row += 1
+
+        # CIOP noise weight
+        components.label(frame, row, 0, "I/O Noise Weight",
+                         tooltip="Applies Coordinated Input-Output Perturbation (CIOP) to each training step.")
+        components.entry(frame, row, 1, self.ui_state, "ciop_noise_weight")
+        row += 1
+
+        # CIOP noise probability
+        components.label(frame, row, 0, "I/O Noise Probability",
+                         tooltip="The probability of I/O perturbation noise for each training step")
+        components.entry(frame, row, 1, self.ui_state, "ciop_p")
+        row += 1
 
         # timestep distribution
-        components.label(frame, 3, 0, "Timestep Distribution",
+        components.label(frame, row, 0, "Timestep Distribution",
                          tooltip="Selects the function to sample timesteps during training",
                          wide_tooltip=True)
-        components.options_adv(frame, 3, 1, [str(x) for x in list(TimestepDistribution)], self.ui_state, "timestep_distribution",
+        components.options_adv(frame, row, 1, [str(x) for x in list(TimestepDistribution)], self.ui_state, "timestep_distribution",
                                adv_command=self.__open_timestep_distribution_window)
+        row += 1
 
         # min noising strength
-        components.label(frame, 4, 0, "Min Noising Strength",
+        components.label(frame, row, 0, "Min Noising Strength",
                          tooltip="Specifies the minimum noising strength used during training. This can help to improve composition, but prevents finer details from being trained")
-        components.entry(frame, 4, 1, self.ui_state, "min_noising_strength", required=True)
+        components.entry(frame, row, 1, self.ui_state, "min_noising_strength", required=True)
+        row += 1
 
         # max noising strength
-        components.label(frame, 5, 0, "Max Noising Strength",
+        components.label(frame, row, 0, "Max Noising Strength",
                          tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
-        components.entry(frame, 5, 1, self.ui_state, "max_noising_strength", required=True)
+        components.entry(frame, row, 1, self.ui_state, "max_noising_strength", required=True)
+        row += 1
 
         # noising weight
-        components.label(frame, 6, 0, "Noising Weight",
+        components.label(frame, row, 0, "Noising Weight",
                          tooltip="Controls the weight parameter of the timestep distribution function. Use the preview to see more details.")
-        components.entry(frame, 6, 1, self.ui_state, "noising_weight", required=True)
+        components.entry(frame, row, 1, self.ui_state, "noising_weight", required=True)
+        row += 1
 
         # noising bias
-        components.label(frame, 7, 0, "Noising Bias",
+        components.label(frame, row, 0, "Noising Bias",
                          tooltip="Controls the bias parameter of the timestep distribution function. Use the preview to see more details.")
-        components.entry(frame, 7, 1, self.ui_state, "noising_bias", required=True)
+        components.entry(frame, row, 1, self.ui_state, "noising_bias", required=True)
+        row += 1
 
         # timestep shift
-        components.label(frame, 8, 0, "Timestep Shift",
+        components.label(frame, row, 0, "Timestep Shift",
                          tooltip="Shift the timestep distribution. Use the preview to see more details.")
-        components.entry(frame, 8, 1, self.ui_state, "timestep_shift", required=True)
+        components.entry(frame, row, 1, self.ui_state, "timestep_shift", required=True)
+        row += 1
 
         if supports_dynamic_timestep_shifting:
             # dynamic timestep shifting
-            components.label(frame, 9, 0, "Dynamic Timestep Shifting",
+            components.label(frame, row, 0, "Dynamic Timestep Shifting",
                              tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. Note: For Z-Image and Flux2, the dynamic shifting parameters are likely wrong and unknown. Use with care or set your own, fixed shift.", wide_tooltip=True)
-            components.switch(frame, 9, 1, self.ui_state, "dynamic_timestep_shifting")
+            components.switch(frame, row, 1, self.ui_state, "dynamic_timestep_shifting")
+            row += 1
 
 
 

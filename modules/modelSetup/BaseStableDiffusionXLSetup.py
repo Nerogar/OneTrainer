@@ -250,6 +250,11 @@ class BaseStableDiffusionXLSetup(
                 model.noise_scheduler.betas,
             )
 
+            if not deterministic:
+                scaled_noisy_latent_image, latent_noise = self._apply_ciop(
+                    scaled_noisy_latent_image, latent_noise, config, generator, rand
+                )
+
             # original size of the image
             original_height = batch['original_resolution'][0]
             original_width = batch['original_resolution'][1]

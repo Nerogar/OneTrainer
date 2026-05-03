@@ -119,6 +119,15 @@ class BaseErnieSetup(
                 model.noise_scheduler.timesteps,
             )
 
+            if not deterministic:
+                scaled_noisy_latent_image, latent_noise = self._apply_ciop(
+                    scaled_noisy_latent_image,
+                    latent_noise,
+                    config,
+                    generator,
+                    rand
+                )
+
             predicted_flow = model.transformer(
                 hidden_states=scaled_noisy_latent_image.to(dtype=model.train_dtype.torch_dtype()),
                 timestep=timestep,
