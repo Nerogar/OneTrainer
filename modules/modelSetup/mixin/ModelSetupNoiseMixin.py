@@ -136,7 +136,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
         """
         ciop_noise_weight = config.ciop_noise_weight
         if ciop_noise_weight != 0:
-            if rand.random() < config.ciop_p:
+            if torch.rand(1, generator=generator, device=noisy_latent.device).item() < config.ciop_p:
                 eps_in = torch.randn(
                     noisy_latent.shape,
                     generator=generator,
