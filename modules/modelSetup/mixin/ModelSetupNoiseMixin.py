@@ -136,23 +136,26 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
         """
         ciop_noise_weight = config.ciop_noise_weight
         if ciop_noise_weight != 0:
-            if torch.rand(1, generator=generator, device=noisy_latent.device).item() < config.ciop_p:
-                eps_in = torch.randn(
-                    noisy_latent.shape,
-                    generator=generator,
-                    device=noisy_latent.device,
-                    dtype=noisy_latent.dtype
-                ) * ciop_noise_weight
+            prob_threshold = torch.rand(1, generator=generator, device=noisy_latent.device)
 
-                eps_out = torch.randn(
-                    target_noise.shape,
-                    generator=generator,
-                    device=target_noise.device,
-                    dtype=target_noise.dtype
-                ) * ciop_noise_weight
+            apply_mask = (prob_threshold < config.ciop_p).to(noisy_latent.dtype)
 
-                noisy_latent = noisy_latent + eps_in
-                target_noise = target_noise + eps_out
+            eps_in = torch.randn(
+                noisy_latent.shape,
+                generator=generator,
+                device=noisy_latent.device,
+                dtype=noisy_latent.dtype
+            ) * (ciop_noise_weight * apply_mask)
+
+            eps_out = torch.randn(
+                target_noise.shape,
+                generator=generator,
+                device=target_noise.device,
+                dtype=target_noise.dtype
+            ) * (ciop_noise_weight * apply_mask)
+
+            noisy_latent = noisy_latent + eps_in
+            target_noise = target_noise + eps_out
 
         return noisy_latent, target_noise
 
