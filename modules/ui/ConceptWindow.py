@@ -198,6 +198,12 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="The loss multiplyer for this concept.")
         components.entry(frame, 9, 1, self.ui_state, "loss_weight")
 
+        # validation timestep shift (only meaningful for VALIDATION concepts)
+        components.label(frame, 10, 0, "Validation Timestep Shift",
+                         tooltip="Per-concept override for the global Validation Timestep Shift. Leave blank to inherit. Only used for VALIDATION concepts.",
+                         wide_tooltip=True)
+        components.entry(frame, 10, 1, self.ui_state, "validation_timestep_shift")
+
         frame.pack(fill="both", expand=1)
         return frame
 

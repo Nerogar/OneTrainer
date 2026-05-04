@@ -691,11 +691,16 @@ class TrainingTab:
                          tooltip="Shift the timestep distribution. Use the preview to see more details.")
         components.entry(frame, 8, 1, self.ui_state, "timestep_shift", required=True)
 
+        # validation timestep shift
+        components.label(frame, 9, 0, "Validation Timestep Shift",
+                         tooltip="Shift applied to the per-sample validation timestep distribution. Validation samples are spread across the full timestep range using stratified sampling, and this shift skews that range the same way Timestep Shift does for training. Concepts can override this value individually.", wide_tooltip=True)
+        components.entry(frame, 9, 1, self.ui_state, "validation_timestep_shift", required=True)
+
         if supports_dynamic_timestep_shifting:
             # dynamic timestep shifting
-            components.label(frame, 9, 0, "Dynamic Timestep Shifting",
+            components.label(frame, 10, 0, "Dynamic Timestep Shifting",
                              tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. Note: For Z-Image and Flux2, the dynamic shifting parameters are likely wrong and unknown. Use with care or set your own, fixed shift.", wide_tooltip=True)
-            components.switch(frame, 9, 1, self.ui_state, "dynamic_timestep_shifting")
+            components.switch(frame, 10, 1, self.ui_state, "dynamic_timestep_shifting")
 
 
 
