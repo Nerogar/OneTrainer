@@ -693,7 +693,7 @@ class TrainingTab:
 
         # validation timestep shift
         components.label(frame, 9, 0, "Validation Timestep Shift",
-                         tooltip="Shift applied to the per-sample validation timestep distribution. Validation samples are spread across the full timestep range using stratified sampling, and this shift skews that range the same way Timestep Shift does for training. Concepts can override this value individually.", wide_tooltip=True)
+                         tooltip="Shift the validation timestep distribution. Concepts can override this value individually.")
         components.entry(frame, 9, 1, self.ui_state, "validation_timestep_shift", required=True)
 
         if supports_dynamic_timestep_shifting:

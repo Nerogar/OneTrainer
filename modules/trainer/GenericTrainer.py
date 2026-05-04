@@ -437,20 +437,15 @@ class GenericTrainer(BaseTrainer):
     def __validation_concept_shifts(self) -> dict[int, float]:
         concepts = self.config.concepts
         if concepts is None:
-            try:
-                with open(self.config.concept_file_name, 'r') as f:
-                    concepts = [ConceptConfig.default_values().from_dict(c) for c in json.load(f)]
-            except OSError:
-                return {}
+            with open(self.config.concept_file_name, 'r') as f:
+                concepts = [ConceptConfig.default_values().from_dict(c) for c in json.load(f)]
 
-        shifts: dict[int, float] = {}
-        for concept in concepts:
-            if ConceptType(concept.type) != ConceptType.VALIDATION:
-                continue
-            override = getattr(concept, 'validation_timestep_shift', None)
-            if override is not None:
-                shifts[concept.seed] = float(override)
-        return shifts
+        return {
+            concept.seed: concept.validation_timestep_shift
+            for concept in concepts
+            if ConceptType(concept.type) == ConceptType.VALIDATION
+            and concept.validation_timestep_shift is not None
+        }
 
     def __save_backup_config(self, backup_path):
         config_path = os.path.join(backup_path, "onetrainer_config")

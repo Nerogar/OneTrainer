@@ -20,15 +20,15 @@ NOISE_TAG = 0x5E2D88C1
 def stratified_unit_position(i: int, n: int, seed: int = VAL_SEED) -> float:
     if n <= 0:
         return 0.0
-    jitter = float(np.random.default_rng([int(seed), TIMESTEP_TAG, int(i)]).random())
-    return (int(i) + jitter) / int(n)
+    jitter = float(np.random.default_rng([seed, TIMESTEP_TAG, i]).random())
+    return (i + jitter) / n
 
 
 def validation_noise_seed(i: int, seed: int = VAL_SEED) -> int:
-    return int(np.random.default_rng([int(seed), NOISE_TAG, int(i)]).integers(0, 2 ** 31))
+    return int(np.random.default_rng([seed, NOISE_TAG, i]).integers(0, 2 ** 31))
 
 
 def apply_timestep_shift_unit(pos: float, shift: float) -> float:
     if shift == 1.0:
-        return float(pos)
-    return float(shift) * float(pos) / ((float(shift) - 1.0) * float(pos) + 1.0)
+        return pos
+    return shift * pos / ((shift - 1.0) * pos + 1.0)
