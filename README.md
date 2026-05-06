@@ -119,6 +119,9 @@ If you are on Mac or Linux, you can also read [the launch script documentation](
 
 For general troubleshooting or questions, ask in [Discussions](https://github.com/Nerogar/OneTrainer/discussions), check the [Wiki](https://github.com/Nerogar/OneTrainer/wiki) or join our [Discord](https://discord.gg/KwgcQd5scF).
 
+> [!NOTE]
+> Ernie Image LoRA safetensors exports use the Musubi-style `lora_unet_*` naming so they can be loaded directly in ComfyUI.
+
 If you encounter a reproducible error you first must run update.bat or update.sh and confirm the issue is still able to be reproduced. Then export anonymized debug information to help us solve an issue you are facing and upload it as part of your Github Issues submission.
 
 -   On Windows double click `export_debug.bat`

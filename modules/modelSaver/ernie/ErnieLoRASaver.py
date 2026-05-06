@@ -1,5 +1,6 @@
 from modules.model.ErnieModel import ErnieModel
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
+from modules.util.convert.lora.convert_ernie_lora import convert_ernie_lora_key_sets
 from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.enum.ModelFormat import ModelFormat
 
@@ -14,7 +15,7 @@ class ErnieLoRASaver(
         super().__init__()
 
     def _get_convert_key_sets(self, model: ErnieModel) -> list[LoraConversionKeySet] | None:
-        return None
+        return convert_ernie_lora_key_sets()
 
     def _get_state_dict(
             self,
@@ -34,4 +35,7 @@ class ErnieLoRASaver(
             output_model_destination: str,
             dtype: torch.dtype | None,
     ):
+        if output_model_format == ModelFormat.COMFY_LORA:
+            output_model_format = ModelFormat.SAFETENSORS
+
         self._save(model, output_model_format, output_model_destination, dtype)
