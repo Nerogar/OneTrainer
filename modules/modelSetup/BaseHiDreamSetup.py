@@ -325,10 +325,10 @@ class BaseHiDreamSetup(
                         if 'text_encoder_3_hidden_state' in batch and not config.train_text_encoder_3_or_embedding() else None,
                     text_encoder_4_output=batch['text_encoder_4_hidden_state'] \
                         if 'text_encoder_4_hidden_state' in batch and not config.train_text_encoder_4_or_embedding() else None,
-                    text_encoder_1_dropout_probability=config.text_encoder.dropout_probability,
-                    text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability,
-                    text_encoder_3_dropout_probability=config.text_encoder_3.dropout_probability,
-                    text_encoder_4_dropout_probability=config.text_encoder_4.dropout_probability,
+                    text_encoder_1_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
+                    text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability if not deterministic else None,
+                    text_encoder_3_dropout_probability=config.text_encoder_3.dropout_probability if not deterministic else None,
+                    text_encoder_4_dropout_probability=config.text_encoder_4.dropout_probability if not deterministic else None,
                     apply_attention_mask=config.transformer.attention_mask,
                 ))
 

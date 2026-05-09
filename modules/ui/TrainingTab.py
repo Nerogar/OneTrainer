@@ -86,6 +86,8 @@ class TrainingTab:
             self.__setup_hi_dream_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_z_image():
             self.__setup_z_image_ui(column_0, column_1, column_2)
+        elif self.train_config.model_type.is_ernie():
+            self.__setup_ernie_ui(column_0, column_1, column_2)
 
 
     def __setup_stable_diffusion_ui(self, column_0, column_1, column_2):
@@ -93,7 +95,7 @@ class TrainingTab:
         self.__create_text_encoder_frame(column_0, 1)
         self.__create_embedding_frame(column_0, 2)
 
-        self.__create_base2_frame(column_1, 0)
+        self.__create_base2_frame(column_1, 0, supports_circular_padding=True)
         self.__create_unet_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2, supports_generalized_offset_noise=True)
 
@@ -122,7 +124,7 @@ class TrainingTab:
         self.__create_text_encoder_n_frame(column_0, 2, i=2)
         self.__create_embedding_frame(column_0, 3)
 
-        self.__create_base2_frame(column_1, 0)
+        self.__create_base2_frame(column_1, 0, supports_circular_padding=True)
         self.__create_unet_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2, supports_generalized_offset_noise=True)
 
@@ -135,7 +137,7 @@ class TrainingTab:
         self.__create_text_encoder_frame(column_0, 1)
         self.__create_embedding_frame(column_0, 2)
 
-        self.__create_base2_frame(column_1, 0)
+        self.__create_base2_frame(column_1, 0, supports_circular_padding=True)
         self.__create_prior_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2)
 
@@ -208,6 +210,18 @@ class TrainingTab:
         self.__create_layer_frame(column_2, 3)
 
     def __setup_z_image_ui(self, column_0, column_1, column_2):
+        self.__create_base_frame(column_0, 0)
+        self.__create_text_encoder_frame(column_0, 1, supports_clip_skip=False, supports_training=False)
+
+        self.__create_base2_frame(column_1, 0)
+        self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False, supports_force_attention_mask=False)
+        self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
+
+        self.__create_masked_frame(column_2, 1)
+        self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
+
+    def __setup_ernie_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
         self.__create_text_encoder_frame(column_0, 1, supports_clip_skip=False, supports_training=False)
 
@@ -335,7 +349,7 @@ class TrainingTab:
                          tooltip="Clips the gradient norm. Leave empty to disable gradient clipping.")
         components.entry(frame, 10, 1, self.ui_state, "clip_grad_norm")
 
-    def __create_base2_frame(self, master, row, video_training_enabled: bool = False):
+    def __create_base2_frame(self, master, row, video_training_enabled: bool=False, supports_circular_padding: bool=False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
@@ -415,9 +429,10 @@ class TrainingTab:
             row += 1
 
         # force circular padding
-        components.label(frame, row, 0, "Force Circular Padding",
-                         tooltip="Enables circular padding for all conv layers to better train seamless images")
-        components.switch(frame, row, 1, self.ui_state, "force_circular_padding")
+        if supports_circular_padding:
+            components.label(frame, row, 0, "Force Circular Padding",
+                             tooltip="Enables circular padding for all conv layers to better train seamless images")
+            components.switch(frame, row, 1, self.ui_state, "force_circular_padding")
 
     def __create_text_encoder_frame(self, master, row, supports_clip_skip=True, supports_training=True, supports_sequence_length=False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)

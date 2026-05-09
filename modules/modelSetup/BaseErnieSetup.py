@@ -2,17 +2,14 @@ from abc import ABCMeta
 from random import Random
 
 import modules.util.multi_gpu_util as multi
-from modules.model.QwenModel import QwenModel
+from modules.model.ErnieModel import ErnieModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
+from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowMatchingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
-from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
-from modules.util.checkpointing_util import (
-    enable_checkpointing_for_qwen25vl_encoder_layers,
-    enable_checkpointing_for_qwen_transformer,
-)
+from modules.util.checkpointing_util import enable_checkpointing_for_ernie_transformer
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -24,34 +21,30 @@ import torch
 from torch import Tensor
 
 
-#TODO share more code with other models
-class BaseQwenSetup(
+class BaseErnieSetup(
     BaseModelSetup,
     ModelSetupDiffusionLossMixin,
     ModelSetupDebugMixin,
     ModelSetupNoiseMixin,
     ModelSetupFlowMatchingMixin,
-    ModelSetupText2ImageMixin,
+    ModelSetupEmbeddingMixin,
     metaclass=ABCMeta
 ):
     LAYER_PRESETS = {
-        "attn-mlp": ["attn", "img_mlp", "txt_mlp"],
-        "attn-only": ["attn"],
-        "blocks": ["transformer_block"],
+        "attn-mlp": ["self_attention", "mlp"],
+        "attn-only": ["self_attention"],
+        "blocks": ["layers"],
         "full": [],
     }
 
     def setup_optimizations(
             self,
-            model: QwenModel,
+            model: ErnieModel,
             config: TrainConfig,
     ):
         if config.gradient_checkpointing.enabled():
             model.transformer_offload_conductor = \
-                enable_checkpointing_for_qwen_transformer(model.transformer, config)
-            if model.text_encoder is not None:
-                model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_qwen25vl_encoder_layers(model.text_encoder, config)
+                enable_checkpointing_for_ernie_transformer(model.transformer, config)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
@@ -78,7 +71,7 @@ class BaseQwenSetup(
 
     def predict(
             self,
-            model: QwenModel,
+            model: ErnieModel,
             batch: dict,
             config: TrainConfig,
             train_progress: TrainProgress,
@@ -91,29 +84,32 @@ class BaseQwenSetup(
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
 
-            text_encoder_output, text_attention_mask = model.encode_text(
+            text_encoder_output, text_lens = model.encode_text(
                 train_device=self.train_device,
                 batch_size=batch['latent_image'].shape[0],
                 rand=rand,
-                tokens=batch.get("tokens"),
-                tokens_mask=batch.get("tokens_mask"),
-                text_encoder_output=batch['text_encoder_hidden_state'] \
-                    if 'text_encoder_hidden_state' in batch and not config.train_text_encoder_or_embedding() else None,
+                tokens=batch.get('tokens'),
+                tokens_mask=batch.get('tokens_mask'),
+                text_encoder_output=batch.get('text_encoder_hidden_state'),
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
 
-            latent_image = batch['latent_image']
+            # Patchify: [B, 32, H, W] -> [B, 128, H/2, W/2]
+            latent_image = model.patchify_latents(batch['latent_image'].float())
+            latent_height = latent_image.shape[-2]
+            latent_width = latent_image.shape[-1]
             scaled_latent_image = model.scale_latents(latent_image)
+
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
-            shift = model.calculate_timestep_shift(scaled_latent_image.shape[-2], scaled_latent_image.shape[-1])
+            shift = model.calculate_timestep_shift(latent_height, latent_width)
             timestep = self._get_timestep_discrete(
                 model.noise_scheduler.config['num_train_timesteps'],
                 deterministic,
                 generator,
                 scaled_latent_image.shape[0],
                 config,
-                shift = shift if config.dynamic_timestep_shifting else config.timestep_shift,
+                shift=shift if config.dynamic_timestep_shifting else config.timestep_shift,
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(
@@ -123,59 +119,39 @@ class BaseQwenSetup(
                 model.noise_scheduler.timesteps,
             )
 
-            latent_input = scaled_noisy_latent_image
-            packed_latent_input = model.pack_latents(latent_input)
-
-            #FIXME list of lists is not according to type hint, but according to diffusers code:
-            #https://github.com/huggingface/diffusers/issues/12295
-            img_shapes = [[(
-                1, #frame for future video model - not batch size
-                latent_input.shape[-2] // 2,
-                latent_input.shape[-1] // 2)
-            ]] * latent_input.shape[0]
-
-            if torch.all(text_attention_mask):
-                text_attention_mask = None
-
-            packed_predicted_flow = model.transformer(
-                hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
-                timestep=timestep / 1000,
-                encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                encoder_hidden_states_mask=text_attention_mask,
-                img_shapes=img_shapes,
-                return_dict=True,
-            ).sample
-
-            predicted_flow = model.unpack_latents(
-                packed_predicted_flow,
-                height=latent_input.shape[-2],
-                width=latent_input.shape[-1],
-            )
+            predicted_flow = model.transformer(
+                hidden_states=scaled_noisy_latent_image.to(dtype=model.train_dtype.torch_dtype()),
+                timestep=timestep,
+                text_bth=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                text_lens=text_lens,
+                return_dict=False,
+            )[0]
 
             flow = latent_noise - scaled_latent_image
             model_output_data = {
                 'loss_type': 'target',
                 'timestep': timestep,
-                'predicted': predicted_flow,
-                'target': flow,
+                # unpatchify to match mask shape for masked training
+                'predicted': model.unpatchify_latents(predicted_flow),
+                'target': model.unpatchify_latents(flow),
             }
 
             if config.debug_mode:
                 with torch.no_grad():
                     predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
-                    self._save_tokens("7-prompt", batch['tokens'], model.tokenizer, config, train_progress)
-                    self._save_latent("1-noise", latent_noise, config, train_progress)
-                    self._save_latent("2-noisy_image", scaled_noisy_latent_image, config, train_progress)
-                    self._save_latent("3-predicted_flow", predicted_flow, config, train_progress)
-                    self._save_latent("4-flow", flow, config, train_progress)
-                    self._save_latent("5-predicted_image", predicted_scaled_latent_image, config, train_progress)
-                    self._save_latent("6-image", scaled_latent_image, config, train_progress)
+                    self._save_tokens('7-prompt', batch['tokens'], model.tokenizer, config, train_progress)
+                    self._save_latent('1-noise', latent_noise, config, train_progress)
+                    self._save_latent('2-noisy_image', scaled_noisy_latent_image, config, train_progress)
+                    self._save_latent('3-predicted_flow', predicted_flow, config, train_progress)
+                    self._save_latent('4-flow', flow, config, train_progress)
+                    self._save_latent('5-predicted_image', predicted_scaled_latent_image, config, train_progress)
+                    self._save_latent('6-image', scaled_latent_image, config, train_progress)
 
         return model_output_data
 
     def calculate_loss(
             self,
-            model: QwenModel,
+            model: ErnieModel,
             batch: dict,
             data: dict,
             config: TrainConfig,
@@ -188,11 +164,8 @@ class BaseQwenSetup(
             sigmas=model.noise_scheduler.sigmas,
         ).mean()
 
-    def prepare_text_caching(self, model: QwenModel, config: TrainConfig):
+    def prepare_text_caching(self, model: ErnieModel, config: TrainConfig):
         model.to(self.temp_device)
-
-        if not config.train_text_encoder_or_embedding():
-            model.text_encoder_to(self.train_device)
-
+        model.text_encoder_to(self.train_device)
         model.eval()
         torch_gc()

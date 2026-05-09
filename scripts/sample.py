@@ -51,7 +51,7 @@ def main():
 
     print("Sampling " + args.destination)
     model_sampler.sample(
-        sample_config=SampleConfig.default_values().from_dict(
+        sample_config=SampleConfig.default_values(args.model_type).from_dict(
             {
                 "prompt": args.prompt,
                 "negative_prompt": args.negative_prompt,
