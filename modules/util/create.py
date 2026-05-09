@@ -673,6 +673,7 @@ def create_optimizer(
             optimizer = SinkSGD_adv(
                 params=parameters,
                 lr=config.learning_rate,
+                normed_momentum=optimizer_config.normed_momentum if optimizer_config.normed_momentum is not None else False,
                 momentum=optimizer_config.momentum if optimizer_config.beta1 is not None else 0,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
@@ -788,6 +789,8 @@ def create_optimizer(
             optimizer = SignSGD_adv(
                 params=parameters,
                 lr=config.learning_rate,
+                stochastic_sign=optimizer_config.stochastic_sign if optimizer_config.stochastic_sign is not None else False,
+                normed_momentum=optimizer_config.normed_momentum if optimizer_config.normed_momentum is not None else False,
                 momentum=optimizer_config.momentum if optimizer_config.momentum is not None else 0,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
@@ -797,7 +800,6 @@ def create_optimizer(
                 Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
                 alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
                 spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
-                stochastic_sign=optimizer_config.stochastic_sign if optimizer_config.stochastic_sign is not None else False,
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",

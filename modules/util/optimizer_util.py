@@ -443,6 +443,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "quant_block_size": 2048
     },
     Optimizer.SINKSGD_ADV: {
+        "normed_momentum": False,
         "momentum": 0.95,
         "nesterov": True,
         "sinkhorn_iterations": 5,
@@ -535,6 +536,8 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "centered_wd_mode": "float8",
     },
     Optimizer.SIGNSGD_ADV: {
+        "stochastic_sign": False,
+        "normed_momentum": False,
         "momentum": 0.95,
         "cautious_wd": False,
         "weight_decay": 0.0,
@@ -544,13 +547,13 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "orthogonal_gradient": False,
         "Simplified_AdEMAMix": False,
         "alpha_grad": 100.0,
-        "stochastic_sign": False,
         "spectral_normalization": False,
         "centered_wd": 0.0,
         "centered_wd_mode": "float8",
         "state_precision": "auto",
     },
     Optimizer.LION_ADV: {
+        "stochastic_sign": False,
         "beta1": 0.9,
         "beta2": 0.99,
         "cautious_wd": False,
@@ -562,7 +565,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "fused_back_pass": False,
         "cautious_mask": False,
         "orthogonal_gradient": False,
-        "stochastic_sign": False,
         "spectral_normalization": False,
         "centered_wd": 0.0,
         "centered_wd_mode": "float8",

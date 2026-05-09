@@ -147,6 +147,7 @@ class TrainOptimizerConfig(BaseConfig):
     state_precision: str
     orthogonal_sinkhorn: False
     sinkhorn_iterations: int
+    normed_momentum: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -269,6 +270,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("state_precision", "float8", str, False))
         data.append(("orthogonal_sinkhorn", False, bool, False))
         data.append(("sinkhorn_iterations", None, int, True))
+        data.append(("normed_momentum", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
