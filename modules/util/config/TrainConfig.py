@@ -136,7 +136,6 @@ class TrainOptimizerConfig(BaseConfig):
     accelerated_ns: False
     cautious_wd: False
     approx_mars: False
-    auto_kappa_p: False
     compile: False
     spectral_normalization: False
     stochastic_sign: False
@@ -259,7 +258,6 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("accelerated_ns", False, bool, False))
         data.append(("cautious_wd", False, bool, False))
         data.append(("approx_mars", False, bool, False))
-        data.append(("auto_kappa_p", False, bool, False))
         data.append(("compile", False, bool, False))
         data.append(("spectral_normalization", False, bool, False))
         data.append(("stochastic_sign", False, bool, False))
