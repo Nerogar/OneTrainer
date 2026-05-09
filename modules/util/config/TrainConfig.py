@@ -114,10 +114,8 @@ class TrainOptimizerConfig(BaseConfig):
     use_atan2: False
     use_AdEMAMix: False
     beta3_ema: float
-    alpha_grad: float
     beta1_warmup: int
     min_beta1: float
-    Simplified_AdEMAMix: False
     kourkoutas_beta: False
     schedulefree_c: float
     ns_steps: int
@@ -236,10 +234,8 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("use_atan2", False, bool, False))
         data.append(("use_AdEMAMix", False, bool, False))
         data.append(("beta3_ema", None, float, True))
-        data.append(("alpha_grad", None, float, True))
         data.append(("beta1_warmup", None, int, True))
         data.append(("min_beta1", None, float, True))
-        data.append(("Simplified_AdEMAMix", False, bool, False))
         data.append(("kourkoutas_beta", False, bool, False))
         data.append(("schedulefree_c", None, float, True))
         data.append(("ns_steps", None, int, True))
