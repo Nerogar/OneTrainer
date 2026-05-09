@@ -145,6 +145,7 @@ class TrainOptimizerConfig(BaseConfig):
     orthogonal_sinkhorn: False
     sinkhorn_iterations: int
     normed_momentum: False
+    nesterov_coef: float
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -265,6 +266,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("orthogonal_sinkhorn", False, bool, False))
         data.append(("sinkhorn_iterations", None, int, True))
         data.append(("normed_momentum", False, bool, False))
+        data.append(("nesterov_coef", None, float, True))
 
         return TrainOptimizerConfig(data)
 

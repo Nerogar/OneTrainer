@@ -677,6 +677,7 @@ def create_optimizer(
                 momentum=optimizer_config.momentum if optimizer_config.beta1 is not None else 0,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
+                nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
@@ -715,6 +716,8 @@ def create_optimizer(
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
+                nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
+                nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
             )
 
         # ADOPT_ADV Optimizer
@@ -743,6 +746,8 @@ def create_optimizer(
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
+                nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
+                nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
             )
 
         # PRODIGY_ADV Optimizer
@@ -777,6 +782,8 @@ def create_optimizer(
                 spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
+                nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
+                nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
             )
 
         # SignSGD_ADV Optimizer
@@ -797,6 +804,8 @@ def create_optimizer(
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
+                nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
+                nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
             )
 
         # LION_ADV Optimizer
@@ -858,6 +867,7 @@ def create_optimizer(
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
+                nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
                 normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
                 beta2_normuon=optimizer_config.beta2_normuon if optimizer_config.beta2_normuon is not None else 0.95,
                 low_rank_ortho=optimizer_config.low_rank_ortho if optimizer_config.low_rank_ortho is not None else False,
@@ -914,6 +924,7 @@ def create_optimizer(
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
+                nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
                 low_rank_ortho=optimizer_config.low_rank_ortho if optimizer_config.low_rank_ortho is not None else False,
                 ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
