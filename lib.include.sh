@@ -404,7 +404,7 @@ function get_platform_requirements_path {
 # Installs the Global and Platform requirements into the active environment.
 function install_requirements_in_active_env {
     print "Installing requirements..."
-    
+
     if has_uv; then
         # Use uv for ultra-fast installation
         run_cmd "${OT_UV_CMD}" pip install --index-strategy unsafe-best-match -r requirements-global.txt -r "$(get_platform_requirements_path)"
@@ -413,7 +413,7 @@ function install_requirements_in_active_env {
         run_pip_in_active_env install --upgrade --upgrade-strategy eager pip setuptools==81.0.0
         run_pip_in_active_env install --upgrade --upgrade-strategy eager -r requirements-global.txt -r "$(get_platform_requirements_path)"
     fi
-    
+
     export OT_MUST_INSTALL_REQUIREMENTS="false"
     # ... rest of the existing function (metadata saving)
 }
