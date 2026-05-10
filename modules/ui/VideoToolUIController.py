@@ -6,338 +6,54 @@ import random
 import shlex
 import subprocess
 import threading
-import webbrowser
 from fractions import Fraction
-from tkinter import filedialog
 
-from modules.util.image_util import load_image
 from modules.util.path_util import SUPPORTED_VIDEO_EXTENSIONS
-from modules.util.ui import components
 
 import av
-import customtkinter as ctk
 import cv2
 import scenedetect
 from PIL import Image
 
 
-class VideoToolUI(ctk.CTkToplevel):
-    def __init__(
-            self,
-            parent,
-            *args, **kwargs,
-    ):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
+class VideoToolUIController:
+    def __init__(self):
+        self.view = None
+        self.args = {
+            "clip_single": "",
+            "clip_list": "",
+            "clip_time_start": "00:00:00",
+            "clip_time_end": "99:99:99",
+            "clip_output": "",
+            "output_subdir_clip": False,
+            "split_cuts": False,
+            "clip_length": "3",
+            "clip_fps": "24.0",
+            "clip_bordercrop": False,
+            "clip_crop": "0.2",
+            "image_single": "",
+            "image_list": "",
+            "image_time_start": "00:00:00",
+            "image_time_end": "99:99:99",
+            "image_output": "",
+            "output_subdir_img": False,
+            "capture_rate": "0.5",
+            "blur_threshold": "0.2",
+            "image_bordercrop": False,
+            "image_crop": "0.2",
+            "download_link": "",
+            "download_list": "",
+            "download_output": "",
+            "download_args": "--quiet --no-warnings --progress --format mp4",
+        }
 
-        self.title("Video Tools")
-        self.geometry("600x720")
-        self.resizable(True, True)
-        self.wait_visibility()
-        self.focus_set()
+    def create_window(self, parent, view_cls):
+        self.view = view_cls(parent, self)
+        return self.view
 
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=0)
-        self.grid_columnconfigure(0, weight=1)
-
-        tabview = ctk.CTkTabview(self)
-        tabview.grid(row=0, column=0, sticky="nsew")
-
-        self.clip_extract_tab = self.__clip_extract_tab(tabview.add("extract clips"))
-        self.image_extract_tab = self.__image_extract_tab(tabview.add("extract images"))
-        self.video_download_tab = self.__video_download_tab(tabview.add("download"))
-        self.status_bar(self)
-
-    def status_bar(self, master):
-        frame = ctk.CTkFrame(master, fg_color="transparent")
-        frame.grid(row=1, column=0)
-        frame.grid_columnconfigure(0, weight=0, minsize=160)
-        frame.grid_columnconfigure(1, weight=0, minsize=300)
-        frame.grid_columnconfigure(2, weight=1)
-
-        #create preview image
-        preview_path = "resources/icons/icon.png"
-        preview = load_image(preview_path, 'RGB')
-        preview.thumbnail((150, 150))
-        self.preview_image= ctk.CTkImage(light_image=preview, size=preview.size)
-        self.preview_image_label = ctk.CTkLabel(
-            master=frame, text="Preview image", image=self.preview_image, height=150, width=150,
-            compound="top")
-        self.preview_image_label.grid(row=0, column=0, sticky="nw", padx=5, pady=5)
-
-        #displays progress and messages that also go to terminal
-        self.status_label = ctk.CTkTextbox(master=frame, width=400, height=160, wrap="word", border_width=2)
-        self.status_label.insert(index="1.0", text="Current status")
-        self.status_label.configure(state="disabled")
-        self.status_label.grid(row=0, column=1, sticky="ne", padx=5, pady=5)
-
-    def __clip_extract_tab(self, master):
-        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0, minsize=120)
-        frame.grid_columnconfigure(1, weight=0, minsize=200)
-        frame.grid_columnconfigure(2, weight=0)
-        frame.grid_columnconfigure(3, weight=1)
-
-        # single video
-        components.label(frame, 0, 0, "Single Video",
-                         tooltip="Link to single video file to process.")
-        self.clip_single_entry = ctk.CTkEntry(frame, width=190)
-        self.clip_single_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
-        self.clip_single_button = ctk.CTkButton(frame, width=30, text="...",
-                                                command=lambda: self.__browse_for_file(self.clip_single_entry,
-                                                    [("Video files", " ".join(f"*{e}" for e in SUPPORTED_VIDEO_EXTENSIONS))]
-                                        ))
-        self.clip_single_button.grid(row=0, column=1, sticky="e", padx=5, pady=5)
-        components.button(frame, 0, 2, "Extract Single",
-                          command=lambda: self.__extract_clips_button(False))
-
-        # time range
-        components.label(frame, 1, 0, "  Time Range",
-                         tooltip="Time range to limit selection for single video, \
-                            format as hour:minute:second, minute:second, or seconds.")
-        self.clip_time_start_entry = ctk.CTkEntry(frame, width=100)
-        self.clip_time_start_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
-        self.clip_time_start_entry.insert(0, "00:00:00")
-        self.clip_time_end_entry = ctk.CTkEntry(frame, width=100)
-        self.clip_time_end_entry.grid(row=1, column=1, sticky="e", padx=5, pady=5)
-        self.clip_time_end_entry.insert(0, "99:99:99")
-
-        # directory of videos
-        components.label(frame, 2, 0, "Directory",
-                         tooltip="Path to directory with multiple videos to process, including in subdirectories.")
-        self.clip_list_entry = ctk.CTkEntry(frame, width=190)
-        self.clip_list_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
-        self.clip_list_button = ctk.CTkButton(frame, width=30, text="...",
-                                              command=lambda: self.__browse_for_dir(self.clip_list_entry))
-        self.clip_list_button.grid(row=2, column=1, sticky="e", padx=5, pady=5)
-        components.button(frame, 2, 2, "Extract Directory",
-                          command=lambda: self.__extract_clips_button(True))
-
-        # output directory
-        components.label(frame, 3, 0, "Output",
-                         tooltip="Path to folder where extracted clips will be saved.")
-        self.clip_output_entry = ctk.CTkEntry(frame, width=190)
-        self.clip_output_entry.grid(row=3, column=1, sticky="w", padx=5, pady=5)
-        self.clip_output_button = ctk.CTkButton(frame, width=30, text="...",
-                                                command=lambda: self.__browse_for_dir(self.clip_output_entry))
-        self.clip_output_button.grid(row=3, column=1, sticky="e", padx=5, pady=5)
-
-        # output to subdirectories
-        self.output_subdir_clip = ctk.BooleanVar(self, False)
-        components.label(frame, 4, 0, "Output to\nSubdirectories",
-                         tooltip="If enabled, files are saved to subfolders based on filename and input directory. \
-                            Otherwise will all be saved to the top level of the output directory.")
-        self.output_subdir_clip_entry = ctk.CTkSwitch(frame, variable=self.output_subdir_clip, text="")
-        self.output_subdir_clip_entry.grid(row=4, column=1, sticky="w", padx=5, pady=5)
-
-        # split at cuts
-        self.split_at_cuts = ctk.BooleanVar(self, False)
-        components.label(frame, 5, 0, "Split at Cuts",
-                         tooltip="If enabled, detect cuts in the input video and split at those points. \
-                            Otherwise will split at any point, and clips may contain cuts.")
-        self.split_cuts_entry = ctk.CTkSwitch(frame, variable=self.split_at_cuts, text="")
-        self.split_cuts_entry.grid(row=5, column=1, sticky="w", padx=5, pady=5)
-
-        # maximum length
-        components.label(frame, 6, 0, "Max Length (s)",
-                         tooltip="Maximum length in seconds for saved clips, larger clips will be broken into multiple small clips.")
-        self.clip_length_entry = ctk.CTkEntry(frame, width=220)
-        self.clip_length_entry.grid(row=6, column=1, sticky="w", padx=5, pady=5)
-        self.clip_length_entry.insert(0, "3")
-
-        # Set FPS
-        components.label(frame, 7, 0, "Set FPS",
-                         tooltip="FPS to convert output videos to, set to 0 to keep original rate.")
-        self.clip_fps_entry = ctk.CTkEntry(frame, width=220)
-        self.clip_fps_entry.grid(row=7, column=1, sticky="w", padx=5, pady=5)
-        self.clip_fps_entry.insert(0, "24.0")
-
-        # Remove borders
-        self.clip_bordercrop = ctk.BooleanVar(self, False)
-        components.label(frame, 8, 0, "Remove Borders",
-                         tooltip="Remove black borders from output clip")
-        self.clip_bordercrop_entry = ctk.CTkSwitch(frame, variable=self.clip_bordercrop, text="")
-        self.clip_bordercrop_entry.grid(row=8, column=1, sticky="w", padx=5, pady=5)
-
-        # Crop Variation
-        components.label(frame, 9, 0, "Crop Variation",
-                         tooltip="Output clips will be randomly cropped to +- the base aspect ratio, \
-                              somewhat biased towards making square videos. Set to 0 to use only base aspect.")
-        self.clip_crop_entry = ctk.CTkEntry(frame, width=220)
-        self.clip_crop_entry.grid(row=9, column=1, sticky="w", padx=5, pady=5)
-        self.clip_crop_entry.insert(0, "0.2")
-
-        # object filter - currently unused, may implement in future
-        # components.label(frame, 9, 0, "Object Filter",
-        #                  tooltip="Detect general features using Haar-Cascade classifier, and choose how to deal with clips where it is detected")
-        # components.options(frame, 9, 1, ["NONE", "FACE", "EYE", "BODY"], self.video_ui_state, "filter_object")
-        # components.options(frame, 9, 2, ["INCLUDE", "EXCLUDE", "SUBFOLDER"], self.video_ui_state, "filter_behavior")
-
-        frame.pack(fill="both", expand=1)
-        return frame
-
-    def __image_extract_tab(self, master):
-        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0, minsize=120)
-        frame.grid_columnconfigure(1, weight=0, minsize=200)
-        frame.grid_columnconfigure(2, weight=0)
-        frame.grid_columnconfigure(3, weight=1)
-
-        # single video
-        components.label(frame, 0, 0, "Single Video",
-                         tooltip="Link to single video file to process.")
-        self.image_single_entry = ctk.CTkEntry(frame, width=190)
-        self.image_single_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
-        self.image_single_button = ctk.CTkButton(frame, width=30, text="...",
-                                                command=lambda: self.__browse_for_file(self.image_single_entry,
-                                                    [("Video files", " ".join(f"*{e}" for e in SUPPORTED_VIDEO_EXTENSIONS))]
-                                                ))
-        self.image_single_button.grid(row=0, column=1, sticky="e", padx=5, pady=5)
-        components.button(frame, 0, 2, "Extract Single",
-                          command=lambda: self.__extract_images_button(False))
-
-        # time range
-        components.label(frame, 1, 0, "  Time Range",
-                         tooltip="Time range to limit selection for single video, \
-                            format as hour:minute:second, minute:second, or seconds.")
-        self.image_time_start_entry = ctk.CTkEntry(frame, width=100)
-        self.image_time_start_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
-        self.image_time_start_entry.insert(0, "00:00:00")
-        self.image_time_end_entry = ctk.CTkEntry(frame, width=100)
-        self.image_time_end_entry.grid(row=1, column=1, sticky="e", padx=5, pady=5)
-        self.image_time_end_entry.insert(0, "99:99:99")
-
-        # directory of videos
-        components.label(frame, 2, 0, "Directory",
-                         tooltip="Path to directory with multiple videos to process, including in subdirectories.")
-        self.image_list_entry = ctk.CTkEntry(frame, width=190)
-        self.image_list_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
-        self.image_list_button = ctk.CTkButton(frame, width=30, text="...",
-                                               command=lambda: self.__browse_for_dir(self.image_list_entry))
-        self.image_list_button.grid(row=2, column=1, sticky="e", padx=5, pady=5)
-        components.button(frame, 2, 2, "Extract Directory",
-                          command=lambda: self.__extract_images_button(True))
-
-        # output directory
-        components.label(frame, 3, 0, "Output",
-                         tooltip="Path to folder where extracted images will be saved.")
-        self.image_output_entry = ctk.CTkEntry(frame, width=190)
-        self.image_output_entry.grid(row=3, column=1, sticky="w", padx=5, pady=5)
-        self.image_output_button = ctk.CTkButton(frame, width=30, text="...",
-                                                 command=lambda: self.__browse_for_dir(self.image_output_entry))
-        self.image_output_button.grid(row=3, column=1, sticky="e", padx=5, pady=5)
-
-        # output to subdirectories
-        self.output_subdir_img = ctk.BooleanVar(self, False)
-        components.label(frame, 4, 0, "Output to\nSubdirectories",
-                         tooltip="If enabled, files are saved to subfolders based on filename and input directory. \
-                            Otherwise will all be saved to the top level of the output directory.")
-        self.output_subdir_img_entry = ctk.CTkSwitch(frame, variable=self.output_subdir_img, text="")
-        self.output_subdir_img_entry.grid(row=4, column=1, sticky="w", padx=5, pady=5)
-
-        # image capture rate
-        components.label(frame, 5, 0, "Images/sec",
-                         tooltip="Number of images to capture per second of video. \
-                            Images will be taken at semi-random frames around the specified frequency.")
-        self.capture_rate_entry = ctk.CTkEntry(frame, width=220)
-        self.capture_rate_entry.grid(row=5, column=1, sticky="w", padx=5, pady=5)
-        self.capture_rate_entry.insert(0, "0.5")
-
-        # blur removal
-        components.label(frame, 6, 0, "Blur Removal",
-                         tooltip="Threshold for removal of blurry images, relative to all others. \
-                            For example at 0.2, the blurriest 20%% of the final selected frames will not be saved.")
-        self.blur_threshold_entry = ctk.CTkEntry(frame, width=220)
-        self.blur_threshold_entry.grid(row=6, column=1, sticky="w", padx=5, pady=5)
-        self.blur_threshold_entry.insert(0, "0.2")
-
-        # Remove borders
-        self.image_bordercrop = ctk.BooleanVar(self, False)
-        components.label(frame, 7, 0, "Remove Borders",
-                         tooltip="Remove black borders from output image")
-        self.image_bordercrop_entry = ctk.CTkSwitch(frame, variable=self.image_bordercrop, text="")
-        self.image_bordercrop_entry.grid(row=7, column=1, sticky="w", padx=5, pady=5)
-
-        # Crop Variation
-        components.label(frame, 8, 0, "Crop Variation",
-                         tooltip="Output images will be randomly cropped to +- the base aspect ratio, \
-                            somewhat biased towards making square images. Set to 0 to use only base sapect.")
-        self.image_crop_entry = ctk.CTkEntry(frame, width=220)
-        self.image_crop_entry.grid(row=8, column=1, sticky="w", padx=5, pady=5)
-        self.image_crop_entry.insert(0, "0.2")
-
-        # # object filter - currently unused, may implement in future
-        # components.label(frame, 5, 0, "Object Filter",
-        #                  tooltip="Detect general features using Haar-Cascade classifier, and choose how to deal with clips where it is detected")
-        # components.options(frame, 5, 1, ["NONE", "FACE", "EYE", "BODY"], self.video_ui_state, "filter_object")
-        # components.options(frame, 5, 2, ["INCLUDE", "EXCLUDE", "SUBFOLDER"], self.video_ui_state, "filter_behavior")
-
-        frame.pack(fill="both", expand=1)
-        return frame
-
-    def __video_download_tab(self, master):
-        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0, minsize=120)
-        frame.grid_columnconfigure(1, weight=0, minsize=200)
-        frame.grid_columnconfigure(2, weight=0)
-        frame.grid_columnconfigure(3, weight=1)
-
-        # link
-        components.label(frame, 0, 0, "Single Link",
-                         tooltip="Link to video/playlist to download. Uses yt-dlp, supports youtube, twitch, instagram, and many other sites.")
-        self.download_link_entry = ctk.CTkEntry(frame, width=220)
-        self.download_link_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
-        components.button(frame, 0, 2, "Download Link", command=lambda: self.__download_button(False))
-
-        # link list
-        components.label(frame, 1, 0, "Link List",
-                         tooltip="Path to txt file with list of links separated by newlines.")
-        self.download_list_entry = ctk.CTkEntry(frame, width=190)
-        self.download_list_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
-        self.download_list_button = ctk.CTkButton(frame, width=30, text="...",
-                                                  command=lambda: self.__browse_for_file(self.download_list_entry, [("Text file", ".txt")]))
-        self.download_list_button.grid(row=1, column=1, sticky="e", padx=5, pady=5)
-        components.button(frame, 1, 2, "Download List", command=lambda: self.__download_button(True))
-
-        # output directory
-        components.label(frame, 2, 0, "Output",
-                         tooltip="Path to folder where downloaded videos will be saved.")
-        self.download_output_entry = ctk.CTkEntry(frame, width=190)
-        self.download_output_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
-        self.download_output_button = ctk.CTkButton(frame, width=30, text="...", command=lambda: self.__browse_for_dir(self.download_output_entry))
-        self.download_output_button.grid(row=2, column=1, sticky="e", padx=5, pady=5)
-
-        # additional args
-        components.label(frame, 3, 0, "Additional Args",
-                         tooltip="Any additional arguments to pass to yt-dlp, for example '--restrict-filenames --force-overwrite'. \
-                            Default args will hide most terminal outputs.")
-        self.download_args_entry = ctk.CTkTextbox(frame, width=220, height=90, border_width=2)
-        self.download_args_entry.grid(row=3, column=1, rowspan=2, sticky="w", padx=5, pady=5)
-        self.download_args_entry.insert(index="1.0", text="--quiet --no-warnings --progress --format mp4")
-        components.button(frame, 3, 2, "yt-dlp info",
-                          command=lambda: webbrowser.open("https://github.com/yt-dlp/yt-dlp?tab=readme-ov-file#usage-and-options", new=0, autoraise=False))
-
-        frame.pack(fill="both", expand=1)
-        return frame
-
-    def __browse_for_dir(self, entry_box):
-        # get the path from the user
-        path = filedialog.askdirectory()
-        # set the path to the entry box
-        # delete entry box text
-        entry_box.focus_set()
-        entry_box.delete(0, ctk.END)
-        entry_box.insert(0, path)
-        self.focus_set()
-
-    def __browse_for_file(self, entry_box, filetypes):
-        # get the path from the user
-        path = filedialog.askopenfilename(filetypes=filetypes)
-        # set the path to the entry box
-        # delete entry box text
-        entry_box.focus_set()
-        entry_box.delete(0, ctk.END)
-        entry_box.insert(0, path)
-        self.focus_set()
+    def __update_status(self, status_text: str):
+        print(status_text)
+        self.view.update_status(status_text)
 
     def __get_vid_paths(self, batch_mode: bool, input_path_single: str, input_path_dir: str):
         input_videos = []
@@ -382,9 +98,7 @@ class VideoToolUI(ctk.CTkToplevel):
 
     def __run_in_thread(self, target, *args):
         """Clear status box and run target function in a daemon thread."""
-        self.status_label.configure(state="normal")
-        self.status_label.delete(index1="1.0", index2="end")
-        self.status_label.configure(state="disabled")
+        self.view.clear_status()
         t = threading.Thread(target=target, args=args)
         t.daemon = True
         t.start()
@@ -463,22 +177,20 @@ class VideoToolUI(ctk.CTkToplevel):
             h1, w1, _ = frame.shape
         return x1, y1, w1, h1
 
-    def __extract_clips_button(self, batch_mode: bool):
+    def extract_clips_button(self, batch_mode: bool):
         self.__run_in_thread(self.__extract_clips_multi, batch_mode)
 
     def __extract_clips_multi(self, batch_mode: bool):
-        if not pathlib.Path(self.clip_output_entry.get()).is_dir() or self.clip_output_entry.get() == "":
+        p = self.args
+        if not pathlib.Path(p['clip_output']).is_dir() or p['clip_output'] == "":
             self.__update_status("Invalid output directory!")
             return
 
         # validate numeric inputs
         try:
-            max_length = float(self.clip_length_entry.get())
-            crop_variation = float(self.clip_crop_entry.get())
-            target_fps = float(self.clip_fps_entry.get())
-            input_single_entry = self.clip_single_entry.get()
-            input_multiple_entry = self.clip_list_entry.get()
-            output_entry = self.clip_output_entry.get()
+            max_length = float(p['clip_length'])
+            crop_variation = float(p['clip_crop'])
+            target_fps = float(p['clip_fps'])
         except ValueError:
             self.__update_status("Invalid numeric input for Max Length, Crop Variation, or FPS.")
             return
@@ -492,26 +204,26 @@ class VideoToolUI(ctk.CTkToplevel):
             self.__update_status("Crop Variation must be between 0.0 and 1.0.")
             return
 
-        input_videos = self.__get_vid_paths(batch_mode, input_single_entry, input_multiple_entry)
+        input_videos = self.__get_vid_paths(batch_mode, p['clip_single'], p['clip_list'])
         if len(input_videos) == 0:  # exit if no paths found
             return
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             for video_path in input_videos:
                 output_directory = self.__get_output_dir(
-                    self.output_subdir_clip_entry.get(), batch_mode,
-                    output_entry, video_path, input_multiple_entry)
-                time_start = "00:00:00" if batch_mode else str(self.clip_time_start_entry.get())
-                time_end = "99:99:99" if batch_mode else str(self.clip_time_end_entry.get())
+                    p['output_subdir_clip'], batch_mode,
+                    p['clip_output'], video_path, p['clip_list'])
+                time_start = "00:00:00" if batch_mode else p['clip_time_start']
+                time_end = "99:99:99" if batch_mode else p['clip_time_end']
                 executor.submit(self.__extract_clips,
                                 str(video_path), time_start, time_end, max_length,
-                                self.split_at_cuts.get(), bool(self.clip_bordercrop_entry.get()),
+                                p['split_cuts'], p['clip_bordercrop'],
                                 crop_variation, target_fps, output_directory)
 
         if batch_mode:
-            self.__update_status(f'Clip extraction from all videos in "{input_multiple_entry}" complete')
+            self.__update_status(f'Clip extraction from all videos in "{p["clip_list"]}" complete')
         else:
-            self.__update_status(f'Clip extraction from "{input_single_entry}" complete')
+            self.__update_status(f'Clip extraction from "{p["clip_single"]}" complete')
 
     def __extract_clips(self, video_path: str, timestamp_min: str, timestamp_max: str, max_length: float,
                         split_at_cuts: bool, remove_borders: bool, crop_variation: float, target_fps: float, output_dir: str):
@@ -614,11 +326,9 @@ class VideoToolUI(ctk.CTkToplevel):
                 preview = Image.fromarray(
                         cv2.cvtColor(frame[y1+y2:y1+y2+h2, x1+x2:x1+x2+w2], cv2.COLOR_BGR2RGB))
                 preview.thumbnail((150, 150))
-                self.preview_image.configure(light_image=preview, size=preview.size)
                 #truncate filename of long files so UI doesn't shift around
                 filename_truncated = basename + ext if len(basename) < 20 else basename[:18] + ".." + ext
-                self.preview_image_label.configure(
-                text=f'{filename_truncated}\nFrames: {scene[0]}-{scene[1]}\nSize: {w2}x{h2}')
+                self.view.update_preview(preview, f'{filename_truncated}\nFrames: {scene[0]}-{scene[1]}\nSize: {w2}x{h2}')
             except Exception:
                 pass
         video.release()
@@ -701,22 +411,20 @@ class VideoToolUI(ctk.CTkToplevel):
                 for pkt in out_video.encode():
                     output_container.mux(pkt)
 
-    def __extract_images_button(self, batch_mode: bool):
+    def extract_images_button(self, batch_mode: bool):
         self.__run_in_thread(self.__extract_images_multi, batch_mode)
 
-    def __extract_images_multi(self, batch_mode : bool):
-        if not pathlib.Path(self.image_output_entry.get()).is_dir() or self.image_output_entry.get() == "":
+    def __extract_images_multi(self, batch_mode: bool):
+        p = self.args
+        if not pathlib.Path(p['image_output']).is_dir() or p['image_output'] == "":
             self.__update_status("Invalid output directory!")
             return
 
         # validate numeric inputs
         try:
-            capture_rate = float(self.capture_rate_entry.get())
-            blur_threshold = float(self.blur_threshold_entry.get())
-            crop_variation = float(self.image_crop_entry.get())
-            input_single_entry = self.image_single_entry.get()
-            input_multiple_entry = self.image_list_entry.get()
-            output_entry = self.image_output_entry.get()
+            capture_rate = float(p['capture_rate'])
+            blur_threshold = float(p['blur_threshold'])
+            crop_variation = float(p['image_crop'])
         except ValueError:
             self.__update_status("Invalid numeric input for Images/sec, Blur Removal, or Crop Variation.")
             return
@@ -730,25 +438,25 @@ class VideoToolUI(ctk.CTkToplevel):
             self.__update_status("Crop Variation must be between 0.0 and 1.0.")
             return
 
-        input_videos = self.__get_vid_paths(batch_mode, input_single_entry, input_multiple_entry)
+        input_videos = self.__get_vid_paths(batch_mode, p['image_single'], p['image_list'])
         if not input_videos:
             return
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             for video_path in input_videos:
                 output_directory = self.__get_output_dir(
-                    self.output_subdir_img_entry.get(), batch_mode,
-                    output_entry, video_path, input_multiple_entry)
-                time_start = "00:00:00" if batch_mode else str(self.image_time_start_entry.get())
-                time_end = "99:99:99" if batch_mode else str(self.image_time_end_entry.get())
+                    p['output_subdir_img'], batch_mode,
+                    p['image_output'], video_path, p['image_list'])
+                time_start = "00:00:00" if batch_mode else p['image_time_start']
+                time_end = "99:99:99" if batch_mode else p['image_time_end']
                 executor.submit(self.__save_frames,
                                 str(video_path), time_start, time_end, capture_rate,
-                                blur_threshold, self.image_bordercrop.get(),
+                                blur_threshold, p['image_bordercrop'],
                                 crop_variation, output_directory)
         if batch_mode:
-            self.__update_status(f'Image extraction from all videos in {input_multiple_entry} complete')
+            self.__update_status(f'Image extraction from all videos in {p["image_list"]} complete')
         else:
-            self.__update_status(f'Image extraction from "{input_single_entry}" complete')
+            self.__update_status(f'Image extraction from "{p["image_single"]}" complete')
 
     def __save_frames(self, video_path: str, timestamp_min: str, timestamp_max: str, capture_rate: float,
                       blur_threshold: float, remove_borders: bool, crop_variation: float, output_dir: str):
@@ -821,32 +529,26 @@ class VideoToolUI(ctk.CTkToplevel):
                         cv2.cvtColor(frame_cropped[y2:y2+h2, x2:x2+w2], cv2.COLOR_BGR2RGB))
                     preview.thumbnail((150, 150))
                     filename_truncated = basename + ext if len(basename) < 20 else basename[:17] + "..." + ext
-                    self.preview_image.configure(light_image=preview, size=preview.size)
-                    self.preview_image_label.configure(text=f'{filename_truncated}\nFrame: {f[0]}\nSize: {w2}x{h2}')
+                    self.view.update_preview(preview, f'{filename_truncated}\nFrame: {f[0]}\nSize: {w2}x{h2}')
                 except Exception:
                     pass  # preview update is non-critical
 
                 cv2.imwrite(filename, frame_cropped[y2:y2+h2, x2:x2+w2])
         video.release()
 
-    def __download_button(self, batch_mode: bool):
+    def download_button(self, batch_mode: bool):
         self.__run_in_thread(self.__download_multi, batch_mode)
 
-    def __update_status(self, status_text: str):
-        print(status_text)
-        self.status_label.configure(state="normal")
-        self.status_label.insert(index="end", text=status_text + "\n")
-        self.status_label.configure(state="disabled")
-
     def __download_multi(self, batch_mode: bool):
-        if not pathlib.Path(self.download_output_entry.get()).is_dir() or self.download_output_entry.get() == "":
+        p = self.args
+        if not pathlib.Path(p['download_output']).is_dir() or p['download_output'] == "":
             self.__update_status("Invalid output directory!")
             return
 
         if not batch_mode:
-            ydl_urls = [self.download_link_entry.get()]
+            ydl_urls = [p['download_link']]
         elif batch_mode:
-            ydl_path = pathlib.Path(self.download_list_entry.get())
+            ydl_path = pathlib.Path(p['download_list'])
             if ydl_path.is_file() and ydl_path.suffix.lower() == ".txt":
                 with open(ydl_path) as file:
                     ydl_urls = file.readlines()
@@ -857,8 +559,8 @@ class VideoToolUI(ctk.CTkToplevel):
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             for url in ydl_urls:
                 executor.submit(self.__download_video,
-                                url.strip(), self.download_output_entry.get(),
-                                self.download_args_entry.get("0.0", ctk.END))
+                                url.strip(), p['download_output'],
+                                p['download_args'])
 
         self.__update_status(f'Completed {len(ydl_urls)} downloads.')
 

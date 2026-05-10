@@ -2,26 +2,21 @@ import contextlib
 import tkinter as tk
 from tkinter import filedialog
 
+from modules.ui.BaseGenerateCaptionsWindowView import BaseGenerateCaptionsWindowView
+from modules.ui.GenerateCaptionsWindowController import GenerateCaptionsWindowController
 from modules.util.ui.ui_utils import set_window_icon
 
 import customtkinter as ctk
 
 
-class GenerateCaptionsWindow(ctk.CTkToplevel):
-    def __init__(self, parent, path, parent_include_subdirectories, *args, **kwargs):
-        """
-        Window for generating captions for a folder of images
-
-        Parameters:
-            parent (`Tk`): the parent window
-            path (`str`): the path to the folder
-            parent_include_subdirectories (`bool`): whether to include subdirectories. used to set the default value of the include subdirectories checkbox
-        """
-        super().__init__(parent, *args, **kwargs)
-        self.parent = parent
+class CtkGenerateCaptionsWindowView(BaseGenerateCaptionsWindowView, ctk.CTkToplevel):
+    def __init__(self, parent, controller: GenerateCaptionsWindowController, path, parent_include_subdirectories, *args, **kwargs):
+        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
 
         if path is None:
             path = ""
+
+        self.controller = controller
 
         self.mode_var = ctk.StringVar(self, "Create if absent")
         self.modes = ["Replace all captions", "Create if absent", "Add as new line"]
@@ -79,7 +74,7 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.progress = ctk.CTkProgressBar(self.frame, orientation="horizontal", mode="determinate", width=200)
         self.progress.grid(row=7, column=1, sticky="w", padx=5, pady=5)
 
-        self.create_captions_button = ctk.CTkButton(self.frame, text="Create Captions", width=310, command=self.create_captions)
+        self.create_captions_button = ctk.CTkButton(self.frame, text="Create Captions", width=310, command=self._on_create_captions)
         self.create_captions_button.grid(row=8, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
         self.frame.pack(fill="both", expand=True)
@@ -88,7 +83,6 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.grab_set()
         self.focus_set()
         self.after(200, lambda: set_window_icon(self))
-
 
     def browse_for_path(self, entry_box):
         # get the path from the user
@@ -106,25 +100,16 @@ class GenerateCaptionsWindow(ctk.CTkToplevel):
         self.progress_label.configure(text=f"{value}/{max_value}")
         self.progress.update()
 
-    def create_captions(self):
-        self.parent.load_captioning_model(self.model_var.get())
-
-        mode = {
-            "Replace all captions": "replace",
-            "Create if absent": "fill",
-            "Add as new line": "add",
-        }[self.mode_var.get()]
-
-        self.parent.captioning_model.caption_folder(
-            sample_dir=self.path_entry.get(),
+    def _on_create_captions(self):
+        self.controller.create_captions(
+            model_name=self.model_var.get(),
+            path=self.path_entry.get(),
             initial_caption=self.caption_entry.get(),
             caption_prefix=self.prefix_entry.get(),
             caption_postfix=self.postfix_entry.get(),
-            mode=mode,
-            progress_callback=self.set_progress,
+            mode_str=self.mode_var.get(),
             include_subdirectories=self.include_subdirectories_var.get(),
         )
-        self.parent.load_image()
 
     def destroy(self):
         with contextlib.suppress(tk.TclError):

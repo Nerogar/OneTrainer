@@ -8,9 +8,9 @@ from typing import Any, Literal
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions
+from modules.util.ui.ctk_validation import DEFAULT_MAX_UNDO, FieldValidator, PathValidator
+from modules.util.ui.CtkUIState import CtkUIState
 from modules.util.ui.ToolTip import ToolTip
-from modules.util.ui.UIState import UIState
-from modules.util.ui.validation import DEFAULT_MAX_UNDO, FieldValidator, PathValidator
 
 import customtkinter as ctk
 from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
@@ -34,11 +34,13 @@ def app_title(master, row, column):
     label_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD)
 
 
-def label(master, row, column, text, pad=PAD, tooltip=None, wide_tooltip=False, wraplength=0):
+def label(master, row, column, text, pad=PAD, tooltip=None, wide_tooltip=False, wraplength=0, underline=False):
     component = ctk.CTkLabel(master, text=text, wraplength=wraplength)
     component.grid(row=row, column=column, padx=pad, pady=pad, sticky="nw")
     if tooltip:
         ToolTip(component, tooltip, wide=wide_tooltip)
+    if underline:
+        component.configure(font=ctk.CTkFont(underline=True))
     return component
 
 
@@ -46,7 +48,7 @@ def entry(
         master,
         row,
         column,
-        ui_state: UIState,
+        ui_state: CtkUIState,
         var_name: str,
         command: Callable[[], None] | None = None,
         tooltip: str = "",
@@ -108,13 +110,8 @@ def entry(
     return component
 
 
-def json_path_modifier(x: str | Path) -> Path:
-    x = Path(x).absolute()
-    return x.parent if x.suffix == ".json" else x
-
-
 def path_entry(
-        master, row, column, ui_state: UIState, var_name: str,
+        master, row, column, ui_state: CtkUIState, var_name: str,
         *,
         mode: Literal["file", "dir"] = "file",
         io_type: PathIOType = PathIOType.INPUT,
@@ -124,9 +121,10 @@ def path_entry(
         command: Callable[[str], None] | None = None,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
+        columnspan: int = 1,
 ):
     frame = ctk.CTkFrame(master, fg_color="transparent")
-    frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
+    frame.grid(row=row, column=column, padx=0, pady=0, sticky="new", columnspan=columnspan)
 
     frame.grid_columnconfigure(0, weight=1)
 
@@ -216,7 +214,7 @@ def path_entry(
     return frame
 
 
-def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_name, supports_time_units: bool = True):
+def time_entry(master, row, column, ui_state: CtkUIState, var_name: str, unit_var_name, supports_time_units: bool = True):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
@@ -239,7 +237,7 @@ def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_n
 
     return frame
 
-def layer_filter_entry(master, row, column, ui_state: UIState, preset_var_name: str, preset_label: str, preset_tooltip: str, presets, entry_var_name, entry_tooltip: str, regex_var_name, regex_tooltip: str, frame_color=None):
+def layer_filter_entry(master, row, column, ui_state: CtkUIState, preset_var_name: str, preset_label: str, preset_tooltip: str, presets, entry_var_name, entry_tooltip: str, regex_var_name, regex_tooltip: str, frame_color=None):
     frame = ctk.CTkFrame(master=master, corner_radius=5, fg_color=frame_color)
     frame.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
     frame.grid_columnconfigure(0, weight=1)
@@ -353,6 +351,15 @@ def icon_button(master, row, column, text, command):
     return component
 
 
+def colored_icon_button(master, row, column, text, fg_color, command, padx=0):
+    component = ctk.CTkButton(
+        master=master, width=20, height=20, text=text,
+        corner_radius=2, fg_color=fg_color, command=command,
+    )
+    component.grid(row=row, column=column, padx=padx)
+    return component
+
+
 def button(master, row, column, text, command, tooltip=None, **kwargs):
     # Pop grid-specific parameters from kwargs, using PAD as the default if not provided.
     padx = kwargs.pop('padx', PAD)
@@ -365,7 +372,7 @@ def button(master, row, column, text, command, tooltip=None, **kwargs):
     return component
 
 
-def options(master, row, column, values, ui_state: UIState, var_name: str, command: Callable[[str], None] | None = None):
+def options(master, row, column, values, ui_state: CtkUIState, var_name: str, command: Callable[[str], None] | None = None):
     component = ctk.CTkOptionMenu(master, values=values, variable=ui_state.get_var(var_name), command=command)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
 
@@ -385,7 +392,7 @@ def options(master, row, column, values, ui_state: UIState, var_name: str, comma
     return component
 
 
-def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
+def options_adv(master, row, column, values, ui_state: CtkUIState, var_name: str,
                 command: Callable[[str], None] | None = None, adv_command: Callable[[], None] | None = None):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
@@ -417,7 +424,7 @@ def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
     return frame, {'component': component, 'button_component': button_component}
 
 
-def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: UIState, var_name: str,
+def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: CtkUIState, var_name: str,
                command: Callable[[Any], None] | None = None):
     var = ui_state.get_var(var_name)
     keys = [key for key, value in values]
@@ -475,16 +482,19 @@ def switch(
         master,
         row,
         column,
-        ui_state: UIState,
+        ui_state: CtkUIState,
         var_name: str,
         command: Callable[[], None] | None = None,
         text: str = "",
+        width: int | None = None,
 ):
     var = ui_state.get_var(var_name)
     if command:
         trace_id = ui_state.add_var_trace(var_name, command)
 
     component = ctk.CTkSwitch(master, variable=var, text=text, command=command)
+    if width is not None:
+        component.configure(width=width)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
 
     def create_destroy(component):
@@ -545,3 +555,34 @@ def double_progress(master, row, column, label_1, label_2):
         description_2_component.configure(text=f"{value}/{max_value}")
 
     return set_1, set_2
+
+
+def section_frame(master, row: int, col: int = 0):
+    frame = ctk.CTkFrame(master=master, corner_radius=5)
+    frame.grid(row=row, column=col, padx=PAD // 2, pady=PAD // 2, sticky="nsew")
+    frame.grid_columnconfigure(0, weight=1)
+    return frame
+
+
+def inline_frame(master, row: int, col: int, columnspan: int = 1):
+    frame = ctk.CTkFrame(master, fg_color="transparent")
+    frame.grid(row=row, column=col, columnspan=columnspan, sticky="ew", padx=0, pady=0)
+    return frame
+
+
+def set_widget_enabled(widget, enabled: bool) -> None:
+    state = "normal" if enabled else "disabled"
+    if isinstance(widget, ctk.CTkFrame):
+        for child in widget.children.values():
+            with contextlib.suppress(Exception):
+                child.configure(state=state)
+    else:
+        widget.configure(state=state)
+
+
+def set_label_text(label, text: str) -> None:
+    label.configure(text=str(text))
+
+
+def call_after(widget, delay_ms: int, func) -> None:
+    widget.after(delay_ms, func)
