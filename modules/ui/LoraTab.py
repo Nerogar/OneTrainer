@@ -121,19 +121,10 @@ class LoraTab:
                             tooltip=f"The block size parameter used when creating a new {name}")
             components.entry(master, 1, 1, self.ui_state, "oft_block_size", required=True)
 
-            # COFT
-            components.label(master, 1, 3, "Constrained OFT (COFT)",
-                             tooltip="Use the constrained variant of OFT. This constrains the learned rotation to stay very close to the identity matrix, limiting adaptation to only small changes. This improves training stability, helps prevent overfitting on small datasets, and better preserves the base models original knowledge but it may lack expressiveness for tasks requiring substantial adaptation and introduces an additional hyperparameter (COFT Epsilon) that needs tuning.")
-            components.switch(master, 1, 4, self.ui_state, "oft_coft")
-
-            components.label(master, 2, 3, "COFT Epsilon",
-                             tooltip="The control strength of COFT. Only has an effect if COFT is enabled.")
-            components.entry(master, 2, 4, self.ui_state, "coft_eps")
-
             # Block Share
-            components.label(master, 3, 3, "Block Share",
+            components.label(master, 1, 3, "Block Share",
                              tooltip="Share the OFT parameters between blocks. A single rotation matrix is shared across all blocks within a layer, drastically cutting the number of trainable parameters and yielding very compact adapter files, potentially improving generalization but at the cost of significant expressiveness, which can lead to underfitting on more complex or diverse tasks.")
-            components.switch(master, 3, 4, self.ui_state, "oft_block_share")
+            components.switch(master, 1, 4, self.ui_state, "oft_block_share")
 
             # Dropout Percentage
             components.label(master, 2, 0, "Dropout Probability",
