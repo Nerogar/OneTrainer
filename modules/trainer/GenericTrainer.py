@@ -837,7 +837,7 @@ class GenericTrainer(BaseTrainer):
                         # which produces 0.0/1.0 accuracy when batch_size=1 regardless of effective batch.
                         micro_dpo_metrics = self.model_setup.get_last_dpo_metrics()
                         if accumulated_dpo_metrics is None:
-                            accumulated_dpo_metrics = {k: 0.0 for k in micro_dpo_metrics}
+                            accumulated_dpo_metrics = dict.fromkeys(micro_dpo_metrics, 0.0)
                             accumulated_dpo_metrics['_count'] = 0
                         for _k, _v in micro_dpo_metrics.items():
                             accumulated_dpo_metrics[_k] += _v
