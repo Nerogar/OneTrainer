@@ -3,28 +3,27 @@ import platform
 from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
-from tkinter import filedialog, messagebox
 
 from modules.ui.AdditionalEmbeddingsTabController import AdditionalEmbeddingsTabController
 from modules.ui.BaseTrainUIView import BaseTrainUIView
 from modules.ui.CloudTabController import CloudTabController
 from modules.ui.ConceptTabController import ConceptTabController
-from modules.ui.CtkAdditionalEmbeddingsTabView import CtkAdditionalEmbeddingsTabView
-from modules.ui.CtkCaptionUIView import CtkCaptionUIView
-from modules.ui.CtkCloudTabView import CtkCloudTabView
-from modules.ui.CtkConceptTabView import CtkConceptTabView
-from modules.ui.CtkConvertModelUIView import CtkConvertModelUIView
-from modules.ui.CtkLoraTabView import CtkLoraTabView
-from modules.ui.CtkModelTabView import CtkModelTabView
-from modules.ui.CtkProfilingWindowView import CtkProfilingWindowView
-from modules.ui.CtkSampleWindowView import CtkSampleWindowView
-from modules.ui.CtkSamplingTabView import CtkSamplingTabView
-from modules.ui.CtkTopBarView import CtkTopBarView
-from modules.ui.CtkTrainingTabView import CtkTrainingTabView
-from modules.ui.CtkVideoToolUIView import CtkVideoToolUIView
 from modules.ui.LoraTabController import LoraTabController
 from modules.ui.ModelTabController import ModelTabController
 from modules.ui.ProfilingWindowController import ProfilingWindowController
+from modules.ui.PySide6AdditionalEmbeddingsTabView import PySide6AdditionalEmbeddingsTabView
+from modules.ui.PySide6CaptionUIView import PySide6CaptionUIView
+from modules.ui.PySide6CloudTabView import PySide6CloudTabView
+from modules.ui.PySide6ConceptTabView import PySide6ConceptTabView
+from modules.ui.PySide6ConvertModelUIView import PySide6ConvertModelUIView
+from modules.ui.PySide6LoraTabView import PySide6LoraTabView
+from modules.ui.PySide6ModelTabView import PySide6ModelTabView
+from modules.ui.PySide6ProfilingWindowView import PySide6ProfilingWindowView
+from modules.ui.PySide6SampleWindowView import PySide6SampleWindowView
+from modules.ui.PySide6SamplingTabView import PySide6SamplingTabView
+from modules.ui.PySide6TopBarView import PySide6TopBarView
+from modules.ui.PySide6TrainingTabView import PySide6TrainingTabView
+from modules.ui.PySide6VideoToolUIView import PySide6VideoToolUIView
 from modules.ui.SamplingTabController import SamplingTabController
 from modules.ui.TopBarController import TopBarController
 from modules.ui.TrainingTabController import TrainingTabController
@@ -32,12 +31,13 @@ from modules.ui.TrainUIController import TrainUIController
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.ui import ctk_components
-from modules.util.ui.CtkUIState import CtkUIState
-from modules.util.ui.ui_utils import set_window_icon
+from modules.util.ui import pyside6_components
+from modules.util.ui.pyside6_abc import QtABCMeta
+from modules.util.ui.PySide6UIState import PySide6UIState
 
-import customtkinter as ctk
-from customtkinter import AppearanceModeTracker
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QFileDialog, QGridLayout, QMainWindow, QMessageBox, QTabWidget, QWidget
 
 # chunk for forcing Windows to ignore DPI scaling when moving between monitors
 # fixes the long standing transparency bug https://github.com/Nerogar/OneTrainer/issues/90
@@ -47,121 +47,101 @@ if platform.system() == "Windows":
         ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
 
 
-class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
-    set_step_progress: Callable[[int, int], None]
-    set_epoch_progress: Callable[[int, int], None]
 
-    status_label: ctk.CTkLabel | None
-    training_button: ctk.CTkButton | None
 
-    _TRAIN_BUTTON_STYLES = {
-        "idle": {
-            "text": "Start Training",
-            "state": "normal",
-            "fg_color": "#198754",
-            "hover_color": "#146c43",
-            "text_color": "white",
-            "text_color_disabled": "white",
-        },
-        "running": {
-            "text": "Stop Training",
-            "state": "normal",
-            "fg_color": "#dc3545",
-            "hover_color": "#bb2d3b",
-            "text_color": "white",
-        },
-        "stopping": {
-            "text": "Stopping...",
-            "state": "disabled",
-            "fg_color": "#dc3545",
-            "hover_color": "#dc3545",
-            "text_color": "white",
-            "text_color_disabled": "white",
-        },
-    }
-
+class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
     def __init__(self):
-        ctk.CTk.__init__(self)
-        BaseTrainUIView.__init__(self, ctk_components)
+        QMainWindow.__init__(self)
+        BaseTrainUIView.__init__(self, pyside6_components)
 
-        self.title("OneTrainer")
-        self.geometry("1100x740")
-
-        self.after(100, lambda: self._set_icon())
-
-        # more efficient version of ctk.set_appearance_mode("System"), which retrieves the system theme on each main loop iteration
-        ctk.set_appearance_mode("Light" if AppearanceModeTracker.detect_appearance_mode() == 0 else "Dark")
-        ctk.set_default_color_theme("blue")
+        self.setWindowTitle("OneTrainer")
+        self.setWindowIcon(QIcon("resources/icons/icon.png"))
+        self.resize(1100, 740)
 
         self.train_config = TrainConfig.default_values()
-        self.ui_state = CtkUIState(self, self.train_config)
+        self.ui_state = PySide6UIState(self.train_config)
 
         self.controller = TrainUIController(self.train_config)
         self.controller.view = self
-
-        self.grid_rowconfigure(0, weight=0)
-        self.grid_rowconfigure(1, weight=1)
-        self.grid_rowconfigure(2, weight=0)
-        self.grid_columnconfigure(0, weight=1)
 
         self.status_label = None
         self.eta_label = None
         self.training_button = None
         self.export_button = None
-        self.tabview = None
+        self.tabview: QTabWidget | None = None
+        self._tab_widgets: dict[str, QWidget] = {}
 
         self.model_tab = None
         self.training_tab = None
         self.lora_tab = None
         self.cloud_tab = None
+        self.concepts_tab = None
+        self.sampling_tab = None
         self.additional_embeddings_tab = None
 
-        self.top_bar_component = self.top_bar(self)
-        self.content_frame(self)
-        self.bottom_bar(self)
+        central = QWidget(self)
+        self.setCentralWidget(central)
+        central_lo = QGridLayout(central)
+        central_lo.setContentsMargins(0, 0, 0, 0)
+        central_lo.setSpacing(0)
+        central_lo.setRowStretch(1, 1)
+        central_lo.setColumnStretch(0, 1)
+
+        self.top_bar_component = self._build_top_bar(central)
+        central_lo.addWidget(self.top_bar_component, 0, 0)
+
+        self.tabview = QTabWidget(central)
+        central_lo.addWidget(self.tabview, 1, 0)
+
+        bottom = self._build_bottom_bar(central)
+        central_lo.addWidget(bottom, 2, 0)
+
+        self._create_tabs()
+        self.change_training_method(self.train_config.training_method)
+
+        self._profiling_controller = ProfilingWindowController()
+        self.profiling_window = PySide6ProfilingWindowView(self, self._profiling_controller)
 
         self.controller._check_start_always_on_tensorboard()
+        self.workspace_dir_trace_id = self.ui_state.add_var_trace(
+            "workspace_dir", self.controller._on_workspace_dir_change_trace
+        )
 
-        self.workspace_dir_trace_id = self.ui_state.add_var_trace("workspace_dir", self.controller._on_workspace_dir_change_trace)
-
-        # Persistent profiling window.
-        self._profiling_controller = ProfilingWindowController()
-        self.profiling_window = self._profiling_controller.create_window(self, CtkProfilingWindowView)
-
-        self.protocol("WM_DELETE_WINDOW", self.__close)
-
-    def __close(self):
+    def closeEvent(self, event):
         self.top_bar_component.save_default()
         self.controller._stop_always_on_tensorboard()
-        if hasattr(self, 'workspace_dir_trace_id'):
-            self.ui_state.remove_var_trace("workspace_dir", self.workspace_dir_trace_id)
-        self.quit()
+        self.ui_state.remove_var_trace("workspace_dir", self.workspace_dir_trace_id)
+        event.accept()
 
     # --- BaseTrainUIView abstract method implementations ---
 
     def on_update_status(self, status: str):
-        self.status_label.configure(text=status)
+        # Called from training thread — defer to main thread
+        self.schedule_on_main_thread(lambda: self.status_label.setText(status))
 
     def on_training_started(self):
         self._set_training_button_style("running")
 
     def on_training_stopped(self, error_caught: bool):
-        self.eta_label.configure(text="")
+        self.eta_label.setText("")
         self._set_training_button_style("idle")
 
     def on_training_stopping(self):
         self._set_training_button_style("stopping")
 
     def on_update_progress(self, epoch_step: int, max_step: int, epoch: int, max_epoch: int, eta_str: str | None):
+        # Called from training thread — defer to main thread
+        self.schedule_on_main_thread(lambda: self._do_update_progress(epoch_step, max_step, epoch, max_epoch, eta_str))
+
+    def _do_update_progress(self, epoch_step: int, max_step: int, epoch: int, max_epoch: int, eta_str: str | None):
         self.set_step_progress(epoch_step, max_step)
         self.set_epoch_progress(epoch, max_epoch)
-        if eta_str is not None:
-            self.eta_label.configure(text=f"ETA: {eta_str}")
-        else:
-            self.eta_label.configure(text="")
+        self.eta_label.setText(f"ETA: {eta_str}" if eta_str is not None else "")
 
     def schedule_on_main_thread(self, fn: Callable):
-        self.after(0, fn)
+        # The 3-argument form (msec, context, fn) is thread-safe: Qt marshals the call
+        # to the thread where `self` lives (the main thread), unlike the 2-arg form.
+        QTimer.singleShot(0, self, fn)
 
     def get_cloud_reattach(self) -> bool:
         return self.cloud_tab.reattach
@@ -174,43 +154,37 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
 
     def show_validation_errors(self, errors: list[str]):
         bullet_list = "\n".join(f"• {e}" for e in errors)
-        messagebox.showerror(
-            "Cannot Start Training",
-            f"Please fix the following errors before training:\n\n{bullet_list}",
-        )
+        QMessageBox.critical(self, "Cannot Start Training",
+                             f"Please fix the following errors before training:\n\n{bullet_list}")
 
     def open_dataset_tool(self):
-        self.wait_window(self.controller.open_dataset_tool(self, CtkCaptionUIView))
+        self.wait_window(self.controller.open_dataset_tool(self, PySide6CaptionUIView))
 
     def open_video_tool(self):
-        self.wait_window(self.controller.open_video_tool(self, CtkVideoToolUIView))
+        self.wait_window(self.controller.open_video_tool(self, PySide6VideoToolUIView))
 
     def open_convert_model_tool(self):
-        self.wait_window(self.controller.open_convert_model_tool(self, CtkConvertModelUIView))
+        self.wait_window(self.controller.open_convert_model_tool(self, PySide6ConvertModelUIView))
 
     def open_sampling_tool(self):
-        self.controller.open_sampling_tool(self, CtkSampleWindowView)
+        self.controller.open_sampling_tool(self, PySide6SampleWindowView)
 
     def open_manual_sample_window(self):
-        self.controller.open_manual_sample_window(self, CtkSampleWindowView)
+        self.controller.open_manual_sample_window(self, PySide6SampleWindowView)
 
     def wait_window(self, window):
-        ctk.CTk.wait_window(self, window)
+        window.exec()
 
     def show_window(self, window):
-        window.focus_set()
+        window.show()
 
     def connect_window_closed(self, window, callback):
-        window.bind("<Destroy>", lambda _: callback())
+        window.finished.connect(lambda _: callback())
 
-    # --- CTK layout and frame builders ---
+    # --- PySide6 layout builders ---
 
-    def _set_icon(self):
-        """Set the window icon safely after window is ready"""
-        set_window_icon(self)
-
-    def top_bar(self, master):
-        return CtkTopBarView(
+    def _build_top_bar(self, master):
+        return PySide6TopBarView(
             master,
             TopBarController(self.train_config),
             self.ui_state,
@@ -219,146 +193,143 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
             self.load_preset,
         )
 
-    def bottom_bar(self, master):
-        frame = ctk.CTkFrame(master=master, corner_radius=0)
-        frame.grid(row=2, column=0, sticky="nsew")
+    def _build_bottom_bar(self, parent):
+        frame = QWidget(parent)
+        lo = QGridLayout(frame)
+        lo.setColumnStretch(0, 1)
+        lo.setColumnStretch(2, 2)
 
-        # status + ETA container
-        status_frame = ctk.CTkFrame(frame, corner_radius=0, fg_color="transparent")
-        status_frame.grid(row=0, column=1, sticky="w")
-        status_frame.grid_rowconfigure(0, weight=0)
-        status_frame.grid_rowconfigure(1, weight=0)
-        status_frame.grid_columnconfigure(0, weight=1)
-
-        # padding
-        frame.grid_columnconfigure(2, weight=1)
+        status_frame = QWidget(frame)
+        status_lo = QGridLayout(status_frame)
+        status_lo.setContentsMargins(0, 0, 0, 0)
+        lo.addWidget(status_frame, 0, 1)
 
         self.build_bottom_bar_content(frame, status_frame, self.controller, self.ui_state)
-        self._set_training_button_style("idle")  # centralized styling
-
+        self._set_training_button_style("idle")
         return frame
 
-    def content_frame(self, master):
-        frame = ctk.CTkFrame(master=master, corner_radius=0)
-        frame.grid(row=1, column=0, sticky="nsew")
+    def _create_scrollable_tab(self, configure_fn):
+        tab_page = QWidget()
+        tab_lo = pyside6_components._layout(tab_page)
+        tab_lo.setRowStretch(0, 1)
+        tab_lo.setColumnStretch(0, 1)
+        scroll, frame = pyside6_components.scrollable_frame(tab_page)
+        tab_lo.addWidget(scroll, 0, 0)
+        configure_fn(frame)
+        return tab_page
 
-        frame.grid_rowconfigure(0, weight=1)
-        frame.grid_columnconfigure(0, weight=1)
-
-        self.tabview = ctk.CTkTabview(frame)
-        self.tabview.grid(row=0, column=0, sticky="nsew")
-
-        self.general_tab = self.create_general_tab(self.tabview.add("general"))
-        self.model_tab = self.create_model_tab(self.tabview.add("model"))
-        self.data_tab = self.create_data_tab(self.tabview.add("data"))
-        self.concepts_tab = self.create_concepts_tab(self.tabview.add("concepts"))
-        self.training_tab = self.create_training_tab(self.tabview.add("training"))
-        self.sampling_tab = self.create_sampling_tab(self.tabview.add("sampling"))
-        self.backup_tab = self.create_backup_tab(self.tabview.add("backup"))
-        self.tools_tab = self.create_tools_tab(self.tabview.add("tools"))
-        self.additional_embeddings_tab = self.create_additional_embeddings_tab(self.tabview.add("additional embeddings"))
-        self.cloud_tab = self.create_cloud_tab(self.tabview.add("cloud"))
-
-        self.change_training_method(self.train_config.training_method)
-
-        return frame
-
-    def create_general_tab(self, master):
-        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, weight=1)
-        frame.grid_columnconfigure(2, weight=0)
-        frame.grid_columnconfigure(3, weight=1)
+    def _configure_general_frame(self, frame):
+        lo = pyside6_components._layout(frame)
+        lo.setColumnStretch(1, 1)
+        lo.setColumnStretch(3, 1)
         self.build_general_tab_content(frame, self.controller, self.ui_state)
-        frame.pack(fill="both", expand=1)
-        return frame
 
-    def create_model_tab(self, master):
-        return CtkModelTabView(master, ModelTabController(self.train_config), self.ui_state)
-
-    def create_data_tab(self, master):
-        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, weight=1)
-        frame.grid_columnconfigure(2, minsize=50)
-        frame.grid_columnconfigure(3, weight=0)
-        frame.grid_columnconfigure(4, weight=1)
+    def _configure_data_frame(self, frame):
+        lo = pyside6_components._layout(frame)
+        lo.setColumnStretch(1, 1)
+        lo.setColumnStretch(3, 1)
         self.build_data_tab_content(frame, self.controller, self.ui_state)
-        frame.pack(fill="both", expand=1)
-        return frame
 
-    def create_concepts_tab(self, master):
-        return CtkConceptTabView(master, ConceptTabController(self.train_config), self.ui_state)
+    def _configure_backup_frame(self, frame):
+        lo = pyside6_components._layout(frame)
+        lo.setColumnStretch(1, 1)
+        lo.setColumnStretch(3, 1)
+        self.build_backup_tab_content(frame, self.controller, self.ui_state)
 
-    def create_training_tab(self, master) -> CtkTrainingTabView:
-        return CtkTrainingTabView(master, TrainingTabController(self.train_config), self.ui_state)
+    def _configure_tools_frame(self, frame):
+        lo = pyside6_components._layout(frame)
+        lo.setColumnStretch(1, 1)
+        self.build_tools_tab_content(frame, self.controller, self.ui_state)
 
-    def create_cloud_tab(self, master) -> CtkCloudTabView:
-        return CtkCloudTabView(master, CloudTabController(self.train_config, parent=self), self.ui_state)
+    def _configure_embedding_frame(self, frame):
+        lo = pyside6_components._layout(frame)
+        lo.setColumnStretch(1, 1)
+        self.build_embedding_tab_content(frame, self.controller, self.ui_state)
 
-    def create_sampling_tab(self, master):
-        master.grid_rowconfigure(0, weight=0)
-        master.grid_rowconfigure(1, weight=1)
-        master.grid_columnconfigure(0, weight=1)
+    def _create_tabs(self):
+        general_page = self._create_scrollable_tab(self._configure_general_frame)
+        self.tabview.addTab(general_page, "general")
+        self._tab_widgets["general"] = general_page
 
-        top_frame = ctk.CTkFrame(master=master, corner_radius=0)
-        top_frame.grid(row=0, column=0, sticky="nsew")
-        sub_frame = ctk.CTkFrame(master=top_frame, corner_radius=0, fg_color="transparent")
-        sub_frame.grid(row=1, column=0, sticky="nsew", columnspan=6)
+        self.model_tab = PySide6ModelTabView(None, ModelTabController(self.train_config), self.ui_state)
+        self.tabview.addTab(self.model_tab, "model")
+        self._tab_widgets["model"] = self.model_tab
+
+        data_page = self._create_scrollable_tab(self._configure_data_frame)
+        self.tabview.addTab(data_page, "data")
+        self._tab_widgets["data"] = data_page
+
+        concepts_page = QWidget()
+        self.concepts_tab = PySide6ConceptTabView(concepts_page, ConceptTabController(self.train_config), self.ui_state)
+        self.tabview.addTab(concepts_page, "concepts")
+        self._tab_widgets["concepts"] = concepts_page
+
+        self.training_tab = PySide6TrainingTabView(None, TrainingTabController(self.train_config), self.ui_state)
+        self.tabview.addTab(self.training_tab, "training")
+        self._tab_widgets["training"] = self.training_tab
+
+        sampling_page = self.create_sampling_tab()
+        self.tabview.addTab(sampling_page, "sampling")
+        self._tab_widgets["sampling"] = sampling_page
+
+        backup_page = self._create_scrollable_tab(self._configure_backup_frame)
+        self.tabview.addTab(backup_page, "backup")
+        self._tab_widgets["backup"] = backup_page
+
+        tools_page = self._create_scrollable_tab(self._configure_tools_frame)
+        self.tabview.addTab(tools_page, "tools")
+        self._tab_widgets["tools"] = tools_page
+
+        additional_embeddings_page = QWidget()
+        self.additional_embeddings_tab = PySide6AdditionalEmbeddingsTabView(
+            additional_embeddings_page,
+            AdditionalEmbeddingsTabController(self.train_config),
+            self.ui_state,
+        )
+        self.tabview.addTab(additional_embeddings_page, "additional embeddings")
+        self._tab_widgets["additional embeddings"] = additional_embeddings_page
+
+        self.cloud_tab = PySide6CloudTabView(None, CloudTabController(self.train_config, self), self.ui_state)
+        self.tabview.addTab(self.cloud_tab, "cloud")
+        self._tab_widgets["cloud"] = self.cloud_tab
+
+    def create_sampling_tab(self):
+        tab_page = QWidget()
+        tab_lo = QGridLayout(tab_page)
+        tab_lo.setContentsMargins(0, 0, 0, 0)
+        tab_lo.setSpacing(0)
+        tab_lo.setRowStretch(0, 0)
+        tab_lo.setRowStretch(1, 1)
+        tab_lo.setColumnStretch(0, 1)
+
+        top_frame = QWidget(tab_page)
+        tab_lo.addWidget(top_frame, 0, 0)
+        top_lo = pyside6_components._layout(top_frame)
+        top_lo.setContentsMargins(pyside6_components.PAD, pyside6_components.PAD, pyside6_components.PAD, pyside6_components.PAD)
+        top_lo.setColumnStretch(8, 1)
+
+        sub_frame = QWidget(top_frame)
+        pyside6_components._layout(top_frame).addWidget(sub_frame, 1, 0, 1, 8)
 
         self.build_sampling_tab_header(top_frame, sub_frame, self.controller, self.ui_state)
+        pyside6_components._layout(sub_frame).setColumnStretch(4, 1)
 
-        frame = ctk.CTkFrame(master=master, corner_radius=0)
-        frame.grid(row=1, column=0, sticky="nsew")
+        sampling_container = QWidget(tab_page)
+        tab_lo.addWidget(sampling_container, 1, 0)
+        self.sampling_tab = PySide6SamplingTabView(
+            sampling_container, SamplingTabController(self.train_config), self.ui_state
+        )
 
-        return CtkSamplingTabView(frame, SamplingTabController(self.train_config), self.ui_state)
-
-    def create_backup_tab(self, master):
-        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, weight=1)
-        frame.grid_columnconfigure(2, minsize=50)
-        frame.grid_columnconfigure(3, weight=0)
-        frame.grid_columnconfigure(4, weight=1)
-        self.build_backup_tab_content(frame, self.controller, self.ui_state)
-        frame.pack(fill="both", expand=1)
-        return frame
-
-    def embedding_tab(self, master):
-        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, weight=1)
-        frame.grid_columnconfigure(2, minsize=50)
-        frame.grid_columnconfigure(3, weight=0)
-        frame.grid_columnconfigure(4, weight=1)
-        self.build_embedding_tab_content(frame, self.controller, self.ui_state)
-        frame.pack(fill="both", expand=1)
-        return frame
-
-    def create_additional_embeddings_tab(self, master):
-        return CtkAdditionalEmbeddingsTabView(master, AdditionalEmbeddingsTabController(self.train_config), self.ui_state)
-
-    def create_tools_tab(self, master):
-        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, weight=1)
-        frame.grid_columnconfigure(2, minsize=50)
-        frame.grid_columnconfigure(3, weight=0)
-        frame.grid_columnconfigure(4, weight=1)
-        self.build_tools_tab_content(frame, self.controller, self.ui_state)
-        frame.pack(fill="both", expand=1)
-        return frame
+        return tab_page
 
     def open_profiling_tool(self):
-        self.profiling_window.deiconify()
+        self.profiling_window.show()
 
     def change_model_type(self, model_type: ModelType):
         if self.model_tab:
             self.model_tab.refresh_ui()
-
         if self.training_tab:
             self.training_tab.refresh_ui()
-
         if self.lora_tab:
             self.lora_tab.refresh_ui()
 
@@ -369,45 +340,53 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
         if self.model_tab:
             self.model_tab.refresh_ui()
 
-        if training_method != TrainingMethod.LORA and "LoRA" in self.tabview._tab_dict:
-            self.tabview.delete("LoRA")
+        if training_method != TrainingMethod.LORA and 'LoRA' in self._tab_widgets:
+            self.tabview.removeTab(self.tabview.indexOf(self._tab_widgets['LoRA']))
+            del self._tab_widgets['LoRA']
             self.lora_tab = None
-        if training_method != TrainingMethod.EMBEDDING and "embedding" in self.tabview._tab_dict:
-            self.tabview.delete("embedding")
+        if training_method != TrainingMethod.EMBEDDING and 'embedding' in self._tab_widgets:
+            self.tabview.removeTab(self.tabview.indexOf(self._tab_widgets['embedding']))
+            del self._tab_widgets['embedding']
 
-        if training_method == TrainingMethod.LORA and "LoRA" not in self.tabview._tab_dict:
-            self.lora_tab = CtkLoraTabView(self.tabview.add("LoRA"), LoraTabController(self.train_config), self.ui_state)
-        if training_method == TrainingMethod.EMBEDDING and "embedding" not in self.tabview._tab_dict:
-            self.embedding_tab(self.tabview.add("embedding"))
+        if training_method == TrainingMethod.LORA and 'LoRA' not in self._tab_widgets:
+            self.lora_tab = PySide6LoraTabView(None, LoraTabController(self.train_config), self.ui_state)
+            self.tabview.addTab(self.lora_tab, 'LoRA')
+            self._tab_widgets['LoRA'] = self.lora_tab
+        if training_method == TrainingMethod.EMBEDDING and 'embedding' not in self._tab_widgets:
+            tab_page = self._create_scrollable_tab(self._configure_embedding_frame)
+            self.tabview.addTab(tab_page, 'embedding')
+            self._tab_widgets['embedding'] = tab_page
 
     def load_preset(self):
-        if not self.tabview:
-            return
-
         if self.additional_embeddings_tab:
             self.additional_embeddings_tab.refresh_ui()
 
     def _set_training_button_style(self, mode: str):
         if not self.training_button:
             return
-        style = self._TRAIN_BUTTON_STYLES.get(mode)
-        if not style:
-            return
-        self.training_button.configure(**style)
+        styles = {
+            "idle":     ("Start Training", True,  "#198754", "white"),
+            "running":  ("Stop Training",  True,  "#dc3545", "white"),
+            "stopping": ("Stopping...",    False, "#dc3545", "white"),
+        }
+        text, enabled, bg, fg = styles.get(mode, ("Start Training", True, "#198754", "white"))
+        self.training_button.setText(text)
+        self.training_button.setEnabled(enabled)
+        self.training_button.setStyleSheet(
+            f"QPushButton {{ background-color: {bg}; color: {fg}; }}"
+            f"QPushButton:disabled {{ background-color: {bg}; color: {fg}; }}"
+        )
 
     def export_training(self):
-        file_path = filedialog.asksaveasfilename(filetypes=[
-            ("All Files", "*.*"),
-            ("json", "*.json"),
-        ], initialdir=".", initialfile="config.json")
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Export Training Config", "config.json",
+            "JSON Files (*.json);;All Files (*.*)"
+        )
         if file_path:
             self.controller.export_training(file_path)
 
     def generate_debug_package(self):
-        zip_path = filedialog.askdirectory(
-            initialdir=".",
-            title="Select Directory to Save Debug Package"
-        )
-        if not zip_path:
+        dir_path = QFileDialog.getExistingDirectory(self, "Select Directory to Save Debug Package", ".")
+        if not dir_path:
             return
-        self.controller.generate_debug_package(Path(zip_path) / "OneTrainer_debug_report.zip")
+        self.controller.generate_debug_package(Path(dir_path) / "OneTrainer_debug_report.zip")

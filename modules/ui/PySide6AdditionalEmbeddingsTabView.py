@@ -1,17 +1,16 @@
-
 from modules.ui.AdditionalEmbeddingsTabController import AdditionalEmbeddingsTabController
 from modules.ui.BaseAdditionalEmbeddingsTabView import BaseAdditionalEmbeddingsTabView, BaseEmbeddingWidgetView
-from modules.ui.CtkConfigListView import CtkConfigListView
-from modules.util.ui import ctk_components
-from modules.util.ui.CtkUIState import CtkUIState
+from modules.ui.PySide6ConfigListView import PySide6ConfigListView
+from modules.util.ui import pyside6_components
+from modules.util.ui.PySide6UIState import PySide6UIState
 
-import customtkinter as ctk
+from PySide6.QtWidgets import QWidget
 
 
-class CtkAdditionalEmbeddingsTabView(CtkConfigListView, BaseAdditionalEmbeddingsTabView):
+class PySide6AdditionalEmbeddingsTabView(PySide6ConfigListView, BaseAdditionalEmbeddingsTabView):
 
     def __init__(self, master, controller: AdditionalEmbeddingsTabController, ui_state):
-        CtkConfigListView.__init__(
+        PySide6ConfigListView.__init__(
             self, master, controller, ui_state,
             attr_name="additional_embeddings",
             enable_key="train",
@@ -22,30 +21,34 @@ class CtkAdditionalEmbeddingsTabView(CtkConfigListView, BaseAdditionalEmbeddings
         )
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        return CtkEmbeddingWidgetView(master, element, i, open_command, remove_command, clone_command, save_command, self.controller)
+        return PySide6EmbeddingWidgetView(master, element, i, open_command, remove_command, clone_command, save_command, self.controller)
 
 
-class CtkEmbeddingWidgetView(BaseEmbeddingWidgetView, ctk.CTkFrame):
+class PySide6EmbeddingWidgetView(BaseEmbeddingWidgetView, QWidget):
 
     def __init__(self, master, element, i, open_command, remove_command, clone_command, save_command, controller):
-        ctk.CTkFrame.__init__(self, master=master, corner_radius=10, bg_color="transparent")
-        BaseEmbeddingWidgetView.__init__(self, ctk_components)
+        QWidget.__init__(self, master)
+        BaseEmbeddingWidgetView.__init__(self, pyside6_components)
 
         self.element = element
-        ui_state = CtkUIState(self, element)
+        ui_state = PySide6UIState(element)
 
-        self.grid_columnconfigure(0, weight=1)
+        pyside6_components._layout(self).setColumnStretch(0, 1)
 
-        top_frame = ctk.CTkFrame(master=self, corner_radius=0, fg_color="transparent")
-        top_frame.grid(row=0, column=0, sticky="nsew")
-        top_frame.grid_columnconfigure(3, weight=1)
-        top_frame.grid_columnconfigure(5, weight=1)
+        top_frame = QWidget(self)
+        pyside6_components._layout(top_frame).setColumnStretch(3, 1)
+        pyside6_components._layout(top_frame).setColumnStretch(5, 1)
+        pyside6_components._layout(self).addWidget(top_frame, 0, 0)
 
-        bottom_frame = ctk.CTkFrame(master=self, corner_radius=0, fg_color="transparent")
-        bottom_frame.grid(row=1, column=0, sticky="nsew")
-        bottom_frame.grid_columnconfigure(7, weight=1)
+        bottom_frame = QWidget(self)
+        pyside6_components._layout(bottom_frame).setColumnStretch(7, 1)
+        pyside6_components._layout(self).addWidget(bottom_frame, 1, 0)
 
         self.build_content(top_frame, bottom_frame, ui_state, i, save_command, remove_command, clone_command, controller)
 
     def place_in_list(self):
-        self.grid(row=self.i, column=0, pady=5, padx=5, sticky="new")
+        pyside6_components._layout(self.parent()).addWidget(self, getattr(self, 'visible_index', self.i), 0)
+        self.show()
+
+    def destroy(self):
+        self.deleteLater()

@@ -1,66 +1,54 @@
-import contextlib
-from tkinter import TclError
-
 from modules.ui.BaseOptimizerParamsWindowView import BaseOptimizerParamsWindowView
-from modules.ui.CtkMuonAdamWindowView import CtkMuonAdamWindowView
 from modules.ui.MuonAdamWindowController import MuonAdamWindowController
 from modules.ui.OptimizerParamsWindowController import OptimizerParamsWindowController
-from modules.util.ui import ctk_components
-from modules.util.ui.CtkUIState import CtkUIState
-from modules.util.ui.ui_utils import set_window_icon
+from modules.ui.PySide6MuonAdamWindowView import PySide6MuonAdamWindowView
+from modules.util.ui import pyside6_components
+from modules.util.ui.PySide6UIState import PySide6UIState
 
-import customtkinter as ctk
+from PySide6.QtWidgets import QDialog, QGridLayout, QPushButton, QWidget
 
 
-class CtkOptimizerParamsWindowView(BaseOptimizerParamsWindowView, ctk.CTkToplevel):
-    def __init__(self, parent, controller: OptimizerParamsWindowController, ui_state, *args, **kwargs):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
-        BaseOptimizerParamsWindowView.__init__(self, ctk_components)
+class PySide6OptimizerParamsWindowView(BaseOptimizerParamsWindowView, QDialog):
+    def __init__(self, parent, controller: OptimizerParamsWindowController, ui_state):
+        QDialog.__init__(self, parent)
+        BaseOptimizerParamsWindowView.__init__(self, pyside6_components)
 
         self.controller = controller
         self.ui_state = ui_state
         self.optimizer_ui_state = ui_state.get_var("optimizer")
         self.muon_adam_button = None
-        self.protocol("WM_DELETE_WINDOW", self.on_window_close)
+        self._dynamic_frame = None
 
-        self.title("Optimizer Settings")
-        self.geometry("800x500")
-        self.resizable(True, True)
+        self.setWindowTitle("Optimizer Settings")
+        self.resize(800, 500)
 
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=0)
-        self.grid_columnconfigure(0, weight=1)
+        outer = QGridLayout(self)
+        outer.setRowStretch(0, 1)
 
-        self.frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        scroll, self._frame = pyside6_components.scrollable_frame(self)
+        lo = pyside6_components._layout(self._frame)
+        lo.setColumnStretch(1, 1)
+        lo.setColumnMinimumWidth(2, 50)
+        lo.setColumnStretch(4, 1)
+        outer.addWidget(scroll, 0, 0)
 
-        self.frame.grid_columnconfigure(0, weight=0)
-        self.frame.grid_columnconfigure(1, weight=1)
-        self.frame.grid_columnconfigure(2, minsize=50)
-        self.frame.grid_columnconfigure(3, weight=0)
-        self.frame.grid_columnconfigure(4, weight=1)
+        ok = QPushButton("ok", self)
+        ok.clicked.connect(self._on_close)
+        outer.addWidget(ok, 1, 0)
 
-        self.components.button(self, 1, 0, "ok", command=self.on_window_close)
-        self.build_content(self.frame, controller, ui_state, self.optimizer_ui_state,
+        self.build_content(self._frame, controller, ui_state, self.optimizer_ui_state,
                            self.on_optimizer_change, self._load_defaults)
         self._rebuild_dynamic_ui()
 
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
-        self.after(200, lambda: set_window_icon(self))
 
     def _rebuild_dynamic_ui(self):
-        with contextlib.suppress(TclError):
-            for widget in self.frame.winfo_children():
-                grid_info = widget.grid_info()
-                if int(grid_info["row"]) >= 1:
-                    widget.destroy()
+        if self._dynamic_frame is not None:
+            self._dynamic_frame.setParent(None)
 
-        if not self.winfo_exists():
-            return
+        self._dynamic_frame = QWidget(self._frame)
+        pyside6_components._layout(self._frame).addWidget(self._dynamic_frame, 1, 0, 1, 5)
 
-        self.build_dynamic_content(self.frame, self.controller, self.optimizer_ui_state,
+        self.build_dynamic_content(self._dynamic_frame, self.controller, self.optimizer_ui_state,
                                    self.update_user_pref, self.open_muon_adam_window)
         self.toggle_muon_adam_button()
 
@@ -75,17 +63,17 @@ class CtkOptimizerParamsWindowView(BaseOptimizerParamsWindowView, ctk.CTkTopleve
     def _load_defaults(self, *args):
         self.controller.load_defaults(self.ui_state)
 
-    def on_window_close(self):
-        self.destroy()
+    def _on_close(self):
+        self.controller.on_close()
+        self.accept()
 
     def toggle_muon_adam_button(self):
-        if self.muon_adam_button and self.muon_adam_button.winfo_exists():
+        if self.muon_adam_button is not None:
             muon_with_adam = self.optimizer_ui_state.get_var("MuonWithAuxAdam").get()
-            self.muon_adam_button.configure(state="normal" if muon_with_adam else "disabled")
+            self.muon_adam_button.setEnabled(bool(muon_with_adam))
 
     def open_muon_adam_window(self):
         adam_config, current_optimizer = self.controller.prepare_muon_adam_config()
-        temp_adam_ui_state = CtkUIState(self, adam_config)
-        window = CtkMuonAdamWindowView(self, MuonAdamWindowController(self.controller.config, current_optimizer), temp_adam_ui_state)
-        self.wait_window(window)
+        adam_ui_state = PySide6UIState(adam_config)
+        PySide6MuonAdamWindowView(self, MuonAdamWindowController(self.controller.config, current_optimizer), adam_ui_state).exec()
         self.controller.save_muon_adam_config(adam_config)

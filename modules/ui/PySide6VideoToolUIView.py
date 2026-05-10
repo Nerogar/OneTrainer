@@ -1,128 +1,155 @@
-from tkinter import filedialog
-
 from modules.ui.BaseVideoToolUIView import BaseVideoToolUIView
 from modules.ui.VideoToolUIController import VideoToolUIController
 from modules.util.image_util import load_image
-from modules.util.ui import ctk_components
-from modules.util.ui.CtkUIState import CtkUIState
+from modules.util.ui import pyside6_components
+from modules.util.ui.pyside6_abc import QtABCMeta
+from modules.util.ui.PySide6UIState import PySide6UIState
 
-import customtkinter as ctk
+from PIL.ImageQt import ImageQt
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import (
+    QDialog,
+    QFileDialog,
+    QGridLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QTabWidget,
+    QTextEdit,
+    QWidget,
+)
 
-PAD = ctk_components.PAD
+_PAD = pyside6_components.PAD
 
 
-class CtkVideoToolUIView(BaseVideoToolUIView, ctk.CTkToplevel):
-    def __init__(self, parent, controller: VideoToolUIController, *args, **kwargs):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
-        BaseVideoToolUIView.__init__(self, ctk_components)
+class PySide6VideoToolUIView(BaseVideoToolUIView, QDialog, metaclass=QtABCMeta):
+    def __init__(self, parent, controller: VideoToolUIController):
+        QDialog.__init__(self, parent)
+        BaseVideoToolUIView.__init__(self, pyside6_components)
 
         self.controller = controller
-        ui_state = CtkUIState(self, controller.args)
+        self._status_box: QTextEdit | None = None
+        self._preview_label: QLabel | None = None
+        self._preview_caption_label: QLabel | None = None
 
-        self.title("Video Tools")
-        self.geometry("600x720")
-        self.resizable(True, True)
-        self.wait_visibility()
-        self.focus_set()
+        ui_state = PySide6UIState(controller.args)
 
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=0)
-        self.grid_columnconfigure(0, weight=1)
+        self.setWindowTitle("Video Tools")
+        self.resize(700, 750)
 
-        tabview = ctk.CTkTabview(self)
-        tabview.grid(row=0, column=0, sticky="nsew")
+        outer = QGridLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        outer.setRowStretch(0, 1)
+        outer.setRowStretch(1, 0)
 
-        clip_frame = ctk.CTkScrollableFrame(tabview.add("extract clips"), fg_color="transparent")
-        clip_frame.grid_columnconfigure(0, weight=0, minsize=120)
-        clip_frame.grid_columnconfigure(1, weight=0, minsize=200)
-        clip_frame.grid_columnconfigure(2, weight=0)
-        clip_frame.grid_columnconfigure(3, weight=1)
-        self.build_clip_extract_tab(clip_frame, controller, ui_state)
-        clip_frame.pack(fill="both", expand=1)
+        tabs = QTabWidget(self)
+        outer.addWidget(tabs, 0, 0)
 
-        image_frame = ctk.CTkScrollableFrame(tabview.add("extract images"), fg_color="transparent")
-        image_frame.grid_columnconfigure(0, weight=0, minsize=120)
-        image_frame.grid_columnconfigure(1, weight=0, minsize=200)
-        image_frame.grid_columnconfigure(2, weight=0)
-        image_frame.grid_columnconfigure(3, weight=1)
-        self.build_image_extract_tab(image_frame, controller, ui_state)
-        image_frame.pack(fill="both", expand=1)
+        for name, build_fn in [
+            ("extract clips", self.build_clip_extract_tab),
+            ("extract images", self.build_image_extract_tab),
+            ("download", self.build_video_download_tab),
+        ]:
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            frame = QWidget()
+            scroll.setWidget(frame)
+            lo = pyside6_components._layout(frame)
+            lo.setContentsMargins(_PAD, _PAD, _PAD, _PAD)
+            lo.setColumnMinimumWidth(0, 120)
+            lo.setColumnStretch(3, 1)
+            build_fn(frame, controller, ui_state)
+            lo.setRowStretch(lo.rowCount(), 1)
+            tabs.addTab(scroll, name)
 
-        download_frame = ctk.CTkScrollableFrame(tabview.add("download"), fg_color="transparent")
-        download_frame.grid_columnconfigure(0, weight=0, minsize=120)
-        download_frame.grid_columnconfigure(1, weight=0, minsize=200)
-        download_frame.grid_columnconfigure(2, weight=0)
-        download_frame.grid_columnconfigure(3, weight=1)
-        self.build_video_download_tab(download_frame, controller, ui_state)
-        download_frame.pack(fill="both", expand=1)
+        outer.addWidget(self._build_status_bar(), 1, 0)
 
-        self._build_status_bar(self)
+    def _build_status_bar(self):
+        frame = QWidget(self)
+        lo = QGridLayout(frame)
+        lo.setColumnMinimumWidth(0, 160)
+        lo.setColumnStretch(2, 1)
 
-    def _build_status_bar(self, master):
-        frame = ctk.CTkFrame(master, fg_color="transparent")
-        frame.grid(row=1, column=0)
-        frame.grid_columnconfigure(0, weight=0, minsize=160)
-        frame.grid_columnconfigure(1, weight=0, minsize=300)
-        frame.grid_columnconfigure(2, weight=1)
-
-        preview_path = "resources/icons/icon.png"
-        preview = load_image(preview_path, 'RGB')
+        self._preview_label = QLabel(frame)
+        self._preview_label.setFixedSize(150, 150)
+        preview = load_image("resources/icons/icon.png", 'RGB')
         preview.thumbnail((150, 150))
-        self.preview_image = ctk.CTkImage(light_image=preview, size=preview.size)
-        self.preview_image_label = ctk.CTkLabel(
-            master=frame, text="Preview image", image=self.preview_image, height=150, width=150,
-            compound="top")
-        self.preview_image_label.grid(row=0, column=0, sticky="nw", padx=5, pady=5)
+        self._preview_label.setPixmap(
+            QPixmap.fromImage(ImageQt(preview.convert("RGBA"))).scaled(
+                150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+        )
+        self._preview_caption_label = QLabel("Preview image", frame)
+        self._preview_caption_label.setWordWrap(True)
 
-        self.status_label = ctk.CTkTextbox(master=frame, width=400, height=160, wrap="word", border_width=2)
-        self.status_label.insert(index="1.0", text="Current status")
-        self.status_label.configure(state="disabled")
-        self.status_label.grid(row=0, column=1, sticky="ne", padx=5, pady=5)
+        preview_col = QWidget(frame)
+        preview_lo = QGridLayout(preview_col)
+        preview_lo.setContentsMargins(0, 0, 0, 0)
+        preview_lo.addWidget(self._preview_label, 0, 0, Qt.AlignTop)
+        preview_lo.addWidget(self._preview_caption_label, 1, 0, Qt.AlignTop)
+        lo.addWidget(preview_col, 0, 0, Qt.AlignTop | Qt.AlignLeft)
+
+        self._status_box = QTextEdit(frame)
+        self._status_box.setReadOnly(True)
+        self._status_box.setFixedHeight(160)
+        self._status_box.setMinimumWidth(300)
+        self._status_box.setPlainText("Current status")
+        lo.addWidget(self._status_box, 0, 1, Qt.AlignTop)
+
+        return frame
+
+    # --- abstract method implementations ---
 
     def _create_textbox(self, master, row, col, width, height, ui_state, var_name):
         var = ui_state.get_var(var_name)
-        textbox = ctk.CTkTextbox(master, width=width, height=height, border_width=2)
-        textbox.insert("1.0", var.get())
-        textbox.grid(row=row, column=col, rowspan=2, sticky="w", padx=PAD, pady=PAD)
-
-        def on_text_change(event=None):
-            var.set(textbox.get("1.0", "end-1c"))
-
-        textbox.bind("<KeyRelease>", on_text_change)
-        return textbox
+        widget = QTextEdit(master)
+        widget.setFixedHeight(height)
+        widget.setMinimumWidth(width)
+        widget.setPlainText(var.get())
+        pyside6_components._add(
+            pyside6_components._layout(master), widget, row, col, sticky="w", rowspan=2
+        )
+        widget.textChanged.connect(lambda: var.set(widget.toPlainText()))
+        return widget
 
     def _create_browse_dir_button(self, master, row, ui_state, var_name):
         def browse():
-            path = filedialog.askdirectory()
+            path = QFileDialog.getExistingDirectory(self, "Select Directory")
             if path:
                 ui_state.get_var(var_name).set(path)
-            self.focus_set()
 
-        button = ctk.CTkButton(master, width=30, text="...", command=browse)
-        button.grid(row=row, column=1, sticky="e", padx=PAD, pady=PAD)
+        button = QPushButton("...", master)
+        button.setMaximumWidth(30)
+        button.clicked.connect(browse)
+        pyside6_components._add(pyside6_components._layout(master), button, row, 1, sticky="e")
         return button
 
     def _create_browse_file_button(self, master, row, ui_state, var_name, filetypes):
         def browse():
-            path = filedialog.askopenfilename(filetypes=filetypes)
+            filters = ";;".join(f"{label} ({pattern})" for label, pattern in filetypes)
+            path, _ = QFileDialog.getOpenFileName(self, "Select File", filter=filters)
             if path:
                 ui_state.get_var(var_name).set(path)
-            self.focus_set()
 
-        button = ctk.CTkButton(master, width=30, text="...", command=browse)
-        button.grid(row=row, column=1, sticky="e", padx=PAD, pady=PAD)
+        button = QPushButton("...", master)
+        button.setMaximumWidth(30)
+        button.clicked.connect(browse)
+        pyside6_components._add(pyside6_components._layout(master), button, row, 1, sticky="e")
         return button
 
+    # --- view interface ---
+
     def update_status(self, status_text: str):
-        self.status_label.configure(state="normal")
-        self.status_label.insert(index="end", text=status_text + "\n")
-        self.status_label.configure(state="disabled")
+        self._status_box.append(status_text)
 
     def clear_status(self):
-        self.status_label.configure(state="normal")
-        self.status_label.delete(index1="1.0", index2="end")
-        self.status_label.configure(state="disabled")
+        self._status_box.clear()
 
     def update_preview(self, preview_image, label_text: str):
-        self.preview_image.configure(light_image=preview_image, size=preview_image.size)
-        self.preview_image_label.configure(text=label_text)
+        pixmap = QPixmap.fromImage(ImageQt(preview_image.convert("RGBA")))
+        self._preview_label.setPixmap(
+            pixmap.scaled(150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        )
+        self._preview_caption_label.setText(label_text)
