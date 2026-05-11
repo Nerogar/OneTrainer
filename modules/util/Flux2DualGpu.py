@@ -115,9 +115,14 @@ def distribute_flux2_transformer(transformer: nn.Module) -> None:
     transformer.norm_out.to(cuda0)
     transformer.proj_out.to(cuda0)
 
-    transformer.single_transformer_blocks[split_at].register_forward_pre_hook(
-        _make_device_bridge_hook(cuda1), with_kwargs=True
-    )
+    # Per-block pre-hook: every single_transformer_block on cuda:1
+    # needs its args moved (temb is shared across the loop, so only
+    # hooking the boundary block leaves temb on cuda:0 for subsequent
+    # blocks).
+    for block in transformer.single_transformer_blocks[split_at:]:
+        block.register_forward_pre_hook(
+            _make_device_bridge_hook(cuda1), with_kwargs=True
+        )
     transformer.norm_out.register_forward_pre_hook(
         _make_device_bridge_hook(cuda0), with_kwargs=True
     )

@@ -121,6 +121,14 @@ class Flux2Model(BaseModel):
         self.vae.to(device=device)
 
     def text_encoder_to(self, device: torch.device):
+        # FLUX2_DUAL_GPU=true: text encoder runs on CPU to avoid
+        # contending with the transformer split that's already
+        # occupying cuda:0. Mistral is frozen during LoRA training
+        # and only encodes captions once before caching, so CPU is
+        # fine performance-wise.
+        import os as _os
+        if _os.environ.get("FLUX2_DUAL_GPU", "false").lower() == "true":
+            device = torch.device("cpu")
         if self.text_encoder is not None:
             if self.text_encoder_offload_conductor is not None and \
                     self.text_encoder_offload_conductor.layer_offload_activated():
