@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
-from modules.util.path_util import supported_image_extensions
+from modules.util.path_util import supported_image_extensions, supported_video_extensions
 from modules.util.ui.pyside6_validation import PySide6FieldValidator, PySide6PathValidator
 from modules.util.ui.UIState import BaseUIState
 from modules.util.ui.validation import DEFAULT_MAX_UNDO
@@ -221,6 +221,7 @@ def path_entry(
         path_modifier: Callable[[str], str | Path] | None = None,
         allow_model_files: bool = True,
         allow_image_files: bool = False,
+        allow_video_files: bool = False,
         command: Callable[[str], None] | None = None,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
@@ -287,6 +288,9 @@ def path_entry(
             if allow_image_files:
                 exts = " ".join(f"*.{x}" for x in supported_image_extensions())
                 filters.append(f"Image ({exts})")
+            if allow_video_files:
+                exts = " ".join(f"*{e}" for e in supported_video_extensions())
+                filters.append(f"Video ({exts})")
             filter_str = ";;".join(filters)
             init_path = str(Path(current_dir) / current_filename) if current_filename else current_dir
 
