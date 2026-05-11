@@ -1,5 +1,3 @@
-from tkinter import filedialog
-
 from modules.ui.BaseVideoToolUIView import BaseVideoToolUIView
 from modules.ui.VideoToolUIController import VideoToolUIController
 from modules.util.image_util import load_image
@@ -90,28 +88,6 @@ class CtkVideoToolUIView(BaseVideoToolUIView, ctk.CTkToplevel):
 
         textbox.bind("<KeyRelease>", on_text_change)
         return textbox
-
-    def _create_browse_dir_button(self, master, row, ui_state, var_name):
-        def browse():
-            path = filedialog.askdirectory()
-            if path:
-                ui_state.get_var(var_name).set(path)
-            self.focus_set()
-
-        button = ctk.CTkButton(master, width=30, text="...", command=browse)
-        button.grid(row=row, column=1, sticky="e", padx=PAD, pady=PAD)
-        return button
-
-    def _create_browse_file_button(self, master, row, ui_state, var_name, filetypes):
-        def browse():
-            path = filedialog.askopenfilename(filetypes=filetypes)
-            if path:
-                ui_state.get_var(var_name).set(path)
-            self.focus_set()
-
-        button = ctk.CTkButton(master, width=30, text="...", command=browse)
-        button.grid(row=row, column=1, sticky="e", padx=PAD, pady=PAD)
-        return button
 
     def update_status(self, status_text: str):
         self.status_label.configure(state="normal")
