@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
-from modules.util.path_util import supported_image_extensions
+from modules.util.path_util import supported_image_extensions, supported_video_extensions
 from modules.util.ui.ctk_validation import DEFAULT_MAX_UNDO, FieldValidator, PathValidator
 from modules.util.ui.CtkUIState import CtkUIState
 from modules.util.ui.ToolTip import ToolTip
@@ -118,6 +118,7 @@ def path_entry(
         path_modifier: Callable[[str], str | Path] | None = None,
         allow_model_files: bool = True,
         allow_image_files: bool = False,
+        allow_video_files: bool = False,
         command: Callable[[str], None] | None = None,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
@@ -180,6 +181,10 @@ def path_entry(
             if allow_image_files:
                 filetypes.extend([
                     ("Image", ' '.join([f"*.{x}" for x in supported_image_extensions()])),
+                ])
+            if allow_video_files:
+                filetypes.extend([
+                    ("Video", ' '.join(f"*{e}" for e in supported_video_extensions())),
                 ])
 
             if use_save_dialog:

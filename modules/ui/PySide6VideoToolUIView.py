@@ -10,10 +10,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QDialog,
-    QFileDialog,
     QGridLayout,
     QLabel,
-    QPushButton,
     QScrollArea,
     QTabWidget,
     QTextEdit,
@@ -113,33 +111,6 @@ class PySide6VideoToolUIView(BaseVideoToolUIView, QDialog, metaclass=QtABCMeta):
         )
         widget.textChanged.connect(lambda: var.set(widget.toPlainText()))
         return widget
-
-    def _create_browse_dir_button(self, master, row, ui_state, var_name):
-        def browse():
-            path = QFileDialog.getExistingDirectory(self, "Select Directory")
-            if path:
-                ui_state.get_var(var_name).set(path)
-
-        button = QPushButton("...", master)
-        button.setMaximumWidth(30)
-        button.clicked.connect(browse)
-        pyside6_components._add(pyside6_components._layout(master), button, row, 1, sticky="e")
-        return button
-
-    def _create_browse_file_button(self, master, row, ui_state, var_name, filetypes):
-        def browse():
-            filters = ";;".join(f"{label} ({pattern})" for label, pattern in filetypes)
-            path, _ = QFileDialog.getOpenFileName(self, "Select File", filter=filters)
-            if path:
-                ui_state.get_var(var_name).set(path)
-
-        button = QPushButton("...", master)
-        button.setMaximumWidth(30)
-        button.clicked.connect(browse)
-        pyside6_components._add(pyside6_components._layout(master), button, row, 1, sticky="e")
-        return button
-
-    # --- view interface ---
 
     def update_status(self, status_text: str):
         self._status_box.append(status_text)
