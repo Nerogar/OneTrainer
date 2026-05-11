@@ -129,6 +129,24 @@ class Flux2Model(BaseModel):
                 self.text_encoder.to(device=device)
 
     def transformer_to(self, device: torch.device):
+        # FLUX2_DUAL_GPU=true: split the transformer across cuda:0 and
+        # cuda:1 instead of moving it to a single device. The caller-
+        # provided `device` is ignored in this path (the layout uses
+        # cuda:0 + cuda:1 explicitly). Mutually exclusive with the
+        # LayerOffloadConductor; enforced inside distribute_flux2_transformer
+        # via the offload-conductor mutex check.
+        from modules.util.Flux2DualGpu import (
+            assert_no_layer_offload,
+            distribute_flux2_transformer,
+            is_dual_gpu_enabled,
+            route_lora_to_wrapped_devices,
+        )
+        if is_dual_gpu_enabled():
+            assert_no_layer_offload(self.transformer_offload_conductor)
+            distribute_flux2_transformer(self.transformer)
+            route_lora_to_wrapped_devices(self.transformer_lora)
+            return
+
         if self.transformer_offload_conductor is not None and \
                 self.transformer_offload_conductor.layer_offload_activated():
             self.transformer_offload_conductor.to(device)
