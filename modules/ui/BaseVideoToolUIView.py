@@ -1,8 +1,6 @@
 import webbrowser
 from abc import ABC, abstractmethod
 
-from modules.util.path_util import SUPPORTED_VIDEO_EXTENSIONS
-
 
 class BaseVideoToolUIView(ABC):
     def __init__(self, components):
@@ -12,9 +10,8 @@ class BaseVideoToolUIView(ABC):
         # single video
         self.components.label(frame, 0, 0, "Single Video",
                          tooltip="Link to single video file to process.")
-        self.components.entry(frame, 0, 1, ui_state, "clip_single", width=190)
-        self._create_browse_file_button(frame, 0, ui_state, "clip_single",
-                                        [("Video files", " ".join(f"*{e}" for e in SUPPORTED_VIDEO_EXTENSIONS))])
+        self.components.path_entry(frame, 0, 1, ui_state, "clip_single",
+                               mode="file", allow_model_files=False, allow_video_files=True)
         self.components.button(frame, 0, 2, "Extract Single",
                           command=lambda: self._extract_clips(False, controller))
 
@@ -28,16 +25,14 @@ class BaseVideoToolUIView(ABC):
         # directory of videos
         self.components.label(frame, 2, 0, "Directory",
                          tooltip="Path to directory with multiple videos to process, including in subdirectories.")
-        self.components.entry(frame, 2, 1, ui_state, "clip_list", width=190)
-        self._create_browse_dir_button(frame, 2, ui_state, "clip_list")
+        self.components.path_entry(frame, 2, 1, ui_state, "clip_list", mode="dir")
         self.components.button(frame, 2, 2, "Extract Directory",
                           command=lambda: self._extract_clips(True, controller))
 
         # output directory
         self.components.label(frame, 3, 0, "Output",
                          tooltip="Path to folder where extracted clips will be saved.")
-        self.components.entry(frame, 3, 1, ui_state, "clip_output", width=190)
-        self._create_browse_dir_button(frame, 3, ui_state, "clip_output")
+        self.components.path_entry(frame, 3, 1, ui_state, "clip_output", mode="dir")
 
         # output to subdirectories
         self.components.label(frame, 4, 0, "Output to\nSubdirectories",
@@ -76,9 +71,8 @@ class BaseVideoToolUIView(ABC):
         # single video
         self.components.label(frame, 0, 0, "Single Video",
                          tooltip="Link to single video file to process.")
-        self.components.entry(frame, 0, 1, ui_state, "image_single", width=190)
-        self._create_browse_file_button(frame, 0, ui_state, "image_single",
-                                        [("Video files", " ".join(f"*{e}" for e in SUPPORTED_VIDEO_EXTENSIONS))])
+        self.components.path_entry(frame, 0, 1, ui_state, "image_single",
+                               mode="file", allow_model_files=False, allow_video_files=True)
         self.components.button(frame, 0, 2, "Extract Single",
                           command=lambda: self._extract_images(False, controller))
 
@@ -92,16 +86,14 @@ class BaseVideoToolUIView(ABC):
         # directory of videos
         self.components.label(frame, 2, 0, "Directory",
                          tooltip="Path to directory with multiple videos to process, including in subdirectories.")
-        self.components.entry(frame, 2, 1, ui_state, "image_list", width=190)
-        self._create_browse_dir_button(frame, 2, ui_state, "image_list")
+        self.components.path_entry(frame, 2, 1, ui_state, "image_list", mode="dir")
         self.components.button(frame, 2, 2, "Extract Directory",
                           command=lambda: self._extract_images(True, controller))
 
         # output directory
         self.components.label(frame, 3, 0, "Output",
                          tooltip="Path to folder where extracted images will be saved.")
-        self.components.entry(frame, 3, 1, ui_state, "image_output", width=190)
-        self._create_browse_dir_button(frame, 3, ui_state, "image_output")
+        self.components.path_entry(frame, 3, 1, ui_state, "image_output", mode="dir")
 
         # output to subdirectories
         self.components.label(frame, 4, 0, "Output to\nSubdirectories",
@@ -143,16 +135,15 @@ class BaseVideoToolUIView(ABC):
         # link list
         self.components.label(frame, 1, 0, "Link List",
                          tooltip="Path to txt file with list of links separated by newlines.")
-        self.components.entry(frame, 1, 1, ui_state, "download_list", width=190)
-        self._create_browse_file_button(frame, 1, ui_state, "download_list", [("Text file", ".txt")])
+        self.components.path_entry(frame, 1, 1, ui_state, "download_list",
+                               mode="file", allow_model_files=False)
         self.components.button(frame, 1, 2, "Download List",
                           command=lambda: self._download(True, controller))
 
         # output directory
         self.components.label(frame, 2, 0, "Output",
                          tooltip="Path to folder where downloaded videos will be saved.")
-        self.components.entry(frame, 2, 1, ui_state, "download_output", width=190)
-        self._create_browse_dir_button(frame, 2, ui_state, "download_output")
+        self.components.path_entry(frame, 2, 1, ui_state, "download_output", mode="dir")
 
         # additional args
         self.components.label(frame, 3, 0, "Additional Args",
@@ -164,14 +155,6 @@ class BaseVideoToolUIView(ABC):
 
     @abstractmethod
     def _create_textbox(self, master, row, col, width, height, ui_state, var_name):
-        pass
-
-    @abstractmethod
-    def _create_browse_dir_button(self, master, row, ui_state, var_name):
-        pass
-
-    @abstractmethod
-    def _create_browse_file_button(self, master, row, ui_state, var_name, filetypes):
         pass
 
     @abstractmethod
