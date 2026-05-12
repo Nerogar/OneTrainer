@@ -24,12 +24,12 @@ class SDConfigModelLoaderMixin(metaclass=ABCMeta):
         yaml_name = None
 
         if base_model_name:
-            new_yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
+            new_yaml_name = os.path.splitext(os.path.basename(base_model_name))[0] + '.yaml'
             if os.path.exists(new_yaml_name):
                 yaml_name = new_yaml_name
 
             if not yaml_name:
-                new_yaml_name = os.path.splitext(base_model_name)[0] + '.yml'
+                new_yaml_name = os.path.splitext(os.path.basename(base_model_name))[0] + '.yml'
                 if os.path.exists(new_yaml_name):
                     yaml_name = new_yaml_name
 
