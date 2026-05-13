@@ -532,7 +532,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "stochastic_rounding": True,
         "compile": False,
         "fused_back_pass": False,
-        "cautious_mask": False,
         "orthogonal_gradient": False,
         "auto_kappa_p": True,
     },
