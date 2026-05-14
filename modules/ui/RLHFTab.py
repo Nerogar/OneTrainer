@@ -86,8 +86,10 @@ class RLHFTab:
             ("Full Concurrent", DPOExecutionMode.FULL_CONCURRENT),
         ]
         components.label(self.scroll_frame, 5, 0, "Execution Mode",
-                         tooltip="Controls the VRAM and speed trade-off for DPO. Full Concurrent is fastest with slightly higher VRAM (~1 GB more). "
-                                 "Sequential uses the least VRAM — use it if you're tight on memory.")
+                         tooltip="VRAM/speed trade-off for DPO. Sequential runs 4 separate forward passes per step — lowest VRAM. "
+                                 "Policy Concurrent batches the two policy forwards together for 3 passes total — medium. "
+                                 "Full Concurrent batches the reference forwards too for 2 passes total — fastest. "
+                                 "Batching requires Shared Noise enabled (the default); with shared noise off, all modes fall back to 4 passes.")
         components.options_kv(self.scroll_frame, 5, 1, execution_options, self.ui_state, "rlhf_dpo_execution_mode")
 
         components.label(self.scroll_frame, 4, 3, "Early Stopping",
