@@ -86,6 +86,12 @@ class CtkConceptTabView(CtkConfigListView, BaseConceptTabView):
         else:
             self._toolbar.grid_configure(row=0, column=4, columnspan=2, sticky="ew", padx=10)
 
+    def _update_filters(self):
+        self._create_element_list(search=self.search_var.get(),
+                                  type=self.filter_var.get(),
+                                  show_disabled=self.show_disabled_var.get())
+        self._refresh_show_disabled_text()
+
     def _reset_filters(self):
         self.search_var.set("")
         self.filter_var.set("ALL")
@@ -109,9 +115,7 @@ class CtkConceptWidgetView(BaseConceptWidgetView, ctk.CTkFrame):
 
     def __init__(self, master, concept, i, open_command, remove_command, clone_command, save_command, controller):
         ctk.CTkFrame.__init__(self, master=master, width=150, height=170, corner_radius=10, bg_color="transparent")
-        BaseConceptWidgetView.__init__(self, ctk_components)
-
-        self.concept = concept
+        BaseConceptWidgetView.__init__(self, ctk_components, concept)
         self.ui_state = CtkUIState(self, concept)
         self.image_ui_state = CtkUIState(self, concept.image)
         self.text_ui_state = CtkUIState(self, concept.text)
