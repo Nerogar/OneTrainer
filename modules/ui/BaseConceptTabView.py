@@ -15,11 +15,6 @@ class BaseConceptTabView(BaseConfigListView):
 
     _FILTER_TYPES = ["ALL", "STANDARD", "VALIDATION", "PRIOR_PREDICTION"]
 
-    def __init__(self, search_var, filter_var, show_disabled_var):
-        self.search_var = search_var
-        self.filter_var = filter_var
-        self.show_disabled_var = show_disabled_var
-
     def _element_matches_filters(self, element):
         if not self.filters.get("show_disabled", True):
             if hasattr(element, 'enabled') and not element.enabled:
