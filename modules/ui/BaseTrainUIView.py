@@ -9,8 +9,10 @@ from modules.util.enum.PathIOType import PathIOType
 
 
 class BaseTrainUIView(ABC):
-    def __init__(self, components):
+    def __init__(self, components, controller, ui_state):
         self.components = components
+        self.controller = controller
+        self.ui_state = ui_state
 
     # --- Abstract callbacks (controller calls into view) ---
 
@@ -51,7 +53,7 @@ class BaseTrainUIView(ABC):
     def connect_window_closed(self, window, callback): pass
 
     def sync_cloud_secrets(self):
-        self.ui_state.get_var("secrets.cloud").update(self.train_config.secrets.cloud)
+        self.ui_state.get_var("secrets.cloud").update(self.controller.train_config.secrets.cloud)
 
     def start_training(self):
         self.controller.start_training()
@@ -82,6 +84,15 @@ class BaseTrainUIView(ABC):
 
     @abstractmethod
     def open_manual_sample_window(self): pass
+
+    @abstractmethod
+    def open_profiling_tool(self): pass
+
+    @abstractmethod
+    def export_training(self): pass
+
+    @abstractmethod
+    def generate_debug_package(self): pass
 
     # --- Content builders (components calls; called by CTK view after frame creation) ---
 

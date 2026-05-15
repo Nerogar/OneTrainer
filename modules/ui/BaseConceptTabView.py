@@ -4,6 +4,7 @@ import pathlib
 from modules.ui.BaseConfigListView import BaseConfigListView
 from modules.ui.ConceptWindowController import ConceptWindowController
 from modules.util import path_util
+from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.image_util import load_image
 
@@ -13,6 +14,11 @@ from PIL import Image
 class BaseConceptTabView(BaseConfigListView):
 
     _FILTER_TYPES = ["ALL", "STANDARD", "VALIDATION", "PRIOR_PREDICTION"]
+
+    def __init__(self, search_var, filter_var, show_disabled_var):
+        self.search_var = search_var
+        self.filter_var = filter_var
+        self.show_disabled_var = show_disabled_var
 
     def _element_matches_filters(self, element):
         if not self.filters.get("show_disabled", True):
@@ -50,17 +56,13 @@ class BaseConceptTabView(BaseConfigListView):
 
         return True
 
-    def _update_filters(self):
-        self._create_element_list(search=self.search_var.get(),
-                                  type=self.filter_var.get(),
-                                  show_disabled=self.show_disabled_var.get())
-        self._refresh_show_disabled_text()
 
 
 class BaseConceptWidgetView:
 
-    def __init__(self, components):
+    def __init__(self, components, concept: ConceptConfig):
         self.components = components
+        self.concept = concept
 
     def _get_display_name(self):
         if self.concept.name:

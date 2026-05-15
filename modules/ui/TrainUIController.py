@@ -1,15 +1,12 @@
-import ctypes
 import datetime
 import json
 import os
-import platform
 import subprocess
 import sys
 import threading
 import time
 import traceback
 import webbrowser
-from contextlib import suppress
 from pathlib import Path
 
 import scripts.generate_debug_report
@@ -27,13 +24,6 @@ from modules.util.TrainProgress import TrainProgress
 from modules.util.ui.validation import flush_and_validate_all
 
 import torch
-
-# chunk for forcing Windows to ignore DPI scaling when moving between monitors
-# fixes the long standing transparency bug https://github.com/Nerogar/OneTrainer/issues/90
-if platform.system() == "Windows":
-    with suppress(Exception):
-        # https://learn.microsoft.com/en-us/windows/win32/hidpi/setting-the-default-dpi-awareness-for-a-process#setting-default-awareness-programmatically
-        ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
 
 
 class TrainUIController:

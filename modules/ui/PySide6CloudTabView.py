@@ -10,9 +10,8 @@ class PySide6CloudTabView(BaseCloudTabView, QWidget, metaclass=QtABCMeta):
 
     def __init__(self, master, controller: CloudTabController, ui_state):
         QWidget.__init__(self, master)
-        BaseCloudTabView.__init__(self, pyside6_components)
+        BaseCloudTabView.__init__(self, pyside6_components, controller)
 
-        self.controller = controller
         self.ui_state = ui_state
 
         scroll, frame = pyside6_components.scrollable_frame(self)

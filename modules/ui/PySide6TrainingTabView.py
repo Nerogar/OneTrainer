@@ -64,34 +64,28 @@ class PySide6TrainingTabView(BaseTrainingTabView, QWidget, metaclass=QtABCMeta):
         pyside6_components._layout(self.scroll_frame).addWidget(column_2, 0, 2)
         pyside6_components._layout(column_2).setColumnStretch(0, 1)
 
-        callbacks = {
-            'restore_optimizer': lambda *args: self.controller.restore_optimizer_config(self.ui_state),
-            'open_optimizer_params': self._open_optimizer_params_window,
-            'restore_scheduler': self._restore_scheduler_config,
-            'open_scheduler_params': self._open_scheduler_params_window,
-            'open_offloading': self._open_offloading_window,
-            'open_timestep_distribution': self._open_timestep_distribution_window,
-        }
-
-        self.build(column_0, column_1, column_2, self.controller, self.ui_state, callbacks)
+        self.build(column_0, column_1, column_2, self.controller, self.ui_state)
 
         for col_widget in (column_0, column_1, column_2):
             lo = pyside6_components._layout(col_widget)
             lo.setRowStretch(lo.rowCount(), 1)
 
-    def _restore_scheduler_config(self, variable):
+    def restore_optimizer_config(self, variable: str):
+        self.controller.restore_optimizer_config(self.ui_state)
+
+    def restore_scheduler(self, variable: str):
         if not hasattr(self, 'lr_scheduler_adv_comp'):
             return
         self.lr_scheduler_adv_comp.setEnabled(self.controller.is_custom_scheduler_value(variable))
 
-    def _open_optimizer_params_window(self):
+    def open_optimizer_params(self):
         PySide6OptimizerParamsWindowView(self, OptimizerParamsWindowController(self.controller.config), self.ui_state).exec()
 
-    def _open_scheduler_params_window(self):
+    def open_scheduler_params(self):
         PySide6SchedulerParamsWindowView(self, SchedulerParamsWindowController(self.controller.config), self.ui_state).exec()
 
-    def _open_timestep_distribution_window(self):
-        PySide6TimestepDistributionWindowView(self, TimestepDistributionWindowController(self.controller.config), self.ui_state).exec()
-
-    def _open_offloading_window(self):
+    def open_offloading(self):
         PySide6OffloadingWindowView(self, OffloadingWindowController(self.controller.config), self.ui_state).exec()
+
+    def open_timestep_distribution(self):
+        PySide6TimestepDistributionWindowView(self, TimestepDistributionWindowController(self.controller.config), self.ui_state).exec()

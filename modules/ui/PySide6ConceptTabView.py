@@ -84,6 +84,11 @@ class PySide6ConceptTabView(PySide6ConfigListView, BaseConceptTabView):
         clear_btn.clicked.connect(self._reset_filters)
         row_lo.addWidget(clear_btn)
 
+    def _update_filters(self):
+        self._create_element_list(search=self.search_var.get(),
+                                  type=self.filter_var.get(),
+                                  show_disabled=self.show_disabled_var.get())
+
     def _reset_filters(self):
         if self.search_var is not None:
             self.search_var.set("")
@@ -98,9 +103,7 @@ class PySide6ConceptWidgetView(BaseConceptWidgetView, QWidget):
 
     def __init__(self, master, concept, i, open_command, remove_command, clone_command, save_command, controller):
         QWidget.__init__(self, master)
-        BaseConceptWidgetView.__init__(self, pyside6_components)
-
-        self.concept = concept
+        BaseConceptWidgetView.__init__(self, pyside6_components, concept)
         self.ui_state = PySide6UIState(concept)
         self.image_ui_state = PySide6UIState(concept.image)
         self.text_ui_state = PySide6UIState(concept.text)

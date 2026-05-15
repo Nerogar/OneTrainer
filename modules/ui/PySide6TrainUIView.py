@@ -52,17 +52,17 @@ if platform.system() == "Windows":
 class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
     def __init__(self):
         QMainWindow.__init__(self)
-        BaseTrainUIView.__init__(self, pyside6_components)
+
+        train_config = TrainConfig.default_values()
+        ui_state = PySide6UIState(train_config)
+        controller = TrainUIController(train_config)
+
+        BaseTrainUIView.__init__(self, pyside6_components, controller, ui_state)
+        self.controller.view = self
 
         self.setWindowTitle("OneTrainer")
         self.setWindowIcon(QIcon("resources/icons/icon.png"))
         self.resize(1100, 740)
-
-        self.train_config = TrainConfig.default_values()
-        self.ui_state = PySide6UIState(self.train_config)
-
-        self.controller = TrainUIController(self.train_config)
-        self.controller.view = self
 
         self.status_label = None
         self.eta_label = None
@@ -97,7 +97,7 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         central_lo.addWidget(bottom, 2, 0)
 
         self._create_tabs()
-        self.change_training_method(self.train_config.training_method)
+        self.change_training_method(self.controller.train_config.training_method)
 
         self._profiling_controller = ProfilingWindowController()
         self.profiling_window = PySide6ProfilingWindowView(self, self._profiling_controller)
@@ -186,7 +186,7 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
     def _build_top_bar(self, master):
         return PySide6TopBarView(
             master,
-            TopBarController(self.train_config),
+            TopBarController(self.controller.train_config),
             self.ui_state,
             self.change_model_type,
             self.change_training_method,
@@ -251,7 +251,7 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         self.tabview.addTab(general_page, "general")
         self._tab_widgets["general"] = general_page
 
-        self.model_tab = PySide6ModelTabView(None, ModelTabController(self.train_config), self.ui_state)
+        self.model_tab = PySide6ModelTabView(None, ModelTabController(self.controller.train_config), self.ui_state)
         self.tabview.addTab(self.model_tab, "model")
         self._tab_widgets["model"] = self.model_tab
 
@@ -260,11 +260,11 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         self._tab_widgets["data"] = data_page
 
         concepts_page = QWidget()
-        self.concepts_tab = PySide6ConceptTabView(concepts_page, ConceptTabController(self.train_config), self.ui_state)
+        self.concepts_tab = PySide6ConceptTabView(concepts_page, ConceptTabController(self.controller.train_config), self.ui_state)
         self.tabview.addTab(concepts_page, "concepts")
         self._tab_widgets["concepts"] = concepts_page
 
-        self.training_tab = PySide6TrainingTabView(None, TrainingTabController(self.train_config), self.ui_state)
+        self.training_tab = PySide6TrainingTabView(None, TrainingTabController(self.controller.train_config), self.ui_state)
         self.tabview.addTab(self.training_tab, "training")
         self._tab_widgets["training"] = self.training_tab
 
@@ -283,13 +283,13 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         additional_embeddings_page = QWidget()
         self.additional_embeddings_tab = PySide6AdditionalEmbeddingsTabView(
             additional_embeddings_page,
-            AdditionalEmbeddingsTabController(self.train_config),
+            AdditionalEmbeddingsTabController(self.controller.train_config),
             self.ui_state,
         )
         self.tabview.addTab(additional_embeddings_page, "additional embeddings")
         self._tab_widgets["additional embeddings"] = additional_embeddings_page
 
-        self.cloud_tab = PySide6CloudTabView(None, CloudTabController(self.train_config, self), self.ui_state)
+        self.cloud_tab = PySide6CloudTabView(None, CloudTabController(self.controller.train_config, self), self.ui_state)
         self.tabview.addTab(self.cloud_tab, "cloud")
         self._tab_widgets["cloud"] = self.cloud_tab
 
@@ -317,7 +317,7 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         sampling_container = QWidget(tab_page)
         tab_lo.addWidget(sampling_container, 1, 0)
         self.sampling_tab = PySide6SamplingTabView(
-            sampling_container, SamplingTabController(self.train_config), self.ui_state
+            sampling_container, SamplingTabController(self.controller.train_config), self.ui_state
         )
 
         return tab_page
@@ -349,7 +349,7 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
             del self._tab_widgets['embedding']
 
         if training_method == TrainingMethod.LORA and 'LoRA' not in self._tab_widgets:
-            self.lora_tab = PySide6LoraTabView(None, LoraTabController(self.train_config), self.ui_state)
+            self.lora_tab = PySide6LoraTabView(None, LoraTabController(self.controller.train_config), self.ui_state)
             self.tabview.addTab(self.lora_tab, 'LoRA')
             self._tab_widgets['LoRA'] = self.lora_tab
         if training_method == TrainingMethod.EMBEDDING and 'embedding' not in self._tab_widgets:

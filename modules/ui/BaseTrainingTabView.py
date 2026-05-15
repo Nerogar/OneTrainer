@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
@@ -16,232 +16,250 @@ class BaseTrainingTabView(ABC):
     def __init__(self, components):
         self.components = components
 
-    def build(self, column_0, column_1, column_2, controller, ui_state, callbacks: dict):
+    @abstractmethod
+    def restore_optimizer_config(self, variable: str): pass
+
+    @abstractmethod
+    def open_optimizer_params(self): pass
+
+    @abstractmethod
+    def restore_scheduler(self, variable): pass
+
+    @abstractmethod
+    def open_scheduler_params(self): pass
+
+    @abstractmethod
+    def open_offloading(self): pass
+
+    @abstractmethod
+    def open_timestep_distribution(self): pass
+
+    def build(self, column_0, column_1, column_2, controller, ui_state):
         model_type = controller.config.model_type
         if model_type.is_stable_diffusion():
-            self.__setup_stable_diffusion_ui(column_0, column_1, column_2, controller, ui_state, callbacks)
+            self.__setup_stable_diffusion_ui(column_0, column_1, column_2, controller, ui_state)
         if model_type.is_stable_diffusion_3():
-            self.__setup_stable_diffusion_3_ui(column_0, column_1, column_2, controller, ui_state, callbacks)
+            self.__setup_stable_diffusion_3_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_stable_diffusion_xl():
-            self.__setup_stable_diffusion_xl_ui(column_0, column_1, column_2, controller, ui_state, callbacks)
+            self.__setup_stable_diffusion_xl_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_wuerstchen():
-            self.__setup_wuerstchen_ui(column_0, column_1, column_2, controller, ui_state, callbacks)
+            self.__setup_wuerstchen_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_pixart():
-            self.__setup_pixart_alpha_ui(column_0, column_1, column_2, controller, ui_state, callbacks)
+            self.__setup_pixart_alpha_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_flux_1():
-            self.__setup_flux_ui(column_0, column_1, column_2, controller, ui_state, callbacks)
+            self.__setup_flux_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_flux_2():
-            self.__setup_flux_2_ui(column_0, column_1, column_2, controller, ui_state, callbacks)
+            self.__setup_flux_2_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_chroma():
-            self.__setup_chroma_ui(column_0, column_1, column_2, controller, ui_state, callbacks)
+            self.__setup_chroma_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_qwen():
-            self.__setup_qwen_ui(column_0, column_1, column_2, controller, ui_state, callbacks)
+            self.__setup_qwen_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_sana():
-            self.__setup_sana_ui(column_0, column_1, column_2, controller, ui_state, callbacks)
+            self.__setup_sana_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_hunyuan_video():
-            self.__setup_hunyuan_video_ui(column_0, column_1, column_2, controller, ui_state, callbacks)
+            self.__setup_hunyuan_video_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_hi_dream():
-            self.__setup_hi_dream_ui(column_0, column_1, column_2, controller, ui_state, callbacks)
+            self.__setup_hi_dream_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_z_image():
-            self.__setup_z_image_ui(column_0, column_1, column_2, controller, ui_state, callbacks)
+            self.__setup_z_image_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_ernie():
-            self.__setup_ernie_ui(column_0, column_1, column_2, controller, ui_state, callbacks)
+            self.__setup_ernie_ui(column_0, column_1, column_2, controller, ui_state)
 
-    def __setup_stable_diffusion_ui(self, column_0, column_1, column_2, controller, ui_state, callbacks):
-        self.__create_base_frame(column_0, 0, controller, ui_state, callbacks)
+    def __setup_stable_diffusion_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_frame(column_0, 1, ui_state)
         self.__create_embedding_frame(column_0, 2, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state, callbacks, supports_circular_padding=True)
+        self.__create_base2_frame(column_1, 0, ui_state, supports_circular_padding=True)
         self.__create_unet_frame(column_1, 1, ui_state)
-        self.__create_noise_frame(column_1, 2, ui_state, callbacks, supports_generalized_offset_noise=True)
+        self.__create_noise_frame(column_1, 2, ui_state, supports_generalized_offset_noise=True)
 
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state)
         self.__create_layer_frame(column_2, 3, controller, ui_state)
 
-    def __setup_stable_diffusion_3_ui(self, column_0, column_1, column_2, controller, ui_state, callbacks):
-        self.__create_base_frame(column_0, 0, controller, ui_state, callbacks)
+    def __setup_stable_diffusion_3_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_n_frame(column_0, 1, ui_state, i=1, supports_include=True)
         self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2, supports_include=True)
         self.__create_text_encoder_n_frame(column_0, 3, ui_state, i=3, supports_include=True)
         self.__create_embedding_frame(column_0, 4, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state, callbacks)
+        self.__create_base2_frame(column_1, 0, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state)
-        self.__create_noise_frame(column_1, 2, ui_state, callbacks)
+        self.__create_noise_frame(column_1, 2, ui_state)
 
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state)
         self.__create_layer_frame(column_2, 3, controller, ui_state)
 
-    def __setup_stable_diffusion_xl_ui(self, column_0, column_1, column_2, controller, ui_state, callbacks):
-        self.__create_base_frame(column_0, 0, controller, ui_state, callbacks)
+    def __setup_stable_diffusion_xl_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_n_frame(column_0, 1, ui_state, i=1)
         self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2)
         self.__create_embedding_frame(column_0, 3, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state, callbacks, supports_circular_padding=True)
+        self.__create_base2_frame(column_1, 0, ui_state, supports_circular_padding=True)
         self.__create_unet_frame(column_1, 1, ui_state)
-        self.__create_noise_frame(column_1, 2, ui_state, callbacks, supports_generalized_offset_noise=True)
+        self.__create_noise_frame(column_1, 2, ui_state, supports_generalized_offset_noise=True)
 
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state)
         self.__create_layer_frame(column_2, 3, controller, ui_state)
 
-    def __setup_wuerstchen_ui(self, column_0, column_1, column_2, controller, ui_state, callbacks):
-        self.__create_base_frame(column_0, 0, controller, ui_state, callbacks)
+    def __setup_wuerstchen_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_frame(column_0, 1, ui_state)
         self.__create_embedding_frame(column_0, 2, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state, callbacks, supports_circular_padding=True)
+        self.__create_base2_frame(column_1, 0, ui_state, supports_circular_padding=True)
         self.__create_prior_frame(column_1, 1, ui_state)
-        self.__create_noise_frame(column_1, 2, ui_state, callbacks)
+        self.__create_noise_frame(column_1, 2, ui_state)
 
         self.__create_masked_frame(column_2, 0, ui_state)
         self.__create_loss_frame(column_2, 1, controller, ui_state)
         self.__create_layer_frame(column_2, 2, controller, ui_state)
 
-    def __setup_pixart_alpha_ui(self, column_0, column_1, column_2, controller, ui_state, callbacks):
-        self.__create_base_frame(column_0, 0, controller, ui_state, callbacks)
+    def __setup_pixart_alpha_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_frame(column_0, 1, ui_state)
         self.__create_embedding_frame(column_0, 2, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state, callbacks)
+        self.__create_base2_frame(column_1, 0, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state)
-        self.__create_noise_frame(column_1, 2, ui_state, callbacks)
+        self.__create_noise_frame(column_1, 2, ui_state)
 
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state, supports_vb_loss=True)
         self.__create_layer_frame(column_2, 3, controller, ui_state)
 
-    def __setup_flux_ui(self, column_0, column_1, column_2, controller, ui_state, callbacks):
-        self.__create_base_frame(column_0, 0, controller, ui_state, callbacks)
+    def __setup_flux_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_n_frame(column_0, 1, ui_state, i=1, supports_include=True)
         self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2, supports_include=True, supports_sequence_length=True)
         self.__create_embedding_frame(column_0, 4, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state, callbacks)
+        self.__create_base2_frame(column_1, 0, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=True)
-        self.__create_noise_frame(column_1, 2, ui_state, callbacks, supports_dynamic_timestep_shifting=True)
+        self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state)
         self.__create_layer_frame(column_2, 3, controller, ui_state)
 
-    def __setup_flux_2_ui(self, column_0, column_1, column_2, controller, ui_state, callbacks):
-        self.__create_base_frame(column_0, 0, controller, ui_state, callbacks)
+    def __setup_flux_2_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_frame(column_0, 1, ui_state, supports_clip_skip=False, supports_training=False, supports_sequence_length=True)
 
-        self.__create_base2_frame(column_1, 0, ui_state, callbacks)
+        self.__create_base2_frame(column_1, 0, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=True, supports_force_attention_mask=False)
-        self.__create_noise_frame(column_1, 2, ui_state, callbacks, supports_dynamic_timestep_shifting=True)
+        self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state)
         self.__create_layer_frame(column_2, 3, controller, ui_state)
 
-    def __setup_chroma_ui(self, column_0, column_1, column_2, controller, ui_state, callbacks):
-        self.__create_base_frame(column_0, 0, controller, ui_state, callbacks)
+    def __setup_chroma_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_frame(column_0, 1, ui_state)
         self.__create_embedding_frame(column_0, 4, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state, callbacks)
+        self.__create_base2_frame(column_1, 0, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=False, supports_force_attention_mask=False)
-        self.__create_noise_frame(column_1, 2, ui_state, callbacks)
+        self.__create_noise_frame(column_1, 2, ui_state)
 
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state)
         self.__create_layer_frame(column_2, 3, controller, ui_state)
 
-    def __setup_qwen_ui(self, column_0, column_1, column_2, controller, ui_state, callbacks):
-        self.__create_base_frame(column_0, 0, controller, ui_state, callbacks)
+    def __setup_qwen_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_frame(column_0, 1, ui_state, supports_clip_skip=False)
 
-        self.__create_base2_frame(column_1, 0, ui_state, callbacks)
+        self.__create_base2_frame(column_1, 0, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=False, supports_force_attention_mask=False)
-        self.__create_noise_frame(column_1, 2, ui_state, callbacks, supports_dynamic_timestep_shifting=True)
+        self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state)
         self.__create_layer_frame(column_2, 3, controller, ui_state)
 
-    def __setup_z_image_ui(self, column_0, column_1, column_2, controller, ui_state, callbacks):
-        self.__create_base_frame(column_0, 0, controller, ui_state, callbacks)
+    def __setup_z_image_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_frame(column_0, 1, ui_state, supports_clip_skip=False, supports_training=False)
 
-        self.__create_base2_frame(column_1, 0, ui_state, callbacks)
+        self.__create_base2_frame(column_1, 0, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=False, supports_force_attention_mask=False)
-        self.__create_noise_frame(column_1, 2, ui_state, callbacks, supports_dynamic_timestep_shifting=True)
+        self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state)
         self.__create_layer_frame(column_2, 3, controller, ui_state)
 
-    def __setup_ernie_ui(self, column_0, column_1, column_2, controller, ui_state, callbacks):
-        self.__create_base_frame(column_0, 0, controller, ui_state, callbacks)
+    def __setup_ernie_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_frame(column_0, 1, ui_state, supports_clip_skip=False, supports_training=False)
 
-        self.__create_base2_frame(column_1, 0, ui_state, callbacks)
+        self.__create_base2_frame(column_1, 0, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=False, supports_force_attention_mask=False)
-        self.__create_noise_frame(column_1, 2, ui_state, callbacks, supports_dynamic_timestep_shifting=True)
+        self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state)
         self.__create_layer_frame(column_2, 3, controller, ui_state)
 
-    def __setup_sana_ui(self, column_0, column_1, column_2, controller, ui_state, callbacks):
-        self.__create_base_frame(column_0, 0, controller, ui_state, callbacks)
+    def __setup_sana_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_frame(column_0, 1, ui_state)
         self.__create_embedding_frame(column_0, 2, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state, callbacks)
+        self.__create_base2_frame(column_1, 0, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state)
-        self.__create_noise_frame(column_1, 2, ui_state, callbacks)
+        self.__create_noise_frame(column_1, 2, ui_state)
 
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state)
         self.__create_layer_frame(column_2, 3, controller, ui_state)
 
-    def __setup_hunyuan_video_ui(self, column_0, column_1, column_2, controller, ui_state, callbacks):
-        self.__create_base_frame(column_0, 0, controller, ui_state, callbacks)
+    def __setup_hunyuan_video_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_n_frame(column_0, 1, ui_state, i=1, supports_include=True)
         self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2, supports_include=True)
         self.__create_embedding_frame(column_0, 4, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state, callbacks, video_training_enabled=True)
+        self.__create_base2_frame(column_1, 0, ui_state, video_training_enabled=True)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=True)
-        self.__create_noise_frame(column_1, 2, ui_state, callbacks)
+        self.__create_noise_frame(column_1, 2, ui_state)
 
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state)
         self.__create_layer_frame(column_2, 3, controller, ui_state)
 
-    def __setup_hi_dream_ui(self, column_0, column_1, column_2, controller, ui_state, callbacks):
-        self.__create_base_frame(column_0, 0, controller, ui_state, callbacks)
+    def __setup_hi_dream_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_n_frame(column_0, 1, ui_state, i=1, supports_include=True)
         self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2, supports_include=True)
         self.__create_text_encoder_n_frame(column_0, 3, ui_state, i=3, supports_include=True)
         self.__create_text_encoder_n_frame(column_0, 4, ui_state, i=4, supports_include=True, supports_layer_skip=False)
         self.__create_embedding_frame(column_0, 5, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state, callbacks, video_training_enabled=True)
+        self.__create_base2_frame(column_1, 0, ui_state, video_training_enabled=True)
         self.__create_transformer_frame(column_1, 1, ui_state)
-        self.__create_noise_frame(column_1, 2, ui_state, callbacks)
+        self.__create_noise_frame(column_1, 2, ui_state)
 
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state)
         self.__create_layer_frame(column_2, 3, controller, ui_state)
 
-    def __create_base_frame(self, master, row, controller, ui_state, callbacks):
+    def __create_base_frame(self, master, row, controller, ui_state):
         frame = self.components.section_frame(master, row)
 
         # optimizer
         self.components.label(frame, 0, 0, "Optimizer",
                               tooltip="The type of optimizer")
         self.components.options_adv(frame, 0, 1, [str(x) for x in list(Optimizer)], ui_state, "optimizer.optimizer",
-                                    command=callbacks.get('restore_optimizer'),
-                                    adv_command=callbacks.get('open_optimizer_params'))
+                                    command=self.restore_optimizer_config,
+                                    adv_command=self.open_optimizer_params)
 
         # learning rate scheduler
         # Wackiness will ensue when reloading configs if we don't check and clear this first.
@@ -252,14 +270,12 @@ class BaseTrainingTabView(ABC):
                               tooltip="Learning rate scheduler that automatically changes the learning rate during training")
         _, d = self.components.options_adv(frame, 1, 1, [str(x) for x in list(LearningRateScheduler)], ui_state,
                                            "learning_rate_scheduler",
-                                           command=callbacks.get('restore_scheduler'),
-                                           adv_command=callbacks.get('open_scheduler_params'))
+                                           command=self.restore_scheduler,
+                                           adv_command=self.open_scheduler_params)
         self.lr_scheduler_comp = d['component']
         self.lr_scheduler_adv_comp = d['button_component']
         # Initial call requires the presence of self.lr_scheduler_adv_comp.
-        restore_scheduler = callbacks.get('restore_scheduler')
-        if restore_scheduler:
-            restore_scheduler(ui_state.get_var("learning_rate_scheduler").get())
+        self.restore_scheduler(ui_state.get_var("learning_rate_scheduler").get())
 
         # learning rate
         self.components.label(frame, 2, 0, "Learning Rate",
@@ -308,7 +324,7 @@ class BaseTrainingTabView(ABC):
                               tooltip="Clips the gradient norm. Leave empty to disable gradient clipping.")
         self.components.entry(frame, 10, 1, ui_state, "clip_grad_norm")
 
-    def __create_base2_frame(self, master, row, ui_state, callbacks, video_training_enabled: bool = False,
+    def __create_base2_frame(self, master, row, ui_state, video_training_enabled: bool = False,
                               supports_circular_padding: bool = False):
         frame = self.components.section_frame(master, row)
         row = 0
@@ -338,7 +354,7 @@ class BaseTrainingTabView(ABC):
                               tooltip="Enables gradient checkpointing. This reduces memory usage, but increases training time")
         self.components.options_adv(frame, row, 1, [str(x) for x in list(GradientCheckpointingMethod)], ui_state,
                                     "gradient_checkpointing",
-                                    adv_command=callbacks.get('open_offloading'))
+                                    adv_command=self.open_offloading)
         row += 1
 
         # gradient checkpointing layer offloading
@@ -588,7 +604,7 @@ class BaseTrainingTabView(ABC):
                                   tooltip="The guidance scale of guidance distilled models passed to the transformer during training.")
             self.components.entry(frame, 4, 1, ui_state, "transformer.guidance_scale")
 
-    def __create_noise_frame(self, master, row, ui_state, callbacks,
+    def __create_noise_frame(self, master, row, ui_state,
                               supports_generalized_offset_noise: bool = False,
                               supports_dynamic_timestep_shifting: bool = False):
         frame = self.components.section_frame(master, row)
@@ -616,7 +632,7 @@ class BaseTrainingTabView(ABC):
                               wide_tooltip=True)
         self.components.options_adv(frame, 3, 1, [str(x) for x in list(TimestepDistribution)], ui_state,
                                     "timestep_distribution",
-                                    adv_command=callbacks.get('open_timestep_distribution'))
+                                    adv_command=self.open_timestep_distribution)
 
         # min noising strength
         self.components.label(frame, 4, 0, "Min Noising Strength",
