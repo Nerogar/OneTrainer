@@ -11,7 +11,7 @@ from modules.ui.TrainingTabController import TrainingTabController
 from modules.util.ui import pyside6_components
 from modules.util.ui.pyside6_abc import QtABCMeta
 
-from PySide6.QtWidgets import QScrollArea, QWidget
+from PySide6.QtWidgets import QScrollArea, QSizePolicy, QWidget
 
 
 class PySide6TrainingTabView(BaseTrainingTabView, QWidget, metaclass=QtABCMeta):
@@ -43,8 +43,6 @@ class PySide6TrainingTabView(BaseTrainingTabView, QWidget, metaclass=QtABCMeta):
         lo.setColumnStretch(0, 1)
         lo.setColumnStretch(1, 1)
         lo.setColumnStretch(2, 1)
-
-        from PySide6.QtWidgets import QSizePolicy
 
         column_0 = QWidget(self.scroll_frame)
         column_0.setMinimumWidth(0)
