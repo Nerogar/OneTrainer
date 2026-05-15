@@ -1,9 +1,28 @@
 import platform
+from abc import ABC, abstractmethod
 
 
-class BaseCaptionUIView:
+class BaseCaptionUIView(ABC):
     def __init__(self, components):
         self.components = components
+
+    @abstractmethod
+    def open_directory(self): pass
+
+    @abstractmethod
+    def open_mask_window(self): pass
+
+    @abstractmethod
+    def open_caption_window(self): pass
+
+    @abstractmethod
+    def open_in_explorer(self): pass
+
+    @abstractmethod
+    def draw_mask_editing_mode(self, *args): pass
+
+    @abstractmethod
+    def fill_mask_editing_mode(self, *args): pass
 
     def build_top_bar(self, frame, controller, ui_state):
         self.components.button(frame, 0, 0, "Open", self.open_directory,

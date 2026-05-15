@@ -7,8 +7,9 @@ from modules.util.enum.CloudType import CloudType
 
 
 class BaseCloudTabView(ABC):
-    def __init__(self, components):
+    def __init__(self, components, controller):
         self.components = components
+        self.controller = controller
 
     @property
     def reattach(self):

@@ -82,7 +82,13 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
 
     def __init__(self):
         ctk.CTk.__init__(self)
-        BaseTrainUIView.__init__(self, ctk_components)
+
+        train_config = TrainConfig.default_values()
+        ui_state = CtkUIState(self, train_config)
+        controller = TrainUIController(train_config)
+
+        BaseTrainUIView.__init__(self, ctk_components, controller, ui_state)
+        self.controller.view = self
 
         self.title("OneTrainer")
         self.geometry("1100x740")
@@ -92,12 +98,6 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
         # more efficient version of ctk.set_appearance_mode("System"), which retrieves the system theme on each main loop iteration
         ctk.set_appearance_mode("Light" if AppearanceModeTracker.detect_appearance_mode() == 0 else "Dark")
         ctk.set_default_color_theme("blue")
-
-        self.train_config = TrainConfig.default_values()
-        self.ui_state = CtkUIState(self, self.train_config)
-
-        self.controller = TrainUIController(self.train_config)
-        self.controller.view = self
 
         self.grid_rowconfigure(0, weight=0)
         self.grid_rowconfigure(1, weight=1)
@@ -212,7 +212,7 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
     def top_bar(self, master):
         return CtkTopBarView(
             master,
-            TopBarController(self.train_config),
+            TopBarController(self.controller.train_config),
             self.ui_state,
             self.change_model_type,
             self.change_training_method,
@@ -259,7 +259,7 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
         self.additional_embeddings_tab = self.create_additional_embeddings_tab(self.tabview.add("additional embeddings"))
         self.cloud_tab = self.create_cloud_tab(self.tabview.add("cloud"))
 
-        self.change_training_method(self.train_config.training_method)
+        self.change_training_method(self.controller.train_config.training_method)
 
         return frame
 
@@ -274,7 +274,7 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
         return frame
 
     def create_model_tab(self, master):
-        return CtkModelTabView(master, ModelTabController(self.train_config), self.ui_state)
+        return CtkModelTabView(master, ModelTabController(self.controller.train_config), self.ui_state)
 
     def create_data_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
@@ -288,13 +288,13 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
         return frame
 
     def create_concepts_tab(self, master):
-        return CtkConceptTabView(master, ConceptTabController(self.train_config), self.ui_state)
+        return CtkConceptTabView(master, ConceptTabController(self.controller.train_config), self.ui_state)
 
     def create_training_tab(self, master) -> CtkTrainingTabView:
-        return CtkTrainingTabView(master, TrainingTabController(self.train_config), self.ui_state)
+        return CtkTrainingTabView(master, TrainingTabController(self.controller.train_config), self.ui_state)
 
     def create_cloud_tab(self, master) -> CtkCloudTabView:
-        return CtkCloudTabView(master, CloudTabController(self.train_config, parent=self), self.ui_state)
+        return CtkCloudTabView(master, CloudTabController(self.controller.train_config, parent=self), self.ui_state)
 
     def create_sampling_tab(self, master):
         master.grid_rowconfigure(0, weight=0)
@@ -311,7 +311,7 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
         frame = ctk.CTkFrame(master=master, corner_radius=0)
         frame.grid(row=1, column=0, sticky="nsew")
 
-        return CtkSamplingTabView(frame, SamplingTabController(self.train_config), self.ui_state)
+        return CtkSamplingTabView(frame, SamplingTabController(self.controller.train_config), self.ui_state)
 
     def create_backup_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
@@ -336,7 +336,7 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
         return frame
 
     def create_additional_embeddings_tab(self, master):
-        return CtkAdditionalEmbeddingsTabView(master, AdditionalEmbeddingsTabController(self.train_config), self.ui_state)
+        return CtkAdditionalEmbeddingsTabView(master, AdditionalEmbeddingsTabController(self.controller.train_config), self.ui_state)
 
     def create_tools_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
@@ -376,7 +376,7 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
             self.tabview.delete("embedding")
 
         if training_method == TrainingMethod.LORA and "LoRA" not in self.tabview._tab_dict:
-            self.lora_tab = CtkLoraTabView(self.tabview.add("LoRA"), LoraTabController(self.train_config), self.ui_state)
+            self.lora_tab = CtkLoraTabView(self.tabview.add("LoRA"), LoraTabController(self.controller.train_config), self.ui_state)
         if training_method == TrainingMethod.EMBEDDING and "embedding" not in self.tabview._tab_dict:
             self.embedding_tab(self.tabview.add("embedding"))
 

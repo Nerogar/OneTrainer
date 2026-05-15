@@ -47,31 +47,25 @@ class CtkTrainingTabView(BaseTrainingTabView):
         column_2.grid(row=0, column=2, sticky="nsew")
         column_2.grid_columnconfigure(0, weight=1)
 
-        callbacks = {
-            'restore_optimizer': lambda *args: self.controller.restore_optimizer_config(self.ui_state),
-            'open_optimizer_params': self._open_optimizer_params_window,
-            'restore_scheduler': self._restore_scheduler_config,
-            'open_scheduler_params': self._open_scheduler_params_window,
-            'open_offloading': self._open_offloading_window,
-            'open_timestep_distribution': self._open_timestep_distribution_window,
-        }
+        self.build(column_0, column_1, column_2, self.controller, self.ui_state)
 
-        self.build(column_0, column_1, column_2, self.controller, self.ui_state, callbacks)
+    def restore_optimizer_config(self, variable: str):
+        self.controller.restore_optimizer_config(self.ui_state)
 
-    def _restore_scheduler_config(self, variable):
+    def open_optimizer_params(self):
+        self.master.wait_window(self.controller.open_optimizer_params_window(self.master, self.ui_state, CtkOptimizerParamsWindowView))
+
+    def restore_scheduler(self, variable: str):
         if not hasattr(self, 'lr_scheduler_adv_comp'):
             return
         state = "normal" if self.controller.is_custom_scheduler_value(variable) else "disabled"
         self.lr_scheduler_adv_comp.configure(state=state)
 
-    def _open_optimizer_params_window(self):
-        self.master.wait_window(self.controller.open_optimizer_params_window(self.master, self.ui_state, CtkOptimizerParamsWindowView))
-
-    def _open_scheduler_params_window(self):
+    def open_scheduler_params(self):
         self.master.wait_window(self.controller.open_scheduler_params_window(self.master, self.ui_state, CtkSchedulerParamsWindowView))
 
-    def _open_timestep_distribution_window(self):
-        self.master.wait_window(self.controller.open_timestep_distribution_window(self.master, self.ui_state, CtkTimestepDistributionWindowView))
-
-    def _open_offloading_window(self):
+    def open_offloading(self):
         self.master.wait_window(self.controller.open_offloading_window(self.master, self.ui_state, CtkOffloadingWindowView))
+
+    def open_timestep_distribution(self):
+        self.master.wait_window(self.controller.open_timestep_distribution_window(self.master, self.ui_state, CtkTimestepDistributionWindowView))

@@ -9,9 +9,8 @@ import customtkinter as ctk
 
 class CtkCloudTabView(BaseCloudTabView):
     def __init__(self, master, controller: CloudTabController, ui_state):
-        BaseCloudTabView.__init__(self, ctk_components)
+        BaseCloudTabView.__init__(self, ctk_components, controller)
         self.master = master
-        self.controller = controller
         self.ui_state = ui_state
 
         self.frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
