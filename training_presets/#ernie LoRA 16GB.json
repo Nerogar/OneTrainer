@@ -1,8 +1,8 @@
 {
-    "base_model_name": "black-forest-labs/FLUX.2-klein-base-9B",
+    "base_model_name": "baidu/ERNIE-Image",
     "batch_size": 2,
-    "learning_rate": 3e-5,
-    "model_type": "FLUX_2",
+    "learning_rate": 3e-4,
+    "model_type": "ERNIE",
     "resolution": "512",
     "compile": true,
     "transformer": {
@@ -19,10 +19,10 @@
     },
     "train_dtype": "BFLOAT_16",
     "output_dtype": "BFLOAT_16",
-    "layer_filter": "transformer_block",
-    "layer_filter_preset": "blocks",
+    "layer_filter": "self_attention,mlp",
+    "layer_filter_preset": "attn-mlp",
     "quantization": {
-        "layer_filter": "transformer_block",
+        "layer_filter": "layers",
         "layer_filter_preset": "blocks"
     },
     "timestep_distribution": "LOGIT_NORMAL",

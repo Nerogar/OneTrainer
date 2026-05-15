@@ -1,19 +1,15 @@
 from abc import ABCMeta
+from random import Random
 
 import modules.util.multi_gpu_util as multi
-from modules.model.Flux2Model import Flux2Model
-from modules.model.FluxModel import FluxModel
+from modules.model.ErnieModel import ErnieModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
 from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowMatchingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
-from modules.util.checkpointing_util import (
-    enable_checkpointing_for_flux2_transformer,
-    enable_checkpointing_for_mistral_encoder_layers,
-    enable_checkpointing_for_qwen3_encoder_layers,
-)
+from modules.util.checkpointing_util import enable_checkpointing_for_ernie_transformer
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -25,7 +21,7 @@ import torch
 from torch import Tensor
 
 
-class BaseFlux2Setup(
+class BaseErnieSetup(
     BaseModelSetup,
     ModelSetupDiffusionLossMixin,
     ModelSetupDebugMixin,
@@ -35,25 +31,20 @@ class BaseFlux2Setup(
     metaclass=ABCMeta
 ):
     LAYER_PRESETS = {
-        "blocks": ["transformer_block"],
+        "attn-mlp": ["self_attention", "mlp"],
+        "attn-only": ["self_attention"],
+        "blocks": ["layers"],
         "full": [],
     }
 
     def setup_optimizations(
             self,
-            model: Flux2Model,
+            model: ErnieModel,
             config: TrainConfig,
     ):
         if config.gradient_checkpointing.enabled():
             model.transformer_offload_conductor = \
-                enable_checkpointing_for_flux2_transformer(model.transformer, config)
-            if model.text_encoder is not None:
-                if model.is_dev():
-                    model.text_encoder_offload_conductor = \
-                        enable_checkpointing_for_mistral_encoder_layers(model.text_encoder, config)
-                else:
-                    model.text_encoder_offload_conductor = \
-                        enable_checkpointing_for_qwen3_encoder_layers(model.text_encoder, config)
+                enable_checkpointing_for_ernie_transformer(model.transformer, config)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
@@ -78,14 +69,9 @@ class BaseFlux2Setup(
         quantize_layers(model.vae, self.train_device, model.train_dtype, config)
         quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
 
-        model.text_encoder_to(self.train_device)
-        model.text_encoder.eval()
-        model.cache_unconditional(text_encoder_sequence_length=config.text_encoder_sequence_length)
-        model.text_encoder_to(self.temp_device)
-
     def predict(
             self,
-            model: Flux2Model,
+            model: ErnieModel,
             batch: dict,
             config: TrainConfig,
             train_progress: TrainProgress,
@@ -96,15 +82,19 @@ class BaseFlux2Setup(
             batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
             generator = torch.Generator(device=config.train_device)
             generator.manual_seed(batch_seed)
+            rand = Random(batch_seed)
 
-            text_encoder_output = model.encode_text(
-                generator=generator,
-                tokens=batch.get("tokens"),
-                tokens_mask=batch.get("tokens_mask"),
-                text_encoder_sequence_length=config.text_encoder_sequence_length,
+            text_encoder_output, text_lens = model.encode_text(
+                train_device=self.train_device,
+                batch_size=batch['latent_image'].shape[0],
+                rand=rand,
+                tokens=batch.get('tokens'),
+                tokens_mask=batch.get('tokens_mask'),
                 text_encoder_output=batch.get('text_encoder_hidden_state'),
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
+
+            # Patchify: [B, 32, H, W] -> [B, 128, H/2, W/2]
             latent_image = model.patchify_latents(batch['latent_image'].float())
             latent_height = latent_image.shape[-2]
             latent_width = latent_image.shape[-1]
@@ -119,7 +109,7 @@ class BaseFlux2Setup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
-                shift = shift if config.dynamic_timestep_shifting else config.timestep_shift,
+                shift=shift if config.dynamic_timestep_shifting else config.timestep_shift,
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(
@@ -128,40 +118,20 @@ class BaseFlux2Setup(
                 timestep,
                 model.noise_scheduler.timesteps,
             )
-            latent_input = scaled_noisy_latent_image
 
-            if model.transformer.config.guidance_embeds:
-                guidance = torch.tensor([config.transformer.guidance_scale], device=self.train_device, dtype=model.train_dtype.torch_dtype())
-                guidance = guidance.expand(latent_input.shape[0])
-            else:
-                guidance = None
-
-            text_ids = model.prepare_text_ids(text_encoder_output)
-            image_ids = model.prepare_latent_image_ids(latent_input)
-            packed_latent_input = model.pack_latents(latent_input)
-
-            packed_predicted_flow = model.transformer(
-                hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
-                timestep=timestep / 1000,
-                guidance=guidance,
-                encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                txt_ids=text_ids,
-                img_ids=image_ids,
-                joint_attention_kwargs=None,
-                return_dict=True
-            ).sample
-
-            predicted_flow = model.unpack_latents(
-                packed_predicted_flow,
-                latent_input.shape[2],
-                latent_input.shape[3],
-            )
+            predicted_flow = model.transformer(
+                hidden_states=scaled_noisy_latent_image.to(dtype=model.train_dtype.torch_dtype()),
+                timestep=timestep,
+                text_bth=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
+                text_lens=text_lens,
+                return_dict=False,
+            )[0]
 
             flow = latent_noise - scaled_latent_image
             model_output_data = {
                 'loss_type': 'target',
                 'timestep': timestep,
-                #unpatchify, to make the shape match the mask shape of masked training:
+                # unpatchify to match mask shape for masked training
                 'predicted': model.unpatchify_latents(predicted_flow),
                 'target': model.unpatchify_latents(flow),
             }
@@ -169,19 +139,19 @@ class BaseFlux2Setup(
             if config.debug_mode:
                 with torch.no_grad():
                     predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
-                    self._save_tokens("7-prompt", batch['tokens'], model.tokenizer, config, train_progress)
-                    self._save_latent("1-noise", latent_noise, config, train_progress)
-                    self._save_latent("2-noisy_image", scaled_noisy_latent_image, config, train_progress)
-                    self._save_latent("3-predicted_flow", predicted_flow, config, train_progress)
-                    self._save_latent("4-flow", flow, config, train_progress)
-                    self._save_latent("5-predicted_image", predicted_scaled_latent_image, config, train_progress)
-                    self._save_latent("6-image", scaled_latent_image, config, train_progress)
+                    self._save_tokens('7-prompt', batch['tokens'], model.tokenizer, config, train_progress)
+                    self._save_latent('1-noise', latent_noise, config, train_progress)
+                    self._save_latent('2-noisy_image', scaled_noisy_latent_image, config, train_progress)
+                    self._save_latent('3-predicted_flow', predicted_flow, config, train_progress)
+                    self._save_latent('4-flow', flow, config, train_progress)
+                    self._save_latent('5-predicted_image', predicted_scaled_latent_image, config, train_progress)
+                    self._save_latent('6-image', scaled_latent_image, config, train_progress)
 
         return model_output_data
 
     def calculate_loss(
             self,
-            model: Flux2Model,
+            model: ErnieModel,
             batch: dict,
             data: dict,
             config: TrainConfig,
@@ -194,7 +164,7 @@ class BaseFlux2Setup(
             sigmas=model.noise_scheduler.sigmas,
         ).mean()
 
-    def prepare_text_caching(self, model: FluxModel, config: TrainConfig):
+    def prepare_text_caching(self, model: ErnieModel, config: TrainConfig):
         model.to(self.temp_device)
         model.text_encoder_to(self.train_device)
         model.eval()
