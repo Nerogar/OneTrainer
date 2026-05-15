@@ -543,7 +543,8 @@ def options_kv(
     str_values = [str(v) for _, v in values]
 
     if var.get() not in str_values and keys:
-        var.set(values[0][1])
+        # store the str repr — UIState's enum trace looks up var_type[string]
+        var.set(str(values[0][1]))
 
     _updating = False
 
@@ -554,7 +555,7 @@ def options_kv(
         _updating = True
         for k, v in values:
             if key == k:
-                var.set(v)
+                var.set(str(v))
                 if command:
                     command(v)
                 break
