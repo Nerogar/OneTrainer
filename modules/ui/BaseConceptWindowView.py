@@ -9,6 +9,9 @@ from modules.util.enum.ConceptType import ConceptType
 class BaseConceptWindowView:
     def __init__(self, components):
         self.components = components
+        self.bucket_ax = None
+        self.text_color = None
+        self.canvas = None
 
     def build_general_tab(self, frame, controller, ui_state, text_ui_state):
         # name
