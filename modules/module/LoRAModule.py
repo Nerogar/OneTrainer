@@ -344,18 +344,18 @@ class OFTModule(PeftBase):
     coft: bool
     coft_eps: float
     block_share: bool
-    scaled_oft: bool
+    oft_scaled: bool
     dropout_probability: float
     adjustment_info: tuple[int, int] | None # for reporting
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, coft: bool, coft_eps: float, block_share: bool, scaled_oft: bool, **kwargs):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, coft: bool, coft_eps: float, block_share: bool, oft_scaled: bool, **kwargs):
         super().__init__(prefix, orig_module)
         self.oft_block_size = oft_block_size
         self.rank = 0
         self.coft = coft
         self.coft_eps = coft_eps
         self.block_share = block_share
-        self.use_scaled_oft = scaled_oft
+        self.oft_scaled = oft_scaled
         self.dropout_probability = kwargs.pop('dropout_probability', 0.0)
         self.oft_R = None
         self.adjustment_info = None
@@ -423,7 +423,7 @@ class OFTModule(PeftBase):
             coft=self.coft,
             coft_eps=self.coft_eps,
             block_share=self.block_share,
-            scaled_oft=self.use_scaled_oft,
+            oft_scaled=self.oft_scaled,
             use_cayley_neumann=True,
             num_cayley_neumann_terms=5,
             dropout_probability=self.dropout_probability,
@@ -439,7 +439,7 @@ class OFTModule(PeftBase):
             rotated_x = self.oft_R(x)
             return self.orig_forward(rotated_x, *args, **kwargs)
 
-        scaling_factor = 2 * math.sqrt(self.oft_R.block_size - 1) if self.use_scaled_oft else 1
+        scaling_factor = 2 * math.sqrt(self.oft_R.block_size - 1) if self.oft_scaled else 1
         effective_weight = self.oft_R.weight / scaling_factor
 
         # For Conv2d, we must rotate the weights, not the input, to preserve spatial information.
@@ -634,7 +634,7 @@ class LoRAModuleWrapper:
                 config.oft_coft,
                 config.coft_eps,
                 config.oft_block_share,
-                config.scaled_oft,
+                config.oft_scaled,
             ]
             self.additional_kwargs = {
                 'dropout_probability': config.dropout_probability,
