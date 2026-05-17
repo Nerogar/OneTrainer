@@ -84,7 +84,7 @@ class WuerstchenFineTuneSetup(
             model: WuerstchenModel,
             config: TrainConfig,
     ):
-        effnet_on_train_device = not config.latent_caching
+        effnet_on_train_device = not config.image_caching
 
         if model.model_type.is_wuerstchen_v2():
             model.decoder_text_encoder_to(self.temp_device)
@@ -95,7 +95,7 @@ class WuerstchenFineTuneSetup(
         text_encoder_on_train_device = \
             config.text_encoder.train \
             or config.train_any_embedding() \
-            or not config.latent_caching
+            or not config.text_caching
 
         model.prior_text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.prior_prior_to(self.train_device)

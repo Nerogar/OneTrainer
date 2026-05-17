@@ -87,11 +87,11 @@ class PixArtAlphaFineTuneSetup(
             model: PixArtAlphaModel,
             config: TrainConfig,
     ):
-        vae_on_train_device = self.debug_mode or not config.latent_caching
+        vae_on_train_device = self.debug_mode or not config.image_caching
         text_encoder_on_train_device = \
             config.text_encoder.train \
             or config.train_any_embedding() \
-            or not config.latent_caching
+            or not config.text_caching
 
         model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
