@@ -1,7 +1,9 @@
 import queue
 import threading
 from collections.abc import Iterable, Iterator
-from contextlib import suppress
+from contextlib import nullcontext, suppress
+
+import torch
 
 
 class PrefetchIterator:
@@ -10,6 +12,9 @@ class PrefetchIterator:
     Wrapping an iterable in PrefetchIterator lets the producer-side work
     (e.g. disk reads, decoding, encoding) overlap with whatever the consumer
     is doing between iterations.
+
+    The producer runs on a dedicated CUDA stream so tensor uploads to the GPU
+    don't have to wait for in-flight training work on the default stream.
     """
 
     def __init__(self, iterable: Iterable, queue_size: int = 1, stop_poll_interval: float = 0.1):
@@ -22,6 +27,8 @@ class PrefetchIterator:
         q: queue.Queue = queue.Queue(maxsize=self._queue_size)
         stop_event = threading.Event()
 
+        stream_ctx = torch.cuda.stream(torch.cuda.Stream()) if torch.cuda.is_available() else nullcontext()
+
         def put_or_stop(value) -> bool:
             # Block on put, but periodically wake to check the stop signal so
             # we can exit if the consumer has gone away.
@@ -32,14 +39,15 @@ class PrefetchIterator:
             return False
 
         def producer():
-            try:
-                for item in self._iterable:
-                    if not put_or_stop(item):
-                        return
-            except BaseException as e:
-                put_or_stop(e)
-                return
-            put_or_stop(StopIteration())
+            with stream_ctx:
+                try:
+                    for item in self._iterable:
+                        if not put_or_stop(item):
+                            return
+                except BaseException as e:
+                    put_or_stop(e)
+                    return
+                put_or_stop(StopIteration())
 
         t = threading.Thread(target=producer, daemon=True)
         t.start()
