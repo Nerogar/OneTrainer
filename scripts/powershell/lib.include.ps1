@@ -115,7 +115,7 @@ function Get-OrUpdatePixi {
         Write-OT "Installing pixi package manager..."
 
         # Install pixi using the official install script.
-        iex (irm -useb https://pixi.sh/install.ps1)
+        . "$PSScriptRoot\install-pixi.ps1"
 
         # current session may not reflect pixi in path, add manually to be sure
         $pixiBinDir = Join-Path $env:USERPROFILE ".pixi\bin"

@@ -173,17 +173,7 @@ function get_or_update_pixi {
         run_cmd pixi self-update
     else
         print_debug '`pixi` not found, attempting installation.'
-        if can_exec curl; then
-            print_debug '`curl` found, installing `pixi` with `curl`.'
-            curl -fsSL https://pixi.sh/install.sh | sh
-        elif can_exec wget; then
-            print_debug '`wget` found, installing `pixi` with `wget`.'
-            wget -qO- https://pixi.sh/install.sh | sh
-        else
-            print_error $'Can\'t install `pixi`: None of `wget` or `curl` found.'
-            print_error 'Please install `wget` or `curl` via the system package manager.'
-            return 1
-        fi
+        ./install-pixi.sh
     fi
 }
 
