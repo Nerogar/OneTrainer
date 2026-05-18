@@ -725,7 +725,10 @@ class GenericTrainer(BaseTrainer):
 
                 self.callbacks.on_update_status("Training ...")
 
-                with TorchMemoryRecorder(enabled=False), TorchProfiler(enabled=False, filename=f"step{train_progress.global_step}.json"):
+                with (
+                    TorchMemoryRecorder(enabled=False, filename=f"memory-step{train_progress.global_step}.pickle"),
+                    TorchProfiler      (enabled=False, filename=f"profile-step{train_progress.global_step}.json"),
+                ):
                     step_seed = train_progress.global_step
                     bf16_stochastic_rounding_set_seed(step_seed, train_device)
 

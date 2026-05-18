@@ -247,7 +247,7 @@ class BaseWuerstchenSetup(
                     'text_encoder_hidden_state'] if not config.train_text_encoder_or_embedding() else None,
                 pooled_text_encoder_output=batch[
                     'pooled_text_encoder_output'] if not config.train_text_encoder_or_embedding() else None,
-                text_encoder_dropout_probability=config.text_encoder.dropout_probability,
+                text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
 
             latent_input = scaled_noisy_latent_image
