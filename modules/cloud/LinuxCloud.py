@@ -98,8 +98,7 @@ class LinuxCloud(BaseCloud):
         #for interactive shells. On RunPod, cuda is missing from $PATH; on vast.ai, python is missing.
         #We cannot pretend to be interactive either, because then vast.ai starts a tmux screen.
         #Add these paths manually:
-        cmd_env = f"export PATH=$PATH:/usr/local/cuda/bin:/venv/main/bin \
-                   && export OT_LAZY_UPDATES=true \
+        cmd_env = f"export PATH=$PATH:/root/.pixi/bin \
                    && cd {shlex.quote(config.onetrainer_dir)}"
 
         if result.exited == 0:
@@ -149,9 +148,8 @@ class LinuxCloud(BaseCloud):
             self.__trail_detached_trainer()
             return
 
-        cmd="export PATH=$PATH:/usr/local/cuda/bin:/venv/main/bin \
-             && export PYTHONUNBUFFERED=1 \
-             && export OT_LAZY_UPDATES=true"
+        cmd="export PATH=$PATH:/root/.pixi/bin \
+             && export PYTHONUNBUFFERED=1"
 
         if self.config.secrets.huggingface_token != "":
             cmd+=f" && export HF_TOKEN={self.config.secrets.huggingface_token}"

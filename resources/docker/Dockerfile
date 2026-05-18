@@ -3,7 +3,7 @@
 #    docker tag <image-name> <dockerhub-username>/<repository-name>:<tag>
 #    docker push <dockerhub-username>/<repository-name>:<tag>
 
-FROM --platform=linux/amd64 ubuntu:24.04
+FROM ubuntu:latest
 
 ENV OT_PLATFORM=cuda
 ENV OT_SCRIPT_DEBUG=true
@@ -16,12 +16,13 @@ RUN apt-get update && \
     git \
     curl \
     ssh
+
 ADD . /OneTrainer
 
 RUN cd OneTrainer \
     && export OT_PLATFORM=cuda \
     && export OT_SCRIPT_DEBUG=true \
-    && ./install.sh \
+    && ./install.sh 2>&1 \
     && rm -rf /root/.cache \
     && mkdir -p /workspace \
     && ln -s /OneTrainer /workspace/OneTrainer
