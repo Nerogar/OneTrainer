@@ -19,6 +19,8 @@
 
 - `OT_SCRIPT_DEBUG`: If set to `true`, it enables additional debug logging in the scripts. Defaults to `false`.
 
+- `OT_PIP_INSTALL`: If set to `true`, it enables pip-based installation of dependencies. When running OneTrainer, it assumes that installation is already handled via pip. Defaults to `false`.
+
 
 ### Examples of how to use the custom environment variables:
 

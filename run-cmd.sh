@@ -2,6 +2,12 @@
 
 set -e
 
+if [ "$OT_PIP_INSTALL" = "true" ]; then
+    echo "[OneTrainer] Installing dependencies via pip..."
+    bash scripts/pip-install/run-cmd.sh "$@"
+    exit 0
+fi
+
 # Xet is buggy. Disabled by default unless already defined - https://github.com/Nerogar/OneTrainer/issues/949
 if [[ -z "${HF_HUB_DISABLE_XET+x}" ]]; then
     export HF_HUB_DISABLE_XET=1
