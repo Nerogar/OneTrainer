@@ -175,6 +175,7 @@ python = "3.13.*"
 [tool.pixi.target.linux-64.dependencies]
 tk = { version = "*", build = "xft_*" }
 libgl = "*"
+libglib = "*"
 
 [tool.pixi.system-requirements]
 linux = "5.17"

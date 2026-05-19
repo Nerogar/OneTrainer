@@ -103,9 +103,9 @@ class LinuxCloud(BaseCloud):
 
         if result.exited == 0:
             if update:
-                self.connection.run(cmd_env + "&& ./update.sh 2>&1", in_stream=False)
+                self.connection.run(cmd_env + "&& ./update.sh", in_stream=False)
         else:
-            self.connection.run(cmd_env + "&& ./install.sh 2>&1", in_stream=False)
+            self.connection.run(cmd_env + "&& ./install.sh", in_stream=False)
 
     def _make_tensorboard_tunnel(self):
         self.tensorboard_tunnel_stop=threading.Event()

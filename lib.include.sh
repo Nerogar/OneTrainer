@@ -174,6 +174,7 @@ function get_or_update_pixi {
     else
         print_debug '`pixi` not found, attempting installation.'
         ./install-pixi.sh
+        export PATH="${HOME:-/root}/.pixi/bin:${PATH}"
     fi
 }
 

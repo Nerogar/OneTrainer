@@ -1,9 +1,5 @@
 #!/bin/bash
-
-cp /etc/rp_build_environment /etc/rp_environment
-# useful information
-# see also: https://github.com/bghira/SimpleTuner/blob/main/OPTIONS.md#environment-configuration-variables
-echo "export PATH=${HOME:-/root}/.pixi/bin" >> /etc/rp_environment
+set -exo pipefail
 
 # Export useful ENV variables, including all Runpod specific vars, to /etc/rp_environment
 # This file can then later be sourced in a login shell
@@ -14,20 +10,21 @@ printenv |
 
 # Add it to Bash login script only if it doesn't already exist
 grep -qxF 'source /etc/rp_environment' ~/.bashrc || echo 'source /etc/rp_environment' >> ~/.bashrc
+echo "cd /workspace/OneTrainer" >> ~/.bashrc
 
 source /etc/rp_environment
 
 # Vast.ai uses $SSH_PUBLIC_KEY
 if [[ $SSH_PUBLIC_KEY ]]; then
-  echo "INFO: Found SSH_PUBLIC_KEY, using it as PUBLIC_KEY" | tee -a "/var/log/portal/start.sh.log"
+  echo "INFO: Found SSH_PUBLIC_KEY, using it as PUBLIC_KEY"
   PUBLIC_KEY="${SSH_PUBLIC_KEY}"
 fi
 
 # Runpod uses $PUBLIC_KEY
 if [[ $PUBLIC_KEY ]]; then
-  echo "INFO: Setting up SSH, adding PUBLIC_KEY to authorized_keys" | tee -a "/var/log/portal/start.sh.log"
+  echo "INFO: Setting up SSH, adding PUBLIC_KEY to authorized_keys"
   mkdir -p ~/.ssh
-  echo "${PUBLIC_KEY}" >>~/.ssh/authorized_keys
+  echo "${PUBLIC_KEY}" >> ~/.ssh/authorized_keys
   chmod 600 ~/.ssh/authorized_keys
   chmod 700 ~/.ssh
 fi
@@ -36,7 +33,7 @@ fi
 sed -i -E 's/#?PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
 
 # Start SSH server
-service ssh start 2>&1 | tee -a "/var/log/portal/start.sh.log"
+service ssh start 2>&1
 
 # Login to HF
 if [[ -n "${HF_TOKEN:-$HUGGING_FACE_HUB_TOKEN}" ]]; then
@@ -52,5 +49,8 @@ else
   echo "WANDB_API_KEY or WANDB_TOKEN not set; skipping login"
 fi
 
-# Update/install
-git pull && pixi install --locked -e cuda 2>&1
+mkdir -p /workspace
+ln -s /OneTrainer /workspace/OneTrainer
+
+# Keep the container running
+sleep infinity

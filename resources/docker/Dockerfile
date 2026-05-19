@@ -22,9 +22,6 @@ ADD . /OneTrainer
 RUN cd OneTrainer \
     && export OT_PLATFORM=cuda \
     && export OT_SCRIPT_DEBUG=true \
-    && ./install.sh 2>&1 \
-    && rm -rf /root/.cache \
-    && mkdir -p /workspace \
-    && ln -s /OneTrainer /workspace/OneTrainer
+    && ./install.sh 2>&1
 
-ENTRYPOINT [ "/usr/bin/bash /docker.init.sh" ]
+ENTRYPOINT [ "/usr/bin/bash", "/OneTrainer/docker.init.sh" ]
