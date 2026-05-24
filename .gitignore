@@ -37,3 +37,6 @@ config_diff.txt
 # pixi environments
 .pixi/*
 !.pixi/config.toml
+
+# macOS
+**/.DS_Store

@@ -171,6 +171,7 @@ extra-index-urls = ["https://download.pytorch.org/whl/cpu"]
 
 [tool.pixi.dependencies]
 python = "3.13.*"
+compilers = "*"
 
 [tool.pixi.target.linux-64.dependencies]
 tk = { version = "*", build = "xft_*" }
