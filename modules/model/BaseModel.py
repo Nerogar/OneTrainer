@@ -76,6 +76,8 @@ class BaseModel(metaclass=ABCMeta):
     embedding_state_dicts: dict[str, dict[str, Tensor]] | None
     autocast_context: torch.autocast | nullcontext
     train_dtype: DataType
+    resumed_tensorboard_subdir: str | None
+    tensorboard_subdir: str | None
 
     def __init__(
             self,
@@ -93,6 +95,8 @@ class BaseModel(metaclass=ABCMeta):
         self.embedding_state_dicts = {}
         self.autocast_context = nullcontext()
         self.train_dtype = DataType.FLOAT_32
+        self.resumed_tensorboard_subdir = None
+        self.tensorboard_subdir = None
 
     @abstractmethod
     def to(self, device: torch.device):

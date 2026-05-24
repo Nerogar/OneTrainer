@@ -68,11 +68,11 @@ class GenericTrainer(BaseTrainer):
         super().__init__(config, callbacks, commands)
 
         if multi.is_master():
-            tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
-            os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
-            self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, f"{config.save_filename_prefix}{get_string_timestamp()}"))
+            # TB writer creation is deferred to start() so a backup's tensorboard_subdir
+            # can be reused and logging continues in the same TB run on resume.
             if config.tensorboard and not config.tensorboard_always_on:
                 super()._start_tensorboard()
+        self.tensorboard = None
 
         self.model = None
         self.one_step_trained = False
@@ -160,6 +160,39 @@ class GenericTrainer(BaseTrainer):
             self.validation_data_loader = self.create_data_loader(
                 self.model, self.model_setup, self.model.train_progress, is_validation=True
             )
+
+        if multi.is_master():
+            self._init_tensorboard_writer()
+
+    def _init_tensorboard_writer(self):
+        """Construct the SummaryWriter.
+
+        On resume (model.resumed_tensorboard_subdir is set and the directory still
+        exists under workspace_dir/tensorboard), reuse the existing subdir so the
+        TB UI shows a single continuous run across stop/resume cycles. Use
+        purge_step to trim any scalars written after the backup point by a
+        previous session that crashed mid-log.
+        """
+        tensorboard_log_dir = os.path.join(self.config.workspace_dir, "tensorboard")
+        os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
+
+        resumed = getattr(self.model, "resumed_tensorboard_subdir", None)
+        reuse_path = None
+        if resumed:
+            candidate = os.path.join(tensorboard_log_dir, resumed)
+            if os.path.isdir(candidate):
+                reuse_path = candidate
+
+        if reuse_path is not None:
+            self.model.tensorboard_subdir = resumed
+            self.tensorboard = SummaryWriter(
+                reuse_path,
+                purge_step=self.model.train_progress.global_step,
+            )
+        else:
+            subdir = f"{self.config.save_filename_prefix}{get_string_timestamp()}"
+            self.model.tensorboard_subdir = subdir
+            self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, subdir))
 
     def __save_config_to_workspace(self):
         path = path_util.canonical_join(self.config.workspace_dir, "config")
