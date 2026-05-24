@@ -71,8 +71,6 @@ class FluxEmbeddingSetup(
         if model.text_encoder_2 is not None:
             model.text_encoder_2.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_1)
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
