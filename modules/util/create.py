@@ -674,7 +674,7 @@ def create_optimizer(
                 params=parameters,
                 lr=config.learning_rate,
                 normed_momentum=optimizer_config.normed_momentum if optimizer_config.normed_momentum is not None else False,
-                momentum=optimizer_config.momentum if optimizer_config.beta1 is not None else 0,
+                momentum=optimizer_config.momentum if optimizer_config.momentum is not None else 0,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
                 nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
