@@ -55,7 +55,7 @@ class BaseCloud(metaclass=ABCMeta):
             if hasattr(add_embedding,"local_model_name"):
                 self.file_sync.sync_up(local=Path(add_embedding.local_model_name),remote=Path(add_embedding.model_name))
 
-        concept_extensions = path_util.supported_image_extensions() | path_util.supported_video_extensions() | {'.txt'}
+        concept_extensions = path_util.supported_image_extensions() | path_util.supported_video_extensions() | path_util.supported_caption_extensions()
         for concept in self.config.concepts:
             print(f"uploading concept {concept.name}...")
             if commands and commands.get_stop_command():
