@@ -202,6 +202,8 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'sinkhorn_iterations': {'title': 'Sinkhorn Iterations', 'tooltip': 'Controls the number of iterations for Multi-Normed Sinkhorn. While 1 iteration is often sufficient for convergence and 3 offers a slight refinement, 5 is the default.', 'type': 'int'},
             'normed_momentum': {'title': 'Normalization-then-Momentum', 'tooltip': 'Applies the momentum after the optimizer normalization. This makes the momentum scale invariant and tracks the true variance of the normalized gradients.', 'type': 'bool'},
             'nesterov_coef': {'title': 'Nesterov Coef', 'tooltip': 'Controls the mixing coefficient between momentum gradients and raw gradients in Nesterov momentum. For a factor of 0.8, the final update will be 80% of the momentum gradients and 20% raw gradient. Leaving it unset toggles the standard Nestrov behavior (where nesterov_coef = beta1 or momentum). Setting it to 0 cancels momentum contribution.', 'type': 'float'},
+            'centered_vt': {'title': 'Variance Preconditioner', 'tooltip': 'Applies centered, scale-invariant row and column confidence pre-conditioner. This is intended to be used with Normalization-then-Momentum.', 'type': 'bool'},
+            'geometric_wd': {'title': 'Geometric Weight Decay', 'tooltip': 'Regularizes weights based on the geometric structure of the optimizer. Compatible with cautious weight decay.', 'type': 'bool'},
         }
         # @formatter:on
 

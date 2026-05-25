@@ -688,6 +688,8 @@ def create_optimizer(
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
+                centered_vt=optimizer_config.centered_vt if optimizer_config.centered_vt is not None else False,
+                geometric_wd=optimizer_config.geometric_wd if optimizer_config.geometric_wd is not None else False,
             )
 
         # ADAMW_ADV Optimizer
