@@ -879,48 +879,69 @@ class NetworkInfo:
     @staticmethod
     def test_url(url: str) -> str:
         """
-        Test network connectivity by pinging the host extracted from a URL.
-        Reports packet loss from the ping command.
+        Test network connectivity using both HTTPS and ping.
         """
-        logger.info(f"Pinging URL: {url}")
+        logger.info(f"Testing URL: {url}")
+
         parsed = urlparse(url)
-        host = parsed.netloc
-        count = "4"  # Number of ping packets
+        host = parsed.netloc or parsed.path
+
+        if not host:
+            return f"Failure: could not parse host from URL: {url}"
+
+        https_status = NetworkInfo._test_https(url, host)
+        ping_status = NetworkInfo._test_ping(host)
+
+        return f"{https_status}; {ping_status}"
+
+    @staticmethod
+    def _test_https(url: str, host: str) -> str:
+        try:
+            response = requests.get(url, timeout=10)
+
+            if 200 <= response.status_code < 400:
+                return f"HTTPS to {host} succeeded: Status code {response.status_code}"
+
+            return f"HTTPS to {host} returned status code {response.status_code}"
+
+        except requests.exceptions.Timeout:
+            return f"HTTPS to {host} failed: timed out"
+        except requests.exceptions.ConnectionError as e:
+            return f"HTTPS to {host} failed: connection error: {e}"
+        except requests.exceptions.RequestException as e:
+            return f"HTTPS to {host} failed: {e}"
+
+    @staticmethod
+    def _test_ping(host: str) -> str:
+        count = "5"
 
         cmd = (
             ["ping", "-n", count, host]
             if platform.system() == "Windows"
             else ["ping", "-c", count, host]
         )
+
         try:
             result = Utility.subprocess_run(cmd)
-            output = result.stdout
+            output = result.stdout or ""
+
             packet_loss = "Unavailable"
+
             if platform.system() == "Windows":
-                m = re.search(r"\((\d+)% loss\)", output)
-                if m:
-                    packet_loss = f"{m.group(1)}%"
+                match = re.search(r"\((\d+)% loss\)", output)
             else:
-                m = re.search(r"(\d+(?:\.\d+)?)% packet loss", output)
-                if m:
-                    packet_loss = f"{m.group(1)}%"
-            return f"Ping to {host} successful: Packet Loss: {packet_loss}"
+                match = re.search(r"(\d+(?:\.\d+)?)% packet loss", output)
+
+            if match:
+                packet_loss = f"{match.group(1)}%"
+
+            return f"Ping to {host} succeeded: Packet loss {packet_loss}"
+
         except subprocess.CalledProcessError as e:
-            logger.warning(
-                f"Ping to {host} failed. Using requests fallback. Error: {e}"
-            )
-            try:
-                r = requests.get(url, timeout=5)
-                if r.status_code == 200:
-                    return f"Requests to {host} succeeded (fallback)."
-                else:
-                    return f"Requests to {host} failed (fallback). Status code: {r.status_code}"
-            except Exception as ex:
-                logger.exception("Requests fallback failed")
-                return f"Requests fallback also failed: {ex}"
+            stderr = e.stderr or ""
+            return f"Ping to {host} failed: {stderr.strip() or 'command failed'}"
         except Exception as e:
-            logger.exception("Unexpected error during ping")
-            return f"Failure: {e}"
+            return f"Ping to {host} failed: {e}"
 
     @staticmethod
     def test_connectivity() -> dict[str, tuple[str, str]]:

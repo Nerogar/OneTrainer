@@ -121,7 +121,7 @@ def _get_model_defaults(model_type) -> dict:
             "diffusion_steps": 25,
             "cfg_scale": 4.5,
         })
-    elif model_type.is_wuerstchen():
+    elif model_type.is_wuerstchen() or model_type.is_ernie():
         defaults.update({
             "width": 1024,
             "height": 1024,

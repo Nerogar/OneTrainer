@@ -12,8 +12,6 @@ from modules.util.modelSpec.ModelSpec import ModelSpec
 import torch
 from torch import Tensor
 
-import safetensors.torch as safetensors
-
 
 class DtypeModelSaverMixin:
     def __init__(self):
@@ -54,8 +52,8 @@ class DtypeModelSaverMixin:
         sha256_hash = hashlib.sha256()
 
         ordered_state_dict = OrderedDict(sorted(state_dict.items()))
-        for key, tensor in ordered_state_dict.items():
-            data = safetensors._tobytes(tensor, key)
+        for tensor in ordered_state_dict.values():
+            data = tensor.contiguous().cpu().flatten().view(torch.uint8).numpy().tobytes()
             sha256_hash.update(data)
 
         return f"0x{sha256_hash.hexdigest()}"

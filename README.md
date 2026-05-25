@@ -6,7 +6,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 
 ## Features
 
--   **Supported models**: Z-Image, Qwen Image, FLUX.1, Flux.2 Dev and Klein, Chroma, Stable Diffusion 1.5, 2.0, 2.1, 3.0, 3.5, SDXL, Würstchen-v2, Stable Cascade,
+-   **Supported models**: Ernie Image, Z-Image, Qwen Image, FLUX.1, Flux.2 Dev and Klein, Chroma, Stable Diffusion 1.5, 2.0, 2.1, 3.0, 3.5, SDXL, Würstchen-v2, Stable Cascade,
     PixArt-Alpha, PixArt-Sigma, Sana, Hunyuan Video and inpainting models
 -   **Model formats**: diffusers and ckpt models
 -   **Training methods**: Full fine-tuning, LoRA, embeddings
@@ -131,8 +131,7 @@ These will both create a `debug_report.log`.
 
 ## Contributing
 
-Contributions are always welcome in any form. You can open issues, participate in discussions, or even open pull
-requests for new or improved functionality. You can find more information about contributing [here](docs/Contributing.md).
+Contributions are always welcome in any form. For new functionality please open a Github discussion or join our discord so that we can align and avoid duplicated work. You can find more information about contributing [here](docs/Contributing.md).
 
 Before you start looking at the code, I recommend reading about the project structure [here](docs/ProjectStructure.md).
 For in depth discussions, you should consider joining the [Discord](https://discord.gg/KwgcQd5scF) server.

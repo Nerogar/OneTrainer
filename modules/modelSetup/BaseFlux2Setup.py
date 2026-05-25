@@ -36,7 +36,7 @@ class BaseFlux2Setup(
     metaclass=ABCMeta
 ):
     LAYER_PRESETS = {
-        "blocks": ["transformer_blocks"],
+        "blocks": ["transformer_block"],
         "full": [],
     }
 
@@ -102,7 +102,7 @@ class BaseFlux2Setup(
                 tokens_mask=batch.get("tokens_mask"),
                 text_encoder_sequence_length=config.text_encoder_sequence_length,
                 text_encoder_output=batch.get('text_encoder_hidden_state'),
-                text_encoder_dropout_probability=config.text_encoder.dropout_probability,
+                text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
             latent_image = model.patchify_latents(batch['latent_image'].float())
             latent_height = latent_image.shape[-2]

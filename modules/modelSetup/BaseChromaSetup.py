@@ -40,7 +40,7 @@ class BaseChromaSetup(
     LAYER_PRESETS = {
         "attn-mlp": ["attn", "ff.net"],
         "attn-only": ["attn"],
-        "blocks": ["transformer_blocks"],
+        "blocks": ["transformer_block"],
         "full": [],
     }
 
@@ -182,7 +182,7 @@ class BaseChromaSetup(
                 text_encoder_layer_skip=config.text_encoder_layer_skip,
                 text_encoder_output=batch['text_encoder_hidden_state'] \
                     if 'text_encoder_hidden_state' in batch and not config.train_text_encoder_or_embedding() else None,
-                text_encoder_dropout_probability=config.text_encoder.dropout_probability,
+                text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
 
             latent_image = batch['latent_image']
