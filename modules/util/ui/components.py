@@ -8,7 +8,7 @@ from typing import Any, Literal
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions
-from modules.util.ui.ToolTip import ToolTip
+from modules.util.ui.ToolTip import InfoTooltip
 from modules.util.ui.UIState import UIState
 from modules.util.ui.validation import DEFAULT_MAX_UNDO, FieldValidator, PathValidator
 
@@ -38,7 +38,7 @@ def label(master, row, column, text, pad=PAD, tooltip=None, wide_tooltip=False, 
     component = ctk.CTkLabel(master, text=text, wraplength=wraplength)
     component.grid(row=row, column=column, padx=pad, pady=pad, sticky="nw")
     if tooltip:
-        ToolTip(component, tooltip, wide=wide_tooltip)
+        InfoTooltip(component, tooltip, wide_wrap=wide_tooltip)
     return component
 
 
@@ -57,6 +57,7 @@ def entry(
         validator_factory: Callable[..., FieldValidator] | None = None,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
+        allow_negative: bool = False,
 ):
     var = ui_state.get_var(var_name)
     trace_id = None
@@ -79,6 +80,7 @@ def entry(
             max_undo=max_undo or DEFAULT_MAX_UNDO,
             extra_validate=extra_validate,
             required=required,
+            allow_negative=allow_negative,
         )
     validator.attach()
     component._validator = validator  # type: ignore[attr-defined]
@@ -103,7 +105,7 @@ def entry(
     component.destroy = new_destroy  # type: ignore[assignment]
 
     if tooltip:
-        ToolTip(component, tooltip, wide=wide_tooltip)
+        InfoTooltip(component, tooltip, wide_wrap=wide_tooltip)
 
     return component
 
@@ -361,7 +363,7 @@ def button(master, row, column, text, command, tooltip=None, **kwargs):
     component = ctk.CTkButton(master, text=text, command=command, **kwargs)
     component.grid(row=row, column=column, padx=padx, pady=pady, sticky="new")
     if tooltip:
-        ToolTip(component, tooltip, x_position=25)
+        InfoTooltip(component, tooltip, y_offset=25)
     return component
 
 
