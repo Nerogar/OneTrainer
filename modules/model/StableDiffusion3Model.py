@@ -174,8 +174,7 @@ class StableDiffusion3Model(BaseModel):
 
     def text_encoder_3_to(self, device: torch.device):
         if self.text_encoder_3 is not None:
-            if self.text_encoder_3_offload_conductor is not None and \
-                    self.text_encoder_3_offload_conductor.layer_offload_activated():
+            if self.text_encoder_3_offload_conductor is not None:
                 self.text_encoder_3_offload_conductor.to(device)
             else:
                 self.text_encoder_3.to(device=device)
@@ -184,8 +183,7 @@ class StableDiffusion3Model(BaseModel):
             self.text_encoder_3_lora.to(device)
 
     def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None and \
-                self.transformer_offload_conductor.layer_offload_activated():
+        if self.transformer_offload_conductor is not None:
             self.transformer_offload_conductor.to(device)
         else:
             self.transformer.to(device=device)
