@@ -69,6 +69,7 @@ class WuerstchenModel(BaseModel):
     decoder_vqgan: PaellaVQModel | None
     effnet_encoder: WuerstchenEfficientNetEncoder | None
     prior_tokenizer: CLIPTokenizer | None
+    orig_prior_tokenizer: CLIPTokenizer | None
     prior_text_encoder: CLIPTextModel | None
     prior_noise_scheduler: DDPMWuerstchenScheduler | None
     prior_prior: WuerstchenPrior | StableCascadeUNet | None
@@ -105,6 +106,7 @@ class WuerstchenModel(BaseModel):
         self.decoder_vqgan = None
         self.effnet_encoder = None
         self.prior_tokenizer = None
+        self.orig_prior_tokenizer = None
         self.prior_text_encoder = None
         self.prior_noise_scheduler = None
         self.prior_prior = None
@@ -179,7 +181,8 @@ class WuerstchenModel(BaseModel):
         self.prior_text_encoder.eval()
         self.prior_prior.eval()
 
-    def create_pipeline(self) -> DiffusionPipeline:
+    def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
+        prior_tokenizer = self.orig_prior_tokenizer if use_original_tokenizers else self.prior_tokenizer
         if self.model_type.is_wuerstchen_v2():
             return WuerstchenCombinedPipeline(
                 tokenizer=self.decoder_tokenizer,
@@ -187,19 +190,19 @@ class WuerstchenModel(BaseModel):
                 decoder=self.decoder_decoder,
                 scheduler=self.decoder_noise_scheduler,
                 vqgan=self.decoder_vqgan,
-                prior_tokenizer=self.prior_tokenizer,
+                prior_tokenizer=prior_tokenizer,
                 prior_text_encoder=self.prior_text_encoder,
                 prior_prior=self.prior_prior,
                 prior_scheduler=self.prior_noise_scheduler,
             )
         elif self.model_type.is_stable_cascade():
             return StableCascadeCombinedPipeline(
-                tokenizer=self.prior_tokenizer,
+                tokenizer=prior_tokenizer,
                 text_encoder=self.prior_text_encoder,
                 decoder=self.decoder_decoder,
                 scheduler=self.decoder_noise_scheduler,
                 vqgan=self.decoder_vqgan,
-                prior_tokenizer=self.prior_tokenizer,
+                prior_tokenizer=prior_tokenizer,
                 prior_text_encoder=self.prior_text_encoder,
                 prior_prior=self.prior_prior,
                 prior_scheduler=self.prior_noise_scheduler,

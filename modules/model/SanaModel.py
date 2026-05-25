@@ -41,6 +41,7 @@ class SanaModelEmbedding:
 class SanaModel(BaseModel):
     # base model data
     tokenizer: GemmaTokenizer | None
+    orig_tokenizer: GemmaTokenizer | None
     noise_scheduler: DDIMScheduler | None
     text_encoder: Gemma2Model | None
     vae: AutoencoderDC | None
@@ -74,6 +75,7 @@ class SanaModel(BaseModel):
         )
 
         self.tokenizer = None
+        self.orig_tokenizer = None
         self.noise_scheduler = None
         self.text_encoder = None
         self.vae = None
@@ -143,9 +145,9 @@ class SanaModel(BaseModel):
         self.text_encoder.eval()
         self.transformer.eval()
 
-    def create_pipeline(self) -> DiffusionPipeline:
+    def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
         return SanaPipeline(
-            tokenizer=self.tokenizer,
+            tokenizer=self.orig_tokenizer if use_original_tokenizers else self.tokenizer,
             text_encoder=self.text_encoder,
             vae=self.vae,
             transformer=self.transformer,
