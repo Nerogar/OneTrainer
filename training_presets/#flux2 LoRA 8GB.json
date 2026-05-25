@@ -19,8 +19,8 @@
     },
     "train_dtype": "BFLOAT_16",
     "output_dtype": "BFLOAT_16",
-    "layer_filter": "blocks",
-    "layer_filter_preset": "transformer_block",
+    "layer_filter": "transformer_block",
+    "layer_filter_preset": "blocks",
     "quantization": {
         "layer_filter": "transformer_block",
         "layer_filter_preset": "blocks"

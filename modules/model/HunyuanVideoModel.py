@@ -58,6 +58,8 @@ class HunyuanVideoModelEmbedding:
 
 
 class HunyuanVideoModel(BaseModel):
+    NATIVE_FPS = 24
+
     # base model data
     tokenizer_1: LlamaTokenizerFast | None
     tokenizer_2: CLIPTokenizer | None

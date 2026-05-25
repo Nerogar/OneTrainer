@@ -14,8 +14,8 @@ from torch import Tensor, nn
 from diffusers import ConfigMixin, DDPMWuerstchenScheduler, DiffusionPipeline, ModelMixin, WuerstchenCombinedPipeline
 from diffusers.configuration_utils import register_to_config
 from diffusers.models import StableCascadeUNet
+from diffusers.pipelines.deprecated.wuerstchen import PaellaVQModel, WuerstchenDiffNeXt, WuerstchenPrior
 from diffusers.pipelines.stable_cascade import StableCascadeCombinedPipeline
-from diffusers.pipelines.wuerstchen import PaellaVQModel, WuerstchenDiffNeXt, WuerstchenPrior
 from transformers import CLIPTextModel, CLIPTokenizer
 
 

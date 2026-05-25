@@ -100,7 +100,7 @@ class BaseZImageSetup(
                 tokens=batch.get("tokens"),
                 tokens_mask=batch.get("tokens_mask"),
                 text_encoder_output=batch.get('text_encoder_hidden_state'),
-                text_encoder_dropout_probability=config.text_encoder.dropout_probability,
+                text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
             scaled_latent_image = model.scale_latents(batch['latent_image'])
 
