@@ -397,6 +397,23 @@ class LoKrModule(PeftBase):
             nn.init.kaiming_uniform_(self.lokr_w2_a, a=math.sqrt(5))
             nn.init.constant_(self.lokr_w2_b, 0)
 
+        if self.weight_decompose:
+            if isinstance(self.orig_module, nn.Linear):
+                orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
+            else:
+                orig_weight = self.orig_module.weight.detach().float()
+
+            dora_num_dims = orig_weight.dim() - 1
+            if self.dora_on_output:
+                dora_scale_val = torch.norm(orig_weight.reshape(orig_weight.shape[0], -1), dim=1, keepdim=True).reshape(orig_weight.shape[0], *[1] * dora_num_dims)
+            else:
+                dora_scale_val = torch.norm(orig_weight.transpose(1, 0).reshape(orig_weight.shape[1], -1), dim=1, keepdim=True).reshape(orig_weight.shape[1], *[1] * dora_num_dims).transpose(0, 1)
+
+            self.lokr_dora_scale = Parameter(
+                dora_scale_val.to(device=self.orig_module.weight.device, dtype=self.orig_module.weight.dtype)
+            )
+            del orig_weight
+
     def _get_factors(self):
         """Returns the two kronecker components W1 and W2."""
         # If using DoRA (weight_decompose), we want clean weights here so we can
@@ -432,20 +449,6 @@ class LoKrModule(PeftBase):
 
         # DoRA for LoKr
         if self.weight_decompose:
-            if self.lokr_dora_scale is None:
-                if isinstance(self.orig_module, nn.Linear):
-                    orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
-                else:
-                    orig_weight = self.orig_module.weight.detach().float()
-
-                dora_num_dims = orig_weight.dim() - 1
-                if self.dora_on_output:
-                    dora_scale_val = torch.norm(orig_weight.reshape(orig_weight.shape[0], -1), dim=1, keepdim=True).reshape(orig_weight.shape[0], *[1] * dora_num_dims)
-                else:
-                    dora_scale_val = torch.norm(orig_weight.transpose(1, 0).reshape(orig_weight.shape[1], -1), dim=1, keepdim=True).reshape(orig_weight.shape[1], *[1] * dora_num_dims).transpose(0, 1)
-
-                self.lokr_dora_scale = Parameter(dora_scale_val).to(device=self.orig_module.weight.device, dtype=self.orig_module.weight.dtype)
-                del orig_weight
 
             if isinstance(self.orig_module, nn.Linear):
                 orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
