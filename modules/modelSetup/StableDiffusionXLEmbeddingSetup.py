@@ -1,6 +1,10 @@
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseStableDiffusionXLSetup import BaseStableDiffusionXLSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
@@ -71,9 +75,10 @@ class StableDiffusionXLEmbeddingSetup(
         self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
-        self.__setup_requires_grad(model, config)
 
-        init_model_parameters(model, self.create_parameters(model, config), self.train_device)
+        params = self.create_parameters(model, config)
+        self.__setup_requires_grad(model, config)
+        init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
             self,
@@ -104,3 +109,6 @@ class StableDiffusionXLEmbeddingSetup(
             model.embedding_wrapper_1.normalize_embeddings()
             model.embedding_wrapper_2.normalize_embeddings()
         self.__setup_requires_grad(model, config)
+
+factory.register(BaseModelSetup, StableDiffusionXLEmbeddingSetup, ModelType.STABLE_DIFFUSION_XL_10_BASE, TrainingMethod.EMBEDDING)
+factory.register(BaseModelSetup, StableDiffusionXLEmbeddingSetup, ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING, TrainingMethod.EMBEDDING)

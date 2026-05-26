@@ -6,7 +6,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 
 ## Features
 
--   **Supported models**: Qwen Image, FLUX.1, Chroma, Stable Diffusion 1.5, 2.0, 2.1, 3.0, 3.5, SDXL, Würstchen-v2, Stable Cascade,
+-   **Supported models**: Ernie Image, Z-Image, Qwen Image, FLUX.1, Flux.2 Dev and Klein, Chroma, Stable Diffusion 1.5, 2.0, 2.1, 3.0, 3.5, SDXL, Würstchen-v2, Stable Cascade,
     PixArt-Alpha, PixArt-Sigma, Sana, Hunyuan Video and inpainting models
 -   **Model formats**: diffusers and ckpt models
 -   **Training methods**: Full fine-tuning, LoRA, embeddings
@@ -34,7 +34,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 ## Installation
 
 > [!IMPORTANT]
-> Installing OneTrainer requires Python >=3.10 and <3.13.
+> Installing OneTrainer requires Python >=3.10 and <3.14.
 > You can download Python at https://www.python.org/downloads/windows/.
 > Then follow the below steps.
 
@@ -45,15 +45,15 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
     - Windows: Double click or execute `install.bat`
     - Linux and Mac: Execute `install.sh`
 
-    #### Manual installation
+#### Manual installation
 
-    1. Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
-    2. Navigate into the cloned directory `cd OneTrainer`
-    3. Set up a virtual environment `python -m venv venv`
-    4. Activate the new venv:
-        - Windows: `venv/scripts/activate`
-        - Linux and Mac: Depends on your shell, activate the venv accordingly
-    5. Install the requirements `pip install -r requirements.txt`
+1. Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
+2. Navigate into the cloned directory `cd OneTrainer`
+3. Set up a virtual environment `python -m venv venv`
+4. Activate the new venv:
+    - Windows: `venv\scripts\activate`
+    - Linux and Mac: Depends on your shell, activate the venv accordingly
+5. Install the requirements `pip install -r requirements.txt`
 
 > [!Tip]
 > Some Linux distributions are missing required packages for instance: On Ubuntu you must install `libGL`:
@@ -63,7 +63,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 > sudo apt-get install libgl1
 > ```
 >
-> Additionally it's been reported Alpine, Arch and Xubuntuu Linux may be missing `tkinter`. Install it via `apk add py3-tk` for Alpine and `sudo pacman -S tk` for Arch.
+> Additionally it's been reported Alpine, Arch and Xubuntu Linux may be missing `tkinter`. Install it via `apk add py3-tk` for Alpine and `sudo pacman -S tk` for Arch.
 
 ## Updating
 
@@ -131,8 +131,7 @@ These will both create a `debug_report.log`.
 
 ## Contributing
 
-Contributions are always welcome in any form. You can open issues, participate in discussions, or even open pull
-requests for new or improved functionality. You can find more information about contributing [here](docs/Contributing.md).
+Contributions are always welcome in any form. For new functionality please open a Github discussion or join our discord so that we can align and avoid duplicated work. You can find more information about contributing [here](docs/Contributing.md).
 
 Before you start looking at the code, I recommend reading about the project structure [here](docs/ProjectStructure.md).
 For in depth discussions, you should consider joining the [Discord](https://discord.gg/KwgcQd5scF) server.

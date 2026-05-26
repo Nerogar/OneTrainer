@@ -3,7 +3,7 @@ from collections.abc import Callable
 
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
-from modules.util import create
+from modules.util import create, factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
@@ -191,3 +191,6 @@ class PixArtAlphaSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
+
+factory.register(BaseModelSampler, PixArtAlphaSampler, ModelType.PIXART_ALPHA)
+factory.register(BaseModelSampler, PixArtAlphaSampler, ModelType.PIXART_SIGMA)

@@ -1,11 +1,10 @@
 from modules.model.QwenModel import QwenModel
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
+from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
 from torch import Tensor
-
-from omi_model_standards.convert.lora.convert_lora_util import LoraConversionKeySet
 
 
 class QwenLoRASaver(

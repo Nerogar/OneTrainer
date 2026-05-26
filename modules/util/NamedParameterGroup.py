@@ -42,6 +42,7 @@ class NamedParameterGroupCollection:
 
             # Create a parameter group for the text encoder
             parameters.append({
+                'name': group.display_name,
                 'params': list(group.parameters),
                 'lr': lr,
                 'initial_lr': lr,

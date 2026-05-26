@@ -285,7 +285,7 @@ def subfolder_scan(conceptconfig : ConceptConfig, advanced_checks : bool, wait_t
 
     for dir in subfolders:
         stats_dict = folder_scan(dir, stats_dict, advanced_checks, start_time, wait_time, cancel_scan_flag)
-        subfolders.extend([f for f in os.scandir(dir) if f.is_dir()])
+        subfolders.extend([f for f in os.scandir(dir) if f.is_dir() and not f.name.startswith('.')])
 
     return stats_dict
 
@@ -302,7 +302,7 @@ def subfolder_scan_threaded(conceptconfig : ConceptConfig, advanced_checks : boo
         stats_futures = []
         for dir in subfolders:
             stats_futures += [executor.submit(folder_scan, dir, init_concept_stats(advanced_checks), advanced_checks, start_time, wait_time, cancel_scan_flag)]
-            subfolders.extend([f.path for f in os.scandir(dir) if f.is_dir()])
+            subfolders.extend([f.path for f in os.scandir(dir) if f.is_dir() and not os.path.basename(f.path).startswith('.')])
         stats_results = [f.result() for f in stats_futures]
 
     final_stats = combine_stats_dicts(stats_results, conceptconfig, advanced_checks)

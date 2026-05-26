@@ -14,11 +14,16 @@
     "dynamic_timestep_shifting": false,
     "train_dtype": "BFLOAT_16",
     "training_method": "LORA",
-    "weight_dtype": "FLOAT_8",
+    "transformer": {
+        "train": true,
+        "weight_dtype": "FLOAT_8"
+    },
     "text_encoder": {
-        "train": false
+        "train": false,
+        "weight_dtype": "FLOAT_8"
     },
     "text_encoder_2": {
-        "train": false
+        "train": false,
+        "weight_dtype": "FLOAT_8"
     }
 }

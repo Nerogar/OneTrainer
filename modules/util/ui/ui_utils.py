@@ -1,4 +1,3 @@
-import contextlib
 import platform
 import sys
 import tkinter as tk
@@ -100,22 +99,3 @@ def set_window_icon(window: tk.Tk | tk.Toplevel | CTk | CTkToplevel) -> None:
 
     except Exception as e:
         print(f"Failed to set window icon: {e}")
-
-class DebounceTimer:
-    def __init__(self, widget, delay_ms: int, callback: Callable[..., Any]):
-        self.widget = widget
-        self.delay_ms = delay_ms
-        self.callback = callback
-        self._after_id: str | None = None
-
-    def call(self, *args, **kwargs):
-        if self._after_id:
-            with contextlib.suppress(tk.TclError):
-                self.widget.after_cancel(self._after_id)
-
-        def fire():
-            self._after_id = None
-            self.callback(*args, **kwargs)
-
-        with contextlib.suppress(tk.TclError):
-            self._after_id = self.widget.after(self.delay_ms, fire)

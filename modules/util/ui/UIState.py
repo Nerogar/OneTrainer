@@ -1,4 +1,3 @@
-import contextlib
 import tkinter as tk
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -48,6 +47,9 @@ class UIState:
 
     def remove_var_trace(self, name, trace_id):
         self.__var_traces[name].pop(trace_id)
+
+    def remove_all_var_traces(self, name):
+        self.__var_traces[name] = {}
 
     def __call_var_traces(self, name):
         for trace in self.__var_traces[name].values():
@@ -116,8 +118,10 @@ class UIState:
                 elif string_var == "-inf":
                     obj[name] = int("-inf")
                 else:
-                    with contextlib.suppress(ValueError):
+                    try:
                         obj[name] = int(string_var)
+                    except ValueError:
+                        obj[name] = None
                 self.__call_var_traces(name)
         else:
             def update(_0, _1, _2):
@@ -129,8 +133,10 @@ class UIState:
                 elif string_var == "-inf":
                     setattr(obj, name, int("-inf"))
                 else:
-                    with contextlib.suppress(ValueError):
+                    try:
                         setattr(obj, name, int(string_var))
+                    except ValueError:
+                        setattr(obj, name, None)
                 self.__call_var_traces(name)
 
         return update
@@ -146,8 +152,10 @@ class UIState:
                 elif string_var == "-inf":
                     obj[name] = float("-inf")
                 else:
-                    with contextlib.suppress(ValueError):
+                    try:
                         obj[name] = float(string_var)
+                    except ValueError:
+                        obj[name] = None
                 self.__call_var_traces(name)
         else:
             def update(_0, _1, _2):
@@ -159,8 +167,10 @@ class UIState:
                 elif string_var == "-inf":
                     setattr(obj, name, float("-inf"))
                 else:
-                    with contextlib.suppress(ValueError):
+                    try:
                         setattr(obj, name, float(string_var))
+                    except ValueError:
+                        setattr(obj, name, None)
                 self.__call_var_traces(name)
 
         return update

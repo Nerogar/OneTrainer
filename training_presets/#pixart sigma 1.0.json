@@ -7,12 +7,15 @@
     "output_model_destination": "models/model",
     "output_model_format": "SAFETENSORS",
     "resolution": "1024",
-    "text_encoder": {
-        "train": false
-    },
     "training_method": "FINE_TUNE",
+    "transformer": {
+        "weight_dtype": "BFLOAT_16"
+    },
+    "text_encoder": {
+        "train": false,
+        "weight_dtype": "BFLOAT_16"
+    },
     "vae": {
         "weight_dtype": "FLOAT_32"
-    },
-    "weight_dtype": "BFLOAT_16"
+    }
 }

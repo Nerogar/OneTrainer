@@ -11,6 +11,12 @@
         "model_name": "TODO: MANUALLY DOWNLOAD EFFNET WEIGHTS",
         "weight_dtype": "FLOAT_16"
     },
+    "prior": {
+        "weight_dtype": "BFLOAT_16"
+    },
+    "text_encoder": {
+        "weight_dtype": "BFLOAT_16"
+    },
     "model_type": "STABLE_CASCADE_1",
     "optimizer": {
         "__version": 0,
@@ -47,7 +53,6 @@
     "output_model_format": "SAFETENSORS",
     "resolution": "1024",
     "training_method": "FINE_TUNE",
-    "weight_dtype": "BFLOAT_16",
     "loss_weight_fn": "P2",
     "loss_weight_strength": 1.0
 }

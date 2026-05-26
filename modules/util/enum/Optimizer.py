@@ -21,7 +21,6 @@ class Optimizer(Enum):
 
     AdEMAMix = 'AdEMAMix'
     AdEMAMix_8BIT = "AdEMAMix_8BIT"
-    SIMPLIFIED_AdEMAMix = "SIMPLIFIED_AdEMAMix"
 
     ADOPT = 'ADOPT'
     ADOPT_ADV = 'ADOPT_ADV'
@@ -42,6 +41,7 @@ class Optimizer(Enum):
     # 32 bit is torch and not bnb
     SGD = 'SGD'
     SGD_8BIT = 'SGD_8BIT'
+    SIGNSGD_ADV = 'SIGNSGD_ADV'
 
     # Schedule-free optimizers
     SCHEDULE_FREE_ADAMW = 'SCHEDULE_FREE_ADAMW'
@@ -58,7 +58,6 @@ class Optimizer(Enum):
     PRODIGY = 'PRODIGY'
     PRODIGY_PLUS_SCHEDULE_FREE = 'PRODIGY_PLUS_SCHEDULE_FREE'
     PRODIGY_ADV = 'PRODIGY_ADV'
-    LION_PRODIGY_ADV = 'LION_PRODIGY_ADV'
 
     # ADAFACTOR
     ADAFACTOR = 'ADAFACTOR'
@@ -66,6 +65,11 @@ class Optimizer(Enum):
     # CAME
     CAME = 'CAME'
     CAME_8BIT = 'CAME_8BIT'
+
+    # MUON
+    MUON = 'MUON'
+    MUON_ADV = 'MUON_ADV'
+    ADAMUON_ADV = 'ADAMUON_ADV'
 
     #Pytorch Optimizers
     ADABELIEF = 'ADABELIEF'
@@ -84,7 +88,6 @@ class Optimizer(Enum):
             self.PRODIGY,
             self.PRODIGY_PLUS_SCHEDULE_FREE,
             self.PRODIGY_ADV,
-            self.LION_PRODIGY_ADV,
         ]
 
     @property
@@ -104,11 +107,12 @@ class Optimizer(Enum):
             Optimizer.ADAMW,
             Optimizer.ADAMW_ADV,
             Optimizer.ADOPT_ADV,
-            Optimizer.SIMPLIFIED_AdEMAMix,
             Optimizer.PRODIGY_PLUS_SCHEDULE_FREE,
             Optimizer.PRODIGY_ADV,
             Optimizer.LION_ADV,
-            Optimizer.LION_PRODIGY_ADV,
+            Optimizer.MUON_ADV,
+            Optimizer.ADAMUON_ADV,
+            Optimizer.SIGNSGD_ADV,
         ]
 
     # Small helper for adjusting learning rates to adaptive optimizers.

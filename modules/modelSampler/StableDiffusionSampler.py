@@ -3,7 +3,7 @@ from collections.abc import Callable
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
-from modules.util import create
+from modules.util import create, factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
@@ -429,3 +429,12 @@ class StableDiffusionSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
+
+factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_15)
+factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_15_INPAINTING)
+factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_20)
+factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_20_BASE)
+factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_20_INPAINTING)
+factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_20_DEPTH)
+factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_21)
+factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_21_BASE)

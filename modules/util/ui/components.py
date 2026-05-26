@@ -1,12 +1,16 @@
 import contextlib
+import tkinter as tk
 from collections.abc import Callable
+from pathlib import Path
 from tkinter import filedialog
-from typing import Any
+from typing import Any, Literal
 
+from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions
 from modules.util.ui.ToolTip import ToolTip
 from modules.util.ui.UIState import UIState
+from modules.util.ui.validation import DEFAULT_MAX_UNDO, FieldValidator, PathValidator
 
 import customtkinter as ctk
 from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
@@ -44,11 +48,15 @@ def entry(
         column,
         ui_state: UIState,
         var_name: str,
-        command: Callable[[], None] = None,
+        command: Callable[[], None] | None = None,
         tooltip: str = "",
         wide_tooltip: bool = False,
         width: int = 140,
         sticky: str = "new",
+        max_undo: int | None = None,
+        validator_factory: Callable[..., FieldValidator] | None = None,
+        extra_validate: Callable[[str], str | None] | None = None,
+        required: bool = False,
 ):
     var = ui_state.get_var(var_name)
     trace_id = None
@@ -58,140 +66,41 @@ def entry(
     component = ctk.CTkEntry(master, textvariable=var, width=width)
     component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky=sticky)
 
-    try:
-        original_border_color = component.cget("border_color")
-    except Exception:
-        original_border_color = "gray50"
-
-    error_border_color = "#dc3545"
-
-    validation_after_id = None
-    revert_after_id = None
-    touched = False
-
-    DEBOUNCE_STOP_TYPING_MS = 1500
-    DEBOUNCED_INVALID_REVERT_MS = 1000
-    FOCUSOUT_INVALID_REVERT_MS = 1200
-
-    last_valid_value = var.get()
-
-    def validate_value(value: str, revert_delay_ms: int | None) -> bool:
-        nonlocal revert_after_id, last_valid_value
-        meta = ui_state.get_field_metadata(var_name)
-        declared_type = meta.type
-        nullable = meta.nullable
-        default_val = meta.default
-
-        if revert_after_id:
-            with contextlib.suppress(Exception):
-                component.after_cancel(revert_after_id)
-            revert_after_id = None
-
-        def success():
-            nonlocal last_valid_value
-            component.configure(border_color=original_border_color)
-            last_valid_value = value
-            return True
-
-        def do_revert():
-            var.set(last_valid_value)
-            component.configure(border_color=original_border_color)
-
-        def fail(_reason: str):
-            nonlocal revert_after_id
-            component.configure(border_color=error_border_color)
-            if revert_delay_ms is not None:
-                revert_after_id = component.after(revert_delay_ms, do_revert)
-            else:
-                do_revert()
-            return False
-
-        if value == "":
-            if nullable:
-                return success()
-            if declared_type is str:
-                if default_val == "":
-                    return success()
-                return fail("Value required")
-
-        try:
-            if declared_type is int:
-                int(value)
-            elif declared_type is float:
-                float(value)
-            elif declared_type is bool:
-                if value.lower() not in ("true", "false", "0", "1"):
-                    return fail("Invalid bool")
-            return success()
-        except ValueError:
-            return fail("Invalid value")
-
-    def debounced_validate(*_):
-        nonlocal validation_after_id, revert_after_id
-        if not touched:
-            if validation_after_id:
-                with contextlib.suppress(Exception):
-                    component.after_cancel(validation_after_id)
-                validation_after_id = None
-            return
-        if revert_after_id:
-            with contextlib.suppress(Exception):
-                component.after_cancel(revert_after_id)
-            revert_after_id = None
-        if validation_after_id:
-            with contextlib.suppress(Exception):
-                component.after_cancel(validation_after_id)
-        validation_after_id = component.after(
-            DEBOUNCE_STOP_TYPING_MS,
-            lambda: validate_value(var.get(), DEBOUNCED_INVALID_REVERT_MS)
+    if validator_factory is not None:
+        validator = validator_factory(
+            component, var, ui_state, var_name,
+            max_undo=max_undo or DEFAULT_MAX_UNDO,
+            extra_validate=extra_validate,
+            required=required,
         )
-
-    validation_trace_name = var.trace_add("write", debounced_validate)
-
-    def on_focus_in(_e=None):
-        nonlocal touched
-        touched = False
-
-    def on_user_input(_e=None):
-        nonlocal touched
-        touched = True
-
-    def on_focus_out(_e=None):
-        # only validate on focus-out if the user interacted with the field.
-        if touched:
-            validate_value(var.get(), FOCUSOUT_INVALID_REVERT_MS)
-
-    component.bind("<FocusIn>", on_focus_in)
-    component.bind("<Key>", on_user_input)
-    component.bind("<<Paste>>", on_user_input)
-    component.bind("<<Cut>>", on_user_input)
-    component.bind("<FocusOut>", on_focus_out)
+    else:
+        validator = FieldValidator(
+            component, var, ui_state, var_name,
+            max_undo=max_undo or DEFAULT_MAX_UNDO,
+            extra_validate=extra_validate,
+            required=required,
+        )
+    validator.attach()
+    component._validator = validator  # type: ignore[attr-defined]
 
     original_destroy = component.destroy
 
     def new_destroy():
+        validator.detach()
+
         # 'temporary' fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
         # unfortunately Tom has admitted to forgetting about how to maintain CTK so this likely will never be merged
-        nonlocal validation_after_id, revert_after_id
         if component._textvariable_callback_name:
-            component._textvariable.trace_remove("write", component._textvariable_callback_name)
+            with contextlib.suppress(tk.TclError):
+                component._textvariable.trace_remove("write", component._textvariable_callback_name)  # type: ignore[union-attr]
             component._textvariable_callback_name = ""
-
-        if validation_after_id:
-            with contextlib.suppress(Exception):
-                component.after_cancel(validation_after_id)
-        if revert_after_id:
-            with contextlib.suppress(Exception):
-                component.after_cancel(revert_after_id)
-
-        var.trace_remove("write", validation_trace_name)
 
         if command is not None and trace_id is not None:
             ui_state.remove_var_trace(var_name, trace_id)
 
         original_destroy()
 
-    component.destroy = new_destroy
+    component.destroy = new_destroy  # type: ignore[assignment]
 
     if tooltip:
         ToolTip(component, tooltip, wide=wide_tooltip)
@@ -199,76 +108,110 @@ def entry(
     return component
 
 
-def file_entry(
+def json_path_modifier(x: str | Path) -> Path:
+    x = Path(x).absolute()
+    return x.parent if x.suffix == ".json" else x
+
+
+def path_entry(
         master, row, column, ui_state: UIState, var_name: str,
-        is_output: bool = False,
-        path_modifier: Callable[[str], str] = None,
+        *,
+        mode: Literal["file", "dir"] = "file",
+        io_type: PathIOType = PathIOType.INPUT,
+        path_modifier: Callable[[str], str | Path] | None = None,
         allow_model_files: bool = True,
         allow_image_files: bool = False,
-        command: Callable[[str], None] = None,
+        command: Callable[[str], None] | None = None,
+        extra_validate: Callable[[str], str | None] | None = None,
+        required: bool = False,
 ):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
     frame.grid_columnconfigure(0, weight=1)
 
-    entry(frame,row=0, column=0, ui_state=ui_state, var_name=var_name)
+    def _path_validator_factory(comp, var, state, name, **kw):
+        return PathValidator(comp, var, state, name, io_type=io_type, **kw)
+
+    entry_component = entry(
+        frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
+        validator_factory=_path_validator_factory,
+        extra_validate=extra_validate,
+        required=required,
+    )
+
+    trace_ids = []
+    if io_type in (PathIOType.OUTPUT, PathIOType.MODEL):
+        validator = getattr(entry_component, '_validator', None)
+        if validator is not None:
+            for dep_var_name in ("prevent_overwrites", "output_model_format"):
+                with contextlib.suppress(KeyError, AttributeError):
+                    dep_var = ui_state.get_var(dep_var_name)
+                    tid = dep_var.trace_add("write", lambda *_a: validator.revalidate())
+                    trace_ids.append((dep_var, tid))
+
+    use_save_dialog = io_type in (PathIOType.OUTPUT, PathIOType.MODEL)
 
     def __open_dialog():
-        filetypes = [
-            ("All Files", "*.*"),
-        ]
+        # Determine currently selected filename and/or directory
+        current_dir, current_filename = None, None
+        current_path_str = ui_state.get_var(var_name).get() or None
 
-        if allow_model_files:
-            filetypes.extend([
-                ("Diffusers", "model_index.json"),
-                ("Checkpoint", "*.ckpt *.pt *.bin"),
-                ("Safetensors", "*.safetensors"),
-            ])
-        if allow_image_files:
-            filetypes.extend([
-                ("Image", ' '.join([f"*.{x}" for x in supported_image_extensions()])),
-            ])
+        if current_path_str is not None:
+            current_path = Path(current_path_str)
+            if mode == "file":
+                current_dir = str(current_path.parent)
+                current_filename = str(current_path.name)
+            elif mode == "dir":
+                current_dir = str(current_path.parent)
+                current_filename = None
 
-        if is_output:
-            file_path = filedialog.asksaveasfilename(filetypes=filetypes)
+        if mode == "dir":
+            chosen = filedialog.askdirectory(initialdir=current_dir)
         else:
-            file_path = filedialog.askopenfilename(filetypes=filetypes)
+            filetypes = [
+                ("All Files", "*.*"),
+            ]
 
-        if file_path:
+            if allow_model_files:
+                filetypes.extend([
+                    ("Diffusers", "model_index.json"),
+                    ("Checkpoint", "*.ckpt *.pt *.bin"),
+                    ("Safetensors", "*.safetensors"),
+                ])
+            if allow_image_files:
+                filetypes.extend([
+                    ("Image", ' '.join([f"*.{x}" for x in supported_image_extensions()])),
+                ])
+
+            if use_save_dialog:
+                chosen = filedialog.asksaveasfilename(filetypes=filetypes, initialdir=current_dir,
+                                                      initialfile=current_filename)
+            else:
+                chosen = filedialog.askopenfilename(filetypes=filetypes, initialdir=current_dir,
+                                                    initialfile=current_filename)
+
+        if chosen:
             if path_modifier:
-                file_path = path_modifier(file_path)
+                chosen = path_modifier(chosen)
 
-            ui_state.get_var(var_name).set(file_path)
+            chosen_str = str(chosen)
+            ui_state.get_var(var_name).set(chosen_str)
 
             if command:
-                command(file_path)
+                command(chosen_str)
 
     button_component = ctk.CTkButton(frame, text="...", width=40, command=__open_dialog)
     button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
 
-    return frame
-
-
-def dir_entry(master, row, column, ui_state: UIState, var_name: str, command: Callable[[str], None] = None):
-    frame = ctk.CTkFrame(master, fg_color="transparent")
-    frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
-
-    frame.grid_columnconfigure(0, weight=1)
-
-    entry(frame, row=0, column=0, ui_state=ui_state, var_name=var_name)
-
-    def __open_dialog():
-        dir_path = filedialog.askdirectory()
-
-        if dir_path:
-            ui_state.get_var(var_name).set(dir_path)
-
-            if command:
-                command(dir_path)
-
-    button_component = ctk.CTkButton(frame, text="...", width=40, command=__open_dialog)
-    button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
+    if trace_ids:
+        original_frame_destroy = frame.destroy
+        def _frame_destroy():
+            for dep_var, tid in trace_ids:
+                with contextlib.suppress(tk.TclError, ValueError):
+                    dep_var.trace_remove("write", tid)
+            original_frame_destroy()
+        frame.destroy = _frame_destroy  # type: ignore[assignment]
 
     return frame
 
@@ -296,6 +239,113 @@ def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_n
 
     return frame
 
+def layer_filter_entry(master, row, column, ui_state: UIState, preset_var_name: str, preset_label: str, preset_tooltip: str, presets, entry_var_name, entry_tooltip: str, regex_var_name, regex_tooltip: str, frame_color=None):
+    frame = ctk.CTkFrame(master=master, corner_radius=5, fg_color=frame_color)
+    frame.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
+    frame.grid_columnconfigure(0, weight=1)
+
+    layer_entry = entry(
+        frame, 1, 0, ui_state, entry_var_name,
+        tooltip=entry_tooltip
+    )
+    layer_entry_fg_color = layer_entry.cget("fg_color")
+    layer_entry_text_color = layer_entry.cget("text_color")
+
+    regex_label = label(
+        frame, 2, 0, "Use Regex",
+        tooltip=regex_tooltip,
+    )
+    regex_switch = switch(
+        frame, 2, 1, ui_state, regex_var_name
+    )
+
+    # Let the user set their own layer filter
+    # TODO
+    #if self.train_config.layer_filter and self.train_config.layer_filter_preset == "custom":
+    #    self.prior_custom = self.train_config.layer_filter
+    #else:
+    #    self.prior_custom = ""
+
+    layer_entry.grid_configure(columnspan=2, sticky="ew")
+
+    presets_list = list(presets.keys()) + ["custom"]
+
+
+    def hide_layer_entry():
+        if layer_entry and layer_entry.winfo_manager():
+            layer_entry.grid_remove()
+
+    def show_layer_entry():
+        if layer_entry and not layer_entry.winfo_manager():
+            layer_entry.grid()
+
+
+    def preset_set_layer_choice(selected: str):
+        if not selected or selected not in presets_list:
+            selected = presets_list[0]
+
+        if selected == "custom":
+            # Allow editing + regex toggle
+            show_layer_entry()
+            layer_entry.configure(state="normal", fg_color=layer_entry_fg_color, text_color=layer_entry_text_color)
+            #layer_entry.cget('textvariable').set("")
+            regex_label.grid()
+            regex_switch.grid()
+        else:
+            # Preserve custom text before overwriting
+            #if self.prior_selected == "custom":
+            #    self.prior_custom = self.layer_entry.get()
+
+            # Resolve preset definition (list[str] OR {'patterns': [...], 'regex': bool})
+            preset_def = presets.get(selected, [])
+            if isinstance(preset_def, dict):
+                patterns = preset_def.get("patterns", [])
+                preset_uses_regex = bool(preset_def.get("regex", False))
+            else:
+                patterns = preset_def
+                preset_uses_regex = False
+
+            disabled_color = ("gray85", "gray17")
+            disabled_text_color = ("gray30", "gray70")
+            layer_entry.configure(state="disabled", fg_color=disabled_color, text_color=disabled_text_color)
+            layer_entry.cget('textvariable').set(",".join(patterns))
+
+            ui_state.get_var(entry_var_name).set(",".join(patterns))
+            ui_state.get_var(regex_var_name).set(preset_uses_regex)
+
+            regex_label.grid_remove()
+            regex_switch.grid_remove()
+
+            if selected == "full" and not patterns:
+                hide_layer_entry()
+            else:
+                show_layer_entry()
+
+#        self.prior_selected = selected
+
+    label(frame, 0, 0, preset_label,
+                     tooltip=preset_tooltip)
+
+
+    ui_state.remove_all_var_traces(preset_var_name)
+
+    layer_selector = options(
+        frame, 0, 1, presets_list, ui_state, preset_var_name,
+        command=preset_set_layer_choice
+    )
+
+    def on_layer_filter_preset_change():
+        if not layer_selector:
+            return
+        selected = ui_state.get_var(preset_var_name).get()
+        preset_set_layer_choice(selected)
+
+    ui_state.add_var_trace(
+        preset_var_name,
+        on_layer_filter_preset_change,
+    )
+
+    preset_set_layer_choice(layer_selector.get())
 
 def icon_button(master, row, column, text, command):
     component = ctk.CTkButton(master, text=text, width=40, command=command)
@@ -315,7 +365,7 @@ def button(master, row, column, text, command, tooltip=None, **kwargs):
     return component
 
 
-def options(master, row, column, values, ui_state: UIState, var_name: str, command: Callable[[str], None] = None):
+def options(master, row, column, values, ui_state: UIState, var_name: str, command: Callable[[str], None] | None = None):
     component = ctk.CTkOptionMenu(master, values=values, variable=ui_state.get_var(var_name), command=command)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
 
@@ -330,13 +380,13 @@ def options(master, row, column, values, ui_state: UIState, var_name: str, comma
         return destroy
 
     destroy = create_destroy(component._dropdown_menu)
-    component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)
+    component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)  # type: ignore[assignment]
 
     return component
 
 
 def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
-                command: Callable[[str], None] = None, adv_command: Callable[[], None] = None):
+                command: Callable[[str], None] | None = None, adv_command: Callable[[], None] | None = None):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
@@ -362,13 +412,13 @@ def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
         return destroy
 
     destroy = create_destroy(component._dropdown_menu)
-    component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)
+    component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)  # type: ignore[assignment]
 
     return frame, {'component': component, 'button_component': button_component}
 
 
 def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: UIState, var_name: str,
-               command: Callable[[Any], None] = None):
+               command: Callable[[Any], None] | None = None):
     var = ui_state.get_var(var_name)
     keys = [key for key, value in values]
 
@@ -416,7 +466,7 @@ def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: UIS
         return destroy
 
     destroy = create_destroy(component._dropdown_menu)
-    component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)
+    component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)  # type: ignore[assignment]
 
     return component
 
@@ -427,7 +477,7 @@ def switch(
         column,
         ui_state: UIState,
         var_name: str,
-        command: Callable[[], None] = None,
+        command: Callable[[], None] | None = None,
         text: str = "",
 ):
     var = ui_state.get_var(var_name)
@@ -449,7 +499,7 @@ def switch(
         return destroy
 
     destroy = create_destroy(component)
-    component.destroy = lambda: destroy(component)
+    component.destroy = lambda: destroy(component)  # type: ignore[assignment]
 
     return component
 

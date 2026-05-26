@@ -3,11 +3,11 @@ import traceback
 from abc import ABCMeta, abstractmethod
 
 from modules.model.BaseModel import BaseModel
+from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet, convert_to_diffusers
 from modules.util.ModelNames import ModelNames
 
 import torch
 
-from omi_model_standards.convert.lora.convert_lora_util import LoraConversionKeySet, convert_to_diffusers
 from safetensors.torch import load_file
 
 

@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
@@ -199,9 +200,14 @@ class HunyuanVideoSampler(BaseModelSampler):
             on_update_progress=on_update_progress,
         )
 
+        fps = self.model.NATIVE_FPS
+
         self.save_sampler_output(
             sampler_output, destination,
             image_format, video_format, audio_format,
+            fps=fps,
         )
 
         on_sample(sampler_output)
+
+factory.register(BaseModelSampler, HunyuanVideoSampler, ModelType.HUNYUAN_VIDEO)

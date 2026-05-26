@@ -1,5 +1,5 @@
 {
-    "base_model_name": "stabilityai/stable-diffusion-2-1",
+    "base_model_name": "sd2-community/stable-diffusion-2-1",
     "batch_size": 4,
     "model_type": "STABLE_DIFFUSION_21",
     "output_model_destination": "models/model.safetensors",

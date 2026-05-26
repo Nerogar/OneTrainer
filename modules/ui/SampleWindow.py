@@ -33,7 +33,8 @@ class SampleWindow(ctk.CTkToplevel):
     def __init__(
             self,
             parent,
-            train_config: TrainConfig | None = None,
+            train_config: TrainConfig,
+            use_external_model: bool,
             callbacks: TrainCallbacks | None = None,
             commands: TrainCommands | None = None,
             *args, **kwargs
@@ -44,7 +45,7 @@ class SampleWindow(ctk.CTkToplevel):
         self.geometry("1200x800")
         self.resizable(True, True)
 
-        if train_config is not None:
+        if not use_external_model:
             self.initial_train_config = TrainConfig.default_values().from_dict(train_config.to_dict())
             # remove some settings to speed up model loading for sampling
             self.initial_train_config.optimizer.optimizer = None
@@ -52,13 +53,17 @@ class SampleWindow(ctk.CTkToplevel):
         else:
             self.initial_train_config = None
 
+        #TODO why is there a current_train_config and an initial_train_config?
+        #current_train_config doesn't seem to ever change
         self.current_train_config = train_config
         self.callbacks = callbacks
         self.commands = commands
-        self.sample = SampleConfig.default_values()
+
+        # get model specific defaults
+        model_type = train_config.model_type
+        self.sample = SampleConfig.default_values(model_type)
         self.ui_state = UIState(self, self.sample)
 
-        use_external_model = self.initial_train_config is None
         if use_external_model:
             self.callbacks.set_on_sample_custom(self.__update_preview)
             self.callbacks.set_on_update_sample_custom_progress(self.__update_progress)
@@ -73,10 +78,10 @@ class SampleWindow(ctk.CTkToplevel):
         self.grid_columnconfigure(0, weight=0)
         self.grid_columnconfigure(1, weight=1)
 
-        prompt_frame = SampleFrame(self, self.sample, self.ui_state, include_settings=False)
+        prompt_frame = SampleFrame(self, self.sample, self.ui_state, include_settings=False, model_type=model_type)
         prompt_frame.grid(row=0, column=0, columnspan=2, padx=0, pady=0, sticky="nsew")
 
-        settings_frame = SampleFrame(self, self.sample, self.ui_state, include_prompt=False)
+        settings_frame = SampleFrame(self, self.sample, self.ui_state, include_prompt=False, model_type=model_type)
         settings_frame.grid(row=1, column=0, padx=0, pady=0, sticky="nsew")
 
         # image
@@ -124,10 +129,15 @@ class SampleWindow(ctk.CTkToplevel):
             else:
                 print("No backup found, loading without backup...")
 
+        if self.initial_train_config.quantization.cache_dir is None:
+            self.initial_train_config.quantization.cache_dir = self.initial_train_config.cache_dir + "/quantization"
+            os.makedirs(self.initial_train_config.quantization.cache_dir, exist_ok=True)
+
         model = model_loader.load(
             model_type=self.initial_train_config.model_type,
             model_names=model_names,
             weight_dtypes=self.initial_train_config.weight_dtypes(),
+            quantization=self.initial_train_config.quantization,
         )
         model.train_config = self.initial_train_config
 

@@ -4,16 +4,16 @@ from pathlib import Path
 
 from modules.model.BaseModel import BaseModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
+from modules.util.convert.lora.convert_lora_util import (
+    LoraConversionKeySet,
+    convert_to_legacy_diffusers,
+    convert_to_omi,
+)
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
 from torch import Tensor
 
-from omi_model_standards.convert.lora.convert_lora_util import (
-    LoraConversionKeySet,
-    convert_to_legacy_diffusers,
-    convert_to_omi,
-)
 from safetensors.torch import save_file
 
 

@@ -5,6 +5,7 @@ from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.modelLoader.mixin.SDConfigModelLoaderMixin import SDConfigModelLoaderMixin
 from modules.util import create
+from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.ModelNames import ModelNames
@@ -46,9 +47,10 @@ class StableDiffusionXLModelLoader(
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             vae_model_name: str,
+            quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
-            self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name)
+            self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name, quantization)
         else:
             raise Exception("not an internal model")
 
@@ -59,6 +61,7 @@ class StableDiffusionXLModelLoader(
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             vae_model_name: str,
+            quantization: QuantizationConfig,
     ):
         tokenizer_1 = CLIPTokenizer.from_pretrained(
             base_model_name,
@@ -117,6 +120,7 @@ class StableDiffusionXLModelLoader(
             weight_dtypes.train_dtype,
             base_model_name,
             "unet",
+            quantization,
         )
 
         model.model_type = model_type
@@ -135,6 +139,7 @@ class StableDiffusionXLModelLoader(
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             vae_model_name: str,
+            quantization: QuantizationConfig,
     ):
         pipeline = StableDiffusionXLPipeline.from_single_file(
             pretrained_model_link_or_path=base_model_name,
@@ -176,6 +181,7 @@ class StableDiffusionXLModelLoader(
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             vae_model_name: str,
+            quantization: QuantizationConfig,
     ):
         if model_type.has_conditioning_image_input():
             pipeline = StableDiffusionXLInpaintPipeline.from_single_file(
@@ -216,7 +222,7 @@ class StableDiffusionXLModelLoader(
             pipeline.text_encoder_2, weight_dtypes.text_encoder_2, weight_dtypes.train_dtype
         )
         unet = self._convert_diffusers_sub_module_to_dtype(
-            pipeline.unet, weight_dtypes.unet, weight_dtypes.train_dtype
+            pipeline.unet, weight_dtypes.unet, weight_dtypes.train_dtype, quantization,
         )
 
         model.model_type = model_type
@@ -234,6 +240,7 @@ class StableDiffusionXLModelLoader(
             model_type: ModelType,
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
+            quantization: QuantizationConfig,
     ):
         stacktraces = []
 
@@ -241,19 +248,19 @@ class StableDiffusionXLModelLoader(
         model.sd_config_filename = self._get_sd_config_name(model_type, model_names.base_model)
 
         try:
-            self.__load_internal(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
+            self.__load_internal(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
-            self.__load_diffusers(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
+            self.__load_diffusers(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
-            self.__load_safetensors(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
+            self.__load_safetensors(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)
             return
         except Exception:
             stacktraces.append(traceback.format_exc())

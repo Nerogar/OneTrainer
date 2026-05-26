@@ -287,13 +287,13 @@ class FluxModel(BaseModel):
         )
 
         # apply dropout
-        if text_encoder_1_dropout_probability is not None:
+        if text_encoder_1_dropout_probability is not None and text_encoder_1_dropout_probability > 0.0:
             dropout_text_encoder_1_mask = (torch.tensor(
                 [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
             pooled_text_encoder_1_output = pooled_text_encoder_1_output * dropout_text_encoder_1_mask[:, None]
 
-        if text_encoder_2_dropout_probability is not None:
+        if text_encoder_2_dropout_probability is not None and text_encoder_2_dropout_probability > 0.0:
             dropout_text_encoder_2_mask = (torch.tensor(
                 [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
@@ -341,7 +341,7 @@ class FluxModel(BaseModel):
 
         return latents
 
-    def calculate_timestep_shift(self, latent_width: int, latent_height: int):
+    def calculate_timestep_shift(self, latent_height: int, latent_width: int):
         base_seq_len = self.noise_scheduler.config.base_image_seq_len
         max_seq_len = self.noise_scheduler.config.max_image_seq_len
         base_shift = self.noise_scheduler.config.base_shift

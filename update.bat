@@ -118,7 +118,7 @@ if errorlevel 1 (
 )
 
 echo.
-"%PYTHON%" "%~dp0scripts\util\version_check.py" 3.10 3.13 2>&1
+"%PYTHON%" "%~dp0scripts\util\version_check.py" 3.10 3.14 2>&1
 if errorlevel 1 (
     echo.
     goto :wrong_python_version
@@ -128,7 +128,7 @@ goto :install_dependencies
 :install_dependencies
 echo Installing dependencies...
 echo Upgrading pip and setuptools...
-"%PYTHON%" -m pip install --upgrade --upgrade-strategy eager pip setuptools
+"%PYTHON%" -m pip install --upgrade --upgrade-strategy eager pip setuptools==81.0.0
 if errorlevel 1 (
     echo Error: pip upgrade failed.
     goto :end_error

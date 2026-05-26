@@ -6,6 +6,7 @@ class ModelFormat(Enum):
     CKPT = 'CKPT'
     SAFETENSORS = 'SAFETENSORS'
     LEGACY_SAFETENSORS = 'LEGACY_SAFETENSORS'
+    COMFY_LORA = 'COMFY_LORA'
 
     INTERNAL = 'INTERNAL'  # an internal format that stores all information to resume training
 
@@ -22,6 +23,8 @@ class ModelFormat(Enum):
             case ModelFormat.SAFETENSORS:
                 return '.safetensors'
             case ModelFormat.LEGACY_SAFETENSORS:
+                return '.safetensors'
+            case ModelFormat.COMFY_LORA:
                 return '.safetensors'
             case _:
                 return ''

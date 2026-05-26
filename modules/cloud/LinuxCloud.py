@@ -39,18 +39,28 @@ class LinuxCloud(BaseCloud):
 
         config=self.config.cloud
         secrets=self.config.secrets.cloud
+        connect_kwargs=secrets.connect_kwargs()
 
         if secrets.host == '' or secrets.port == '':
             raise ValueError('Host and port required for SSH connection')
 
         try:
-            self.connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
+            self.connection=fabric.Connection(host=secrets.host,
+                                             port=secrets.port,
+                                             user=secrets.user,
+                                             connect_kwargs=connect_kwargs)
             self.connection.open()
             self.connection.transport.set_keepalive(30)
 
-            self.callback_connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
+            self.callback_connection=fabric.Connection(host=secrets.host,
+                                                       port=secrets.port,
+                                                       user=secrets.user,
+                                                       connect_kwargs=connect_kwargs)
 
-            self.command_connection=fabric.Connection(host=secrets.host,port=secrets.port,user=secrets.user)
+            self.command_connection=fabric.Connection(host=secrets.host,
+                                                      port=secrets.port,
+                                                      user=secrets.user,
+                                                      connect_kwargs=connect_kwargs)
             #the command connection isn't used for long periods of time; prevent remote from closing it:
             self.command_connection.open()
             self.command_connection.transport.set_keepalive(30)

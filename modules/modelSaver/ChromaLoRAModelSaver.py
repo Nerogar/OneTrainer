@@ -1,35 +1,12 @@
 from modules.model.ChromaModel import ChromaModel
-from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSaver.chroma.ChromaEmbeddingSaver import ChromaEmbeddingSaver
 from modules.modelSaver.chroma.ChromaLoRASaver import ChromaLoRASaver
-from modules.modelSaver.mixin.InternalModelSaverMixin import InternalModelSaverMixin
-from modules.util.enum.ModelFormat import ModelFormat
+from modules.modelSaver.GenericLoRAModelSaver import make_lora_model_saver
 from modules.util.enum.ModelType import ModelType
 
-import torch
-
-
-class ChromaLoRAModelSaver(
-    BaseModelSaver,
-    InternalModelSaverMixin,
-):
-    def __init__(self):
-        super().__init__()
-
-    def save(
-            self,
-            model: ChromaModel,
-            model_type: ModelType,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
-    ):
-        lora_model_saver = ChromaLoRASaver()
-        embedding_model_saver = ChromaEmbeddingSaver()
-
-        lora_model_saver.save(model, output_model_format, output_model_destination, dtype)
-        if not model.train_config.bundle_additional_embeddings or output_model_format == ModelFormat.INTERNAL:
-            embedding_model_saver.save_multiple(model, output_model_format, output_model_destination, dtype)
-
-        if output_model_format == ModelFormat.INTERNAL:
-            self._save_internal_data(model, output_model_destination)
+ChromaLoRAModelSaver = make_lora_model_saver(
+    ModelType.CHROMA_1,
+    model_class=ChromaModel,
+    lora_saver_class=ChromaLoRASaver,
+    embedding_saver_class=ChromaEmbeddingSaver,
+)

@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 from modules.model.FluxModel import FluxModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
@@ -131,8 +132,8 @@ class FluxSampler(BaseModelSampler):
                     guidance=guidance.to(dtype=self.model.train_dtype.torch_dtype()),
                     pooled_projections=pooled_prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
                     encoder_hidden_states=prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
-                    txt_ids=text_ids.to(dtype=self.model.train_dtype.torch_dtype()),
-                    img_ids=image_ids.to(dtype=self.model.train_dtype.torch_dtype()),
+                    txt_ids=text_ids,
+                    img_ids=image_ids,
                     joint_attention_kwargs=None,
                     return_dict=True
                 ).sample
@@ -146,7 +147,6 @@ class FluxSampler(BaseModelSampler):
 
             self.model.transformer_to(self.temp_device)
             torch_gc()
-
             latent_image = self.model.unpack_latents(
                 latent_image,
                 height // vae_scale_factor,
@@ -159,7 +159,7 @@ class FluxSampler(BaseModelSampler):
             latents = (latent_image / vae.config.scaling_factor) + vae.config.shift_factor
             image = vae.decode(latents, return_dict=False)[0]
 
-            do_denormalize = [True] * image.shape[0]
+            do_denormalize = [True] * image.shape[0] #TODO remove and test, from Flux and other models. True is the default
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
             self.model.vae_to(self.temp_device)
@@ -254,13 +254,7 @@ class FluxSampler(BaseModelSampler):
                 latent_conditioning_image = (latent_conditioning_image - vae.config.shift_factor) \
                                             * vae.config.scaling_factor
 
-                latent_conditioning_image = self.model.pack_latents(
-                    latent_conditioning_image,
-                    latent_conditioning_image.shape[0],
-                    latent_conditioning_image.shape[1],
-                    height // vae_scale_factor,
-                    width // vae_scale_factor,
-                )
+                latent_conditioning_image = self.model.pack_latents(latent_conditioning_image)
 
                 # batch_size, height, 8, width, 8
                 mask = mask.view(
@@ -280,13 +274,7 @@ class FluxSampler(BaseModelSampler):
                     width // vae_scale_factor,
                 )
 
-                latent_mask = self.model.pack_latents(
-                    mask,
-                    mask.shape[0],
-                    mask.shape[1],
-                    height // vae_scale_factor,
-                    width // vae_scale_factor,
-                )
+                latent_mask = self.model.pack_latents(mask)
             else:
                 conditioning_image = torch.zeros(
                     (1, 3, height, width),
@@ -296,13 +284,8 @@ class FluxSampler(BaseModelSampler):
                 latent_conditioning_image = vae.encode(conditioning_image).latent_dist.mode()
                 latent_conditioning_image = (latent_conditioning_image - vae.config.shift_factor) \
                                             * vae.config.scaling_factor
-                latent_conditioning_image = self.model.pack_latents(
-                    latent_conditioning_image,
-                    latent_conditioning_image.shape[0],
-                    latent_conditioning_image.shape[1],
-                    height // vae_scale_factor,
-                    width // vae_scale_factor,
-                )
+
+                latent_conditioning_image = self.model.pack_latents(latent_conditioning_image)
 
                 latent_mask = torch.ones(
                     size=(1, (height // vae_scale_factor // 2) * (width // vae_scale_factor // 2), 256),
@@ -467,3 +450,6 @@ class FluxSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
+
+factory.register(BaseModelSampler, FluxSampler, ModelType.FLUX_DEV_1)
+factory.register(BaseModelSampler, FluxSampler, ModelType.FLUX_FILL_DEV_1)

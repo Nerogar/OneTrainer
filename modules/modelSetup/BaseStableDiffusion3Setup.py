@@ -9,6 +9,7 @@ from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiff
 from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowMatchingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
+from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.checkpointing_util import (
     enable_checkpointing_for_clip_encoder_layers,
@@ -16,20 +17,15 @@ from modules.util.checkpointing_util import (
     enable_checkpointing_for_t5_encoder_layers,
 )
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.quantization_util import quantize_layers
+from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor
 
-PRESETS = {
-    "attn-only": ["attn"],
-    "blocks": ["transformer_block"],
-    "full": [],
-}
 
 class BaseStableDiffusion3Setup(
     BaseModelSetup,
@@ -38,8 +34,14 @@ class BaseStableDiffusion3Setup(
     ModelSetupNoiseMixin,
     ModelSetupFlowMatchingMixin,
     ModelSetupEmbeddingMixin,
+    ModelSetupText2ImageMixin,
     metaclass=ABCMeta
 ):
+    LAYER_PRESETS = {
+        "attn-only": ["attn"],
+        "blocks": ["transformer_block"],
+        "full": [],
+    }
 
     def setup_optimizations(
             self,
@@ -56,12 +58,6 @@ class BaseStableDiffusion3Setup(
             if model.text_encoder_3 is not None:
                 model.text_encoder_3_offload_conductor = \
                     enable_checkpointing_for_t5_encoder_layers(model.text_encoder_3, config)
-
-        if config.force_circular_padding:
-            apply_circular_padding_to_conv2d(model.vae)
-            apply_circular_padding_to_conv2d(model.transformer)
-            if model.transformer_lora is not None:
-                apply_circular_padding_to_conv2d(model.transformer_lora)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
@@ -86,11 +82,11 @@ class BaseStableDiffusion3Setup(
                 config.enable_autocast_cache,
             )
 
-        quantize_layers(model.text_encoder_1, self.train_device, model.train_dtype)
-        quantize_layers(model.text_encoder_2, self.train_device, model.train_dtype)
-        quantize_layers(model.text_encoder_3, self.train_device, model.text_encoder_3_train_dtype)
-        quantize_layers(model.vae, self.train_device, model.train_dtype)
-        quantize_layers(model.transformer, self.train_device, model.train_dtype)
+        quantize_layers(model.text_encoder_1, self.train_device, model.train_dtype, config)
+        quantize_layers(model.text_encoder_2, self.train_device, model.train_dtype, config)
+        quantize_layers(model.text_encoder_3, self.train_device, model.text_encoder_3_train_dtype, config)
+        quantize_layers(model.vae, self.train_device, model.train_dtype, config)
+        quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
 
     def _setup_embeddings(
             self,
@@ -282,9 +278,9 @@ class BaseStableDiffusion3Setup(
                     if 'text_encoder_2_pooled_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
                 text_encoder_3_output=batch['text_encoder_3_hidden_state'] \
                     if 'text_encoder_3_hidden_state' in batch and not config.train_text_encoder_3_or_embedding() else None,
-                text_encoder_1_dropout_probability=config.text_encoder.dropout_probability,
-                text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability,
-                text_encoder_3_dropout_probability=config.text_encoder_3.dropout_probability,
+                text_encoder_1_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
+                text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability if not deterministic else None,
+                text_encoder_3_dropout_probability=config.text_encoder_3.dropout_probability if not deterministic else None,
                 apply_attention_mask=config.transformer.attention_mask,
             ))
 
@@ -339,63 +335,14 @@ class BaseStableDiffusion3Setup(
 
             if config.debug_mode:
                 with torch.no_grad():
-                    self._save_text(
-                        self._decode_tokens(batch['tokens_1'], model.tokenizer_1),
-                        config.debug_dir + "/training_batches",
-                        "7-prompt",
-                        train_progress.global_step,
-                    )
-
-                    # noise
-                    self._save_image(
-                        self._project_latent_to_image(latent_noise),
-                        config.debug_dir + "/training_batches",
-                        "1-noise",
-                        train_progress.global_step,
-                    )
-
-                    # noisy image
-                    self._save_image(
-                        self._project_latent_to_image(scaled_noisy_latent_image),
-                        config.debug_dir + "/training_batches",
-                        "2-noisy_image",
-                        train_progress.global_step,
-                    )
-
-                    # predicted flow
-                    self._save_image(
-                        self._project_latent_to_image(predicted_flow),
-                        config.debug_dir + "/training_batches",
-                        "3-predicted_flow",
-                        train_progress.global_step,
-                    )
-
-                    # flow
-                    flow = latent_noise - scaled_latent_image
-                    self._save_image(
-                        self._project_latent_to_image(flow),
-                        config.debug_dir + "/training_batches",
-                        "4-flow",
-                        train_progress.global_step,
-                    )
-
                     predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
-
-                    # predicted image
-                    self._save_image(
-                        self._project_latent_to_image(predicted_scaled_latent_image),
-                        config.debug_dir + "/training_batches",
-                        "5-predicted_image",
-                        train_progress.global_step,
-                    )
-
-                    # image
-                    self._save_image(
-                        self._project_latent_to_image(scaled_latent_image),
-                        config.debug_dir + "/training_batches",
-                        "6-image",
-                        model.train_progress.global_step,
-                    )
+                    self._save_tokens("7-prompt", batch['tokens_1'], model.tokenizer_1, config, train_progress)
+                    self._save_latent("1-noise", latent_noise, config, train_progress)
+                    self._save_latent("2-noisy_image", scaled_noisy_latent_image, config, train_progress)
+                    self._save_latent("3-predicted_flow", predicted_flow, config, train_progress)
+                    self._save_latent("4-flow", flow, config, train_progress)
+                    self._save_latent("5-predicted_image", predicted_scaled_latent_image, config, train_progress)
+                    self._save_latent("6-image", scaled_latent_image, config, train_progress)
 
         return model_output_data
 
@@ -413,3 +360,18 @@ class BaseStableDiffusion3Setup(
             train_device=self.train_device,
             sigmas=model.noise_scheduler.sigmas,
         ).mean()
+
+    def prepare_text_caching(self, model: StableDiffusion3Model, config: TrainConfig):
+        model.to(self.temp_device)
+
+        if not config.train_text_encoder_or_embedding():
+            model.text_encoder_to(self.train_device)
+
+        if not config.train_text_encoder_2_or_embedding():
+            model.text_encoder_2_to(self.train_device)
+
+        if not config.train_text_encoder_3_or_embedding():
+            model.text_encoder_3_to(self.train_device)
+
+        model.eval()
+        torch_gc()

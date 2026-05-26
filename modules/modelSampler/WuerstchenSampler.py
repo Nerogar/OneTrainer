@@ -3,6 +3,7 @@ from collections.abc import Callable
 
 from modules.model.WuerstchenModel import WuerstchenModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
@@ -364,3 +365,6 @@ class WuerstchenSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
+
+factory.register(BaseModelSampler, WuerstchenSampler, ModelType.WUERSTCHEN_2)
+factory.register(BaseModelSampler, WuerstchenSampler, ModelType.STABLE_CASCADE_1)

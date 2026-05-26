@@ -7,14 +7,17 @@
     "output_model_destination": "models/lora.safetensors",
     "output_model_format": "SAFETENSORS",
     "resolution": "1024",
-    "text_encoder": {
-        "train": false
-    },
     "training_method": "LORA",
     "lora_rank": 16,
 	"lora_alpha": 1.0,
+    "transformer": {
+        "weight_dtype": "BFLOAT_16"
+    },
+    "text_encoder": {
+        "train": false,
+        "weight_dtype": "BFLOAT_16"
+    },
     "vae": {
         "weight_dtype": "FLOAT_32"
-    },
-    "weight_dtype": "BFLOAT_16"
+    }
 }

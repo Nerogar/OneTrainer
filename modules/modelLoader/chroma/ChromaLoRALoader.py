@@ -1,10 +1,9 @@
 from modules.model.BaseModel import BaseModel
 from modules.model.ChromaModel import ChromaModel
 from modules.modelLoader.mixin.LoRALoaderMixin import LoRALoaderMixin
+from modules.util.convert.lora.convert_chroma_lora import convert_chroma_lora_key_sets
+from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.ModelNames import ModelNames
-
-from omi_model_standards.convert.lora.convert_chroma_lora import convert_chroma_lora_key_sets
-from omi_model_standards.convert.lora.convert_lora_util import LoraConversionKeySet
 
 
 class ChromaLoRALoader(

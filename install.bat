@@ -10,7 +10,7 @@ pushd "%~dp0" || call :die "Cannot cd to script directory"
 set "SCRIPT_DIR=%CD%"
 set "VENV_DIR=%SCRIPT_DIR%\\venv"
 set "VERSION_FILE=%SCRIPT_DIR%\\scripts\\util\\version_check.py"
-set "MIN_PY=3.10" & set "MAX_PY=3.13"
+set "MIN_PY=3.10" & set "MAX_PY=3.14"
 
 goto :main
 
@@ -138,7 +138,7 @@ for %%D in (%SEARCH_PATHS%) do (
                     "%%P\python.exe" "%VERSION_FILE%" %MIN_PY% %MAX_PY% >nul 2>&1
                     if not errorlevel 1 (
                         echo   %GRN%SELECTED Python from "%%P"%RESET%
-                        set "PYTHON="%%P\python.exe""
+                        set "PYTHON=%%~P\python.exe"
                         goto :py_ok
                     ) else (
                         echo   %YEL%"%%P\python.exe" is not a suitable version.%RESET%
@@ -221,7 +221,7 @@ echo.
 echo %CYAN%Managing virtual environment...%RESET%
 if not exist "%VENV_DIR%\\Scripts\\python.exe" (
   echo Creating venv at "%VENV_DIR%"...
-  !PYTHON! -m venv "%VENV_DIR%" || call :die "venv creation failed using !PYTHON!"
+  "!PYTHON!" -m venv "%VENV_DIR%" || call :die "venv creation failed using !PYTHON!"
 ) else (
   echo Virtual environment already exists at "%VENV_DIR%"
 )

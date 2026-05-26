@@ -1,15 +1,16 @@
-import copy
 import os
 import re
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.StableDiffusionModel import StableDiffusionModel
-from modules.util import path_util
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.util import factory, path_util
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
-from mgds.MGDS import MGDS, TrainDataLoader
 from mgds.OutputPipelineModule import OutputPipelineModule
 from mgds.pipelineModules.AspectBatchSorting import AspectBatchSorting
 from mgds.pipelineModules.AspectBucketing import AspectBucketing
@@ -39,39 +40,6 @@ import torch
 
 
 class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            config: TrainConfig,
-            model: StableDiffusionModel,
-            train_progress: TrainProgress,
-            is_validation: bool = False,
-    ):
-        super().__init__(
-            train_device,
-            temp_device,
-        )
-
-        if is_validation:
-            config = copy.copy(config)
-            config.batch_size = 1
-            config.multi_gpu = False
-
-        self.__ds = self.create_dataset(
-            config=config,
-            model=model,
-            train_progress=train_progress,
-            is_validation=is_validation,
-        )
-        self.__dl = TrainDataLoader(self.__ds, config.batch_size)
-
-    def get_data_set(self) -> MGDS:
-        return self.__ds
-
-    def get_data_loader(self) -> TrainDataLoader:
-        return self.__dl
-
     def _setup_cache_device(
             self,
             model: StableDiffusionModel,
@@ -222,8 +190,10 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         def before_cache_fun():
             self._setup_cache_device(model, self.train_device, self.temp_device, config)
 
-        disk_cache = DiskCache(cache_dir=config.cache_dir, split_names=split_names, aggregate_names=aggregate_names, variations_in_name='concept.image_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
-        variation_sorting = VariationSorting(names=sort_names, balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled')
+        disk_cache = DiskCache(cache_dir=config.cache_dir, split_names=split_names, aggregate_names=aggregate_names, variations_in_name='concept.image_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',
+                               variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_fun)
+        variation_sorting = VariationSorting(names=sort_names, balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'],
+                               group_enabled_in_name='concept.enabled')
 
         modules = []
 
@@ -278,21 +248,18 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         save_image = SaveImage(image_in_name='decoded_image', original_path_in_name='image_path', path=debug_dir, in_range_min=-1, in_range_max=1, before_save_fun=before_save_fun)
         save_mask = SaveImage(image_in_name='latent_mask', original_path_in_name='image_path', path=debug_dir, in_range_min=0, in_range_max=1, before_save_fun=before_save_fun)
 
-        modules = []
-
-        modules.append(decode_image)
-        modules.append(save_image)
+        modules = [decode_image, save_image]
 
         if config.masked_training or config.model_type.has_mask_input():
-            modules.append(upscale_mask)
-            modules.append(save_mask)
+            modules += [upscale_mask, save_mask]
 
         return modules
 
-    def create_dataset(
+    def _create_dataset(
             self,
             config: TrainConfig,
             model: StableDiffusionModel,
+            model_setup: BaseModelSetup,
             train_progress: TrainProgress,
             is_validation: bool = False,
     ):
@@ -326,3 +293,12 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             train_progress,
             is_validation,
         )
+
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE_VAE)
+factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE_VAE)
