@@ -130,10 +130,6 @@ class OFTRotationModule(nn.Module):
 
         orig_shape = x.shape
 
-        if self.coft:
-            with torch.no_grad():
-                self.weight.copy_(self._project_batch(self.weight, coft_eps=self.coft_eps))
-
         scaling_factor = 2 * math.sqrt(self.block_size - 1) if self.oft_scaled else 1
         effective_weight = self.weight / scaling_factor
 
