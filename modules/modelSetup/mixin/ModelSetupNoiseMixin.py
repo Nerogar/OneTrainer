@@ -118,8 +118,8 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
 
         return noise
 
+    @staticmethod
     def _apply_conditional_embedding_perturbation(
-            self,
             embedding: Tensor | list,
             gamma: float,
             generator: Generator
