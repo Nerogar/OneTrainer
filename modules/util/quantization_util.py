@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from functools import partial
 
+import modules.util.multi_gpu_util as multi
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.config.TrainConfig import QuantizationConfig, TrainConfig
@@ -122,7 +123,7 @@ def __replace_linear_layers(
     visited_modules.add(id(parent_module))
 
     if isinstance(parent_module, (nn.ModuleList, nn.Sequential, nn.ModuleDict)):
-        for key, module in parent_module.items() if isinstance(parent_module, nn.ModuleDict) else enumerate(parent_module):
+        for key, module in (parent_module.items() if isinstance(parent_module, nn.ModuleDict) else enumerate(parent_module)):
             if isinstance(module, convert_type):
                 if filters is not None and len(filters) > 0 and not any(f.matches(name_prefix) for f in filters):
                     continue
@@ -137,7 +138,7 @@ def __replace_linear_layers(
                     keep_in_fp32_modules=keep_in_fp32_modules,
                     filters=filters,
                     copy_parameters=copy_parameters,
-                    name_prefix=f"{name_prefix}[{key}]",
+                    name_prefix=f"{name_prefix}.{key}",
                     visited_modules=visited_modules,
                 )
     else:
@@ -257,8 +258,10 @@ def is_quantized_parameter(
 
 
 def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataType, config: TrainConfig):
-    if module is not None:
-        child_modules = list(module.modules())
+    if module is None:
+        return
+    child_modules = list(module.modules())
+    for _ in multi.master_first(): #avoid cache writing conflicts
         for child_module in tqdm(child_modules, desc="Quantizing model weights", total=len(child_modules), delay=5, smoothing=0.1):
             if isinstance(child_module, (QuantizedModuleMixin, GGUFLinear)):
                 child_module.compute_dtype = train_dtype.torch_dtype()

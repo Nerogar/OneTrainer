@@ -43,8 +43,6 @@ class OFTRotationModule(nn.Module):
         n_elements,
         block_size,
         in_features,
-        coft=False,
-        coft_eps=6e-5,
         block_share=False,
         oft_scaled=False,
         use_cayley_neumann=True,
@@ -57,8 +55,6 @@ class OFTRotationModule(nn.Module):
         self.block_size = block_size
         self.in_features = in_features
         self.weight = nn.Parameter(torch.empty(r, n_elements))
-        self.coft = coft
-        self.coft_eps = coft_eps
         self.block_share = block_share
         if oft_scaled:
             # Register a persistent buffer to indicate this module uses Scaled OFT.
@@ -126,22 +122,6 @@ class OFTRotationModule(nn.Module):
             R = torch.linalg.solve(id_mat + Q_skew, id_mat - Q_skew, left=False)
 
         return R.to(previous_dtype)
-
-    def _project_batch(self, Q, coft_eps=1e-4):
-        oft_R = self._pytorch_skew_symmetric(Q, self.block_size)
-        # scaling factor for each of the smaller block matrix
-        coft_eps = coft_eps * 1 / torch.sqrt(torch.tensor(oft_R.shape[0]))
-        origin_matrix = (
-            torch.zeros((oft_R.size(1), oft_R.size(1)), device=oft_R.device, dtype=oft_R.dtype)
-            .unsqueeze(0)
-            .expand_as(oft_R)
-        )
-        diff = oft_R - origin_matrix
-        norm_diff = torch.norm(oft_R - origin_matrix, dim=(1, 2), keepdim=True)
-        mask = (norm_diff <= coft_eps).bool()
-        out = torch.where(mask, oft_R, origin_matrix + coft_eps * (diff / norm_diff))
-
-        return self._pytorch_skew_symmetric_inv(out, self.block_size)
 
     def forward(self, x):
         required_dtype = x.dtype

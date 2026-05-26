@@ -126,9 +126,10 @@ class FluxLoRASetup(
         self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
-        self.__setup_requires_grad(model, config)
 
-        init_model_parameters(model, self.create_parameters(model, config), self.train_device)
+        params = self.create_parameters(model, config)
+        self.__setup_requires_grad(model, config)
+        init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
             self,

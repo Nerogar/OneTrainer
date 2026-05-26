@@ -230,7 +230,7 @@ class Flux2Model(BaseModel):
         return text_encoder_output
 
     def is_dev(self) -> bool:
-        return isinstance(self.tokenizer, PixtralProcessor)
+        return self.transformer.config.num_attention_heads == 48
 
     def is_klein(self) -> bool:
         return not self.is_dev()

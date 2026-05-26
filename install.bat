@@ -10,7 +10,7 @@ pushd "%~dp0" || call :die "Cannot cd to script directory"
 set "SCRIPT_DIR=%CD%"
 set "VENV_DIR=%SCRIPT_DIR%\\venv"
 set "VERSION_FILE=%SCRIPT_DIR%\\scripts\\util\\version_check.py"
-set "MIN_PY=3.10" & set "MAX_PY=3.13"
+set "MIN_PY=3.10" & set "MAX_PY=3.14"
 
 goto :main
 

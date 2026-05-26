@@ -341,19 +341,15 @@ class OFTModule(PeftBase):
     oft_R: OFTRotationModule | None
     rank: int
     oft_block_size: int
-    coft: bool
-    coft_eps: float
     block_share: bool
     oft_scaled: bool
     dropout_probability: float
     adjustment_info: tuple[int, int] | None # for reporting
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, coft: bool, coft_eps: float, block_share: bool, oft_scaled: bool, **kwargs):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, block_share: bool, oft_scaled: bool, **kwargs):
         super().__init__(prefix, orig_module)
         self.oft_block_size = oft_block_size
         self.rank = 0
-        self.coft = coft
-        self.coft_eps = coft_eps
         self.block_share = block_share
         self.oft_scaled = oft_scaled
         self.dropout_probability = kwargs.pop('dropout_probability', 0.0)
@@ -420,8 +416,6 @@ class OFTModule(PeftBase):
             n_elements=n_elements,
             block_size=self.oft_block_size,
             in_features=in_features,
-            coft=self.coft,
-            coft_eps=self.coft_eps,
             block_share=self.block_share,
             oft_scaled=self.oft_scaled,
             use_cayley_neumann=True,
@@ -631,8 +625,6 @@ class LoRAModuleWrapper:
             self.dummy_klass = DummyOFTModule
             self.additional_args = [
                 config.oft_block_size,
-                config.oft_coft,
-                config.coft_eps,
                 config.oft_block_share,
                 config.oft_scaled,
             ]

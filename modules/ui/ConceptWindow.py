@@ -91,6 +91,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_ui_state = text_ui_state
         self.image_preview_file_index = 0
         self.preview_augmentations = ctk.BooleanVar(self, True)
+        self.bucket_fig = None
 
         self.title("Concept")
         self.geometry("800x700")
@@ -147,14 +148,14 @@ class ConceptWindow(ctk.CTkToplevel):
         # path
         components.label(frame, 3, 0, "Path",
                          tooltip="Path where the training data is located")
-        components.dir_entry(frame, 3, 1, self.ui_state, "path")
+        components.path_entry(frame, 3, 1, self.ui_state, "path", mode="dir")
         components.button(frame, 3, 2, text="download now", command=self.__download_dataset_threaded,
                           tooltip="Download dataset from Huggingface now, for the purpose of previewing and statistics. Otherwise, it will be downloaded when you start training. Path must be a Huggingface repository.")
 
         # prompt source
         components.label(frame, 4, 0, "Prompt Source",
                          tooltip="The source for prompts used during training. When selecting \"From single text file\", select a text file that contains a list of prompts")
-        prompt_path_entry = components.file_entry(frame, 4, 2, self.text_ui_state, "prompt_path")
+        prompt_path_entry = components.path_entry(frame, 4, 2, self.text_ui_state, "prompt_path", mode="file")
 
         def set_prompt_path_entry_enabled(option: str):
             if option == 'concept':
@@ -514,6 +515,8 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_color = f"#{int(text_color[0]/256):x}{int(text_color[1]/256):x}{int(text_color[2]/256):x}"
 
         plt.set_loglevel('WARNING')     #suppress errors about data type in bar chart
+
+        assert self.bucket_fig is None
         self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7,3))
         self.canvas = FigureCanvasTkAgg(self.bucket_fig, master=frame)
         self.canvas.get_tk_widget().grid(row=19, column=0, columnspan=4, rowspan=2)
@@ -610,6 +613,8 @@ class ConceptWindow(ctk.CTkToplevel):
         concept_path = self.get_concept_path(self.concept.path)
         if concept_path:
             for path in pathlib.Path(concept_path).glob(glob_pattern):
+                if any(part.startswith('.') for part in path.relative_to(concept_path).parent.parts):
+                    continue
                 extension = os.path.splitext(path)[1]
                 if path.is_file() and path_util.is_supported_image_extension(extension) \
                         and not path.name.endswith("-masklabel.png") and not path.name.endswith("-condlabel.png"):
@@ -862,9 +867,6 @@ class ConceptWindow(ctk.CTkToplevel):
         return aspect_string
 
     def __get_concept_stats(self, advanced_checks: bool, wait_time: float):
-        if not os.path.isdir(self.concept.path):
-            print(f"Unable to get statistics for invalid concept path: {self.concept.path}")
-            return
         start_time = time.perf_counter()
         last_update = time.perf_counter()
         self.cancel_scan_flag.clear()
@@ -872,7 +874,7 @@ class ConceptWindow(ctk.CTkToplevel):
         concept_path = self.get_concept_path(self.concept.path)
 
         if not concept_path:
-           print(f"Unable to get statistics for invalid concept path: {self.concept.path}")
+           print(f"Unable to get statistics for concept path: {self.concept.path}")
            self.concept_stats_tab.after(0, self.__enable_scan_buttons)
            return
         subfolders = [concept_path]
@@ -883,7 +885,7 @@ class ConceptWindow(ctk.CTkToplevel):
                 break
             stats_dict = concept_stats.folder_scan(path, stats_dict, advanced_checks, self.concept, start_time, wait_time, self.cancel_scan_flag)
             if self.concept.include_subdirectories and not self.cancel_scan_flag.is_set():     #add all subfolders of current directory to for loop
-                subfolders.extend([f for f in os.scandir(path) if f.is_dir()])
+                subfolders.extend([f for f in os.scandir(path) if f.is_dir() and not f.name.startswith('.')])
             self.concept.concept_stats = stats_dict
             #update GUI approx every half second
             if time.perf_counter() > (last_update + 0.5):
@@ -920,6 +922,13 @@ class ConceptWindow(ctk.CTkToplevel):
                 self.__get_concept_stats(False, 2)    #force rescan if config is empty, timeout of 2 sec
                 if self.concept.concept_stats["processing_time"] < 0.1:
                     self.__get_concept_stats(True, 2)    #do advanced scan automatically if basic took <0.1s
+
+    def destroy(self):
+        if self.bucket_fig is not None:
+            plt.close(self.bucket_fig)
+            self.bucket_fig = None
+
+        super().destroy()
 
     def __ok(self):
         self.destroy()
