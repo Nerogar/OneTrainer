@@ -58,7 +58,7 @@ class OFTRotationModule(nn.Module):
         self.block_share = block_share
         if oft_scaled:
             # Register a persistent buffer to indicate this module uses Scaled OFT.
-            # This embeds the scaling configuration directly into the state_dict, 
+            # This embeds the scaling configuration directly into the state_dict,
             # allowing inference tools to automatically detect scaled oft.
             self.register_buffer("scaled_oft", torch.tensor(True))
         self.oft_scaled = oft_scaled
