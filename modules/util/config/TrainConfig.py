@@ -1181,7 +1181,6 @@ class TrainConfig(BaseConfig):
         data.append(("lokr_use_tucker", False, bool, False))
         data.append(("lokr_weight_decompose", False, bool, False))
         data.append(("lokr_dora_on_output", True, bool, False))
-        data.append(("", False, bool, False))
         data.append(("lokr_full_matrix", False, bool, False))
         data.append(("lokr_vec_trick", True, bool, False))
 
