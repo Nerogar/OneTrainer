@@ -3,9 +3,9 @@
 
 # pytorch
 --extra-index-url https://download.pytorch.org/whl/rocm6.3
-torch==2.7.1+rocm6.3  #intentionally not upgraded because of reported problems
-torchvision==0.22.1+rocm6.3
-onnxruntime==1.22.1
+torch==2.9.1+rocm6.3
+torchvision==0.24.1+rocm6.3
+onnxruntime==1.23.2
 
 # optimizers
 # TODO

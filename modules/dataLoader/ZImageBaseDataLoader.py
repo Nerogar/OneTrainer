@@ -9,12 +9,15 @@ from modules.modelSetup.BaseZImageSetup import BaseZImageSetup
 from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
+from modules.util.thread_safety import apply_thread_safe_forward
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
 from mgds.pipelineModules.EncodeQwenText import EncodeQwenText
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
+from mgds.pipelineModules.PadMaskedTokens import PadMaskedTokens
+from mgds.pipelineModules.PruneMaskedTokens import PruneMaskedTokens
 from mgds.pipelineModules.RescaleImageChannels import RescaleImageChannels
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.SaveImage import SaveImage
@@ -36,9 +39,10 @@ class ZImageBaseDataLoader(
                                     apply_chat_template = lambda caption: format_input(caption), apply_chat_template_kwargs = {'add_generation_prompt': True, 'enable_thinking': True}
                                   )
         if config.dataloader_threads > 1:
-            raise NotImplementedError("Multiple data loader threads are not supported due to an issue with the transformers library: https://github.com/huggingface/transformers/issues/42673")
+            apply_thread_safe_forward(model.text_encoder)  # workaround for transformers#42673
         encode_prompt = EncodeQwenText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask',
                                        text_encoder=model.text_encoder, hidden_state_output_index=-2, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        prune_masked_tokens = PruneMaskedTokens(tokens_name='tokens', tokens_mask_name='tokens_mask', hidden_state_name='text_encoder_hidden_state')
 
         modules = [rescale_image, encode_image, image_sample]
 
@@ -46,6 +50,10 @@ class ZImageBaseDataLoader(
             modules.append(downscale_mask)
 
         modules += [tokenize_prompt, encode_prompt]
+
+        if config.latent_caching:
+            modules.append(prune_masked_tokens)
+
         return modules
 
     def _cache_modules(self, config: TrainConfig, model: ZImageModel, model_setup: BaseZImageSetup):
@@ -76,6 +84,8 @@ class ZImageBaseDataLoader(
         )
 
     def _output_modules(self, config: TrainConfig, model: ZImageModel, model_setup: BaseZImageSetup):
+        pad_masked_tokens = PadMaskedTokens(tokens_name='tokens', tokens_mask_name='tokens_mask', hidden_state_name='text_encoder_hidden_state', max_length=PROMPT_MAX_LENGTH)
+
         output_names = [
             'image_path', 'latent_image',
             'prompt',
@@ -89,7 +99,7 @@ class ZImageBaseDataLoader(
 
         output_names.append('text_encoder_hidden_state')
 
-        return self._output_modules_from_out_names(
+        output_module_list = self._output_modules_from_out_names(
             model, model_setup,
             output_names=output_names,
             config=config,
@@ -98,6 +108,11 @@ class ZImageBaseDataLoader(
             autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
         )
+
+        if config.latent_caching:
+            output_module_list = [pad_masked_tokens] + output_module_list
+
+        return output_module_list
 
     def _debug_modules(self, config: TrainConfig, model: ZImageModel):
         debug_dir = os.path.join(config.debug_dir, "dataloader")
