@@ -231,7 +231,7 @@ class BaseFluxSetup(
                 apply_attention_mask=config.transformer.attention_mask,
             )
 
-            if config.cep_enabled:
+            if config.cep_gamma > 0 and not deterministic:
                 text_encoder_output = self._apply_conditional_embedding_perturbation(
                     text_encoder_output, config.cep_gamma, generator
                 )
