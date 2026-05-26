@@ -1,10 +1,10 @@
-from pathlib import Path
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import PeftType
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+from modules.util.ui.validation_helpers import check_range
 
 import customtkinter as ctk
 
@@ -64,9 +64,9 @@ class LoraTab:
         # lora model name
         components.label(master, 0, 0, f"{name} base model",
                          tooltip=f"The base {name} to train on. Leave empty to create a new {name}")
-        entry = components.file_entry(
+        entry = components.path_entry(
             master, 0, 1, self.ui_state, "lora_model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            mode="file", path_modifier=components.json_path_modifier
         )
         entry.grid(row=0, column=1, columnspan=4)
 
@@ -89,12 +89,12 @@ class LoraTab:
             # rank
             components.label(master, 1, 0, f"{name} rank",
                             tooltip=f"The rank parameter used when creating a new {name}")
-            components.entry(master, 1, 1, self.ui_state, "lora_rank")
+            components.entry(master, 1, 1, self.ui_state, "lora_rank", required=True, extra_validate=check_range(lower=1, message="Rank must be at least 1"))
 
             # alpha
             components.label(master, 2, 0, f"{name} alpha",
                             tooltip=f"The alpha parameter used when creating a new {name}")
-            components.entry(master, 2, 1, self.ui_state, "lora_alpha")
+            components.entry(master, 2, 1, self.ui_state, "lora_alpha", required=True)
 
             # Dropout Percentage
             components.label(master, 3, 0, "Dropout Probability",
@@ -119,31 +119,23 @@ class LoraTab:
             # Block Size
             components.label(master, 1, 0, f"{name} Block Size",
                             tooltip=f"The block size parameter used when creating a new {name}")
-            components.entry(master, 1, 1, self.ui_state, "oft_block_size")
-
-            # COFT
-            components.label(master, 1, 3, "Constrained OFT (COFT)",
-                             tooltip="Use the constrained variant of OFT. This constrains the learned rotation to stay very close to the identity matrix, limiting adaptation to only small changes. This improves training stability, helps prevent overfitting on small datasets, and better preserves the base models original knowledge but it may lack expressiveness for tasks requiring substantial adaptation and introduces an additional hyperparameter (COFT Epsilon) that needs tuning.")
-            components.switch(master, 1, 4, self.ui_state, "oft_coft")
-
-            components.label(master, 2, 3, "COFT Epsilon",
-                             tooltip="The control strength of COFT. Only has an effect if COFT is enabled.")
-            components.entry(master, 2, 4, self.ui_state, "coft_eps")
+            components.entry(master, 1, 1, self.ui_state, "oft_block_size", required=True)
 
             # Block Share
-            components.label(master, 3, 3, "Block Share",
+            components.label(master, 1, 3, "Block Share",
                              tooltip="Share the OFT parameters between blocks. A single rotation matrix is shared across all blocks within a layer, drastically cutting the number of trainable parameters and yielding very compact adapter files, potentially improving generalization but at the cost of significant expressiveness, which can lead to underfitting on more complex or diverse tasks.")
-            components.switch(master, 3, 4, self.ui_state, "oft_block_share")
+            components.switch(master, 1, 4, self.ui_state, "oft_block_share")
 
-            # DoRA-OFT
-            components.label(master, 4, 3, "DoRA OFT (DOFT)",
-                             tooltip="Combines Weight-Decomposed Low-Rank Adaptation (DoRA) with OFT. By decoupling the weight into magnitude and direction components, it achieves the superior training dynamics of DoRA but with the stability and performance of OFT. Because OFT is norm-preserving, it avoids the heavy re-calculations typically found in standard DoRA, resulting in faster training (same speed as standard OFT) and better convergence.")
-            components.switch(master, 4, 4, self.ui_state, "dora_oft")
 
-            # Scaled OFT
-            components.label(master, 5, 3, "Scaled OFT",
+            # Scaled OFT (SOFT)
+            components.label(master, 2, 3, "Scaled OFT (SOFT)",
                              tooltip="Applies a scaling factor to the learned weights. This ensures that the effective learning rate remains consistent across different block sizes. Without this, different block sizes require significantly different learning rates.")
-            components.switch(master, 5, 4, self.ui_state, "scaled_oft")
+            components.switch(master, 2, 4, self.ui_state, "oft_scaled")
+
+            # DoRA-OFT (DOFT)
+            components.label(master, 3, 3, "DoRA OFT (DOFT)",
+                             tooltip="Combines Weight-Decomposed Low-Rank Adaptation (DoRA) with OFT. By decoupling the weight into magnitude and direction components, it achieves the superior training dynamics of DoRA but with the stability and performance of OFT. Because OFT is norm-preserving, it avoids the heavy re-calculations typically found in standard DoRA, resulting in faster training (same speed as standard OFT) and better convergence.")
+            components.switch(master, 3, 4, self.ui_state, "dora_oft")
 
             # Dropout Percentage
             components.label(master, 2, 0, "Dropout Probability",

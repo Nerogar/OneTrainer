@@ -12,7 +12,7 @@ import webbrowser
 from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 
 import scripts.generate_debug_report
 from modules.ui.AdditionalEmbeddingsTab import AdditionalEmbeddingsTab
@@ -36,12 +36,14 @@ from modules.util.enum.DataType import DataType
 from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
+from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ui import components
 from modules.util.ui.ui_utils import set_window_icon
 from modules.util.ui.UIState import UIState
+from modules.util.ui.validation import flush_and_validate_all
 
 import torch
 
@@ -129,6 +131,9 @@ class TrainUI(ctk.CTk):
         self.training_thread = None
         self.training_callbacks = None
         self.training_commands = None
+
+        self.start_time = None
+        self.start_total_steps = None
 
         self.always_on_tensorboard_subprocess = None
         self.current_workspace_dir = self.train_config.workspace_dir
@@ -239,12 +244,12 @@ class TrainUI(ctk.CTk):
         # workspace dir
         components.label(frame, 0, 0, "Workspace Directory",
                          tooltip="The directory where all files of this training run are saved")
-        components.dir_entry(frame, 0, 1, self.ui_state, "workspace_dir", command=self._on_workspace_dir_change)
+        components.path_entry(frame, 0, 1, self.ui_state, "workspace_dir", mode="dir", command=self._on_workspace_dir_change)
 
         # cache dir
         components.label(frame, 0, 2, "Cache Directory",
                          tooltip="The directory where cached data is saved")
-        components.dir_entry(frame, 0, 3, self.ui_state, "cache_dir")
+        components.path_entry(frame, 0, 3, self.ui_state, "cache_dir", mode="dir")
 
         # continue from previous backup
         components.label(frame, 2, 0, "Continue from last backup",
@@ -256,6 +261,12 @@ class TrainUI(ctk.CTk):
                          tooltip="Only populate the cache, without any training")
         components.switch(frame, 2, 3, self.ui_state, "only_cache")
 
+        # TODO: In Phase 4 rework the general tab.
+        # prevent overwrites
+        components.label(frame, 3, 0, "Prevent Overwrites",
+                         tooltip="When enabled, output paths that already exist on disk will be flagged as invalid to avoid accidental overwrites")
+        components.switch(frame, 3, 1, self.ui_state, "prevent_overwrites")
+
         # debug
         components.label(frame, 4, 0, "Debug mode",
                          tooltip="Save debug information during the training into the debug directory")
@@ -263,7 +274,7 @@ class TrainUI(ctk.CTk):
 
         components.label(frame, 4, 2, "Debug Directory",
                          tooltip="The directory where debug data is saved")
-        components.dir_entry(frame, 4, 3, self.ui_state, "debug_dir")
+        components.path_entry(frame, 4, 3, self.ui_state, "debug_dir", mode="dir", io_type=PathIOType.OUTPUT)
 
         # tensorboard
         components.label(frame, 6, 0, "Tensorboard",
@@ -294,11 +305,11 @@ class TrainUI(ctk.CTk):
         # device
         components.label(frame, 10, 0, "Dataloader Threads",
                          tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
-        components.entry(frame, 10, 1, self.ui_state, "dataloader_threads")
+        components.entry(frame, 10, 1, self.ui_state, "dataloader_threads", required=True)
 
         components.label(frame, 11, 0, "Train Device",
                          tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\". Must be \"cuda\" for multi-GPU training.")
-        components.entry(frame, 11, 1, self.ui_state, "train_device")
+        components.entry(frame, 11, 1, self.ui_state, "train_device", required=True)
 
         components.label(frame, 12, 0, "Multi-GPU",
                          tooltip="Enable multi-GPU training")
@@ -400,7 +411,7 @@ class TrainUI(ctk.CTk):
 
         components.button(top_frame, 0, 6, "sample now", self.sample_now)
 
-        components.button(top_frame, 0, 7, "manual sample", self.open_sample_ui)
+        components.button(top_frame, 0, 7, "manual sample", self.open_manual_sample_window )
 
         components.label(sub_frame, 0, 0, "Non-EMA Sampling",
                          tooltip="Whether to include non-ema sampling when using ema.")
@@ -468,53 +479,6 @@ class TrainUI(ctk.CTk):
         frame.pack(fill="both", expand=1)
         return frame
 
-    def lora_tab(self, master):
-        frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, weight=1)
-        frame.grid_columnconfigure(2, minsize=50)
-        frame.grid_columnconfigure(3, weight=0)
-        frame.grid_columnconfigure(4, weight=1)
-
-        # lora model name
-        components.label(frame, 0, 0, "LoRA base model",
-                         tooltip="The base LoRA to train on. Leave empty to create a new LoRA")
-        components.file_entry(
-            frame, 0, 1, self.ui_state, "lora_model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
-        )
-
-        # lora rank
-        components.label(frame, 1, 0, "LoRA rank",
-                         tooltip="The rank parameter used when creating a new LoRA")
-        components.entry(frame, 1, 1, self.ui_state, "lora_rank")
-
-        # lora rank
-        components.label(frame, 2, 0, "LoRA alpha",
-                         tooltip="The alpha parameter used when creating a new LoRA")
-        components.entry(frame, 2, 1, self.ui_state, "lora_alpha")
-
-        # Dropout Percentage
-        components.label(frame, 3, 0, "Dropout Probability",
-                         tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
-        components.entry(frame, 3, 1, self.ui_state, "dropout_probability")
-
-        # lora weight dtype
-        components.label(frame, 4, 0, "LoRA Weight Data Type",
-                         tooltip="The LoRA weight data type used for training. This can reduce memory consumption, but reduces precision")
-        components.options_kv(frame, 4, 1, [
-            ("float32", DataType.FLOAT_32),
-            ("bfloat16", DataType.BFLOAT_16),
-        ], self.ui_state, "lora_weight_dtype")
-
-        # For use with additional embeddings.
-        components.label(frame, 5, 0, "Bundle Embeddings",
-                         tooltip="Bundles any additional embeddings into the LoRA output file, rather than as separate files")
-        components.switch(frame, 5, 1, self.ui_state, "bundle_additional_embeddings")
-
-        frame.pack(fill="both", expand=1)
-        return frame
-
     def embedding_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
         frame.grid_columnconfigure(0, weight=0)
@@ -526,9 +490,9 @@ class TrainUI(ctk.CTk):
         # embedding model name
         components.label(frame, 0, 0, "Base embedding",
                          tooltip="The base embedding to train on. Leave empty to create a new embedding")
-        components.file_entry(
+        components.path_entry(
             frame, 0, 1, self.ui_state, "embedding.model_name",
-            path_modifier=lambda x: Path(x).parent.absolute() if x.endswith(".json") else x
+            mode="file", path_modifier=components.json_path_modifier
         )
 
         # token count
@@ -639,13 +603,20 @@ class TrainUI(ctk.CTk):
         webbrowser.open("http://localhost:" + str(self.train_config.tensorboard_port), new=0, autoraise=False)
 
     def _calculate_eta_string(self, train_progress: TrainProgress, max_step: int, max_epoch: int) -> str | None:
-        spent_total = time.monotonic() - self.start_time
-        steps_done = train_progress.epoch * max_step + train_progress.epoch_step
-        remaining_steps = (max_epoch - train_progress.epoch - 1) * max_step + (max_step - train_progress.epoch_step)
-        total_eta = spent_total / steps_done * remaining_steps
+        assert self.start_time is not None and self.start_total_steps is not None
 
-        if train_progress.global_step <= 30:
+        spent_total = time.monotonic() - self.start_time
+
+        # calculate steps done in THIS SESSION only
+        current_total_steps = train_progress.epoch * max_step + train_progress.epoch_step
+        steps_done_this_session = current_total_steps - self.start_total_steps
+
+        remaining_steps = (max_epoch - train_progress.epoch - 1) * max_step + (max_step - train_progress.epoch_step)
+
+        if steps_done_this_session <= 30:
             return "Estimating ..."
+
+        total_eta = spent_total / steps_done_this_session * remaining_steps
 
         td = datetime.timedelta(seconds=total_eta)
         days = td.days
@@ -671,6 +642,10 @@ class TrainUI(ctk.CTk):
         self.eta_label.configure(text="")
 
     def on_update_train_progress(self, train_progress: TrainProgress, max_step: int, max_epoch: int):
+        # capture session start on first progress update
+        if self.start_total_steps is None:
+            self.start_total_steps = train_progress.epoch * max_step + train_progress.epoch_step
+
         self.set_step_progress(train_progress.epoch_step, max_step)
         self.set_epoch_progress(train_progress.epoch, max_epoch)
         self.set_eta_label(train_progress, max_step, max_epoch)
@@ -694,6 +669,7 @@ class TrainUI(ctk.CTk):
         if not self.training_callbacks and not self.training_commands:
             window = SampleWindow(
                 self,
+                use_external_model=False,
                 train_config=self.train_config,
             )
             self.wait_window(window)
@@ -724,13 +700,15 @@ class TrainUI(ctk.CTk):
             self.on_update_status(f"Error generating debug package: {e}")
 
 
-    def open_sample_ui(self):
+    def open_manual_sample_window (self):
         training_callbacks = self.training_callbacks
         training_commands = self.training_commands
 
         if training_callbacks and training_commands:
             window = SampleWindow(
                 self,
+                train_config=self.train_config,
+                use_external_model=True,
                 callbacks=training_callbacks,
                 commands=training_commands,
             )
@@ -751,6 +729,8 @@ class TrainUI(ctk.CTk):
             if self.train_config.cloud.enabled:
                 self.ui_state.get_var("secrets.cloud").update(self.train_config.secrets.cloud)
 
+            # Reset session tracking - actual values captured on first progress callback
+            self.start_total_steps = None
             self.start_time = time.monotonic()
             trainer.train()
         except Exception:
@@ -784,6 +764,18 @@ class TrainUI(ctk.CTk):
     def start_training(self):
         if self.training_thread is None:
             self.save_default()
+
+            # --- pre-training validation gate ---
+            errors = flush_and_validate_all()
+
+            if errors:
+                bullet_list = "\n".join(f"• {e}" for e in errors)
+                messagebox.showerror(
+                    "Cannot Start Training",
+                    f"Please fix the following errors before training:\n\n{bullet_list}",
+                )
+                return
+
             self._set_training_button_running()
 
             if self.train_config.tensorboard and not self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:

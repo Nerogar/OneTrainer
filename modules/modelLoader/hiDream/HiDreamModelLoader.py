@@ -102,7 +102,7 @@ class HiDreamModelLoader(
 
         tokenizer_2 = CLIPTokenizer.from_pretrained(
             base_model_name,
-            subfolder="tokenizer",
+            subfolder="tokenizer_2",
         ) if include_text_encoder_2 else None
 
         tokenizer_3 = T5Tokenizer.from_pretrained(
@@ -112,7 +112,7 @@ class HiDreamModelLoader(
 
         tokenizer_4 = LlamaTokenizerFast.from_pretrained(
             text_encoder_4_model_name,
-        ) if include_text_encoder_1 else None
+        ) if include_text_encoder_4 else None
 
         noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
             base_model_name,
