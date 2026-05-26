@@ -60,7 +60,7 @@ class OFTRotationModule(nn.Module):
             # Register a persistent buffer to indicate this module uses Scaled OFT.
             # This embeds the scaling configuration directly into the state_dict, 
             # allowing inference tools to automatically detect scaled oft.
-            self.register_buffer("scaled_oft", torch.tensor())
+            self.register_buffer("scaled_oft", torch.tensor(True))
         self.oft_scaled = oft_scaled
         self.use_cayley_neumann = use_cayley_neumann
         self.num_cayley_neumann_terms = num_cayley_neumann_terms
