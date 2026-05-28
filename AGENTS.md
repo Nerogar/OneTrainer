@@ -126,49 +126,9 @@ Presets in `training_presets/` are partial overrides applied on top of
 
 ## Recipes
 
-### Add a new model family
+Detailed implementation guides live in [`docs/recipes/`](docs/recipes/):
 
-Pick the closest existing family as a template (`Flux2`, `Qwen`, `Sana`, `HiDream`,
-`Chroma`, `HunyuanVideo`, `PixArtAlpha`, `StableDiffusion3`, etc.) — file-naming
-conventions vary slightly per family, so copy the analog rather than guess.
-
-1. Drop subclasses (auto-registered via `factory.import_dir`):
-   - `modules/model/<Name>Model.py` ← `BaseModel`
-   - `modules/modelLoader/<Name>{FineTune,LoRA,Embedding}ModelLoader.py` ← `BaseModelLoader`
-     (some families instead use a single `<Name>ModelLoader.py`)
-   - `modules/modelSetup/Base<Name>Setup.py` + per-method `<Name>{FineTune,LoRA,Embedding}Setup.py`
-     ← `BaseModelSetup` (only the per-method classes auto-register)
-   - `modules/dataLoader/<Name>BaseDataLoader.py` ← `BaseDataLoader`
-   - `modules/modelSampler/<Name>Sampler.py` ← `BaseModelSampler` (one file per family)
-   - `modules/modelSaver/<Name>{FineTune,LoRA,Embedding}ModelSaver.py` ← `BaseModelSaver`
-2. Add `ModelType.<NAME>` to `modules/util/enum/ModelType.py`; mirror any sibling `is_<name>()` predicate.
-3. Sweep `modules/ui/ModelTab.py` and `modules/ui/TrainingTab.py` for `if/elif model_type == ...` chains. Partial registration = silent feature absence.
-4. Add a starter `training_presets/#<name> LoRA.json` (clone an analog's preset).
-5. Optional: `resources/sd_model_spec/<name>.json`, `resources/icons/<name>.png`.
-
-Cross-family shared logic lives in `modules/modelSetup/mixin/` and `modules/modelLoader/mixin/` — extend a mixin rather than duplicating.
-
-### Add a new optimizer
-
-1. `modules/util/enum/Optimizer.py` — add enum entry; update `is_adaptive` / `is_schedule_free` / `supports_fused_back_pass` predicates if applicable.
-2. `modules/util/create.py::create_optimizer` — add `case Optimizer.<NAME>:`.
-3. `modules/util/optimizer_util.py::OPTIMIZER_DEFAULT_PARAMETERS` — register default hyperparams.
-4. If torch internals need patching: add a module under `modules/util/optimizer/` modelled on the existing `*_extensions.py`.
-5. UI exposure: `modules/ui/OptimizerParamsWindow.py`.
-6. Pin any new package in `requirements-global.txt` (or appropriate platform file).
-
-### Add a new LR scheduler
-
-1. `modules/util/enum/LearningRateScheduler.py` — add enum entry.
-2. `modules/util/lr_scheduler_util.py` — add `lr_lambda_<name>(...)`.
-3. `modules/util/create.py::create_lr_scheduler` — add `case` branch wiring the lambda.
-4. UI exposure: `modules/ui/SchedulerParamsWindow.py` if it needs parameters.
-
-### Add a new noise scheduler
-
-1. `modules/util/enum/NoiseScheduler.py` — add enum entry.
-2. `modules/util/create.py::create_noise_scheduler` — add `case` branch returning a `diffusers` scheduler. Mirror an existing case for the signature.
-3. UI exposure: `modules/ui/SamplingTab.py`.
+- **New optimizer** — see [`docs/recipes/AddOptimizer.md`](docs/recipes/AddOptimizer.md).
 
 ### Add a `TrainConfig` field
 

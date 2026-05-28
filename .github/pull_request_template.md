@@ -1,6 +1,8 @@
+<!--
 Thanks for contributing to OneTrainer.
-Please read [AGENTS.md](../AGENTS.md) (project rules for any AI-assisted work) before opening this PR,
-and [docs/Contributing.md](../docs/Contributing.md) / [docs/ProjectStructure.md](../docs/ProjectStructure.md) for the wider project guide.
+Please read AGENTS.md (project rules for any AI-assisted work) before opening this PR,
+and docs/Contributing.md / docs/ProjectStructure.md for the wider project guide.
+-->
 
 ## Summary
 
@@ -28,7 +30,4 @@ your co-author. Pick exactly one option below.
 - [ ] AI-assisted — I have read every line in this diff and can defend each change
 - [ ] Early AI prototype — opened for discussion, **not ready for review**
 
----
-
-By opening this PR (and not marking it as an early prototype, aka a draft) I confirm I have read every
-line in this diff and have tested it locally.
+<!-- By opening this PR (and not marking it as an early prototype, aka a draft) I confirm I have read every line in this diff and have tested it locally. -->
