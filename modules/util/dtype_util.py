@@ -64,16 +64,16 @@ def disable_fp16_autocast_context(
 
     # fp16 training but this component is unstable in fp16 -> override the outer fp16
     # autocast and run it at the fallback precision. A bf16 fallback works on every
-    # backend; a float32 fallback can only be applied via autocast on CUDA, so on
-    # other devices disable autocast and let the component run at its weight dtype.
+    # backend; a float32 fallback can only be applied via autocast on CUDA.
     fallback_torch_dtype = fallback_train_dtype.torch_dtype()
     if fallback_torch_dtype in (torch.float16, torch.bfloat16) or device.type == "cuda":
         return torch.autocast(device_type=device.type, dtype=fallback_torch_dtype,
                               cache_enabled=enable_autocast_cache), fallback_train_dtype
     else:
-        print("Warning: the float32 fallback for fp16-unstable layers is not applied on device type "
-              f"'{device.type}' (only CUDA can autocast to float32); these layers run at their weight dtype.")
-        return torch.autocast(device_type=device.type, enabled=False), fallback_train_dtype
+        raise RuntimeError(
+            f"A float32 fallback for fp16-unstable layers cannot be applied on device type "
+            f"'{device.type}' (only CUDA can autocast to float32). Use a bfloat16 fallback dtype."
+        )
 
 
 def disable_bf16_on_fp16_autocast_context(
