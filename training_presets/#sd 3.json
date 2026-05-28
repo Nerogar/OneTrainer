@@ -2,7 +2,7 @@
     "base_model_name": "stabilityai/stable-diffusion-3-medium-diffusers",
     "model_type": "STABLE_DIFFUSION_3",
     "output_dtype": "FLOAT_16",
-    "output_model_destination": "models/model.safetensors",
+    "run_name": "model",
     "output_model_format": "SAFETENSORS",
     "transformer": {
         "weight_dtype": "FLOAT_32"

@@ -4,7 +4,7 @@
     "masked_training": true,
     "model_type": "STABLE_DIFFUSION_15_INPAINTING",
     "normalize_masked_area_loss": true,
-    "output_model_destination": "models/model.safetensors",
+    "run_name": "model",
     "output_model_format": "SAFETENSORS",
     "resolution": "512",
     "training_method": "FINE_TUNE",

@@ -5,7 +5,7 @@
     "learning_rate": 0.0003,
     "learning_rate_warmup_steps": 20,
     "model_type": "STABLE_DIFFUSION_21",
-    "output_model_destination": "models/embedding.safetensors",
+    "run_name": "embedding",
     "output_model_format": "SAFETENSORS",
     "resolution": "512",
     "sample_after": 1,

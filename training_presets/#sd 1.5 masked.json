@@ -5,7 +5,7 @@
     "max_noising_strength": 0.8,
     "model_type": "STABLE_DIFFUSION_15",
     "normalize_masked_area_loss": true,
-    "output_model_destination": "models/model.safetensors",
+    "run_name": "model",
     "output_model_format": "SAFETENSORS",
     "resolution": "512",
     "training_method": "FINE_TUNE",

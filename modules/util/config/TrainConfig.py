@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import uuid
 from copy import deepcopy
 from typing import Any
@@ -23,13 +24,59 @@ from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType, PeftType
 from modules.util.enum.Optimizer import Optimizer
+from modules.util.enum.RunNameMode import RunNameMode
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.enum.VideoFormat import VideoFormat
 from modules.util.ModelNames import EmbeddingName, ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
+from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import default_device
+from modules.util.TrainProgress import TrainProgress
+
+import friendlywords
+
+BACKUP_NAME_TIMESTAMP_RE = re.compile(r"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})$")
+
+
+def generate_run_name(training_method, run_name_mode: RunNameMode = RunNameMode.DEFAULT) -> str:
+    mode = str(run_name_mode)
+
+    if mode == str(RunNameMode.FRIENDLY):
+        return friendlywords.generate(2, separator="_")
+
+    method = str(training_method).lower().replace(" ", "_")
+    return f"{method}_{get_string_timestamp()}"
+
+
+def is_auto_run_name_mode(run_name_mode: RunNameMode | str | None) -> bool:
+    return str(run_name_mode or RunNameMode.DEFAULT) != str(RunNameMode.CUSTOM)
+
+
+def prepare_run_name(
+    training_method,
+    run_name_mode: RunNameMode = RunNameMode.DEFAULT,
+    current_run_name: str | None = None,
+    *,
+    is_new_invocation: bool = False,
+) -> str:
+    """Choose the run name to use now, reusing an existing one when allowed and regenerating auto names for a new run."""
+    if is_new_invocation and is_auto_run_name_mode(run_name_mode):
+        return generate_run_name(training_method, run_name_mode)
+
+    if (current_run_name or "").strip():
+        return current_run_name or ""
+
+    return generate_run_name(training_method, run_name_mode)
+
+def get_output_model_destination(
+    final_output_dir: str,
+    run_name: str,
+    output_model_format: ModelFormat,
+) -> str:
+    """Build the path for final model output (non workspace ones)"""
+    return os.path.join(final_output_dir, f"{run_name}{output_model_format.file_extension()}")
 
 
 class TrainOptimizerConfig(BaseConfig):
@@ -359,6 +406,8 @@ class TrainConfig(BaseConfig):
     validate_after_unit: TimeUnit
     continue_last_backup: bool
     prevent_overwrites: bool
+    auto_correct_input: bool
+    run_name_mode: RunNameMode
     include_train_config: ConfigPart
 
     # multi-GPU
@@ -371,9 +420,10 @@ class TrainConfig(BaseConfig):
 
     # model settings
     base_model_name: str
+    run_name: str
+    final_output_dir: str
     output_dtype: DataType
     output_model_format: ModelFormat
-    output_model_destination: str
     gradient_checkpointing: GradientCheckpointingMethod
     enable_async_offloading: bool
     enable_activation_offloading: bool
@@ -550,7 +600,6 @@ class TrainConfig(BaseConfig):
     save_every: int
     save_every_unit: TimeUnit
     save_skip_first: int
-    save_filename_prefix: str
 
     # secrets - not saved into config file
     secrets: SecretsConfig
@@ -558,7 +607,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=10,
+            config_version=11,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -570,6 +619,7 @@ class TrainConfig(BaseConfig):
                 7: self.__migration_7,
                 8: self.__migration_8,
                 9: self.__migration_9,
+                10: self.__migration_10,
             }
         )
 
@@ -789,6 +839,31 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_10(self, data: dict) -> dict:
+        from pathlib import PurePosixPath, PureWindowsPath
+        migrated_data = data.copy()
+
+        dest = migrated_data.pop("output_model_destination", "")
+        old_prefix = migrated_data.pop("save_filename_prefix", "")
+        migrated_data.pop("output_name_as_run_name", None)
+
+        if dest:
+            p = PureWindowsPath(dest) if "\\" in dest else PurePosixPath(dest)
+            run_name = p.stem
+            parent = str(p.parent)
+            final_output_dir = parent if parent != "." else "./models"
+        else:
+            run_name = ""
+            final_output_dir = "./models"
+
+        if old_prefix:
+            run_name = old_prefix.rstrip("-").strip()
+
+        migrated_data["run_name"] = run_name
+        migrated_data["final_output_dir"] = final_output_dir
+
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
@@ -867,18 +942,121 @@ class TrainConfig(BaseConfig):
         else:
             return self.additional_embeddings
 
-    def get_last_backup_path(self) -> str | None:
+    def _backup_sort_key(self, backup_path: str) -> tuple[str, int, int, int, str]:
+        """Sort by the backup name's embedded timestamp/progress (not mtime), so copied backups and prefixes dont change which backup is considered latest."""
+        backup_name = os.path.basename(backup_path)
+        prefix_and_timestamp, separator, progress_suffix = backup_name.rpartition("-backup-")
+
+        if separator:
+            timestamp_match = BACKUP_NAME_TIMESTAMP_RE.search(prefix_and_timestamp)
+            progress_parts = progress_suffix.split("-")
+
+            if timestamp_match and len(progress_parts) == 3 and all(part.isdigit() for part in progress_parts):
+                global_step, epoch, epoch_step = (int(part) for part in progress_parts)
+                return (timestamp_match.group(1), global_step, epoch, epoch_step, backup_name)
+
+        return ("", -1, -1, -1, backup_name)
+
+    def get_backup_paths(self) -> list[str]:
         backups_path = os.path.join(self.workspace_dir, "backup")
-        if os.path.exists(backups_path):
-            backup_paths = sorted(
-                [path for path in os.listdir(backups_path) if
-                 os.path.isdir(os.path.join(backups_path, path))],
-                reverse=True,
+        if not os.path.exists(backups_path):
+            return []
+
+        backup_paths = [
+            os.path.join(backups_path, path)
+            for path in os.listdir(backups_path)
+            if os.path.isdir(os.path.join(backups_path, path))
+        ]
+        backup_paths.sort(key=self._backup_sort_key, reverse=True)
+
+        return backup_paths
+
+    def _load_backup_train_progress(self, backup_path: str) -> TrainProgress | None:
+        meta_path = os.path.join(backup_path, "meta.json")
+        if not os.path.isfile(meta_path):
+            return None
+
+        try:
+            with open(meta_path, 'r') as f:
+                meta = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return None
+
+        train_progress = meta.get("train_progress")
+        if not isinstance(train_progress, dict):
+            return None
+
+        try:
+            return TrainProgress(
+                epoch=int(train_progress["epoch"]),
+                epoch_step=int(train_progress["epoch_step"]),
+                epoch_sample=int(train_progress["epoch_sample"]),
+                global_step=int(train_progress["global_step"]),
+            )
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    def _backup_training_method_is_compatible(self, backup_path: str) -> bool:
+        args_path = os.path.join(backup_path, "onetrainer_config", "args.json")
+        if not os.path.isfile(args_path):
+            return False
+
+        try:
+            with open(args_path, 'r') as f:
+                backup_settings = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return False
+
+        if backup_settings.get("training_method") != str(self.training_method):
+            return False
+
+        if self.training_method == TrainingMethod.LORA:
+            return backup_settings.get("peft_type") == str(self.peft_type)
+
+        return True
+
+    def _last_backup_path_error_message(self, backup_paths: list[str]) -> str:
+        mode = f"training_method={self.training_method}"
+        if self.training_method == TrainingMethod.LORA:
+            mode += f", peft_type={self.peft_type}"
+
+        if not backup_paths:
+            return (
+                "Continue from latest backup is enabled, but no backups were found in "
+                f"'{os.path.join(self.workspace_dir, 'backup')}' for {mode}."
             )
 
-            if backup_paths:
-                last_backup_path = backup_paths[0]
-                return os.path.join(backups_path, last_backup_path)
+        return (
+            "Continue from latest backup is enabled, but no compatible backup was found in "
+            f"'{os.path.join(self.workspace_dir, 'backup')}' for {mode}."
+        )
+
+    def _last_backup_complete_error_message(self, backup_path: str, train_progress: TrainProgress) -> str:
+        return (
+            "Continue from latest backup is enabled, but the latest compatible backup "
+            f"'{backup_path}' has already reached epoch {train_progress.epoch}. "
+            "Increase your total epochs to continue."
+        )
+
+    def get_last_backup_path(
+        self,
+        require_compatible: bool = False,
+        require_remaining_work: bool = False,
+    ) -> str | None:
+        backup_paths = self.get_backup_paths()
+        for backup_path in backup_paths:
+            if not self._backup_training_method_is_compatible(backup_path):
+                continue
+
+            if require_remaining_work:
+                train_progress = self._load_backup_train_progress(backup_path)
+                if train_progress is not None and train_progress.epoch >= self.epochs:
+                    raise ValueError(self._last_backup_complete_error_message(backup_path, train_progress))
+
+            return backup_path
+
+        if require_compatible:
+            raise ValueError(self._last_backup_path_error_message(backup_paths))
 
         return None
 
@@ -943,6 +1121,8 @@ class TrainConfig(BaseConfig):
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
         data.append(("continue_last_backup", False, bool, False))
         data.append(("prevent_overwrites", False, bool, False))
+        data.append(("auto_correct_input", True, bool, False))
+        data.append(("run_name_mode", RunNameMode.DEFAULT, RunNameMode, False))
         data.append(("include_train_config", ConfigPart.NONE, ConfigPart, False))
 
         #multi-GPU
@@ -955,9 +1135,10 @@ class TrainConfig(BaseConfig):
 
         # model settings
         data.append(("base_model_name", "stable-diffusion-v1-5/stable-diffusion-v1-5", str, False))
+        data.append(("run_name", "", str, False))
+        data.append(("final_output_dir", "models", str, False))
         data.append(("output_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
-        data.append(("output_model_destination", "models/model.safetensors", str, False))
         data.append(("gradient_checkpointing", GradientCheckpointingMethod.ON, GradientCheckpointingMethod, False))
         data.append(("enable_async_offloading", True, bool, False))
         data.append(("enable_activation_offloading", True, bool, False))
@@ -1175,7 +1356,6 @@ class TrainConfig(BaseConfig):
         data.append(("save_every", 0, int, False))
         data.append(("save_every_unit", TimeUnit.NEVER, TimeUnit, False))
         data.append(("save_skip_first", 0, int, False))
-        data.append(("save_filename_prefix", "", str, False))
 
         # secrets
         secrets = SecretsConfig.default_values()

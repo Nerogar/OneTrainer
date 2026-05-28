@@ -1,13 +1,15 @@
 
 from modules.util import create
-from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.TrainConfig import TrainConfig, is_auto_run_name_mode
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.PathIOType import PathIOType
+from modules.util.enum.RunNameMode import RunNameMode
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
+from modules.util.ui.validation import RunNameValidator
 
 import customtkinter as ctk
 
@@ -634,14 +636,31 @@ class ModelTab:
             allow_legacy_safetensors: bool = False,
             allow_comfy: bool = False,
     ) -> int:
-        # output model destination
-        components.label(frame, row, 0, "Model Output Destination",
-                         tooltip="Filename or directory where the output model is saved")
-        components.path_entry(
-            frame, row, 1, self.ui_state, "output_model_destination",
-            mode="file",
-            io_type=PathIOType.MODEL,
-        )
+        # run name mode
+        components.label(frame, row, 0, "Run Name",
+                         tooltip="String used as the filename and as a prefix for saves, backups, samples, and tensorboard. "
+                                 "The file extension is determined automatically by the Output Format")
+
+        run_name_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        run_name_frame.grid(row=row, column=1, padx=0, pady=0, sticky="ew")
+        run_name_frame.grid_columnconfigure(1, weight=1)
+
+        run_name_entry = components.entry(run_name_frame, 0, 1, self.ui_state, "run_name",
+                         validator_factory=RunNameValidator, sticky="ew")
+
+        def _on_run_name_mode_change(_value=None):
+            mode_var = self.ui_state.get_var("run_name_mode")
+            if is_auto_run_name_mode(mode_var.get()):
+                run_name_entry.set_disabled()
+            else:
+                run_name_entry.set_enabled()
+
+        components.options_kv(run_name_frame, 0, 0, [
+            ("Default", RunNameMode.DEFAULT),
+            ("Friendly", RunNameMode.FRIENDLY),
+            ("Custom", RunNameMode.CUSTOM),
+        ], self.ui_state, "run_name_mode", command=_on_run_name_mode_change)
+        _on_run_name_mode_change()
 
         # output data type
         components.label(frame, row, 3, "Output Data Type",
@@ -653,6 +672,17 @@ class ModelTab:
             ("float8", DataType.FLOAT_8),
             ("nfloat4", DataType.NFLOAT_4),
         ], self.ui_state, "output_dtype")
+
+        row += 1
+
+        # final output directory
+        components.label(frame, row, 0, "Final Output Directory",
+                         tooltip="Directory where the final trained model is saved")
+        components.path_entry(
+            frame, row, 1, self.ui_state, "final_output_dir",
+            mode="dir",
+            io_type=PathIOType.OUTPUT,
+        )
 
         row += 1
 

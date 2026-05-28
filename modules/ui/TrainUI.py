@@ -31,7 +31,7 @@ from modules.ui.VideoToolUI import VideoToolUI
 from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.TrainConfig import TrainConfig, prepare_run_name
 from modules.util.enum.DataType import DataType
 from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 from modules.util.enum.ImageFormat import ImageFormat
@@ -244,12 +244,12 @@ class TrainUI(ctk.CTk):
         # workspace dir
         components.label(frame, 0, 0, "Workspace Directory",
                          tooltip="The directory where all files of this training run are saved")
-        components.path_entry(frame, 0, 1, self.ui_state, "workspace_dir", mode="dir", command=self._on_workspace_dir_change)
+        components.path_entry(frame, 0, 1, self.ui_state, "workspace_dir", mode="dir", command=self._on_workspace_dir_change, io_type=PathIOType.OUTPUT)
 
         # cache dir
         components.label(frame, 0, 2, "Cache Directory",
                          tooltip="The directory where cached data is saved")
-        components.path_entry(frame, 0, 3, self.ui_state, "cache_dir", mode="dir")
+        components.path_entry(frame, 0, 3, self.ui_state, "cache_dir", mode="dir", io_type=PathIOType.OUTPUT)
 
         # continue from previous backup
         components.label(frame, 2, 0, "Continue from last backup",
@@ -267,40 +267,44 @@ class TrainUI(ctk.CTk):
                          tooltip="When enabled, output paths that already exist on disk will be flagged as invalid to avoid accidental overwrites")
         components.switch(frame, 3, 1, self.ui_state, "prevent_overwrites")
 
-        # debug
-        components.label(frame, 4, 0, "Debug mode",
-                         tooltip="Save debug information during the training into the debug directory")
-        components.switch(frame, 4, 1, self.ui_state, "debug_mode")
+        # Input validation
+        components.label(frame, 3, 2, "Auto Correct Input",
+                         tooltip="Automatically corrects common input mistakes: trims whitespace, normalises Unicode, fixes decimal notation, cleans path separators, and more")
+        components.switch(frame, 3, 3, self.ui_state, "auto_correct_input")
 
-        components.label(frame, 4, 2, "Debug Directory",
+        # debug
+        components.label(frame, 5, 0, "Debug mode",
+                         tooltip="Save debug information during the training into the debug directory")
+        components.switch(frame, 5, 1, self.ui_state, "debug_mode")
+
+        components.label(frame, 5, 2, "Debug Directory",
                          tooltip="The directory where debug data is saved")
-        components.path_entry(frame, 4, 3, self.ui_state, "debug_dir", mode="dir", io_type=PathIOType.OUTPUT)
+        components.path_entry(frame, 5, 3, self.ui_state, "debug_dir", mode="dir", io_type=PathIOType.OUTPUT)
 
         # tensorboard
-        components.label(frame, 6, 0, "Tensorboard",
+        components.label(frame, 7, 0, "Tensorboard",
                          tooltip="Starts the Tensorboard Web UI during training")
-        components.switch(frame, 6, 1, self.ui_state, "tensorboard")
+        components.switch(frame, 7, 1, self.ui_state, "tensorboard")
 
-        components.label(frame, 6, 2, "Always-On Tensorboard",
+        components.label(frame, 7, 2, "Always-On Tensorboard",
                          tooltip="Keep Tensorboard accessible even when not training. Useful for monitoring completed training sessions.")
-        components.switch(frame, 6, 3, self.ui_state, "tensorboard_always_on", command=self._on_always_on_tensorboard_toggle)
+        components.switch(frame, 7, 3, self.ui_state, "tensorboard_always_on", command=self._on_always_on_tensorboard_toggle)
 
-        components.label(frame, 7, 0, "Expose Tensorboard",
+        components.label(frame, 8, 0, "Expose Tensorboard",
                          tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)")
-        components.switch(frame, 7, 1, self.ui_state, "tensorboard_expose")
-        components.label(frame, 7, 2, "Tensorboard Port",
+        components.switch(frame, 8, 1, self.ui_state, "tensorboard_expose")
+        components.label(frame, 8, 2, "Tensorboard Port",
                          tooltip="Port to use for Tensorboard link")
-        components.entry(frame, 7, 3, self.ui_state, "tensorboard_port")
-
+        components.entry(frame, 8, 3, self.ui_state, "tensorboard_port")
 
         # validation
-        components.label(frame, 8, 0, "Validation",
+        components.label(frame, 9, 0, "Validation",
                          tooltip="Enable validation steps and add new graph in tensorboard")
-        components.switch(frame, 8, 1, self.ui_state, "validation")
+        components.switch(frame, 9, 1, self.ui_state, "validation")
 
-        components.label(frame, 8, 2, "Validate after",
+        components.label(frame, 9, 2, "Validate after",
                          tooltip="The interval used when validate training")
-        components.time_entry(frame, 8, 3, self.ui_state, "validate_after", "validate_after_unit")
+        components.time_entry(frame, 9, 3, self.ui_state, "validate_after", "validate_after_unit")
 
         # device
         components.label(frame, 10, 0, "Dataloader Threads",
@@ -314,33 +318,34 @@ class TrainUI(ctk.CTk):
         components.label(frame, 12, 0, "Multi-GPU",
                          tooltip="Enable multi-GPU training")
         components.switch(frame, 12, 1, self.ui_state, "multi_gpu")
-        components.label(frame, 12, 2, "Device Indexes",
-                         tooltip="Multi-GPU: A comma-separated list of device indexes. If empty, all your GPUs are used. With a list such as \"0,1,3,4\" you can omit a GPU, for example an on-board graphics GPU.")
-        components.entry(frame, 12, 3, self.ui_state, "device_indexes")
 
-        components.label(frame, 13, 0, "Gradient Reduce Precision",
+        components.label(frame, 13, 2, "Device Indexes",
+                         tooltip="Multi-GPU: A comma-separated list of device indexes. If empty, all your GPUs are used. With a list such as \"0,1,3,4\" you can omit a GPU, for example an on-board graphics GPU.")
+        components.entry(frame, 13, 3, self.ui_state, "device_indexes")
+
+        components.label(frame, 14, 0, "Gradient Reduce Precision",
                          tooltip="WEIGHT_DTYPE: Reduce gradients between GPUs in your weight data type; can be imprecise, but more efficient than float32\n"
                                  "WEIGHT_DTYPE_STOCHASTIC: Sum up the gradients in your weight data type, but average them in float32 and stochastically round if your weight data type is bfloat16\n"
                                  "FLOAT_32: Reduce gradients in float32\n"
                                  "FLOAT_32_STOCHASTIC: Reduce gradients in float32; use stochastic rounding to bfloat16 if your weight data type is bfloat16",
                          wide_tooltip=True)
-        components.options(frame, 13, 1, [str(x) for x in list(GradientReducePrecision)], self.ui_state,
+        components.options(frame, 14, 1, [str(x) for x in list(GradientReducePrecision)], self.ui_state,
                            "gradient_reduce_precision")
 
-        components.label(frame, 13, 2, "Fused Gradient Reduce",
+        components.label(frame, 14, 2, "Fused Gradient Reduce",
                          tooltip="Multi-GPU: Gradient synchronisation during the backward pass. Can be more efficient, especially with Async Gradient Reduce")
-        components.switch(frame, 13, 3, self.ui_state, "fused_gradient_reduce")
+        components.switch(frame, 14, 3, self.ui_state, "fused_gradient_reduce")
 
-        components.label(frame, 14, 0, "Async Gradient Reduce",
+        components.label(frame, 15, 0, "Async Gradient Reduce",
                          tooltip="Multi-GPU: Asynchroniously start the gradient reduce operations during the backward pass. Can be more efficient, but requires some VRAM.")
-        components.switch(frame, 14, 1, self.ui_state, "async_gradient_reduce")
-        components.label(frame, 14, 2, "Buffer size (MB)",
+        components.switch(frame, 15, 1, self.ui_state, "async_gradient_reduce")
+        components.label(frame, 15, 2, "Buffer size (MB)",
                          tooltip="Multi-GPU: Maximum VRAM for \"Async Gradient Reduce\", in megabytes. A multiple of this value can be needed if combined with \"Fused Back Pass\" and/or \"Layer offload fraction\"")
-        components.entry(frame, 14, 3, self.ui_state, "async_gradient_reduce_buffer")
+        components.entry(frame, 15, 3, self.ui_state, "async_gradient_reduce_buffer")
 
-        components.label(frame, 15, 0, "Temp Device",
+        components.label(frame, 16, 0, "Temp Device",
                          tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
-        components.entry(frame, 15, 1, self.ui_state, "temp_device")
+        components.entry(frame, 16, 1, self.ui_state, "temp_device")
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -470,11 +475,6 @@ class TrainUI(ctk.CTk):
         components.label(frame, 4, 0, "Skip First",
                          tooltip="Start saving automatically after this interval has elapsed")
         components.entry(frame, 4, 1, self.ui_state, "save_skip_first", width=50, sticky="nw")
-
-        # save filename prefix
-        components.label(frame, 5, 0, "Save Filename Prefix",
-                         tooltip="The prefix for filenames used when saving the model during training")
-        components.entry(frame, 5, 1, self.ui_state, "save_filename_prefix")
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -755,8 +755,22 @@ class TrainUI(ctk.CTk):
             self.on_update_status("Stopped")
         self.delete_eta_label()
 
-        # queue UI update on Tk main thread; _set_training_button_idle applies shared styles, avoid potential race/crash
-        self.after(0, self._set_training_button_idle)
+        self.after(0, self._on_training_stopped)
+
+    def _sync_run_name(self, *, is_new_invocation: bool):
+        name = prepare_run_name(
+            self.train_config.training_method,
+            self.train_config.run_name_mode,
+            self.train_config.run_name,
+            is_new_invocation=is_new_invocation,
+        )
+        self.train_config.run_name = name
+        self.ui_state.get_var("run_name").set(name)
+
+    def _on_training_stopped(self):
+        # _set_training_button_idle applies shared styles on the Tk main thread.
+        self._set_training_button_idle()
+        self._sync_run_name(is_new_invocation=True)
 
         if self.train_config.tensorboard_always_on and not self.always_on_tensorboard_subprocess:
             self.after(0, self._start_always_on_tensorboard)
@@ -764,6 +778,8 @@ class TrainUI(ctk.CTk):
     def start_training(self):
         if self.training_thread is None:
             self.save_default()
+
+            self._sync_run_name(is_new_invocation=False)
 
             # --- pre-training validation gate ---
             errors = flush_and_validate_all()
@@ -775,6 +791,16 @@ class TrainUI(ctk.CTk):
                     f"Please fix the following errors before training:\n\n{bullet_list}",
                 )
                 return
+
+            if self.train_config.continue_last_backup:
+                try:
+                    self.train_config.get_last_backup_path(
+                        require_compatible=True,
+                        require_remaining_work=True,
+                    )
+                except ValueError as e:
+                    messagebox.showerror("Cannot Start Training", str(e))
+                    return
 
             self._set_training_button_running()
 

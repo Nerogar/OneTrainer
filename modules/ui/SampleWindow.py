@@ -115,19 +115,18 @@ class SampleWindow(ctk.CTkToplevel):
 
         model_names = self.initial_train_config.model_names()
         if self.initial_train_config.continue_last_backup:
-            last_backup_path = self.initial_train_config.get_last_backup_path()
+            last_backup_path = self.initial_train_config.get_last_backup_path(require_compatible=True)
+            assert last_backup_path is not None
 
-            if last_backup_path:
-                if self.initial_train_config.training_method == TrainingMethod.LORA:
-                    model_names.lora = last_backup_path
-                elif self.initial_train_config.training_method == TrainingMethod.EMBEDDING:
-                    model_names.embedding.model_name = last_backup_path
-                else:  # fine-tunes
-                    model_names.base_model = last_backup_path
-
-                print(f"Loading from backup '{last_backup_path}'...")
+            if self.initial_train_config.training_method == TrainingMethod.LORA:
+                model_names.lora = last_backup_path
+            elif self.initial_train_config.training_method == TrainingMethod.EMBEDDING:
+                assert model_names.embedding is not None
+                model_names.embedding.model_name = last_backup_path
             else:
-                print("No backup found, loading without backup...")
+                model_names.base_model = last_backup_path
+
+            print(f"Loading from backup '{last_backup_path}'...")
 
         if self.initial_train_config.quantization.cache_dir is None:
             self.initial_train_config.quantization.cache_dir = self.initial_train_config.cache_dir + "/quantization"
