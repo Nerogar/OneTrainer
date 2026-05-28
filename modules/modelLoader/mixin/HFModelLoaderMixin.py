@@ -1,6 +1,4 @@
 import json
-
-# huggingface_hub 1.16+ uses httpx, which logs every HTTP request/response at INFO level.
 import logging
 import os
 import re
@@ -22,6 +20,7 @@ import huggingface_hub
 from huggingface_hub.utils import EntryNotFoundError
 from safetensors.torch import load_file
 
+# huggingface_hub 1.16+ uses httpx, which logs every HTTP request/response at INFO level.
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
