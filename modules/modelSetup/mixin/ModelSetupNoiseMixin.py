@@ -128,7 +128,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
         Applies Conditional Embedding Perturbation (CEP) as per Equation (8).
         Paper: "Slight Corruption in Pre-training Data Makes Better Diffusion Models"
 
-        delta ~ U(-(gamma/sqrt(d), gamma/sqrt(d)) or N(0, gamma/sqrt(d))
+        delta ~ U(-(gamma/sqrt(d), gamma/sqrt(d))
         """
         def _perturb_cep(tensor: Tensor) -> Tensor:
             # d denotes the dimension of c_theta(y)
