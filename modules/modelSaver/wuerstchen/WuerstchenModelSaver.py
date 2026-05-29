@@ -25,7 +25,7 @@ class WuerstchenModelSaver(
             dtype: torch.dtype | None,
     ):
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
-        pipeline = model.create_pipeline().prior_pipe
+        pipeline = model.create_pipeline(use_original_tokenizers=True).prior_pipe
         original_device = pipeline.device
         pipeline.to("cpu")
         pipeline_copy = copy.deepcopy(pipeline)
