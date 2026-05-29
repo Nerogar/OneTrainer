@@ -119,6 +119,41 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
 
         return noise
 
+    @staticmethod
+    def _apply_conditional_embedding_perturbation(
+            embedding: Tensor | list,
+            gamma: float,
+            generator: Generator
+    ) -> Tensor | list:
+        """
+        Applies Conditional Embedding Perturbation (CEP) as per Equation (8).
+        Paper: "Slight Corruption in Pre-training Data Makes Better Diffusion Models"
+
+        delta ~ U(-(gamma/sqrt(d), gamma/sqrt(d))
+        """
+        def _perturb_cep(tensor: Tensor) -> Tensor:
+            # d denotes the dimension of c_theta(y)
+            d = tensor.shape[-1]
+
+            # gamma controls perturbation magnitude (Paper uses gamma=1.0 as default baseline)
+            # Calculate scaling factor: gamma / sqrt(d)
+            scale = gamma / math.sqrt(d)
+
+            # CEP-U (Uniform) scheme
+            noise = torch.rand(
+                tensor.shape,
+                generator=generator,
+                device=tensor.device,
+                dtype=tensor.dtype
+            )
+            perturbation = (noise * 2.0 - 1.0) * scale
+            return tensor + perturbation
+
+        if isinstance(embedding, list):
+            return [_perturb_cep(emb) for emb in embedding]
+        else:
+            return _perturb_cep(embedding)
+
     def _get_timestep_discrete(
             self,
             num_train_timesteps: int,
