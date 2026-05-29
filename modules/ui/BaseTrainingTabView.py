@@ -412,34 +412,40 @@ class BaseTrainingTabView(ABC):
     def __create_text_encoder_frame(self, master, row, ui_state, supports_clip_skip=True, supports_training=True,
                                     supports_sequence_length=False):
         frame = self.components.section_frame(master, row)
+        row = 0
 
         if supports_training:
-            self.components.label(frame, 0, 0, "Train Text Encoder",
+            self.components.label(frame, row, 0, "Train Text Encoder",
                                   tooltip="Enables training the text encoder model")
-            self.components.switch(frame, 0, 1, ui_state, "text_encoder.train")
+            self.components.switch(frame, row, 1, ui_state, "text_encoder.train")
+            row += 1
 
         # dropout
-        self.components.label(frame, 1, 0, "Caption Dropout Probability",
+        self.components.label(frame, row, 0, "Caption Dropout Probability",
                               tooltip="The Probability for dropping the text encoder conditioning")
-        self.components.entry(frame, 1, 1, ui_state, "text_encoder.dropout_probability")
+        self.components.entry(frame, row, 1, ui_state, "text_encoder.dropout_probability")
+        row += 1
 
         if supports_training:
             # train text encoder epochs
-            self.components.label(frame, 2, 0, "Stop Training After",
+            self.components.label(frame, row, 0, "Stop Training After",
                                   tooltip="When to stop training the text encoder")
-            self.components.time_entry(frame, 2, 1, ui_state, "text_encoder.stop_training_after",
+            self.components.time_entry(frame, row, 1, ui_state, "text_encoder.stop_training_after",
                                        "text_encoder.stop_training_after_unit", supports_time_units=False)
+            row += 1
 
             # text encoder learning rate
-            self.components.label(frame, 3, 0, "Text Encoder Learning Rate",
+            self.components.label(frame, row, 0, "Text Encoder Learning Rate",
                                   tooltip="The learning rate of the text encoder. Overrides the base learning rate")
-            self.components.entry(frame, 3, 1, ui_state, "text_encoder.learning_rate")
+            self.components.entry(frame, row, 1, ui_state, "text_encoder.learning_rate")
+            row += 1
 
         if supports_clip_skip:
             # text encoder layer skip (clip skip)
-            self.components.label(frame, 4, 0, "Clip Skip",
+            self.components.label(frame, row, 0, "Clip Skip",
                                   tooltip="The number of additional clip layers to skip. 0 = the model default")
-            self.components.entry(frame, 4, 1, ui_state, "text_encoder_layer_skip")
+            self.components.entry(frame, row, 1, ui_state, "text_encoder_layer_skip")
+            row += 1
 
         if supports_sequence_length:
             # text encoder sequence length

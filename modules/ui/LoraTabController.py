@@ -13,6 +13,7 @@ class LoraTabController:
             ("LoRA", PeftType.LORA),
             ("LoHa", PeftType.LOHA),
             ("OFT v2", PeftType.OFT_2),
+            ("LoKr", PeftType.LOKR),
         ]
 
     def get_lora_weight_dtypes(self) -> list[tuple[str, DataType]]:

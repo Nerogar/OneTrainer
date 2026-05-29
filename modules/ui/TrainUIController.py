@@ -36,9 +36,13 @@ class TrainUIController:
         self.training_commands: TrainCommands | None = None
         self.always_on_tensorboard_subprocess = None
         self.current_workspace_dir = config.workspace_dir
-        self.start_time: float = 0.0
+        self.start_time: float | None = None
+        self.start_total_steps: int | None = None
 
     def on_update_train_progress(self, train_progress: TrainProgress, max_step: int, max_epoch: int):
+        # capture session start on first progress update
+        if self.start_total_steps is None:
+            self.start_total_steps = train_progress.epoch * max_step + train_progress.epoch_step
         eta_str = self._calculate_eta_string(train_progress, max_step, max_epoch)
         self.view.on_update_progress(train_progress.epoch_step, max_step, train_progress.epoch, max_epoch, eta_str)
 
@@ -46,13 +50,20 @@ class TrainUIController:
         self.view.on_update_status(status)
 
     def _calculate_eta_string(self, train_progress: TrainProgress, max_step: int, max_epoch: int) -> str | None:
-        spent_total = time.monotonic() - self.start_time
-        steps_done = train_progress.epoch * max_step + train_progress.epoch_step
-        remaining_steps = (max_epoch - train_progress.epoch - 1) * max_step + (max_step - train_progress.epoch_step)
-        total_eta = spent_total / steps_done * remaining_steps
+        assert self.start_time is not None and self.start_total_steps is not None
 
-        if train_progress.global_step <= 30:
+        spent_total = time.monotonic() - self.start_time
+
+        # calculate steps done in THIS SESSION only
+        current_total_steps = train_progress.epoch * max_step + train_progress.epoch_step
+        steps_done_this_session = current_total_steps - self.start_total_steps
+
+        remaining_steps = (max_epoch - train_progress.epoch - 1) * max_step + (max_step - train_progress.epoch_step)
+
+        if steps_done_this_session <= 30:
             return "Estimating ..."
+
+        total_eta = spent_total / steps_done_this_session * remaining_steps
 
         td = datetime.timedelta(seconds=total_eta)
         days = td.days
@@ -212,6 +223,8 @@ class TrainUIController:
             if self.train_config.cloud.enabled:
                 self.view.sync_cloud_secrets()
 
+            # Reset session tracking - actual values captured on first progress callback
+            self.start_total_steps = None
             self.start_time = time.monotonic()
             trainer.train()
         except Exception:

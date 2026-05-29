@@ -211,7 +211,7 @@ class PixArtAlphaModel(BaseModel):
         )
 
         # apply dropout
-        if text_encoder_dropout_probability is not None:
+        if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
             dropout_text_encoder_mask = (torch.tensor(
                 [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()

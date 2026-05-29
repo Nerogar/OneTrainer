@@ -37,6 +37,7 @@ def write_json_atomic(path: str, obj: Any):
 
 SUPPORTED_IMAGE_EXTENSIONS = {'.bmp', '.jpg', '.jpeg', '.png', '.tif', '.tiff', '.webp', '.avif'}
 SUPPORTED_VIDEO_EXTENSIONS = {'.webm', '.mkv', '.flv', '.avi', '.mov', '.wmv', '.mp4', '.mpeg', '.m4v'}
+SUPPORTED_CAPTION_EXTENSIONS = {'.txt'}
 
 
 def supported_image_extensions() -> set[str]:
@@ -53,6 +54,10 @@ def supported_video_extensions() -> set[str]:
 
 def is_supported_video_extension(extension: str) -> bool:
     return extension.lower() in SUPPORTED_VIDEO_EXTENSIONS
+
+
+def supported_caption_extensions() -> set[str]:
+    return SUPPORTED_CAPTION_EXTENSIONS
 
 
 def json_path_modifier(x: str | Path) -> Path:
