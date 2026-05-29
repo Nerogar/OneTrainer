@@ -277,32 +277,32 @@ class BaseTrainUIView(ABC):
         self.components.switch(frame, 1, 1, ui_state, "rolling_backup")
 
         # rolling backup count
-        self.components.label(frame, 1, 3, "Rolling Backup Count",
+        self.components.label(frame, 2, 0, "Rolling Backup Count",
                          tooltip="Defines the number of backups to keep if rolling backups are enabled")
-        self.components.entry(frame, 1, 4, ui_state, "rolling_backup_count")
+        self.components.entry(frame, 2, 1, ui_state, "rolling_backup_count")
 
         # backup before save
-        self.components.label(frame, 2, 0, "Backup Before Save",
+        self.components.label(frame, 3, 0, "Backup Before Save",
                          tooltip="Create a full backup before saving the final model")
-        self.components.switch(frame, 2, 1, ui_state, "backup_before_save")
+        self.components.switch(frame, 3, 1, ui_state, "backup_before_save")
 
         # save after
-        self.components.label(frame, 3, 0, "Save Every",
+        self.components.label(frame, 4, 0, "Save Every",
                          tooltip="The interval used when automatically saving the model during training")
-        self.components.time_entry(frame, 3, 1, ui_state, "save_every", "save_every_unit")
+        self.components.time_entry(frame, 4, 1, ui_state, "save_every", "save_every_unit")
 
         # save now
-        self.components.button(frame, 3, 3, "save now", self.save_now)
+        self.components.button(frame, 4, 3, "save now", self.save_now)
 
         # skip save
-        self.components.label(frame, 4, 0, "Skip First",
+        self.components.label(frame, 5, 0, "Skip First",
                          tooltip="Start saving automatically after this interval has elapsed")
-        self.components.entry(frame, 4, 1, ui_state, "save_skip_first", width=50, sticky="nw")
+        self.components.entry(frame, 5, 1, ui_state, "save_skip_first", width=50, sticky="nw")
 
         # save filename prefix
-        self.components.label(frame, 5, 0, "Save Filename Prefix",
+        self.components.label(frame, 6, 0, "Save Filename Prefix",
                          tooltip="The prefix for filenames used when saving the model during training")
-        self.components.entry(frame, 5, 1, ui_state, "save_filename_prefix")
+        self.components.entry(frame, 6, 1, ui_state, "save_filename_prefix")
 
     def build_embedding_tab_content(self, frame, controller, ui_state):
         # embedding model name
