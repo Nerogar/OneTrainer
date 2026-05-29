@@ -4,13 +4,13 @@ from modules.ui.BaseTopBarView import BaseTopBarView
 from modules.ui.TopBarController import TopBarController
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.ui import ctk_components, dialogs
-from modules.util.ui.CtkUIState import CtkUIState
+from modules.util.ui import pyside6_components
 
-import customtkinter as ctk
+from PySide6.QtWidgets import QInputDialog, QWidget
 
 
-class CtkTopBarView(BaseTopBarView):
+class PySide6TopBarView(BaseTopBarView, QWidget):
+
     def __init__(
             self,
             master,
@@ -20,31 +20,35 @@ class CtkTopBarView(BaseTopBarView):
             change_training_method_callback: Callable[[TrainingMethod], None],
             load_preset_callback: Callable[[], None],
     ):
-        BaseTopBarView.__init__(self, ctk_components)
+        QWidget.__init__(self, master)
+        BaseTopBarView.__init__(self, pyside6_components)
 
-        frame = ctk.CTkFrame(master=master, corner_radius=0)
-        frame.grid(row=0, column=0, sticky="nsew")
+        self.frame = QWidget(self)
+        pyside6_components._layout(self).addWidget(self.frame, 0, 0)
+        pyside6_components._layout(self.frame).setContentsMargins(
+            pyside6_components.PAD, pyside6_components.PAD,
+            pyside6_components.PAD, pyside6_components.PAD,
+        )
 
-        self.build(frame, master, controller, ui_state, change_model_type_callback, change_training_method_callback, load_preset_callback)
+        self.build(self.frame, master, controller, ui_state,
+                   change_model_type_callback, change_training_method_callback, load_preset_callback)
 
     def _make_config_ui_state(self, master, data):
-        return CtkUIState(master, data)
+        from modules.util.ui.PySide6UIState import PySide6UIState
+        return PySide6UIState(data)
 
     def _get_dropdown_text(self, widget) -> str:
-        return widget.get()
+        return widget.currentText()
 
     def _setup_frame_column_weight(self):
-        self.frame.grid_columnconfigure(5, weight=1)
+        pyside6_components._layout(self.frame).setColumnStretch(5, 1)
 
     def _forget_dropdown(self):
-        self.configs_dropdown.grid_forget()
+        pyside6_components._layout(self.frame).removeWidget(self.configs_dropdown)
+        self.configs_dropdown.hide()
+        self.configs_dropdown.deleteLater()
 
     def _show_save_dialog(self, default_value: str, callback):
-        dialogs.StringInputDialog(
-            parent=self.master,
-            title="name",
-            question="Config Name",
-            callback=callback,
-            default_value=default_value,
-            validate_callback=lambda x: not x.startswith("#"),
-        )
+        text, ok = QInputDialog.getText(self, "name", "Config Name", text=default_value)
+        if ok and not text.startswith("#"):
+            callback(text)
