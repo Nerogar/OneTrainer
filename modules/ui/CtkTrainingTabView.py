@@ -438,34 +438,40 @@ class TrainingTab:
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
+        row = 0
 
         if supports_training:
-            components.label(frame, 0, 0, "Train Text Encoder",
+            components.label(frame, row, 0, "Train Text Encoder",
                              tooltip="Enables training the text encoder model")
-            components.switch(frame, 0, 1, self.ui_state, "text_encoder.train")
+            components.switch(frame, row, 1, self.ui_state, "text_encoder.train")
+            row += 1
 
         # dropout
-        components.label(frame, 1, 0, "Caption Dropout Probability",
+        components.label(frame, row, 0, "Caption Dropout Probability",
                          tooltip="The Probability for dropping the text encoder conditioning")
-        components.entry(frame, 1, 1, self.ui_state, "text_encoder.dropout_probability")
+        components.entry(frame, row, 1, self.ui_state, "text_encoder.dropout_probability")
+        row += 1
 
         if supports_training:
             # train text encoder epochs
-            components.label(frame, 2, 0, "Stop Training After",
+            components.label(frame, row, 0, "Stop Training After",
                              tooltip="When to stop training the text encoder")
-            components.time_entry(frame, 2, 1, self.ui_state, "text_encoder.stop_training_after",
+            components.time_entry(frame, row, 1, self.ui_state, "text_encoder.stop_training_after",
                                   "text_encoder.stop_training_after_unit", supports_time_units=False)
+            row += 1
 
             # text encoder learning rate
-            components.label(frame, 3, 0, "Text Encoder Learning Rate",
+            components.label(frame, row, 0, "Text Encoder Learning Rate",
                              tooltip="The learning rate of the text encoder. Overrides the base learning rate")
-            components.entry(frame, 3, 1, self.ui_state, "text_encoder.learning_rate")
+            components.entry(frame, row, 1, self.ui_state, "text_encoder.learning_rate")
+            row += 1
 
         if supports_clip_skip:
             # text encoder layer skip (clip skip)
-            components.label(frame, 4, 0, "Clip Skip",
+            components.label(frame, row, 0, "Clip Skip",
                              tooltip="The number of additional clip layers to skip. 0 = the model default")
-            components.entry(frame, 4, 1, self.ui_state, "text_encoder_layer_skip")
+            components.entry(frame, row, 1, self.ui_state, "text_encoder_layer_skip")
+            row += 1
 
         if supports_sequence_length:
             # text encoder sequence length
