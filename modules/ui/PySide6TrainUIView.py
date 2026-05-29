@@ -223,28 +223,29 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         lo.setColumnStretch(1, 1)
         lo.setColumnStretch(3, 1)
         self.build_general_tab_content(frame, self.controller, self.ui_state)
+        pyside6_components._pack_form(frame)
 
     def _configure_data_frame(self, frame):
         lo = pyside6_components._layout(frame)
         lo.setColumnStretch(1, 1)
         lo.setColumnStretch(3, 1)
         self.build_data_tab_content(frame, self.controller, self.ui_state)
+        pyside6_components._pack_form(frame)
 
     def _configure_backup_frame(self, frame):
         lo = pyside6_components._layout(frame)
         lo.setColumnStretch(1, 1)
         lo.setColumnStretch(3, 1)
         self.build_backup_tab_content(frame, self.controller, self.ui_state)
+        pyside6_components._pack_form(frame)
 
     def _configure_tools_frame(self, frame):
-        lo = pyside6_components._layout(frame)
-        lo.setColumnStretch(1, 1)
         self.build_tools_tab_content(frame, self.controller, self.ui_state)
+        pyside6_components._pack_form(frame)
 
     def _configure_embedding_frame(self, frame):
-        lo = pyside6_components._layout(frame)
-        lo.setColumnStretch(1, 1)
         self.build_embedding_tab_content(frame, self.controller, self.ui_state)
+        pyside6_components._pack_form(frame)
 
     def _create_tabs(self):
         general_page = self._create_scrollable_tab(self._configure_general_frame)

@@ -100,9 +100,11 @@ def scrollable_frame(parent: QWidget) -> tuple[QScrollArea, QWidget]:
 
 
 def _pack_form(master: QWidget) -> None:
-    """Add a stretch row after the last content row so rows don't expand to fill available space."""
+    # Add a stretch row and column after the last content cell so extra space
+    # goes to the empty gutter rather than stretching content widgets.
     lo = _layout(master)
     lo.setRowStretch(lo.rowCount(), 1)
+    lo.setColumnStretch(lo.columnCount(), 1)
 
 
 # ---------------------------------------------------------------------------
