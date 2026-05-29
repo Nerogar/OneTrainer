@@ -1,0 +1,3 @@
+[submodule "modules/ipex_to_cuda"]
+	path = modules/ipex_to_cuda
+	url = https://github.com/Disty0/ipex_to_cuda
