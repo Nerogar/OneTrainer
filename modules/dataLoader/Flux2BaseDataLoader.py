@@ -93,7 +93,7 @@ class Flux2BaseDataLoader(
             text_caching=True,
         )
 
-    def _output_modules(self, config: TrainConfig, model: Flux2Model, model_setup: BaseFlux2Setup):
+    def _output_modules(self, config: TrainConfig, model: Flux2Model, model_setup: BaseFlux2Setup, is_validation: bool = False):
         output_names = [
             'image_path', 'latent_image',
             'prompt',
@@ -115,6 +115,7 @@ class Flux2BaseDataLoader(
             vae=model.vae,
             autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
+            is_validation=is_validation,
         )
 
     def _debug_modules(self, config: TrainConfig, model: Flux2Model):

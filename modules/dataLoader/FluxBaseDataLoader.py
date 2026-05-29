@@ -106,7 +106,7 @@ class FluxBaseDataLoader(
             text_caching=not config.train_text_encoder_or_embedding() or not config.train_text_encoder_2_or_embedding(),
         )
 
-    def _output_modules(self, config: TrainConfig, model: FluxModel, model_setup: BaseFluxSetup):
+    def _output_modules(self, config: TrainConfig, model: FluxModel, model_setup: BaseFluxSetup, is_validation: bool = False):
         output_names = [
             'image_path', 'latent_image',
             'prompt_1', 'prompt_2',
@@ -135,6 +135,7 @@ class FluxBaseDataLoader(
             vae=model.vae,
             autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
+            is_validation=is_validation,
         )
 
     def _debug_modules(self, config: TrainConfig, model: FluxModel):
