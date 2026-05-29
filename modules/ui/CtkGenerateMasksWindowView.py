@@ -2,13 +2,15 @@ import contextlib
 import tkinter as tk
 from tkinter import filedialog
 
+from modules.ui.BaseGenerateMasksWindowView import BaseGenerateMasksWindowView
+from modules.ui.GenerateMasksWindowController import GenerateMasksWindowController
 from modules.util.ui.ui_utils import set_window_icon
 
 import customtkinter as ctk
 
 
-class GenerateMasksWindow(ctk.CTkToplevel):
-    def __init__(self, parent, path, parent_include_subdirectories, *args, **kwargs):
+class CtkGenerateMasksWindowView(BaseGenerateMasksWindowView, ctk.CTkToplevel):
+    def __init__(self, parent, controller: GenerateMasksWindowController, path, parent_include_subdirectories, *args, **kwargs):
         """
         Window for generating masks for a folder of images
 
@@ -17,9 +19,9 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             path (`str`): the path to the folder
             parent_include_subdirectories (`bool`): whether to include subdirectories. used to set the default value of the include subdirectories checkbox
         """
-        super().__init__(parent, *args, **kwargs)
+        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
 
-        self.parent = parent
+        self.controller = controller
         if path is None:
             path = ""
 
@@ -93,7 +95,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.progress = ctk.CTkProgressBar(self.frame, orientation="horizontal", mode="determinate", width=200)
         self.progress.grid(row=9, column=1, sticky="w", padx=5, pady=5)
 
-        self.create_masks_button = ctk.CTkButton(self.frame, text="Create Masks", width=310, command=self.create_masks)
+        self.create_masks_button = ctk.CTkButton(self.frame, text="Create Masks", width=310, command=self._on_create_masks)
         self.create_masks_button.grid(row=10, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
         self.frame.pack(fill="both", expand=True)
@@ -102,7 +104,6 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.grab_set()
         self.focus_set()
         self.after(200, lambda: set_window_icon(self))
-
 
     def browse_for_path(self, entry_box):
         # get the path from the user
@@ -120,29 +121,18 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.progress_label.configure(text=f"{value}/{max_value}")
         self.progress.update()
 
-    def create_masks(self):
-        self.parent.load_masking_model(self.model_var.get())
-
-        mode = {
-            "Replace all masks": "replace",
-            "Create if absent": "fill",
-            "Add to existing": "add",
-            "Subtract from existing": "subtract",
-            "Blend with existing": "blend",
-        }[self.mode_var.get()]
-
-        self.parent.masking_model.mask_folder(
-            sample_dir=self.path_entry.get(),
-            prompts=[self.prompt_entry.get()],
-            mode=mode,
-            alpha=float(self.alpha_entry.get()),
-            threshold=float(self.threshold_entry.get()),
-            smooth_pixels=int(self.smooth_entry.get()),
-            expand_pixels=int(self.expand_entry.get()),
-            progress_callback=self.set_progress,
+    def _on_create_masks(self):
+        self.controller.create_masks(
+            model_name=self.model_var.get(),
+            path=self.path_entry.get(),
+            prompt=self.prompt_entry.get(),
+            mode_str=self.mode_var.get(),
+            alpha_str=self.alpha_entry.get(),
+            threshold_str=self.threshold_entry.get(),
+            smooth_str=self.smooth_entry.get(),
+            expand_str=self.expand_entry.get(),
             include_subdirectories=self.include_subdirectories_var.get(),
         )
-        self.parent.load_image()
 
     def destroy(self):
         with contextlib.suppress(tk.TclError):

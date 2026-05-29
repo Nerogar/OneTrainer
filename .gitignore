@@ -1,4 +1,5 @@
 # development
+PLAN.md  # claude's planning file, kept local-only
 .idea
 *.bak
 *.pyc

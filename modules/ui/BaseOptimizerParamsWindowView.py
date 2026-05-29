@@ -1,94 +1,32 @@
-import contextlib
-from tkinter import TclError
 
-from modules.ui.MuonAdamWindow import MUON_AUX_ADAM_DEFAULTS, MuonAdamWindow
-from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.optimizer_util import (
     OPTIMIZER_DEFAULT_PARAMETERS,
-    change_optimizer,
-    load_optimizer_defaults,
-    update_optimizer_config,
 )
-from modules.util.ui import components
-from modules.util.ui.ui_utils import set_window_icon
-from modules.util.ui.UIState import UIState
-
-import customtkinter as ctk
 
 
-class OptimizerParamsWindow(ctk.CTkToplevel):
-    def __init__(
-            self,
-            parent,
-            train_config: TrainConfig,
-            ui_state,
-            *args, **kwargs,
-    ):
-        super().__init__(parent, *args, **kwargs)
+class BaseOptimizerParamsWindowView:
+    def __init__(self, components):
+        self.components = components
 
-        self.parent = parent
-        self.train_config = train_config
-        self.ui_state = ui_state
-        self.optimizer_ui_state = ui_state.get_var("optimizer")
-        self.protocol("WM_DELETE_WINDOW", self.on_window_close)
-        self.muon_adam_button = None
-
-        self.title("Optimizer Settings")
-        self.geometry("800x500")
-        self.resizable(True, True)
-
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=0)
-        self.grid_columnconfigure(0, weight=1)
-
-        self.frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-
-        self.frame.grid_columnconfigure(0, weight=0)
-        self.frame.grid_columnconfigure(1, weight=1)
-        self.frame.grid_columnconfigure(2, minsize=50)
-        self.frame.grid_columnconfigure(3, weight=0)
-        self.frame.grid_columnconfigure(4, weight=1)
-
-        components.button(self, 1, 0, "ok", command=self.on_window_close)
-        self.main_frame(self.frame)
-
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
-        self.after(200, lambda: set_window_icon(self))
-
-
-    def main_frame(self, master):
+    def build_content(self, frame, controller, ui_state, optimizer_ui_state,
+                      on_optimizer_change_cb, load_defaults_cb):
         # Optimizer
-        components.label(master, 0, 0, "Optimizer",
-                         tooltip="The type of optimizer")
+        self.components.label(frame, 0, 0, "Optimizer",
+                              tooltip="The type of optimizer")
 
         # Create the optimizer dropdown menu and set the command
-        components.options(master, 0, 1, [str(x) for x in list(Optimizer)], self.optimizer_ui_state, "optimizer",
-                           command=self.on_optimizer_change)
+        self.components.options(frame, 0, 1, [str(x) for x in list(Optimizer)], optimizer_ui_state, "optimizer",
+                                command=on_optimizer_change_cb)
 
         # Defaults Button
-        components.label(master, 0, 3, "Optimizer Defaults",
-                         tooltip="Load default settings for the selected optimizer")
-        components.button(self.frame, 0, 4, "Load Defaults", self.load_defaults,
-                          tooltip="Load default settings for the selected optimizer")
+        self.components.label(frame, 0, 3, "Optimizer Defaults",
+                              tooltip="Load default settings for the selected optimizer")
+        self.components.button(frame, 0, 4, "Load Defaults", load_defaults_cb,
+                               tooltip="Load default settings for the selected optimizer")
 
-        self.create_dynamic_ui(master)
-
-    def clear_dynamic_ui(self, master):
-        with contextlib.suppress(TclError):
-            for widget in master.winfo_children():
-                grid_info = widget.grid_info()
-                if int(grid_info["row"]) >= 1:
-                    widget.destroy()
-
-    def create_dynamic_ui(
-            self,
-            master,
-    ):
-
+    def build_dynamic_content(self, master, controller, optimizer_ui_state,
+                              update_user_pref_cb, open_muon_adam_cb):
         # Lookup for the title and tooltip for a key
         # @formatter:off
         KEY_DETAIL_MAP = {
@@ -197,10 +135,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
         }
         # @formatter:on
 
-        if not self.winfo_exists():  # check if this window isn't open
-            return
-
-        selected_optimizer = self.train_config.optimizer.optimizer
+        selected_optimizer = controller.config.optimizer.optimizer
 
         # Extract the keys for the selected optimizer
         for index, key in enumerate(OPTIMIZER_DEFAULT_PARAMETERS[selected_optimizer].keys()):
@@ -215,74 +150,20 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             row = (index // 2) + 1
             col = 3 * (index % 2)
 
-            components.label(master, row, col, title, tooltip=tooltip)
+            self.components.label(master, row, col, title, tooltip=tooltip)
 
             if key == 'MuonWithAuxAdam':
-                frame = ctk.CTkFrame(master, fg_color="transparent")
-                frame.grid(row=row, column=col + 1, columnspan=2, sticky="ew", padx=0, pady=0)
-                frame.grid_columnconfigure(0, weight=0)
-                frame.grid_columnconfigure(1, weight=0)
+                frame = self.components.inline_frame(master, row, col + 1, columnspan=2)
 
-                components.switch(frame, 0, 0, self.optimizer_ui_state, key, command=self.update_user_pref)
+                self.components.switch(frame, 0, 0, optimizer_ui_state, key, command=update_user_pref_cb)
 
-                self.muon_adam_button = components.button(
-                    frame, 0, 1, "...", self.open_muon_adam_window,
+                self.muon_adam_button = self.components.button(
+                    frame, 0, 1, "...", open_muon_adam_cb,
                     tooltip="Configure the auxiliary AdamW_adv optimizer",
-                    width=20, padx=5                )
-                self.toggle_muon_adam_button()
+                    width=20, padx=5)
             elif type != 'bool':
-                components.entry(master, row, col + 1, self.optimizer_ui_state, key,
-                                 command=self.update_user_pref)
+                self.components.entry(master, row, col + 1, optimizer_ui_state, key,
+                                      command=update_user_pref_cb)
             else:
-                components.switch(master, row, col + 1, self.optimizer_ui_state, key,
-                                  command=self.update_user_pref)
-
-    def update_user_pref(self, *args):
-        update_optimizer_config(self.train_config)
-        self.toggle_muon_adam_button()
-
-    def on_optimizer_change(self, *args):
-        optimizer_config = change_optimizer(self.train_config)
-        self.ui_state.get_var("optimizer").update(optimizer_config)
-
-        self.clear_dynamic_ui(self.frame)
-        self.create_dynamic_ui(self.frame)
-
-    def load_defaults(self, *args):
-        optimizer_config = load_optimizer_defaults(self.train_config)
-        self.ui_state.get_var("optimizer").update(optimizer_config)
-
-    def on_window_close(self):
-        self.destroy()
-
-    def toggle_muon_adam_button(self):
-        if self.muon_adam_button and self.muon_adam_button.winfo_exists():
-            muon_with_adam = self.optimizer_ui_state.get_var("MuonWithAuxAdam").get()
-            self.muon_adam_button.configure(state="normal" if muon_with_adam else "disabled")
-
-    def open_muon_adam_window(self):
-        current_optimizer = self.train_config.optimizer.optimizer
-
-        adam_config = TrainOptimizerConfig.default_values()
-        current_state = self.train_config.optimizer.muon_adam_config
-
-        if current_optimizer == Optimizer.MUON:
-            defaults = MUON_AUX_ADAM_DEFAULTS
-        else:
-            defaults = OPTIMIZER_DEFAULT_PARAMETERS[Optimizer.ADAMW_ADV]
-
-        if not current_state:
-            adam_config.from_dict(defaults)
-            if current_optimizer != Optimizer.MUON:
-                adam_config.optimizer = Optimizer.ADAMW_ADV
-        elif isinstance(current_state, dict):
-            adam_config.from_dict(current_state)
-        else:
-            # Should not happen if TrainConfig defines it as dict, but for safety
-            adam_config = current_state
-
-        temp_adam_ui_state = UIState(self, adam_config)
-        window = MuonAdamWindow(self, self.train_config, temp_adam_ui_state, current_optimizer)
-        self.wait_window(window)
-
-        self.train_config.optimizer.muon_adam_config = adam_config.to_dict()
+                self.components.switch(master, row, col + 1, optimizer_ui_state, key,
+                                       command=update_user_pref_cb)

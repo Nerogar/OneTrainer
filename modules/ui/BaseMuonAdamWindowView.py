@@ -1,67 +1,10 @@
-from modules.util.config.TrainConfig import TrainConfig
-from modules.util.enum.Optimizer import Optimizer
-from modules.util.optimizer_util import OPTIMIZER_DEFAULT_PARAMETERS
-from modules.util.ui import components
-from modules.util.ui.ui_utils import set_window_icon
-from modules.util.ui.UIState import UIState
 
-import customtkinter as ctk
 
-MUON_AUX_ADAM_DEFAULTS = {
-    "beta1": 0.9,
-    "beta2": 0.999,
-    "eps": 1e-8,
-    "weight_decay": 0.0,
-}
+class BaseMuonAdamWindowView:
+    def __init__(self, components):
+        self.components = components
 
-class MuonAdamWindow(ctk.CTkToplevel):
-    def __init__(
-            self,
-            parent,
-            train_config: TrainConfig,
-            ui_state: UIState,
-            parent_optimizer_type: Optimizer,
-            *args, **kwargs,
-    ):
-        super().__init__(parent, *args, **kwargs)
-
-        self.parent = parent
-        self.train_config = train_config
-        self.adam_ui_state = ui_state
-        self.parent_optimizer_type = parent_optimizer_type
-
-        if self.parent_optimizer_type == Optimizer.MUON:
-            self.title("Muon's Auxiliary AdamW Settings")
-            self.adam_params_def = MUON_AUX_ADAM_DEFAULTS
-        else:
-            self.title("Muon_adv's Auxiliary AdamW_adv Settings")
-            self.adam_params_def = OPTIMIZER_DEFAULT_PARAMETERS[Optimizer.ADAMW_ADV]
-
-        self.geometry("800x500")
-        self.resizable(True, True)
-
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=0)
-        self.grid_columnconfigure(0, weight=1)
-
-        self.frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-
-        self.frame.grid_columnconfigure(0, weight=0)
-        self.frame.grid_columnconfigure(1, weight=1)
-        self.frame.grid_columnconfigure(2, minsize=50)
-        self.frame.grid_columnconfigure(3, weight=0)
-        self.frame.grid_columnconfigure(4, weight=1)
-
-        components.button(self, 1, 0, "ok", command=self.destroy)
-        self.create_adam_params_ui(self.frame)
-
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
-        self.after(200, lambda: set_window_icon(self))
-
-    def create_adam_params_ui(self, master):
+    def build_content(self, master, controller, ui_state):
         # This is a large map, copied from OptimizerParamsWindow for simplicity.
         # @formatter:off
         KEY_DETAIL_MAP = {
@@ -84,7 +27,7 @@ class MuonAdamWindow(ctk.CTkToplevel):
         }
         # @formatter:on
 
-        adam_params = self.adam_params_def
+        adam_params = controller.get_adam_params_def()
 
         for index, key in enumerate(adam_params.keys()):
             if key not in KEY_DETAIL_MAP:
@@ -99,9 +42,9 @@ class MuonAdamWindow(ctk.CTkToplevel):
             row = index // 2
             col = 3 * (index % 2)
 
-            components.label(master, row, col, title, tooltip=tooltip)
+            self.components.label(master, row, col, title, tooltip=tooltip)
 
             if param_type != 'bool':
-                components.entry(master, row, col + 1, self.adam_ui_state, key)
+                self.components.entry(master, row, col + 1, ui_state, key)
             else:
-                components.switch(master, row, col + 1, self.adam_ui_state, key)
+                self.components.switch(master, row, col + 1, ui_state, key)
