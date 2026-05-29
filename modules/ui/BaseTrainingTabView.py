@@ -29,9 +29,6 @@ class BaseTrainingTabView(ABC):
     def open_scheduler_params(self): pass
 
     @abstractmethod
-    def open_offloading(self): pass
-
-    @abstractmethod
     def open_timestep_distribution(self): pass
 
     def build(self, column_0, column_1, column_2, controller, ui_state):
