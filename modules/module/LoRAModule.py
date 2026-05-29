@@ -321,11 +321,19 @@ class LoKrModule(PeftBase):
         lokr_dim = self.dim
         device = self.orig_module.weight.device
 
+        factor = -1 if self.decompose_factor < 0 else self.decompose_factor
+
         match self.orig_module:
             case nn.Linear():
                 in_dim, out_dim = self.orig_module.in_features, self.orig_module.out_features
-                in_m, in_n = factorization(in_dim, self.decompose_factor)
-                out_l, out_k = factorization(out_dim, self.decompose_factor)
+
+                in_m, in_n = factorization(in_dim, factor)
+                if in_m > in_n:
+                    in_m, in_n = in_n, in_m
+                out_l, out_k = factorization(out_dim, factor)
+                if out_l > out_k:
+                    out_l, out_k = out_k, out_l
+
                 shape = ((out_l, out_k), (in_m, in_n))
 
                 # Store factorization shapes for the forward pass
@@ -353,8 +361,14 @@ class LoKrModule(PeftBase):
             case nn.Conv2d():
                 in_dim, out_dim = self.orig_module.in_channels, self.orig_module.out_channels
                 k_size = self.orig_module.kernel_size
-                in_m, in_n = factorization(in_dim, self.decompose_factor)
-                out_l, out_k = factorization(out_dim, self.decompose_factor)
+
+                in_m, in_n = factorization(in_dim, factor)
+                if in_m > in_n:
+                    in_m, in_n = in_n, in_m
+                out_l, out_k = factorization(out_dim, factor)
+                if out_l > out_k:
+                    out_l, out_k = out_k, out_l
+
                 shape = ((out_l, out_k), (in_m, in_n), *k_size)
                 self.tucker = self.use_tucker and any(i != 1 for i in k_size)
 
@@ -413,6 +427,9 @@ class LoKrModule(PeftBase):
                 dora_scale_val.to(device=self.orig_module.weight.device, dtype=self.orig_module.weight.dtype)
             )
             del orig_weight
+
+        if self.use_w1 and self.use_w2:
+            self.alpha.fill_(lokr_dim)
 
     def _get_factors(self):
         """Returns the two kronecker components W1 and W2."""
