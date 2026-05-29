@@ -114,8 +114,8 @@ def create_data_loader(
     # part does layer offloading, even though only a component that is actually cached really runs in the
     # dataloader worker threads.
     # TODO: narrow this to the cached components only.
-    if config.dataloader_threads > 1 and any(part.offload_fraction > 0 for part in config.model_part_configs()):
-        raise RuntimeError('layer offloading can not be activated if "dataloader_threads" > 1')
+    if config.caching_threads > 1 and any(part.offload_fraction > 0 for part in config.model_part_configs()):
+        raise RuntimeError('layer offloading can not be activated if "caching_threads" > 1')
 
     if train_progress is None:
         train_progress = TrainProgress()
