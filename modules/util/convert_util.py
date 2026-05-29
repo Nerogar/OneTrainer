@@ -138,7 +138,7 @@ def reverse_conversion_pattern(input: ConversionPattern):
         to_patterns=input.from_patterns,
         convert_fn=input.reverse_convert_fn,
         reverse_convert_fn=input.convert_fn,
-        children=reverse_conversion(input.children),
+        children=reverse_conversion(input.children) if input.children else None,
     )
 
 def reverse_conversion(input: list[ConversionPattern]):
@@ -247,6 +247,66 @@ def lora_fuse_mlp_to_qkv_mlp(mlp_up, mlp_down, mlp_alpha):
     #TODO where to get output shape from, if there is no qkv dim?
     raise NotImplementedError
 
+def _not_implemented(*_args):
+    raise NotImplementedError
+
+def lora_unfuse_qkv(qkv_up, qkv_down, qkv_alpha):
+    """Inverse of lora_fuse_qkv. Splits OT's block-diagonal QKV adapter back into Q, K, V.
+
+    Recovers Q, K, V by extracting the three diagonal blocks from qkv_up and splitting
+    qkv_down into three equal parts. Exact round-trip with lora_fuse_qkv.
+    """
+    if qkv_down.shape[0] % 3 != 0:
+        raise RuntimeError(f"lora_unfuse_qkv: qkv_down row count {qkv_down.shape[0]} is not divisible by 3")
+    if qkv_up.shape[0] % 3 != 0:
+        raise RuntimeError(f"lora_unfuse_qkv: qkv_up row count {qkv_up.shape[0]} is not divisible by 3")
+    rank = qkv_down.shape[0] // 3
+    dim  = qkv_up.shape[0]  // 3
+    q_up   = qkv_up[0:dim,       0:rank      ]
+    k_up   = qkv_up[dim:2*dim,   rank:2*rank ]
+    v_up   = qkv_up[2*dim:3*dim, 2*rank:3*rank]
+    q_down = qkv_down[0:rank      ]
+    k_down = qkv_down[rank:2*rank ]
+    v_down = qkv_down[2*rank:3*rank]
+    alpha  = qkv_alpha / 3
+    return q_up, q_down, alpha, k_up, k_down, alpha, v_up, v_down, alpha
+
+def lora_unfuse_qkv_mlp(qkv_up, qkv_down, qkv_alpha):
+    """Inverse of lora_fuse_qkv_mlp. Splits OT's block-diagonal QKVM adapter back into Q, K, V, MLP.
+
+    Recovers per-component output dims from the block-diagonal structure: column block i
+    (width rank) is non-zero only in the rows belonging to its component. Component dims
+    may be unequal (e.g. Q/K/V dim != MLP dim). Exact round-trip with lora_fuse_qkv_mlp.
+    """
+    if qkv_down.shape[0] % 4 != 0:
+        raise RuntimeError(f"lora_unfuse_qkv_mlp: qkv_down row count {qkv_down.shape[0]} is not divisible by 4")
+    rank = qkv_down.shape[0] // 4
+
+    def _row_range(col_start: int) -> tuple[int, int]:
+        block = qkv_up[:, col_start:col_start + rank]
+        nonzero = block.abs().sum(dim=1).nonzero(as_tuple=False).flatten()
+        if nonzero.numel() == 0:
+            return 0, 0
+        return int(nonzero[0].item()), int(nonzero[-1].item()) + 1
+
+    q_start, q_end = _row_range(0)
+    k_start, k_end = _row_range(rank)
+    v_start, v_end = _row_range(2 * rank)
+    m_start, m_end = _row_range(3 * rank)
+
+    q_up   = qkv_up[q_start:q_end, 0:rank      ]
+    k_up   = qkv_up[k_start:k_end, rank:2*rank ]
+    v_up   = qkv_up[v_start:v_end, 2*rank:3*rank]
+    mlp_up = qkv_up[m_start:m_end, 3*rank:4*rank]
+
+    q_down   = qkv_down[0:rank      ]
+    k_down   = qkv_down[rank:2*rank ]
+    v_down   = qkv_down[2*rank:3*rank]
+    mlp_down = qkv_down[3*rank:4*rank]
+
+    alpha = qkv_alpha / 4
+    return q_up, q_down, alpha, k_up, k_down, alpha, v_up, v_down, alpha, mlp_up, mlp_down, alpha
+
 def swap_chunks(input: torch.Tensor, dim: int=0) -> torch.Tensor:
     chunks = input.chunk(2, dim=dim)
     return torch.cat([chunks[1], chunks[0]], dim=dim)
@@ -256,7 +316,7 @@ def lora_qkv_fusion(q: str, k: str, v: str, qkv: str):
         ([f"{q}.lora_up.weight", f"{q}.lora_down.weight", f"{q}.alpha",
           f"{k}.lora_up.weight", f"{k}.lora_down.weight", f"{k}.alpha",
           f"{v}.lora_up.weight", f"{v}.lora_down.weight", f"{v}.alpha"],
-         [f"{qkv}.lora_up.weight", f"{qkv}.lora_down.weight", f"{qkv}.alpha"], lora_fuse_qkv),
+         [f"{qkv}.lora_up.weight", f"{qkv}.lora_down.weight", f"{qkv}.alpha"], lora_fuse_qkv, lora_unfuse_qkv),
     ]
 
 def lora_qkv_mlp_fusion(q: str, k: str, v: str, mlp: str, qkv_mlp: str, separator: str='.'):
@@ -265,7 +325,7 @@ def lora_qkv_mlp_fusion(q: str, k: str, v: str, mlp: str, qkv_mlp: str, separato
           f"{k}.lora_up.weight",   f"{k}.lora_down.weight", f"{k}.alpha",
           f"{v}.lora_up.weight",   f"{v}.lora_down.weight", f"{v}.alpha",
           f"{mlp}.lora_up.weight", f"{mlp}.lora_down.weight", f"{mlp}.alpha"],
-         [f"{qkv_mlp}.lora_up.weight", f"{qkv_mlp}.lora_down.weight", f"{qkv_mlp}.alpha"], lora_fuse_qkv_mlp
+         [f"{qkv_mlp}.lora_up.weight", f"{qkv_mlp}.lora_down.weight", f"{qkv_mlp}.alpha"], lora_fuse_qkv_mlp, lora_unfuse_qkv_mlp,
         ),
 
         #qkv only, in case there are no mlp layers:
@@ -273,13 +333,15 @@ def lora_qkv_mlp_fusion(q: str, k: str, v: str, mlp: str, qkv_mlp: str, separato
           f"{k}.lora_up.weight",   f"{k}.lora_down.weight", f"{k}.alpha",
           f"{v}.lora_up.weight",   f"{v}.lora_down.weight", f"{v}.alpha"],
          [f"{qkv_mlp}.lora_up.weight", f"{qkv_mlp}.lora_down.weight", f"{qkv_mlp}.alpha"],
-          lambda q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha: lora_fuse_qkv_to_qkv_mlp(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha)
+          lambda q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha: lora_fuse_qkv_to_qkv_mlp(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha),
+          _not_implemented,
         ),
 
         #mlp only, in case there are no qkv layers:
         ([f"{mlp}.lora_up.weight", f"{mlp}.lora_down.weight", f"{mlp}.alpha"],
          [f"{qkv_mlp}.lora_up.weight", f"{qkv_mlp}.lora_down.weight", f"{qkv_mlp}.alpha"],
-          lambda mlp_up, mlp_down, mlp_alpha: lora_fuse_mlp_to_qkv_mlp(mlp_up, mlp_down, mlp_alpha)
+          lambda mlp_up, mlp_down, mlp_alpha: lora_fuse_mlp_to_qkv_mlp(mlp_up, mlp_down, mlp_alpha),
+          _not_implemented,
         ),
     ]
 

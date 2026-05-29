@@ -19,12 +19,16 @@ class LoRALoaderMixin(metaclass=ABCMeta):
     def _get_convert_key_sets(self, model: BaseModel) -> list[LoraConversionKeySet] | None:
         pass
 
+    def _preprocess_state_dict(self, state_dict: dict) -> dict:
+        return state_dict
+
     def __load_safetensors(
             self,
             model: BaseModel,
             lora_name: str,
     ):
         state_dict = load_file(lora_name)
+        state_dict = self._preprocess_state_dict(state_dict)
 
         key_sets = self._get_convert_key_sets(model)
         if key_sets is not None:
@@ -38,6 +42,7 @@ class LoRALoaderMixin(metaclass=ABCMeta):
             lora_name: str,
     ):
         state_dict = torch.load(lora_name, weights_only=True)
+        state_dict = self._preprocess_state_dict(state_dict)
 
         key_sets = self._get_convert_key_sets(model)
         if key_sets is not None:
