@@ -404,7 +404,8 @@ class TrainConfig(BaseConfig):
     ema: EMAMode
     ema_decay: float
     ema_update_step_interval: int
-    dataloader_threads: int
+    caching_threads: int
+    prefetch_next_batch: bool
     train_device: str
     temp_device: str
     train_dtype: DataType
@@ -569,7 +570,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=10,
+            config_version=11,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -581,6 +582,7 @@ class TrainConfig(BaseConfig):
                 7: self.__migration_7,
                 8: self.__migration_8,
                 9: self.__migration_9,
+                10: self.__migration_10,
             }
         )
 
@@ -800,6 +802,14 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_10(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        if "dataloader_threads" in migrated_data:
+            migrated_data["caching_threads"] = migrated_data.pop("dataloader_threads")
+
+        return migrated_data
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
@@ -997,7 +1007,8 @@ class TrainConfig(BaseConfig):
         data.append(("ema", EMAMode.OFF, EMAMode, False))
         data.append(("ema_decay", 0.999, float, False))
         data.append(("ema_update_step_interval", 5, int, False))
-        data.append(("dataloader_threads", 2, int, False))
+        data.append(("caching_threads", 2, int, False))
+        data.append(("prefetch_next_batch", True, bool, False))
         data.append(("train_device", default_device.type, str, False))
         data.append(("temp_device", "cpu", str, False))
         data.append(("train_dtype", DataType.FLOAT_16, DataType, False))
