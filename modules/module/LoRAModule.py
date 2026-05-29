@@ -306,7 +306,7 @@ class LoKrModule(PeftBase):
         self.use_w1 = False
         self.use_w2 = False
         self.tucker = False
-        self.lokr_dora_scale = None
+        self.dora_scale = None
 
         # Cache shapes for the forward pass
         self.in_m = self.in_n = self.out_l = self.out_k = None
@@ -409,7 +409,7 @@ class LoKrModule(PeftBase):
             else:
                 dora_scale_val = torch.norm(orig_weight.transpose(1, 0).reshape(orig_weight.shape[1], -1), dim=1, keepdim=True).reshape(orig_weight.shape[1], *[1] * dora_num_dims).transpose(0, 1)
 
-            self.lokr_dora_scale = Parameter(
+            self.dora_scale = Parameter(
                 dora_scale_val.to(device=self.orig_module.weight.device, dtype=self.orig_module.weight.dtype)
             )
             del orig_weight
@@ -465,7 +465,7 @@ class LoKrModule(PeftBase):
             else:
                 norm = wp.detach().transpose(0, 1).reshape(wp.shape[1], -1).norm(dim=1, keepdim=True).reshape(wp.shape[1], *[1] * (wp.dim() - 1)).transpose(0, 1) + eps
 
-            wp = self.lokr_dora_scale * (wp / norm)
+            wp = self.dora_scale * (wp / norm)
 
             # Apply dropout to the input 'x' (DoRA style)
             return self.op(self.dropout(x), wp.to(x.dtype), self.orig_module.bias, **self.layer_kwargs)
