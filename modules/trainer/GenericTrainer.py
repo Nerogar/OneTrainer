@@ -649,6 +649,10 @@ class GenericTrainer(BaseTrainer):
                     self.model_setup.setup_train_device(self.model, self.config)
                     self.data_loader.get_data_set().start_next_epoch()
 
+            if not any(p.requires_grad for p in self.parameters):
+                print("All trainable components have reached their stop_training_after limit. Stopping training.")
+                return
+
             if self.config.debug_mode:
                 multi.warn_parameter_divergence(self.parameters, train_device)
 
@@ -752,12 +756,13 @@ class GenericTrainer(BaseTrainer):
                     loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
 
                     loss = loss / self.config.gradient_accumulation_steps
-                    if scaler:
-                        scaler.scale(loss).backward()
-                    else:
-                        loss.backward()
+                    if loss.requires_grad:
+                        if scaler:
+                            scaler.scale(loss).backward()
+                        else:
+                            loss.backward()
 
-                    has_gradient = True
+                        has_gradient = True
                     detached_loss = loss.detach()
                     multi.reduce_tensor_mean(detached_loss)
                     accumulated_loss += detached_loss
