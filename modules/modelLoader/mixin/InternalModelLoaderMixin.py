@@ -38,5 +38,13 @@ class InternalModelLoaderMixin(metaclass=ABCMeta):
             with contextlib.suppress(FileNotFoundError):
                 model.ema_state_dict = torch.load(os.path.join(model_name, "ema", "ema.pt"), weights_only=True)
 
+            # Optional grad-accum snapshot; legacy backups without it fall through to defaults.
+            # weights_only=False: payload mixes tensors with python dicts/tuples (RNG state).
+            with contextlib.suppress(FileNotFoundError):
+                model.accumulator_state = torch.load(
+                    os.path.join(model_name, "accumulator", "accumulator.pt"),
+                    weights_only=False,
+                )
+
             # meta
             model.train_progress = train_progress

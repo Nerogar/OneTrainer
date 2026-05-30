@@ -32,6 +32,12 @@ class NamedParameterGroupCollection:
     def parameters(self) -> list[Parameter]:
         return [p for group in self.__groups for p in group.parameters]
 
+    def iter_named_parameters(self) -> Iterable[tuple[str, Parameter]]:
+        # Stable per-parameter keys for accumulator-state save/load.
+        for group in self.__groups:
+            for i, p in enumerate(group.parameters):
+                yield f"{group.unique_name}.{i}", p
+
     def parameters_for_optimizer(self, config: TrainConfig) -> list[dict]:
         parameters = []
 
