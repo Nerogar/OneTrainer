@@ -37,6 +37,8 @@ class ModelType(Enum):
 
     QWEN = 'QWEN'
 
+    ANIMA = 'ANIMA'
+
     Z_IMAGE = 'Z_IMAGE'
 
     ERNIE = 'ERNIE'
@@ -96,6 +98,9 @@ class ModelType(Enum):
 
     def is_qwen(self):
         return self == ModelType.QWEN
+
+    def is_anima(self):
+        return self == ModelType.ANIMA
 
     def is_sana(self):
         return self == ModelType.SANA
@@ -157,6 +162,7 @@ class ModelType(Enum):
             or self.is_flux() \
             or self.is_chroma() \
             or self.is_qwen() \
+            or self.is_anima() \
             or self.is_sana() \
             or self.is_hunyuan_video() \
             or self.is_hi_dream() \

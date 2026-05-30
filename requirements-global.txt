@@ -20,7 +20,7 @@ safetensors==0.8.0rc0
 tensorboard==2.20.0
 
 # diffusion models
--e git+https://github.com/huggingface/diffusers.git@0f1abc4#egg=diffusers
+-e git+https://github.com/huggingface/diffusers.git@b003a47#egg=diffusers
 gguf==0.17.1
 transformers==5.9.0
 sentencepiece==0.2.1 # transitive dependency of transformers for tokenizer loading
@@ -32,7 +32,7 @@ pooch==1.8.2
 open-clip-torch==2.32.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@9320a69#egg=mgds
+-e git+https://github.com/dxqb/mgds.git@fa6ae65#egg=mgds
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers
