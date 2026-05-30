@@ -2,7 +2,7 @@ from contextlib import nullcontext
 from random import Random
 
 from modules.model.BaseModel import BaseModel, BaseModelEmbedding
-from modules.model.util.clip_util import encode_clip
+from modules.model.util.clip_util import encode_clip, encode_clip_chunked, get_num_clip_chunks
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import (
@@ -211,13 +211,21 @@ class StableDiffusionXLModel(BaseModel):
             text_encoder_1_dropout_probability: float | None = None,
             text_encoder_2_dropout_probability: float | None = None,
             pooled_text_encoder_2_output: Tensor = None,
+            min_chunks: int = 1,
     ) -> tuple[Tensor, Tensor, Tensor]:
+        use_chunking = self.train_config.use_clip_token_chunks if self.train_config else False
+        encode_fn = encode_clip_chunked if use_chunking else encode_clip
+
+        max_chunks = self.train_config.clip_max_chunks if self.train_config else 1
+        chunk_size = self.text_encoder_1.config.max_position_embeddings - 2
+        max_length = max_chunks * chunk_size + 2
+
         if tokens_1 is None and text is not None:
             tokenizer_output = self.tokenizer_1(
                 self.add_text_encoder_1_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
-                max_length=77,
+                max_length=max(self.tokenizer_1.model_max_length, max_length) if use_chunking else self.tokenizer_1.model_max_length,
                 return_tensors="pt",
             )
             tokens_1 = tokenizer_output.input_ids.to(self.text_encoder_1.device)
@@ -227,12 +235,35 @@ class StableDiffusionXLModel(BaseModel):
                 self.add_text_encoder_2_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
-                max_length=77,
+                max_length=max(self.tokenizer_2.model_max_length, max_length) if use_chunking else self.tokenizer_2.model_max_length,
                 return_tensors="pt",
             )
             tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
 
-        text_encoder_1_output, _ = encode_clip(
+        text_encoder_1_kwargs = {}
+        text_encoder_2_kwargs = {}
+        if use_chunking:
+            chunk_size_1 = self.text_encoder_1.config.max_position_embeddings - 2
+            chunk_size_2 = self.text_encoder_2.config.max_position_embeddings - 2
+
+            split_on_comma = self.train_config.clip_chunk_split_on_comma if self.train_config else False
+            min_chunks_1 = get_num_clip_chunks(tokens_1, chunk_size_1, split_on_comma, self.tokenizer_1, max_chunks=max_chunks)
+            min_chunks_2 = get_num_clip_chunks(tokens_2, chunk_size_2, split_on_comma, self.tokenizer_2, max_chunks=max_chunks)
+
+            min_chunks = max(min_chunks, min_chunks_1, min_chunks_2)
+
+            text_encoder_1_kwargs['min_chunks'] = min_chunks
+            text_encoder_1_kwargs['max_chunks'] = max_chunks
+            text_encoder_2_kwargs['min_chunks'] = min_chunks
+            text_encoder_2_kwargs['max_chunks'] = max_chunks
+            text_encoder_1_kwargs['pooled_output_handling'] = self.train_config.clip_chunk_pooled_output_handling
+            text_encoder_2_kwargs['pooled_output_handling'] = self.train_config.clip_chunk_pooled_output_handling
+            text_encoder_1_kwargs['split_on_comma'] = self.train_config.clip_chunk_split_on_comma
+            text_encoder_1_kwargs['tokenizer'] = self.tokenizer_1
+            text_encoder_2_kwargs['split_on_comma'] = self.train_config.clip_chunk_split_on_comma
+            text_encoder_2_kwargs['tokenizer'] = self.tokenizer_2
+
+        text_encoder_1_output, _ = encode_fn(
             text_encoder=self.text_encoder_1,
             tokens=tokens_1,
             default_layer=-2,
@@ -241,9 +272,10 @@ class StableDiffusionXLModel(BaseModel):
             add_pooled_output=False,
             use_attention_mask=False,
             add_layer_norm=False,
+            **text_encoder_1_kwargs,
         )
 
-        text_encoder_2_output, pooled_text_encoder_2_output = encode_clip(
+        text_encoder_2_output, pooled_text_encoder_2_output = encode_fn(
             text_encoder=self.text_encoder_2,
             tokens=tokens_2,
             default_layer=-2,
@@ -253,6 +285,7 @@ class StableDiffusionXLModel(BaseModel):
             pooled_text_encoder_output=pooled_text_encoder_2_output,
             use_attention_mask=False,
             add_layer_norm=False,
+            **text_encoder_2_kwargs,
         )
 
         text_encoder_1_output = self._apply_output_embeddings(
@@ -260,6 +293,8 @@ class StableDiffusionXLModel(BaseModel):
             self.tokenizer_1,
             tokens_1,
             text_encoder_1_output,
+            use_clip_token_chunks=use_chunking,
+            clip_max_chunks=max_chunks,
         )
 
         text_encoder_2_output = self._apply_output_embeddings(
@@ -267,6 +302,8 @@ class StableDiffusionXLModel(BaseModel):
             self.tokenizer_2,
             tokens_2,
             text_encoder_2_output,
+            use_clip_token_chunks=use_chunking,
+            clip_max_chunks=max_chunks,
         )
 
         # apply dropout
