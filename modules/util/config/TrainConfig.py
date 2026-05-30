@@ -112,8 +112,6 @@ class TrainOptimizerConfig(BaseConfig):
     nnmf_factor: False
     orthogonal_gradient: False
     use_atan2: False
-    use_AdEMAMix: False
-    beta3_ema: float
     beta1_warmup: int
     min_beta1: float
     kourkoutas_beta: False
@@ -235,8 +233,6 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("nnmf_factor", False, bool, False))
         data.append(("orthogonal_gradient", False, bool, False))
         data.append(("use_atan2", False, bool, False))
-        data.append(("use_AdEMAMix", False, bool, False))
-        data.append(("beta3_ema", None, float, True))
         data.append(("beta1_warmup", None, int, True))
         data.append(("min_beta1", None, float, True))
         data.append(("kourkoutas_beta", False, bool, False))
