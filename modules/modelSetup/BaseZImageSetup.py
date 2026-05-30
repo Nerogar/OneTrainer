@@ -122,6 +122,12 @@ class BaseZImageSetup(
                 timestep,
                 model.noise_scheduler.timesteps,
             )
+
+            if not deterministic:
+                scaled_noisy_latent_image, latent_noise = self._apply_ciop(
+                    scaled_noisy_latent_image, latent_noise, config, generator, rand
+                )
+
             latent_input = scaled_noisy_latent_image.unsqueeze(2).to(dtype=model.train_dtype.torch_dtype())
             latent_input_list = list(latent_input.unbind(dim=0))
 

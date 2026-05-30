@@ -205,6 +205,15 @@ class BaseChromaSetup(
                 model.noise_scheduler.timesteps,
             )
 
+            if not deterministic:
+                scaled_noisy_latent_image, latent_noise = self._apply_ciop(
+                    scaled_noisy_latent_image,
+                    latent_noise,
+                    config,
+                    generator,
+                    rand
+                )
+
             latent_input = scaled_noisy_latent_image
 
             text_ids = torch.zeros(
