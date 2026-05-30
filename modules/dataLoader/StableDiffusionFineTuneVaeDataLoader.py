@@ -6,6 +6,7 @@ from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util import factory, path_util
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ImagePreprocessing import ImagePreprocessing
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.torch_util import torch_gc
@@ -20,6 +21,7 @@ from mgds.pipelineModules.DecodeVAE import DecodeVAE
 from mgds.pipelineModules.DiskCache import DiskCache
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
 from mgds.pipelineModules.InlineAspectBatchSorting import InlineAspectBatchSorting
+from mgds.pipelineModules.KeepAspectCalculation import KeepAspectCalculation
 from mgds.pipelineModules.LoadImage import LoadImage
 from mgds.pipelineModules.ModifyPath import ModifyPath
 from mgds.pipelineModules.RandomBrightness import RandomBrightness
@@ -101,9 +103,10 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
     def __aspect_bucketing_in(self, config: TrainConfig):
         calc_aspect = CalcAspect(image_in_name='image', resolution_out_name='original_resolution')
+        quantization = 8
 
         aspect_bucketing = AspectBucketing(
-            quantization=8,
+            quantization=quantization,
             resolution_in_name='original_resolution',
             target_resolution_in_name='settings.target_resolution',
             enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
@@ -125,12 +128,25 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             possible_resolutions_out_name='possible_resolutions'
         )
 
-        modules = [calc_aspect]
+        keep_aspect_calculation = KeepAspectCalculation(
+            resolution_in_name='original_resolution',
+            target_resolution_in_name='settings.target_resolution',
+            enable_target_resolutions_override_in_name='concept.image.enable_resolution_override',
+            target_resolutions_override_in_name='concept.image.resolution_override',
+            scale_resolution_out_name='scale_resolution',
+            crop_resolution_out_name='crop_resolution',
+            quantization=quantization,
+        )
 
-        if config.aspect_ratio_bucketing:
-            modules.append(aspect_bucketing)
-        else:
-            modules.append(single_aspect_calculation)
+        modules: list = [calc_aspect]
+
+        match config.image_preprocessing:
+            case ImagePreprocessing.SQUARE_CENTER_CROP:
+                modules.append(single_aspect_calculation)
+            case ImagePreprocessing.ASPECT_RATIO_BUCKETING:
+                modules.append(aspect_bucketing)
+            case ImagePreprocessing.KEEP_ASPECT_RATIO:
+                modules.append(keep_aspect_calculation)
 
         return modules
 
