@@ -136,6 +136,7 @@ class ConceptConfig(BaseConfig):
     text_variations: int
     repeats: float
     loss_weight: float
+    validation_timestep_shift: float | None
     concept_stats: dict
 
     image: ConceptImageConfig
@@ -195,6 +196,7 @@ class ConceptConfig(BaseConfig):
         data.append(("balancing", 1.0, float, False))
         data.append(("balancing_strategy", BalancingStrategy.REPEATS, BalancingStrategy, False))
         data.append(("loss_weight", 1.0, float, False))
+        data.append(("validation_timestep_shift", None, float, True))
         data.append(("concept_stats", {}, dict, False))
 
         return ConceptConfig(data)

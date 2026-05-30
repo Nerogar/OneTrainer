@@ -210,7 +210,7 @@ class BaseWuerstchenSetup(
             elif model.model_type.is_stable_cascade():
                 scaled_latent_image = latent_image
 
-            batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
+            batch_seed = int(batch.get("__val_noise_seed__", 0)) if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
             generator = torch.Generator(device=config.train_device)
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
@@ -222,6 +222,7 @@ class BaseWuerstchenSetup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+                validation_override=batch.get("__val_timestep_unit__"),
             )
 
             if model.model_type.is_wuerstchen_v2():
