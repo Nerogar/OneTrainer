@@ -103,6 +103,6 @@ class MuonAdamWindow(ctk.CTkToplevel):
             if param_type != 'bool':
                 components.entry(master, row, col + 1, self.adam_ui_state, key)
             elif type == 'StatePrecision':
-                components.options(master, row, col + 1, ["auto", "factored", "fp32", "bf16_sr", "int8_sr"], self.optimizer_ui_state, key)
+                components.options(master, row, col + 1, ["auto", "factored", "fp32", "bf16_sr", "int8_sr"], self.adam_ui_state, key)
             else:
                 components.switch(master, row, col + 1, self.adam_ui_state, key)
