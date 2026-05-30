@@ -65,6 +65,43 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 >
 > Additionally it's been reported Alpine, Arch and Xubuntu Linux may be missing `tkinter`. Install it via `apk add py3-tk` for Alpine and `sudo pacman -S tk` for Arch.
 
+#### Docker installation
+
+OneTrainer provides a local Docker stack for running the GUI inside an isolated container. It requires Docker and an X11
+environment on the host. Also supports Podman.
+
+1. Clone OneTrainer locally: `git clone https://github.com/Nerogar/OneTrainer.git`
+2. Review `compose.yaml` and edit it to your liking
+3. Run `docker compose up` to start the container
+
+To update the Docker image, simply run:
+
+```shell
+# Update OneTrainer
+git pull
+# Rebuild the image
+docker compose build
+```
+
+##### Docker on Windows
+
+If you're using Docker on Windows via WSL, you may need additional software and configuration to support the X11
+graphical protocol.
+
+According to Microsoft, X11 support is enabled out of the box with WSL2:
+https://learn.microsoft.com/en-us/windows/wsl/tutorials/gui-apps. However, some testers reported that they had to
+install [vcxsrv](https://github.com/marchaesen/vcxsrv).
+
+
+##### TclError: couldn't connect to display ""
+
+This error means that the DISPLAY environment variable is either missing or invalid. On most X11 systems, this variable
+is set upon connection, so a reboot might solve the issue. If that doesn't work, make sure you have an X11 server
+installed and running (Windows users: see the previous section), and try to determine its DISPLAY value (the most common
+one according to testers is `host.docker.internal:0.0`).
+
+Once found, you can re-run the command as follows: `DISPLAY=<value> docker compose up`.
+
 ## Updating
 
 #### Automatic update
