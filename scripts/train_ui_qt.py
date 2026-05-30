@@ -9,31 +9,14 @@ from util.import_util import script_imports
 script_imports()
 
 from modules.ui.PySide6TrainUIView import PySide6TrainView
+from modules.util.ui.theme import apply_theme
 
-from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
 
 def main():
     app = QApplication(sys.argv)
-
-    palette = app.palette()
-    palette.setColor(QPalette.ColorRole.Base, QColor("white"))
-    palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Base, QColor("#e0e0e0"))
-    app.setPalette(palette)
-
-    app.setStyleSheet("""
-        QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit {
-            padding: 2px 2px;
-        }
-        QCheckBox::indicator {
-            width: 16px;
-            height: 16px;
-        }
-        QProgressBar {
-            background-color: #c8c8c8;
-        }
-    """)
+    apply_theme(app)
     window = PySide6TrainView()
     window.show()
     sys.exit(app.exec())
