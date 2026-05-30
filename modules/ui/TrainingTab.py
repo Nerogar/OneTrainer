@@ -78,6 +78,8 @@ class TrainingTab:
             self.__setup_chroma_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_qwen():
             self.__setup_qwen_ui(column_0, column_1, column_2)
+        elif self.train_config.model_type.is_anima():
+            self.__setup_anima_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_sana():
             self.__setup_sana_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_hunyuan_video():
@@ -200,6 +202,18 @@ class TrainingTab:
     def __setup_qwen_ui(self, column_0, column_1, column_2):
         self.__create_base_frame(column_0, 0)
         self.__create_text_encoder_frame(column_0, 1, supports_clip_skip=False)
+
+        self.__create_base2_frame(column_1, 0)
+        self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False, supports_force_attention_mask=False)
+        self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
+
+        self.__create_masked_frame(column_2, 1)
+        self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
+
+    def __setup_anima_ui(self, column_0, column_1, column_2):
+        self.__create_base_frame(column_0, 0)
+        self.__create_text_encoder_frame(column_0, 1, supports_clip_skip=False, supports_training=False)
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False, supports_force_attention_mask=False)

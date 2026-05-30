@@ -100,6 +100,7 @@ class TopBar:
                 ("HiDream Full", ModelType.HI_DREAM_FULL),
                 ("Chroma1", ModelType.CHROMA_1),
                 ("QwenImage", ModelType.QWEN),
+                ("Anima", ModelType.ANIMA),
                 ("Z-Image", ModelType.Z_IMAGE),
                 ("Ernie Image", ModelType.ERNIE),
             ],
@@ -136,6 +137,7 @@ class TopBar:
                 ("Embedding", TrainingMethod.EMBEDDING),
             ]
         elif self.train_config.model_type.is_qwen() \
+             or self.train_config.model_type.is_anima() \
              or self.train_config.model_type.is_z_image() \
              or self.train_config.model_type.is_flux_2() \
              or self.train_config.model_type.is_ernie():
