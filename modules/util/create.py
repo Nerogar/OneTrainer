@@ -688,7 +688,7 @@ def create_optimizer(
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
-                centered_vt=optimizer_config.centered_vt if optimizer_config.centered_vt is not None else False,
+                snr_cond=optimizer_config.snr_cond if optimizer_config.snr_cond is not None else False,
                 geometric_wd=optimizer_config.geometric_wd if optimizer_config.geometric_wd is not None else False,
             )
 
@@ -808,6 +808,8 @@ def create_optimizer(
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
                 nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
+                snr_cond=optimizer_config.snr_cond if optimizer_config.snr_cond is not None else False,
+                geometric_wd=optimizer_config.geometric_wd if optimizer_config.geometric_wd is not None else False,
             )
 
         # LION_ADV Optimizer

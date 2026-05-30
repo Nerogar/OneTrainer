@@ -146,7 +146,7 @@ class TrainOptimizerConfig(BaseConfig):
     sinkhorn_iterations: int
     normed_momentum: False
     nesterov_coef: float
-    centered_vt: False
+    snr_cond: False
     geometric_wd: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
@@ -269,7 +269,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("sinkhorn_iterations", None, int, True))
         data.append(("normed_momentum", False, bool, False))
         data.append(("nesterov_coef", None, float, True))
-        data.append(("centered_vt", False, bool, False))
+        data.append(("snr_cond", False, bool, False))
         data.append(("geometric_wd", False, bool, False))
 
         return TrainOptimizerConfig(data)
