@@ -1,7 +1,4 @@
-import ctypes
-import platform
 from collections.abc import Callable
-from contextlib import suppress
 from pathlib import Path
 
 from modules.ui.AdditionalEmbeddingsTabController import AdditionalEmbeddingsTabController
@@ -38,15 +35,6 @@ from modules.util.ui.PySide6UIState import PySide6UIState
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QFileDialog, QGridLayout, QMainWindow, QMessageBox, QTabWidget, QWidget
-
-# chunk for forcing Windows to ignore DPI scaling when moving between monitors
-# fixes the long standing transparency bug https://github.com/Nerogar/OneTrainer/issues/90
-if platform.system() == "Windows":
-    with suppress(Exception):
-        # https://learn.microsoft.com/en-us/windows/win32/hidpi/setting-the-default-dpi-awareness-for-a-process#setting-default-awareness-programmatically
-        ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
-
-
 
 
 class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
