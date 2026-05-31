@@ -132,10 +132,10 @@ class OFTRotationModule(nn.Module):
         if use_cayley_neumann and self.oft_clipped_norm:
             # The Neumann series only converges if the spectral norm ||Q||_2 < 1.
             # We estimate the spectral norm using a single step of Power Iteration.
-            next_v, next_u = self._spectral_norm(Q_skew)
+            v_norm, u_norm = self._spectral_norm(Q_skew)
             # Estimate sigma (The spectral norm)
-            u_raw_grad = torch.bmm(Q_skew, next_v)
-            sigma = torch.sum(next_u * u_raw_grad, dim=1, keepdim=True)
+            u_raw_grad = torch.bmm(Q_skew, v_norm)
+            sigma = torch.sum(u_norm * u_raw_grad, dim=1, keepdim=True)
             max_norm = 0.999
             Q_skew = Q_skew * (max_norm / torch.clamp(sigma, min=max_norm))
 
