@@ -129,7 +129,6 @@ class LoraTab:
                              tooltip="Share the OFT parameters between blocks. A single rotation matrix is shared across all blocks within a layer, drastically cutting the number of trainable parameters and yielding very compact adapter files, potentially improving generalization but at the cost of significant expressiveness, which can lead to underfitting on more complex or diverse tasks.")
             components.switch(master, 1, 4, self.ui_state, "oft_block_share")
 
-
             # Scaled OFT (SOFT)
             components.label(master, 2, 3, "Scaled OFT (SOFT)",
                              tooltip="Applies a scaling factor to the learned weights. This ensures that the effective learning rate remains consistent across different block sizes. Without this, different block sizes require significantly different learning rates.")
