@@ -135,8 +135,8 @@ class LoraTab:
             components.switch(master, 2, 4, self.ui_state, "oft_scaled")
 
             # Clip OFT max norm
-            components.label(master, 5, 0, "Clip OFT Norm",
-                             tooltip="Strictly clips the max Frobenius norm of the OFT matrix at 1. This guarantees the convergence of the Cayley parametrization, which mathematically requires a matrix norm of <= 1.")
+            components.label(master, 5, 0, "Spectral Norm Clipping",
+                             tooltip="Strictly clips the spectral norm of the OFT matrix at 1. This guarantees the convergence of the Cayley parametrization, which mathematically requires a spectral norm of <= 1.")
             components.switch(master, 5, 1, self.ui_state, "oft_clipped_norm")
 
             # Dropout Percentage
