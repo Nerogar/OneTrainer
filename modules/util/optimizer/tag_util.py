@@ -1,9 +1,11 @@
-import torch
 from modules.module.LoRAModule import LoRAModuleWrapper
+
+import torch
+
 
 def tag_peft_parameters(model: torch.nn.Module | None):
     """
-    Tags PEFT parameters with attributes like `_is_lora_A`, `_is_lora_B`, 
+    Tags PEFT parameters with attributes like `_is_lora_A`, `_is_lora_B`,
     `_is_oft`, and `_is_dora_scale` based on their names.
     This is required to apply correct scaling and optimizations for certain features in adv_optm library.
     """
@@ -21,7 +23,7 @@ def tag_peft_parameters(model: torch.nn.Module | None):
             # Set of independent vectors (rank, n_elements)
             p._is_oft = True
 
-    for module_prefix, module in vars(model).items():
+    for module in vars(model).values():
         if isinstance(module, LoRAModuleWrapper):
             for lora_module in module.lora_modules.values():
                 for param_name, p in lora_module.named_parameters():
