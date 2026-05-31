@@ -92,7 +92,7 @@ class LinuxCloud(BaseCloud):
                                   && cd {shlex.quote(parent)} \
                                   && {config.install_cmd})',in_stream=False)
 
-        result=self.connection.run(f"test -d {shlex.quote(config.onetrainer_dir)}/venv",warn=True,in_stream=False)
+        result=self.connection.run(f"test -d {shlex.quote(config.onetrainer_dir)}/.pixi",warn=True,in_stream=False)
 
         #many docker images, including the default ones on RunPod and vast.ai, only set up $PATH correctly
         #for interactive shells. On RunPod, cuda is missing from $PATH; on vast.ai, python is missing.

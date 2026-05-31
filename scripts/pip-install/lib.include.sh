@@ -3,7 +3,7 @@
 set -e
 
 # Detect absolute path to the directory where "lib.include.sh" resides.
-export SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+export SCRIPT_DIR="$(cd --"$(dirname -- "${BASH_SOURCE[0]}")/../.." &>/dev/null && pwd)"
 
 # Guard against including the library multiple times.
 readonly SCRIPT_DIR

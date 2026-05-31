@@ -169,8 +169,11 @@ function run_in_env {
 
 function get_or_update_pixi {
     if can_exec pixi; then
-        print_debug '`pixi` found, updating.'
-        run_cmd pixi self-update
+        if [[ "$1" == "upgrade" ]]; then
+            print_debug '`pixi` found, updating.'
+            run_cmd pixi self-update
+        fi
+        print_debug "`pixi` already available at $(which pixi)."
     else
         print_debug '`pixi` not found, attempting installation.'
         ./install-pixi.sh
@@ -181,7 +184,7 @@ function get_or_update_pixi {
 # Performs the most important startup sanity checks and environment preparation.
 function prepare_runtime_environment {
     # Ensure that pixi is installed.
-    get_or_update_pixi
+    get_or_update_pixi "$@"
 
     # Get the right platform
     export OT_PLATFORM="$(get_platform)"

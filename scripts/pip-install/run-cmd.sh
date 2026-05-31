@@ -2,12 +2,6 @@
 
 set -e
 
-if [ "$OT_PIP_INSTALL" = "true" ]; then
-    echo "[OneTrainer] Running via pip..."
-    bash scripts/pip-install/run-cmd.sh "$@"
-    exit 0
-fi
-
 # Xet is buggy. Disabled by default unless already defined - https://github.com/Nerogar/OneTrainer/issues/949
 if [[ -z "${HF_HUB_DISABLE_XET+x}" ]]; then
     export HF_HUB_DISABLE_XET=1
@@ -31,4 +25,4 @@ prepare_runtime_environment
 
 # Remove $1 (name of the script) and pass all remaining arguments to the script.
 shift
-run_in_env python "${OT_CUSTOM_SCRIPT_FILE}" "$@"
+run_python_in_active_env "${OT_CUSTOM_SCRIPT_FILE}" "$@"

@@ -19,4 +19,4 @@ git pull
 source "lib.include.sh"
 
 # Prepare runtime and upgrade all dependencies to latest compatible version.
-prepare_runtime_environment
+prepare_runtime_environment upgrade
