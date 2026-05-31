@@ -73,6 +73,13 @@ class OFTRotationModule(nn.Module):
         self.oft_clipped_norm = oft_clipped_norm
         if oft_clipped_norm:
             self.register_buffer("clipped_oft", torch.tensor(True))
+            # Initialize states for Spectral Normalization via Power Iteration
+            u = torch.randn(r, block_size)
+            u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            self.register_buffer("u_state", u, persistent=False)
+            v = torch.randn(r, block_size)
+            v = v / v.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            self.register_buffer("v_state", v, persistent=False)
 
 
     def _pytorch_skew_symmetric(self, vec, block_size):
@@ -104,11 +111,29 @@ class OFTRotationModule(nn.Module):
         Q_skew = self._pytorch_skew_symmetric(Q, block_size)
 
         if use_cayley_neumann and self.oft_clipped_norm:
-            # The Neumann series only converges if the matrix norm Q < 1.
-            # Cap the Frobenius norm at sqrt(2), which strictly bounds the Spectral norm at < 1.0
-            norms = torch.linalg.vector_norm(Q_skew, ord=2, dim=(-2, -1), keepdim=True)
-            max_norm = math.sqrt(2) * 0.999
-            Q_skew = Q_skew * (max_norm / torch.clamp(norms, min=max_norm))
+            # The Neumann series only converges if the spectral norm ||Q||_2 < 1.
+            # We estimate the spectral norm using a single step of Power Iteration.
+            with torch.no_grad():
+                u = self.u_state.unsqueeze(-1).to(Q_skew.dtype)
+                v = self.v_state.unsqueeze(-1).to(Q_skew.dtype)
+                # Update v (Right Singular Vector)
+                v_raw = torch.bmm(Q_skew.mT, u)
+                v_norm = torch.linalg.vector_norm(v_raw, dim=1, keepdim=True)
+                candidate_v = v_raw / v_norm.clamp_min(1e-8)
+                next_v = torch.where(v_norm >= 1e-6, candidate_v, v)
+                # Update u (Left Singular Vector)
+                u_raw = torch.bmm(Q_skew, next_v)
+                u_norm = torch.linalg.vector_norm(u_raw, dim=1, keepdim=True)
+                candidate_u = u_raw / u_norm.clamp_min(1e-8)
+                next_u = torch.where(u_norm >= 1e-6, candidate_u, u)
+                if self.training:
+                    self.v_state.copy_(next_v.squeeze(-1))
+                    self.u_state.copy_(next_u.squeeze(-1))
+            # Estimate sigma (The spectral norm)
+            u_raw_grad = torch.bmm(Q_skew, next_v)
+            sigma = torch.sum(next_u * u_raw_grad, dim=1, keepdim=True)
+            max_norm = 0.999
+            Q_skew = Q_skew * (max_norm / torch.clamp(sigma, min=max_norm))
 
         if use_cayley_neumann:
             R = torch.eye(block_size, device=Q.device, dtype=Q.dtype).repeat(b, 1, 1)
