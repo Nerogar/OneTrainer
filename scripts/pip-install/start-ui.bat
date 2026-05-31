@@ -1,7 +1,8 @@
 @echo off
 
 REM Avoid footgun by explictly navigating to the directory containing the batch file
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
+set "SCRIPT_DIR=%CD%"
 
 REM Verify that OneTrainer is our current working directory
 if not exist "scripts\train_ui.py" (
@@ -17,7 +18,7 @@ if not defined PYTHON (
     )
     set PYTHON=python
 )
-if not defined VENV_DIR (set "VENV_DIR=%~dp0venv")
+if not defined VENV_DIR (set "VENV_DIR=%SCRIPT_DIR%\venv")
 
 :check_venv
 dir "%VENV_DIR%" > NUL 2> NUL
@@ -52,7 +53,7 @@ if errorlevel 1 (
 )
 
 echo.
-%PYTHON% "%~dp0scripts\util\version_check.py" 3.10 3.14 2>&1
+%PYTHON% "%SCRIPT_DIR%\scripts\util\version_check.py" 3.10 3.14 2>&1
 if errorlevel 1 (
     echo.
     goto :wrong_python_version

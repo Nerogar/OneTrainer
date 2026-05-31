@@ -2,8 +2,8 @@
 
 if "%OT_PIP_INSTALL%" == "true" (
     echo "[OneTrainer] Running UI inside virtual environment..."
-    CALL scripts/pip-install/start-ui.bat
-    exit /b %_EXIT%
+    CALL "%~dp0scripts\pip-install\start-ui.bat"
+    exit /b
 )
 
 chcp 65001 >nul

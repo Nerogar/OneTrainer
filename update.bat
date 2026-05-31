@@ -2,8 +2,8 @@
 
 if "%OT_PIP_INSTALL%" == "true" (
     echo "[OneTrainer] Updating dependencies via pip..."
-    CALL scripts/pip-install/update.bat
-    exit /b %_EXIT%
+    CALL "%~dp0scripts\pip-install\update.bat"
+    exit /b
 )
 
 chcp 65001 >nul

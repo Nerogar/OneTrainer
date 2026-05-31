@@ -2,8 +2,8 @@
 
 if "%OT_PIP_INSTALL%" == "true" (
     echo "[OneTrainer] Running debug export inside virtual environment..."
-    CALL scripts/pip-install/export_debug.bat
-    exit /b %_EXIT%
+    CALL "%~dp0scripts\pip-install\export_debug.bat"
+    exit /b
 )
 
 chcp 65001 >nul

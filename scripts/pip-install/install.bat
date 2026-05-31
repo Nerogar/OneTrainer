@@ -6,7 +6,7 @@ rem --- Color codes ---
 set "RED=[31m" & set "YEL=[33m" & set "GRN=[92m" & set "CYAN=[36m" & set "RESET=[0m"
 
 rem --- Constants ---
-pushd "%~dp0" || call :die "Cannot cd to script directory"
+pushd "%~dp0..\.." || call :die "Cannot cd to project root"
 set "SCRIPT_DIR=%CD%"
 set "VENV_DIR=%SCRIPT_DIR%\\venv"
 set "VERSION_FILE=%SCRIPT_DIR%\\scripts\\util\\version_check.py"
