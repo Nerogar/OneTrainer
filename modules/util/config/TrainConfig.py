@@ -257,7 +257,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("spectral_normalization", False, bool, False))
         data.append(("stochastic_sign", False, bool, False))
         data.append(("centered_wd", 0.0, float, False))
-        data.append(("centered_wd_mode", "float8", str, False))
+        data.append(("centered_wd_mode", "full", str, False))
         data.append(("factored_2nd", False, bool, False))
         data.append(("fisher_wd", False, bool, False))
         data.append(("state_precision", "float8", str, False))

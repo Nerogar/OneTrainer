@@ -459,7 +459,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "orthogonal_gradient": False,
         "spectral_normalization": False,
         "centered_wd": 0.0,
-        "centered_wd_mode": "float8",
+        "centered_wd_mode": "full",
         "state_precision": "auto",
     },
     Optimizer.ADAMW_ADV: {
@@ -480,7 +480,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "kourkoutas_beta": False,
         "spectral_normalization": False,
         "centered_wd": 0.0,
-        "centered_wd_mode": "float8",
+        "centered_wd_mode": "full",
         "state_precision": "auto",
     },
     Optimizer.ADOPT_ADV: {
@@ -501,7 +501,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "kourkoutas_beta": False,
         "spectral_normalization": False,
         "centered_wd": 0.0,
-        "centered_wd_mode": "float8",
+        "centered_wd_mode": "full",
         "state_precision": "auto",
     },
     Optimizer.PRODIGY_ADV: {
@@ -529,7 +529,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "orthogonal_gradient": False,
         "kourkoutas_beta": False,
         "centered_wd": 0.0,
-        "centered_wd_mode": "float8",
+        "centered_wd_mode": "full",
     },
     Optimizer.SIGNSGD_ADV: {
         "stochastic_sign": False,
@@ -547,7 +547,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "orthogonal_gradient": False,
         "spectral_normalization": False,
         "centered_wd": 0.0,
-        "centered_wd_mode": "float8",
+        "centered_wd_mode": "full",
         "state_precision": "auto",
     },
     Optimizer.LION_ADV: {
@@ -564,7 +564,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "orthogonal_gradient": False,
         "spectral_normalization": False,
         "centered_wd": 0.0,
-        "centered_wd_mode": "float8",
+        "centered_wd_mode": "full",
     },
     Optimizer.MUON_ADV: {
         "beta1": 0.9,
@@ -592,7 +592,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "orthogonal_gradient": False,
         "approx_mars": False,
         "centered_wd": 0.0,
-        "centered_wd_mode": "float8",
+        "centered_wd_mode": "full",
         "state_precision": "auto",
         "muon_adam_config": {},
     },
@@ -624,7 +624,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "orthogonal_gradient": False,
         "approx_mars": False,
         "centered_wd": 0.0,
-        "centered_wd_mode": "float8",
+        "centered_wd_mode": "full",
         "state_precision": "auto",
         "muon_adam_config": {},
     },
