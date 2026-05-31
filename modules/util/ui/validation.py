@@ -330,8 +330,6 @@ class FieldValidator:
         try:
             if declared_type is int:
                 v = int(value)
-                if v < 0:
-                    return "Value must be non-negative"
             elif declared_type is float:
                 v = float(value)
                 if v < 0:
