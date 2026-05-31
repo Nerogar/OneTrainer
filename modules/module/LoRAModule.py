@@ -767,15 +767,16 @@ class DoRAOFTModule(OFTModule):
             bias_view = bias.view(1, -1, 1, 1) if isinstance(self.orig_module, nn.Conv2d) else bias
             result = result - bias_view
 
-        # Apply DoRA Scaling
-        scale = (self.dora_scale) / (self.initial_norm)
+        # Apply DoRA Scaling (add epsilon for safety against dead neurons)
+        eps = torch.finfo(self.dora_scale.dtype).eps
+        scale = self.dora_scale / (self.initial_norm + eps)
 
         if isinstance(self.orig_module, nn.Linear):
             scale = scale.view(1, -1)
         elif isinstance(self.orig_module, nn.Conv2d):
             scale = scale.view(1, -1, 1, 1)
 
-        result = result * scale
+        result = result * scale.to(result.dtype)
 
         # Re-add bias
         if bias is not None:
