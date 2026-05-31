@@ -16,9 +16,8 @@ class TorchMemoryRecorder:
         if self.enabled:
             try:
                 torch.cuda.memory._dump_snapshot(filename=self.filename)
-                print(f"dumped memory snapshot to {self.filename}")
             except Exception:
-                print(f"could not dump memory snapshot {self.filename}")
+                print(f"could not write memory snapshot {self.filename}")
 
             torch.cuda.memory._record_memory_history(enabled=None)
 

@@ -165,10 +165,7 @@ class TrainOptimizerConfig(BaseConfig):
     beta1_warmup: int
     min_beta1: float
     Simplified_AdEMAMix: False
-    cautious_mask: False
-    grams_moment: False
     kourkoutas_beta: False
-    k_warmup_steps: int
     schedulefree_c: float
     ns_steps: int
     MuonWithAuxAdam: False
@@ -181,13 +178,11 @@ class TrainOptimizerConfig(BaseConfig):
     rms_rescaling: True
     normuon_variant: False
     beta2_normuon: float
-    normuon_eps: float
     low_rank_ortho: False
     ortho_rank: int
     accelerated_ns: False
     cautious_wd: False
     approx_mars: False
-    kappa_p: float
     auto_kappa_p: False
     compile: False
 
@@ -283,10 +278,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("beta1_warmup", None, int, True))
         data.append(("min_beta1", None, float, True))
         data.append(("Simplified_AdEMAMix", False, bool, False))
-        data.append(("cautious_mask", False, bool, False))
-        data.append(("grams_moment", False, bool, False))
         data.append(("kourkoutas_beta", False, bool, False))
-        data.append(("k_warmup_steps", None, int, True))
         data.append(("schedulefree_c", None, float, True))
         data.append(("ns_steps", None, int, True))
         data.append(("MuonWithAuxAdam", False, bool, False))
@@ -299,13 +291,11 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("rms_rescaling", True, bool, True))
         data.append(("normuon_variant", False, bool, False))
         data.append(("beta2_normuon", None, float, True))
-        data.append(("normuon_eps", None, float, True))
         data.append(("low_rank_ortho", False, bool, False))
         data.append(("ortho_rank", None, int, True))
         data.append(("accelerated_ns", False, bool, False))
         data.append(("cautious_wd", False, bool, False))
         data.append(("approx_mars", False, bool, False))
-        data.append(("kappa_p", None, float, True))
         data.append(("auto_kappa_p", False, bool, False))
         data.append(("compile", False, bool, False))
 
@@ -580,9 +570,18 @@ class TrainConfig(BaseConfig):
 
     # oft
     oft_block_size: int
-    oft_coft: bool
-    coft_eps: float
     oft_block_share: bool
+    oft_scaled: bool
+
+    # lokr
+    lokr_dim: int
+    lokr_decompose_both: bool
+    lokr_decompose_factor: int
+    lokr_use_tucker: bool
+    lokr_weight_decompose: bool
+    lokr_dora_on_output: bool
+    lokr_full_matrix: bool
+    lokr_vec_trick: bool
 
     # optimizer
     optimizer: TrainOptimizerConfig
@@ -1341,9 +1340,18 @@ class TrainConfig(BaseConfig):
 
         # oft
         data.append(("oft_block_size", 32, int, False))
-        data.append(("oft_coft", False, bool, False))
-        data.append(("coft_eps", 1e-4, float, False))
         data.append(("oft_block_share", False, bool, False))
+        data.append(("oft_scaled", False, bool, False))
+
+        # lokr
+        data.append(("lokr_dim", 16, int, False))
+        data.append(("lokr_decompose_both", False, bool, False))
+        data.append(("lokr_decompose_factor", -1, int, False))
+        data.append(("lokr_use_tucker", False, bool, False))
+        data.append(("lokr_weight_decompose", False, bool, False))
+        data.append(("lokr_dora_on_output", True, bool, False))
+        data.append(("lokr_full_matrix", False, bool, False))
+        data.append(("lokr_vec_trick", True, bool, False))
 
         # optimizer
         data.append(("optimizer", TrainOptimizerConfig.default_values(), TrainOptimizerConfig, False))

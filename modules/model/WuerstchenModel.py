@@ -14,8 +14,8 @@ from torch import Tensor, nn
 from diffusers import ConfigMixin, DDPMWuerstchenScheduler, DiffusionPipeline, ModelMixin, WuerstchenCombinedPipeline
 from diffusers.configuration_utils import register_to_config
 from diffusers.models import StableCascadeUNet
+from diffusers.pipelines.deprecated.wuerstchen import PaellaVQModel, WuerstchenDiffNeXt, WuerstchenPrior
 from diffusers.pipelines.stable_cascade import StableCascadeCombinedPipeline
-from diffusers.pipelines.wuerstchen import PaellaVQModel, WuerstchenDiffNeXt, WuerstchenPrior
 from transformers import CLIPTextModel, CLIPTokenizer
 
 
@@ -261,7 +261,7 @@ class WuerstchenModel(BaseModel):
         )
 
         # apply dropout
-        if text_encoder_dropout_probability is not None:
+        if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
             dropout_text_encoder_mask = (torch.tensor(
                 [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()

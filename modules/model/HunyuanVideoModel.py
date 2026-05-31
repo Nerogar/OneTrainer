@@ -58,6 +58,8 @@ class HunyuanVideoModelEmbedding:
 
 
 class HunyuanVideoModel(BaseModel):
+    NATIVE_FPS = 24
+
     # base model data
     tokenizer_1: LlamaTokenizerFast | None
     tokenizer_2: CLIPTokenizer | None
@@ -298,13 +300,13 @@ class HunyuanVideoModel(BaseModel):
         )
 
         # apply dropout
-        if text_encoder_1_dropout_probability is not None:
+        if text_encoder_1_dropout_probability is not None and text_encoder_1_dropout_probability > 0.0:
             dropout_text_encoder_1_mask = (torch.tensor(
                 [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
             text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None, None]
 
-        if text_encoder_2_dropout_probability is not None:
+        if text_encoder_2_dropout_probability is not None and text_encoder_2_dropout_probability > 0.0:
             dropout_text_encoder_2_mask = (torch.tensor(
                 [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()

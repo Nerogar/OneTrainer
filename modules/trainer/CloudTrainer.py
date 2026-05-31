@@ -175,6 +175,10 @@ class CloudTrainer(BaseTrainer):
         for concept in remote.concepts:
             adjust(concept,"path", if_exists=True)
             adjust(concept.text,"prompt_path")
+            #tag_dropout_special_tags may hold an inline tag list or a path to a .txt/.csv file;
+            #only remap+upload it when it's actually a file, matching DropTags' own detection:
+            if concept.text.tag_dropout_special_tags.lower().endswith((".txt", ".csv")):
+                adjust(concept.text,"tag_dropout_special_tags", if_exists=True)
 
         if remote.train_device == "cpu":
             #if there is no local GPU, "cpu" is the default, but not correct for cloud training

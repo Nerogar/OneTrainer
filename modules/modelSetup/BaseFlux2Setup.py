@@ -36,7 +36,7 @@ class BaseFlux2Setup(
     metaclass=ABCMeta
 ):
     LAYER_PRESETS = {
-        "blocks": ["transformer_blocks"],
+        "blocks": ["transformer_block"],
         "full": [],
     }
 
@@ -55,13 +55,6 @@ class BaseFlux2Setup(
                 else:
                     model.text_encoder_offload_conductor = \
                         enable_checkpointing_for_qwen3_encoder_layers(model.text_encoder, config)
-
-        if config.force_circular_padding:
-            raise NotImplementedError #TODO applies to Flux2?
-#            apply_circular_padding_to_conv2d(model.vae)
-#            apply_circular_padding_to_conv2d(model.transformer)
-#            if model.transformer_lora is not None:
-#                apply_circular_padding_to_conv2d(model.transformer_lora)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
@@ -109,7 +102,7 @@ class BaseFlux2Setup(
                 tokens_mask=batch.get("tokens_mask"),
                 text_encoder_sequence_length=config.text_encoder_sequence_length,
                 text_encoder_output=batch.get('text_encoder_hidden_state'),
-                text_encoder_dropout_probability=config.text_encoder.dropout_probability,
+                text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
             latent_image = model.patchify_latents(batch['latent_image'].float())
             latent_height = latent_image.shape[-2]

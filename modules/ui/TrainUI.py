@@ -132,6 +132,9 @@ class TrainUI(ctk.CTk):
         self.training_callbacks = None
         self.training_commands = None
 
+        self.start_time = None
+        self.start_total_steps = None
+
         self.always_on_tensorboard_subprocess = None
         self.current_workspace_dir = self.train_config.workspace_dir
         self._check_start_always_on_tensorboard()
@@ -600,13 +603,20 @@ class TrainUI(ctk.CTk):
         webbrowser.open("http://localhost:" + str(self.train_config.tensorboard_port), new=0, autoraise=False)
 
     def _calculate_eta_string(self, train_progress: TrainProgress, max_step: int, max_epoch: int) -> str | None:
-        spent_total = time.monotonic() - self.start_time
-        steps_done = train_progress.epoch * max_step + train_progress.epoch_step
-        remaining_steps = (max_epoch - train_progress.epoch - 1) * max_step + (max_step - train_progress.epoch_step)
-        total_eta = spent_total / steps_done * remaining_steps
+        assert self.start_time is not None and self.start_total_steps is not None
 
-        if train_progress.global_step <= 30:
+        spent_total = time.monotonic() - self.start_time
+
+        # calculate steps done in THIS SESSION only
+        current_total_steps = train_progress.epoch * max_step + train_progress.epoch_step
+        steps_done_this_session = current_total_steps - self.start_total_steps
+
+        remaining_steps = (max_epoch - train_progress.epoch - 1) * max_step + (max_step - train_progress.epoch_step)
+
+        if steps_done_this_session <= 30:
             return "Estimating ..."
+
+        total_eta = spent_total / steps_done_this_session * remaining_steps
 
         td = datetime.timedelta(seconds=total_eta)
         days = td.days
@@ -632,6 +642,10 @@ class TrainUI(ctk.CTk):
         self.eta_label.configure(text="")
 
     def on_update_train_progress(self, train_progress: TrainProgress, max_step: int, max_epoch: int):
+        # capture session start on first progress update
+        if self.start_total_steps is None:
+            self.start_total_steps = train_progress.epoch * max_step + train_progress.epoch_step
+
         self.set_step_progress(train_progress.epoch_step, max_step)
         self.set_epoch_progress(train_progress.epoch, max_epoch)
         self.set_eta_label(train_progress, max_step, max_epoch)
@@ -655,6 +669,7 @@ class TrainUI(ctk.CTk):
         if not self.training_callbacks and not self.training_commands:
             window = SampleWindow(
                 self,
+                use_external_model=False,
                 train_config=self.train_config,
             )
             self.wait_window(window)
@@ -693,6 +708,7 @@ class TrainUI(ctk.CTk):
             window = SampleWindow(
                 self,
                 train_config=self.train_config,
+                use_external_model=True,
                 callbacks=training_callbacks,
                 commands=training_commands,
             )
@@ -713,6 +729,8 @@ class TrainUI(ctk.CTk):
             if self.train_config.cloud.enabled:
                 self.ui_state.get_var("secrets.cloud").update(self.train_config.secrets.cloud)
 
+            # Reset session tracking - actual values captured on first progress callback
+            self.start_total_steps = None
             self.start_time = time.monotonic()
             trainer.train()
         except Exception:
