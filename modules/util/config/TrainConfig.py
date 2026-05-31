@@ -524,6 +524,7 @@ class TrainConfig(BaseConfig):
     dora_oft: bool
     oft_scaled: bool
 
+    # lokr
     lokr_dim: int
     lokr_decompose_both: bool
     lokr_decompose_factor: int
