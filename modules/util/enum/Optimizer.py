@@ -99,6 +99,19 @@ class Optimizer(Enum):
             self.PRODIGY_PLUS_SCHEDULE_FREE,
         ]
 
+    @property
+    def is_adv(self):
+        return self in [
+            self.ADAMW_ADV,
+            self.ADOPT_ADV,
+            self.LION_ADV,
+            self.SINKSGD_ADV,
+            self.SIGNSGD_ADV,
+            self.PRODIGY_ADV,
+            self.MUON_ADV,
+            self.ADAMUON_ADV,
+        ]
+
     def supports_fused_back_pass(self):
         return self in [
             Optimizer.ADAFACTOR,

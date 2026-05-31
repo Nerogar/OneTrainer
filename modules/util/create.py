@@ -33,6 +33,7 @@ from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer.adafactor_extensions import patch_adafactor
 from modules.util.optimizer.adam_extensions import patch_adam
 from modules.util.optimizer.adamw_extensions import patch_adamw
+from modules.util.optimizer.tag_util import tag_peft_parameters
 from modules.util.optimizer.muon_util import split_parameters_for_muon
 from modules.util.TrainProgress import TrainProgress
 from modules.zluda import ZLUDA
@@ -140,6 +141,9 @@ def create_optimizer(
 
     parameters = parameter_group_collection.parameters_for_optimizer(config)
 
+    if config.optimizer.optimizer.is_adv:
+        # Tag PEFT parameters based on parameter names.
+        tag_peft_parameters(model)
 
     match config.optimizer.optimizer:
 
