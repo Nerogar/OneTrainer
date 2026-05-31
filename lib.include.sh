@@ -171,7 +171,7 @@ function get_or_update_pixi {
     if can_exec pixi; then
         if [[ "$1" == "upgrade" ]]; then
             print_debug '`pixi` found, updating.'
-            run_cmd pixi self-update
+            run_cmd pixi self-update --no-release-notes
         fi
         print_debug "`pixi` already available at $(which pixi)."
     else
