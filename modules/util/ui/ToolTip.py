@@ -112,8 +112,8 @@ class ValidationTooltip:
 
         if from_typing:
             self._suppressed_until_keystroke = False
-            self._show()
-            self._schedule_auto_hide()
+            if self._show():
+                self._schedule_auto_hide()
         elif self._hovered or (self._focused and not self._suppressed_until_keystroke):
             self._show()
 
@@ -124,8 +124,8 @@ class ValidationTooltip:
     def on_user_keystroke(self):
         self._suppressed_until_keystroke = False
         if self._error_active and self._focused:
-            self._show()
-            self._schedule_auto_hide()
+            if self._show():
+                self._schedule_auto_hide()
 
     def on_focus_in(self):
         self._focused = True
@@ -147,29 +147,18 @@ class ValidationTooltip:
         if not self._focused:
             self._hide()
 
-    def _show(self):
+    def _show(self) -> bool:
+        if not self._can_show():
+            self._hide()
+            return False
+
         if ValidationTooltip._active_instance not in (None, self):
             ValidationTooltip._active_instance._hide()
         ValidationTooltip._active_instance = self
 
-        try:
-            root = self.widget.winfo_toplevel()
-            state = root.wm_state()
-            if state in ("iconic", "withdrawn"):
-                return
-        except tk.TclError:
-            return
-
         if self._toplevel is not None:
             self._update_text()
-            self._reposition()
-            return
-
-        try:
-            if not self.widget.winfo_exists():
-                return
-        except tk.TclError:
-            return
+            return self._reposition()
 
         x, y = self._calc_position()
         toplevel = ctk.CTkToplevel(self.widget)
@@ -189,6 +178,18 @@ class ValidationTooltip:
         self._toplevel = toplevel
 
         self._bind_configure_events()
+        return True
+
+    def _can_show(self) -> bool:
+        try:
+            if not self.widget.winfo_exists() or not self.widget.winfo_viewable():
+                return False
+            root = self.widget.winfo_toplevel()
+            if not root.winfo_exists():
+                return False
+            return root.wm_state() not in ("iconic", "withdrawn")
+        except tk.TclError:
+            return False
 
     def _hide(self):
         self._cancel_auto_hide()
@@ -216,32 +217,71 @@ class ValidationTooltip:
             x, y = 0, 0
         return x, y
 
-    def _reposition(self):
+    def _reposition(self) -> bool:
+        if not self._can_show():
+            self._hide()
+            return False
+
         x, y = self._calc_position()
         if self._toplevel is not None:
             with contextlib.suppress(tk.TclError):
                 self._toplevel.wm_geometry(f"+{x}+{y}")
+            return True
+        return False
 
     def _bind_configure_events(self):
         self._unbind_configure_events()
 
-        targets: list[tk.Misc] = [self.widget]
-        with contextlib.suppress(tk.TclError):
-            targets.append(self.widget.winfo_toplevel())
+        targets = self._visibility_targets()
 
         def _on_configure(e=None):
             if self._toplevel is not None and getattr(e, "widget", None) in targets:
                 self._reposition()
 
+        def _on_unmap(e=None):
+            if getattr(e, "widget", None) in targets:
+                self._hide()
+
         for target in targets:
-            with contextlib.suppress(tk.TclError):
-                func_id = target.bind("<Configure>", _on_configure, add=True)
-                self._configure_binds.append((target, "<Configure>", func_id))
+            self._bind_visibility_event(target, "<Configure>", _on_configure)
+            self._bind_visibility_event(target, "<Unmap>", _on_unmap)
+
+    def _bind_visibility_event(
+        self,
+        target: tk.Misc,
+        sequence: str,
+        handler: Callable[[tk.Event], None],
+    ):
+        with contextlib.suppress(tk.TclError, NotImplementedError, ValueError):
+            func_id = tk.Misc.bind(target, sequence, handler, add=True)
+            self._configure_binds.append((target, sequence, func_id))
+
+    def _visibility_targets(self) -> list[tk.Misc]:
+        targets: list[tk.Misc] = []
+        seen: set[str] = set()
+
+        def add_target(target: tk.Misc | None):
+            if target is None:
+                return
+            target_id = str(target)
+            if target_id not in seen:
+                targets.append(target)
+                seen.add(target_id)
+
+        target: tk.Misc | None = self.widget
+        while target is not None:
+            add_target(target)
+            target = getattr(target, "master", None)
+
+        with contextlib.suppress(tk.TclError):
+            add_target(self.widget.winfo_toplevel())
+
+        return targets
 
     def _unbind_configure_events(self):
         for target, seq, func_id in self._configure_binds:
-            with contextlib.suppress(tk.TclError):
-                target.unbind(seq, func_id)
+            with contextlib.suppress(tk.TclError, ValueError):
+                tk.Misc.unbind(target, seq, func_id)
         self._configure_binds.clear()
 
     def _schedule_auto_hide(self):

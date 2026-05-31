@@ -3,6 +3,7 @@ import os
 import re
 import sys
 import unicodedata
+from urllib.parse import urlparse
 
 from modules.util.enum.PathIOType import PathIOType
 
@@ -26,6 +27,8 @@ _NUMERIC_SEPARATOR_RE = re.compile(r"[_,\u066b]")
 _ANY_DECIMAL_RE = re.compile(r"^(-?\d+)[.,\u066b](\d*)$")
 _FOREIGN_DECIMAL_RE = re.compile(r"^(-?\d+)[,\u066b](\d+)$")
 _WINDOWS_DRIVE_PREFIX_RE = re.compile(r"^[A-Za-z]:[/\\]")
+_ENDS_WITH_EXT_RE = re.compile(r"\.[A-Za-z0-9]+$")
+_HUGGINGFACE_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
 _IS_WINDOWS = sys.platform == "win32"
@@ -40,6 +43,34 @@ def _strip_matched_quotes(text: str) -> str:
     if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
         return text[1:-1].strip()
     return text
+
+
+def is_huggingface_repo_or_file(value: str) -> bool:
+    trimmed = value.strip()
+
+    if trimmed.startswith("https://"):
+        parsed = urlparse(trimmed)
+        if parsed.netloc not in {"huggingface.co", "huggingface.com"}:
+            return False
+        parts = parsed.path.strip("/").split("/")
+        if len(parts) >= 5 and parts[2] in {"resolve", "blob"}:
+            return bool(_ENDS_WITH_EXT_RE.search(parts[-1]))
+        return False
+
+    if len(trimmed) > 96:
+        return False
+    if " " in trimmed or "\t" in trimmed:
+        return False
+    if "—" in trimmed or ".." in trimmed:
+        return False
+    if trimmed.startswith(("\\\\", "//", "/")):
+        return False
+    if len(trimmed) >= 2 and trimmed[1] == ":" and trimmed[0].isalpha():
+        return False
+    if trimmed.count("/") != 1:
+        return False
+
+    return bool(_HUGGINGFACE_REPO_RE.match(trimmed))
 
 
 def autocorrect_string(value: str) -> str:
@@ -99,6 +130,9 @@ def autocorrect_path(
 
     result = _strip_matched_quotes(value.strip())
     if not result:
+        return result
+
+    if is_huggingface_repo_or_file(result):
         return result
 
     result = result.translate({ord(c): None for c in INVALID_PATH_CHARS})

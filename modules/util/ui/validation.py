@@ -9,7 +9,6 @@ from collections import deque
 from collections.abc import Callable
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlparse
 
 from modules.util.config.TrainConfig import get_output_model_destination, is_auto_run_name_mode, prepare_run_name
 from modules.util.enum.ModelFormat import ModelFormat
@@ -21,6 +20,7 @@ from modules.util.ui.autocorrect import (
     autocorrect_int,
     autocorrect_path,
     autocorrect_string,
+    is_huggingface_repo_or_file,
 )
 from modules.util.ui.ToolTip import ValidationTooltip
 
@@ -37,8 +37,6 @@ ERROR_BORDER_COLOR = "#dc3545"
 _active_validators: set[FieldValidator] = set()
 
 TRAILING_SLASH_RE = re.compile(r"[\\/]$")
-ENDS_WITH_EXT = re.compile(r"\.[A-Za-z0-9]+$")
-HUGGINGFACE_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 _IS_WINDOWS = sys.platform == "win32"
 
@@ -70,34 +68,6 @@ def _describe_invalid_chars(value: str) -> str:
     if len(bad) > _MAX_DISPLAY_CHARS:
         shown += f" and {len(bad) - _MAX_DISPLAY_CHARS} more"
     return f": {shown}"
-
-
-def _is_huggingface_repo_or_file(value: str) -> bool:
-    trimmed = value.strip()
-
-    if trimmed.startswith("https://"):
-        parsed = urlparse(trimmed)
-        if parsed.netloc not in {"huggingface.co", "huggingface.com"}:
-            return False
-        parts = parsed.path.strip("/").split("/")
-        if len(parts) >= 5 and parts[2] in {"resolve", "blob"}:
-            return bool(ENDS_WITH_EXT.search(parts[-1]))
-        return False
-
-    if len(trimmed) > 96:
-        return False
-    if " " in trimmed or "\t" in trimmed:
-        return False
-    if "—" in trimmed or ".." in trimmed:
-        return False
-    if trimmed.startswith(("\\\\", "//", "/")):
-        return False
-    if len(trimmed) >= 2 and trimmed[1] == ":" and trimmed[0].isalpha():
-        return False
-    if trimmed.count("/") != 1:
-        return False
-
-    return bool(HUGGINGFACE_REPO_RE.match(trimmed))
 
 
 def _has_invalid_chars(value: str) -> bool:
@@ -152,7 +122,7 @@ def validate_path(
             return "Cloud path must use forward slashes (/)"
         return None
 
-    if io_type == PathIOType.INPUT and _is_huggingface_repo_or_file(trimmed):
+    if io_type == PathIOType.INPUT and is_huggingface_repo_or_file(trimmed):
         return None
 
     if io_type == PathIOType.INPUT:
