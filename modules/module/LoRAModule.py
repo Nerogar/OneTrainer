@@ -710,51 +710,35 @@ class DoRAOFTModule(OFTModule):
     Since OFT (Orthogonal Finetuning) applies a rotation R such that W_new = W_orig @ R^T,
     and R is orthogonal, the norm of the weight rows (output features) is preserved.
     ||W_new|| = ||W_orig||.
-
-    Standard DoRA: W_new = m * (V / ||V||).
-    In OFT-DoRA: V = W_orig @ R^T.
-    Since ||V|| = ||W_orig|| is constant under rotation, we can simplify:
-    W_final = m * ( (W_orig @ R^T) / ||W_orig|| )
-            = (m / ||W_orig||) * OFT(x)
-
-    We learn 'm' (dora_scale) and the rotation parameters.
     """
-    dora_scale: nn.Parameter | None
-    initial_norm: Tensor | None
+    dora_multiplier: nn.Parameter | None
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, block_share: bool, oft_scaled: bool, **kwargs):
-        self.dora_scale = None
-
+        self.dora_multiplier = None
         super().__init__(prefix, orig_module, oft_block_size, block_share, oft_scaled, **kwargs)
-
-        if not hasattr(self, "initial_norm"):
-            self.register_buffer("initial_norm", None)
 
     def initialize_weights(self):
         super().initialize_weights()
 
-        # Calculate initial norms (magnitude) of the weights
+        # Calculate multiplier shapes
         if isinstance(self.orig_module, nn.Linear):
-            weight = get_unquantized_weight(self.orig_module, torch.float32, self.orig_module.weight.device)
-            norm = torch.norm(weight, dim=1, keepdim=True)
+            multiplier_shape = (self.orig_module.weight.shape[0],)
         elif isinstance(self.orig_module, nn.Conv2d):
-            weight = self.orig_module.weight.detach().float()
-            norm = torch.norm(weight.reshape(weight.shape[0], -1), dim=1).reshape(weight.shape[0], 1, 1, 1)
+            multiplier_shape = (self.orig_module.weight.shape[0], 1, 1, 1)
         else:
             raise NotImplementedError("DoRA-OFT only supports Linear and Conv2d")
 
-        if hasattr(self, "initial_norm"):
-             self.initial_norm = norm.to(self.orig_module.weight.device).detach()
-        else:
-             self.register_buffer("initial_norm", norm.to(self.orig_module.weight.device).detach())
-
-        # Initialize learnable magnitude vector to the initial norm
-        self.dora_scale = nn.Parameter(self.initial_norm.clone())
+        # Initialize dora_multiplier to 1.0
+        self.dora_multiplier = nn.Parameter(
+            torch.ones(
+                multiplier_shape, 
+                device=self.orig_module.weight.device
+            )
+        )
 
     def check_initialized(self):
         super().check_initialized()
-        assert self.dora_scale is not None
-        assert self.initial_norm is not None
+        assert self.dora_multiplier is not None
 
     def forward(self, x, *args, **kwargs):
         # Get the standard OFT output
@@ -767,16 +751,8 @@ class DoRAOFTModule(OFTModule):
             bias_view = bias.view(1, -1, 1, 1) if isinstance(self.orig_module, nn.Conv2d) else bias
             result = result - bias_view
 
-        # Apply DoRA Scaling (add epsilon for safety against dead neurons)
-        eps = torch.finfo(self.dora_scale.dtype).eps
-        scale = self.dora_scale / (self.initial_norm + eps)
-
-        if isinstance(self.orig_module, nn.Linear):
-            scale = scale.view(1, -1)
-        elif isinstance(self.orig_module, nn.Conv2d):
-            scale = scale.view(1, -1, 1, 1)
-
-        result = result * scale.to(result.dtype)
+        # Apply DoRA multiplier
+        result = result * self.dora_multiplier.to(result.dtype)
 
         # Re-add bias
         if bias is not None:
