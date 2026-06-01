@@ -16,7 +16,7 @@ def tag_peft_parameters(model: torch.nn.Module | None):
         elif name.endswith(("lora_up.weight", "lokr_w1_a", "lokr_w2_a")):
             # Up projection
             p._is_lora_B = True
-        elif name.endswith("dora_scale"):
+        elif name.endswith(("dora_scale", "dora_multiplier")):
             # Vector in shape of >= 2D tensor
             p._is_dora_scale = True
         elif name.endswith("oft_R.weight"):
