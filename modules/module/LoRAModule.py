@@ -711,26 +711,21 @@ class DoRAOFTModule(OFTModule):
     and R is orthogonal, the norm of the weight rows (output features) is preserved.
     ||W_new|| = ||W_orig||.
     """
-    dora_multiplier: nn.Parameter | None
+    dora_log_multiplier: nn.Parameter | None
 
     def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, block_share: bool, oft_scaled: bool, **kwargs):
-        self.dora_multiplier = None
+        self.dora_log_multiplier = None
         super().__init__(prefix, orig_module, oft_block_size, block_share, oft_scaled, **kwargs)
 
     def initialize_weights(self):
         super().initialize_weights()
 
-        # Calculate multiplier shapes
-        if isinstance(self.orig_module, nn.Linear):
-            multiplier_shape = (self.orig_module.weight.shape[0],)
-        elif isinstance(self.orig_module, nn.Conv2d):
-            multiplier_shape = (self.orig_module.weight.shape[0], 1, 1, 1)
-        else:
-            raise NotImplementedError("DoRA-OFT only supports Linear and Conv2d")
+        # Calculate multiplier shape
+        multiplier_shape = (self.orig_module.weight.shape[0],)
 
-        # Initialize dora_multiplier to 1.0
-        self.dora_multiplier = nn.Parameter(
-            torch.ones(
+        # Initialize dora_log_multiplier to 0.0 (exp(0) = 1.0 multiplier)
+        self.dora_log_multiplier = nn.Parameter(
+            torch.zeros(
                 multiplier_shape,
                 device=self.orig_module.weight.device
             )
@@ -738,7 +733,7 @@ class DoRAOFTModule(OFTModule):
 
     def check_initialized(self):
         super().check_initialized()
-        assert self.dora_multiplier is not None
+        assert self.dora_log_multiplier is not None
 
     def forward(self, x, *args, **kwargs):
         # Get the standard OFT output
@@ -751,8 +746,9 @@ class DoRAOFTModule(OFTModule):
             bias_view = bias.view(1, -1, 1, 1) if isinstance(self.orig_module, nn.Conv2d) else bias
             result = result - bias_view
 
-        # Apply DoRA multiplier
-        result = result * self.dora_multiplier.to(result.dtype)
+        # Apply Exponential DoRA Scale (exp(0) = Multiplies by 1.0 at step 0)
+        multiplier = torch.exp(self.dora_log_multiplier.reshape(result.shape[0], *([1] * (result.dim() - 1))))
+        result = result * multiplier.to(result.dtype)
 
         # Re-add bias
         if bias is not None:
