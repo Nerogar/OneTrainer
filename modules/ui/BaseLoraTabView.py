@@ -92,7 +92,7 @@ class BaseLoraTabView:
 
             # Clip OFT max norm
             self.components.label(master, 5, 0, "Spectral Norm Clipping",
-                             tooltip="Strictly clips the spectral norm of the OFT matrix to guarantee convergence of the Cayley parametrization (requires norm <= 1.0). Smaller values constrain the learned rotation to stay near the identity matrix, limiting adaptation to minor adjustments Default: 1.0 (e.g. 0.8 = 80% of maximum expressiveness). Leave empty to disable.")
+                             tooltip="Strictly clips the spectral norm of the OFT matrix to guarantee convergence of the Cayley parametrization (requires norm <= 1.0). Smaller values constrain the learned rotation to stay near the identity matrix, limiting adaptation. Default: 1.0 (e.g. 0.8 = 80% of maximum expressiveness). Leave empty to disable.")
             self.components.entry(master, 5, 1, ui_state, "oft_clipped_norm")
 
             # Dropout Percentage
