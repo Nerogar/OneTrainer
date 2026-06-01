@@ -747,7 +747,9 @@ class DoRAOFTModule(OFTModule):
             result = result - bias_view
 
         # Apply Exponential DoRA Scale (exp(0) = Multiplies by 1.0 at step 0)
-        multiplier = torch.exp(self.dora_log_multiplier.reshape(result.shape[0], *([1] * (result.dim() - 1))))
+        multiplier = torch.exp(self.dora_log_multiplier)
+        if isinstance(self.orig_module, nn.Conv2d):
+            multiplier = multiplier.view(1, -1, 1, 1)
         result = result * multiplier.to(result.dtype)
 
         # Re-add bias
