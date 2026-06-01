@@ -731,7 +731,7 @@ class DoRAOFTModule(OFTModule):
         # Initialize dora_multiplier to 1.0
         self.dora_multiplier = nn.Parameter(
             torch.ones(
-                multiplier_shape, 
+                multiplier_shape,
                 device=self.orig_module.weight.device
             )
         )
