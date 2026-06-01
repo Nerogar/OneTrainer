@@ -48,7 +48,7 @@ class OFTRotationModule(nn.Module):
         use_cayley_neumann=True,
         num_cayley_neumann_terms=5,
         dropout_probability=0.0,
-        oft_clipped_norm=False,
+        oft_clipped_norm: float | None = 1.0,
     ):
         super().__init__()
         self.r = r
@@ -71,8 +71,10 @@ class OFTRotationModule(nn.Module):
         self.register_buffer("cols", cols, persistent=False)
         self.dropout = MultiplicativeDropoutLayer(p=dropout_probability)
         self.oft_clipped_norm = oft_clipped_norm
-        if oft_clipped_norm:
-            self.register_buffer("clipped_oft", torch.tensor(True))
+        if use_cayley_neumann and oft_clipped_norm is not None:
+            if oft_clipped_norm > 1:
+                raise ValueError("OFT clipped norm must be <=1.")
+            self.register_buffer("clipped_oft", torch.tensor(self.oft_clipped_norm))
             # Initialize states for Spectral Normalization via Power Iteration
             u = torch.randn(r, block_size)
             u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
@@ -129,14 +131,14 @@ class OFTRotationModule(nn.Module):
 
         Q_skew = self._pytorch_skew_symmetric(Q, block_size)
 
-        if use_cayley_neumann and self.oft_clipped_norm:
+        if use_cayley_neumann and self.oft_clipped_norm is not None:
             # The Neumann series only converges if the spectral norm ||Q||_2 < 1.
             # We estimate the spectral norm using a single step of Power Iteration.
             v_norm, u_norm = self._spectral_norm(Q_skew)
             # Estimate sigma (The spectral norm)
             u_raw_grad = torch.bmm(Q_skew, v_norm)
             sigma = torch.sum(u_norm * u_raw_grad, dim=1, keepdim=True)
-            max_norm = 0.999
+            max_norm = 0.999 * self.oft_clipped_norm
             Q_skew = Q_skew * (max_norm / torch.clamp(sigma, min=max_norm))
 
         if use_cayley_neumann:
