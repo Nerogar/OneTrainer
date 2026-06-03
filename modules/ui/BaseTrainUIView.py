@@ -227,15 +227,20 @@ class BaseTrainUIView(ABC):
                          tooltip="Aspect ratio bucketing enables training on images with different aspect ratios")
         self.components.switch(frame, 0, 1, ui_state, "aspect_ratio_bucketing")
 
-        # latent caching
-        self.components.label(frame, 1, 0, "Latent Caching",
-                         tooltip="Caching of intermediate training data that can be re-used between epochs")
-        self.components.switch(frame, 1, 1, ui_state, "latent_caching")
+        # image caching
+        self.components.label(frame, 1, 0, "Image Caching",
+                         tooltip="Caches image latents (VAE outputs) so they can be re-used between epochs")
+        self.components.switch(frame, 1, 1, ui_state, "image_caching")
+
+        # text caching
+        self.components.label(frame, 2, 0, "Text Caching",
+                         tooltip="Caches text encoder outputs so they can be re-used between epochs")
+        self.components.switch(frame, 2, 1, ui_state, "text_caching")
 
         # clear cache before training
-        self.components.label(frame, 2, 0, "Clear cache before training",
+        self.components.label(frame, 3, 0, "Clear cache before training",
                          tooltip="Clears the cache directory before starting to train. Only disable this if you want to continue using the same cached data. Disabling this can lead to errors, if other settings are changed during a restart")
-        self.components.switch(frame, 2, 1, ui_state, "clear_cache_before_training")
+        self.components.switch(frame, 3, 1, ui_state, "clear_cache_before_training")
 
     def build_sampling_tab_header(self, top_frame, sub_frame, controller, ui_state):
         self.components.label(top_frame, 0, 0, "Sample After",

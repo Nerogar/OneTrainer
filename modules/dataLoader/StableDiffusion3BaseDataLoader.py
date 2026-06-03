@@ -117,7 +117,11 @@ class StableDiffusion3BaseDataLoader(
             text_split_names=text_split_names,
             sort_names=sort_names,
             config=config,
-            text_caching=not config.train_text_encoder_or_embedding() or not config.train_text_encoder_2_or_embedding() or not config.train_text_encoder_3_or_embedding(),
+            text_caching=config.text_caching and (
+                not config.train_text_encoder_or_embedding()
+                or not config.train_text_encoder_2_or_embedding()
+                or not config.train_text_encoder_3_or_embedding()
+            ),
         )
 
     def _output_modules(self, config: TrainConfig, model: StableDiffusion3Model, model_setup: BaseStableDiffusion3Setup):
