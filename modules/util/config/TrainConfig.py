@@ -421,7 +421,8 @@ class TrainConfig(BaseConfig):
     ema: EMAMode
     ema_decay: float
     ema_update_step_interval: int
-    dataloader_threads: int
+    caching_threads: int
+    prefetch_next_batch: bool
     train_device: str
     temp_device: str
     train_dtype: DataType
@@ -854,6 +855,9 @@ class TrainConfig(BaseConfig):
             migrated_data["image_caching"] = latent_caching
             migrated_data["text_caching"] = latent_caching
 
+        if "dataloader_threads" in migrated_data:
+            migrated_data["caching_threads"] = migrated_data.pop("dataloader_threads")
+
         return migrated_data
 
     def model_part_configs(self) -> list[TrainModelPartConfig]:
@@ -1056,7 +1060,8 @@ class TrainConfig(BaseConfig):
         data.append(("ema", EMAMode.OFF, EMAMode, False))
         data.append(("ema_decay", 0.999, float, False))
         data.append(("ema_update_step_interval", 5, int, False))
-        data.append(("dataloader_threads", 2, int, False))
+        data.append(("caching_threads", 2, int, False))
+        data.append(("prefetch_next_batch", True, bool, False))
         data.append(("train_device", default_device.type, str, False))
         data.append(("temp_device", "cpu", str, False))
         data.append(("train_dtype", DataType.FLOAT_16, DataType, False))
