@@ -35,6 +35,7 @@ class TopBarController:
             ("HiDream Full", ModelType.HI_DREAM_FULL),
             ("Chroma1", ModelType.CHROMA_1),
             ("QwenImage", ModelType.QWEN),
+            ("Anima", ModelType.ANIMA),
             ("Z-Image", ModelType.Z_IMAGE),
             ("Ernie Image", ModelType.ERNIE),
         ]
@@ -63,6 +64,7 @@ class TopBarController:
                 ("Embedding", TrainingMethod.EMBEDDING),
             ]
         elif model_type.is_qwen() \
+                or model_type.is_anima() \
                 or model_type.is_z_image() \
                 or model_type.is_flux_2() \
                 or model_type.is_ernie():

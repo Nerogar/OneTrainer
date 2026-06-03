@@ -27,7 +27,7 @@ class StableDiffusion3ModelSaver(
             dtype: torch.dtype | None,
     ):
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
-        pipeline = model.create_pipeline()
+        pipeline = model.create_pipeline(use_original_tokenizers=True)
         pipeline.to("cpu")
         if dtype is not None:
             # replace the tokenizers __deepcopy__ before calling deepcopy, to prevent a copy being made.
