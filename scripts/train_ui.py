@@ -2,11 +2,11 @@ from util.import_util import script_imports
 
 script_imports()
 
-from modules.ui.TrainUI import TrainUI
+from modules.ui.CtkTrainUIView import CtkTrainUIView
 
 
 def main():
-    ui = TrainUI()
+    ui = CtkTrainUIView()
     ui.mainloop()
 
 
