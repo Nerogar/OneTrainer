@@ -127,14 +127,21 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             batch_size: int,
             config: TrainConfig,
             shift: float = None,
+            validation_override: float | None = None,
     ) -> Tensor:
         if shift is None:
             shift = config.timestep_shift
 
         if deterministic:
-            # -1 is for zero-based indexing
+            if validation_override is not None:
+                # Already-shifted unit position in [0, 1]; map to integer timestep.
+                t = int(validation_override * num_train_timesteps)
+                t = max(0, min(num_train_timesteps - 1, t))
+            else:
+                # -1 is for zero-based indexing
+                t = int(num_train_timesteps * 0.5) - 1
             return torch.tensor(
-                int(num_train_timesteps * 0.5) - 1,
+                t,
                 dtype=torch.long,
                 device=generator.device,
             ).unsqueeze(0)
@@ -258,11 +265,13 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             generator: Generator,
             batch_size: int,
             config: TrainConfig,
+            validation_override: float | None = None,
     ) -> Tensor:
         if deterministic:
+            fill_value = float(validation_override) if validation_override is not None else 0.5
             return torch.full(
                 size=(batch_size,),
-                fill_value=0.5,
+                fill_value=fill_value,
                 device=generator.device,
             )
         else:

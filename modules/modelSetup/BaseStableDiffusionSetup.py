@@ -151,7 +151,7 @@ class BaseStableDiffusionSetup(
             deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
-            batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
+            batch_seed = int(batch.get("__val_noise_seed__", 0)) if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
             generator = torch.Generator(device=config.train_device)
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
@@ -182,6 +182,7 @@ class BaseStableDiffusionSetup(
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+                validation_override=batch.get("__val_timestep_unit__"),
             )
 
             latent_noise = self._create_noise(

@@ -79,7 +79,7 @@ class BaseErnieSetup(
             deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
-            batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
+            batch_seed = int(batch.get("__val_noise_seed__", 0)) if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
             generator = torch.Generator(device=config.train_device)
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
@@ -110,6 +110,7 @@ class BaseErnieSetup(
                 scaled_latent_image.shape[0],
                 config,
                 shift=shift if config.dynamic_timestep_shifting else config.timestep_shift,
+                validation_override=batch.get("__val_timestep_unit__"),
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(

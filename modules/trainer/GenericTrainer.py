@@ -20,6 +20,7 @@ from modules.util import create, path_util
 from modules.util.bf16_stochastic_rounding import set_seed as bf16_stochastic_rounding_set_seed
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
@@ -33,6 +34,11 @@ from modules.util.profiling_util import TorchMemoryRecorder, TorchProfiler
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
+from modules.util.validation_timestep import (
+    apply_timestep_shift_unit,
+    stratified_unit_position,
+    validation_noise_seed,
+)
 
 import torch
 from torch import Tensor, nn
@@ -364,9 +370,28 @@ class GenericTrainer(BaseTrainer):
             mapping_seed_to_label = {}
             mapping_label_to_seed = {}
 
-            for validation_batch in step_tqdm_validation:
+            concept_shift_by_seed = self.__validation_concept_shifts()
+            global_validation_shift = self.config.validation_timestep_shift
+            n_validation = current_epoch_length_validation
+
+            for i, validation_batch in enumerate(step_tqdm_validation):
                 if self.__needs_gc(train_progress):
                     torch_gc()
+
+                # since validation batch size = 1
+                concept_name = validation_batch["concept_name"][0]
+                concept_path = validation_batch["concept_path"][0]
+                concept_seed = validation_batch["concept_seed"].item()
+
+                shift_for_sample = concept_shift_by_seed.get(concept_seed)
+                if shift_for_sample is None:
+                    shift_for_sample = global_validation_shift
+
+                pos = stratified_unit_position(i, n_validation)
+                validation_batch["__val_timestep_unit__"] = apply_timestep_shift_unit(
+                    pos, shift_for_sample
+                )
+                validation_batch["__val_noise_seed__"] = validation_noise_seed(i)
 
                 with torch.no_grad():
                     model_output_data = self.model_setup.predict(
@@ -374,10 +399,6 @@ class GenericTrainer(BaseTrainer):
                     loss_validation = self.model_setup.calculate_loss(
                         self.model, validation_batch, model_output_data, self.config)
 
-                # since validation batch size = 1
-                concept_name = validation_batch["concept_name"][0]
-                concept_path = validation_batch["concept_path"][0]
-                concept_seed = validation_batch["concept_seed"].item()
                 loss = loss_validation.item()
 
                 label = concept_name if concept_name else os.path.basename(concept_path)
@@ -412,6 +433,19 @@ class GenericTrainer(BaseTrainer):
                 self.tensorboard.add_scalar("loss/validation_step/total_average",
                                             total_average_loss,
                                             train_progress.global_step)
+
+    def __validation_concept_shifts(self) -> dict[int, float]:
+        concepts = self.config.concepts
+        if concepts is None:
+            with open(self.config.concept_file_name, 'r') as f:
+                concepts = [ConceptConfig.default_values().from_dict(c) for c in json.load(f)]
+
+        return {
+            concept.seed: concept.validation_timestep_shift
+            for concept in concepts
+            if ConceptType(concept.type) == ConceptType.VALIDATION
+            and concept.validation_timestep_shift is not None
+        }
 
     def __save_backup_config(self, backup_path):
         config_path = os.path.join(backup_path, "onetrainer_config")
