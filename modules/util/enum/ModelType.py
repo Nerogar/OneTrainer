@@ -190,7 +190,7 @@ class ModelType(Enum):
                 or self.is_hi_dream() \
                 or self.is_chroma():
             return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA, TrainingMethod.EMBEDDING)
-        if self.is_qwen() or self.is_z_image() or self.is_flux_2() or self.is_ernie():
+        if self.is_qwen() or self.is_anima() or self.is_z_image() or self.is_flux_2() or self.is_ernie():
             return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA)
         raise ValueError(f"No supported training methods defined for model type {self}")
 
@@ -223,6 +223,7 @@ _MODEL_PARTS: dict[ModelType, tuple[str, ...]] = {
     ModelType.HI_DREAM_FULL: ("text_encoder", "text_encoder_2", "text_encoder_3", "text_encoder_4", "transformer", "vae"),
     ModelType.CHROMA_1: ("text_encoder", "transformer", "vae"),
     ModelType.QWEN: ("text_encoder", "transformer", "vae"),
+    ModelType.ANIMA: ("text_encoder", "transformer", "vae"),
     ModelType.Z_IMAGE: ("text_encoder", "transformer", "vae"),
     ModelType.ERNIE: ("text_encoder", "transformer", "vae"),
 }
