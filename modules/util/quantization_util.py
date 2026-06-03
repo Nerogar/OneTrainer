@@ -76,6 +76,7 @@ def dequantize(q: Tensor, scale: float | Tensor) -> Tensor:
     return q.float() * scale
 
 
+from modules.module.quantized.LinearA8 import LinearA8
 from modules.module.quantized.LinearFp8 import LinearFp8
 from modules.module.quantized.LinearGGUFA8 import LinearGGUFA8
 from modules.module.quantized.LinearSVD import BaseLinearSVD, make_svd_linear
@@ -193,6 +194,12 @@ def replace_linear_with_quantized_layers(
     elif dtype == DataType.GGUF_A8_FLOAT:
         linear_class=LinearGGUFA8
         kwargs = {'dtype': torch.float8_e4m3fn}
+    elif dtype == DataType.BFLOAT_16_A8_INT:
+        linear_class=LinearA8
+        kwargs = {'dtype': torch.int8}
+    elif dtype == DataType.BFLOAT_16_A8_FLOAT:
+        linear_class=LinearA8
+        kwargs = {'dtype': torch.float8_e4m3fn}
     else:
         return
 
@@ -226,7 +233,7 @@ def replace_linear_with_quantized_layers(
     #https://github.com/Nerogar/OneTrainer/issues/1050
     for name, module in parent_module.named_modules():
         assert (not isinstance(module, convert_type)
-                or isinstance(module, (QuantizedLinearMixin, LinearGGUFA8))
+                or isinstance(module, (QuantizedLinearMixin, LinearGGUFA8, LinearA8))
                 or any(s in name.split('.') for s in keep_in_fp32_modules)
                 or (quant_filters is not None and len(quant_filters) > 0 and not any(f.matches(name) for f in quant_filters))
                ), f"Linear layer {name} was not found in model for quantization"
@@ -263,7 +270,7 @@ def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataTy
     child_modules = list(module.modules())
     for _ in multi.master_first(): #avoid cache writing conflicts
         for child_module in tqdm(child_modules, desc="Quantizing model weights", total=len(child_modules), delay=5, smoothing=0.1):
-            if isinstance(child_module, (QuantizedModuleMixin, GGUFLinear)):
+            if isinstance(child_module, (QuantizedModuleMixin, GGUFLinear, LinearA8)):
                 child_module.compute_dtype = train_dtype.torch_dtype()
             if isinstance(child_module, QuantizedModuleMixin):
                 child_module.quantize(device=device)
