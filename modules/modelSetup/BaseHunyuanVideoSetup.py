@@ -18,7 +18,6 @@ from modules.util.checkpointing_util import (
 )
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
-from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.quantization_util import quantize_layers
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
@@ -56,25 +55,14 @@ class BaseHunyuanVideoSetup(
         if model.text_encoder_2 is not None and config.text_encoder_2.checkpointing_or_offloading_enabled():
             enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config, config.text_encoder_2)
 
-        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().transformer,
-            config.weight_dtypes().text_encoder,
-            config.weight_dtypes().text_encoder_2,
-            config.weight_dtypes().vae,
-            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-            config.weight_dtypes().embedding if config.train_any_embedding() else None,
-        ], config.enable_autocast_cache)
+        model.autocast_context, model.train_dtype = create_autocast_context(
+            self.train_device, config.train_dtype, config.enable_autocast_cache)
 
         model.transformer_autocast_context, model.transformer_train_dtype = \
             disable_fp16_autocast_context(
                 self.train_device,
                 config.train_dtype,
                 config.fallback_train_dtype,
-                [
-                    config.weight_dtypes().transformer,
-                    config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-                    config.weight_dtypes().embedding if config.train_any_embedding() else None,
-                ],
                 config.enable_autocast_cache,
             )
 
