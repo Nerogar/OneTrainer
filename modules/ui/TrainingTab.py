@@ -475,10 +475,9 @@ class TrainingTab:
 
         if supports_sequence_length:
             # text encoder sequence length
-            components.label(frame, row, 0, "Text Encoder Sequence Length",
+            components.label(frame, 5, 0, "Text Encoder Sequence Length",
                              tooltip="Number of tokens for captions")
-            components.entry(frame, row, 1, self.ui_state, "text_encoder_sequence_length")
-            row += 1
+            components.entry(frame, 5, 1, self.ui_state, "text_encoder_sequence_length")
 
     def __create_text_encoder_n_frame(
             self,
