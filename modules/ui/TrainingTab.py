@@ -12,6 +12,7 @@ from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossScaler import LossScaler
 from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.Optimizer import Optimizer
+from modules.util.enum.PooledOutputHandling import PooledOutputHandling
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.optimizer_util import change_optimizer
 from modules.util.ui import components
@@ -94,6 +95,7 @@ class TrainingTab:
         self.__create_base_frame(column_0, 0)
         self.__create_text_encoder_frame(column_0, 1)
         self.__create_embedding_frame(column_0, 2)
+        self.__create_clip_chunking_frame(column_0, 3)
 
         self.__create_base2_frame(column_1, 0, supports_circular_padding=True)
         self.__create_unet_frame(column_1, 1)
@@ -123,6 +125,7 @@ class TrainingTab:
         self.__create_text_encoder_n_frame(column_0, 1, i=1)
         self.__create_text_encoder_n_frame(column_0, 2, i=2)
         self.__create_embedding_frame(column_0, 3)
+        self.__create_clip_chunking_frame(column_0, 4)
 
         self.__create_base2_frame(column_1, 0, supports_circular_padding=True)
         self.__create_unet_frame(column_1, 1)
@@ -267,6 +270,7 @@ class TrainingTab:
         self.__create_text_encoder_n_frame(column_0, 3, i=3, supports_include=True)
         self.__create_text_encoder_n_frame(column_0, 4, i=4, supports_include=True, supports_layer_skip=False)
         self.__create_embedding_frame(column_0, 5)
+        self.__create_clip_chunking_frame(column_0, 6)
 
         self.__create_base2_frame(column_1, 0, video_training_enabled=True)
         self.__create_transformer_frame(column_1, 1)
@@ -561,6 +565,32 @@ class TrainingTab:
         components.label(frame, 1, 0, "Preserve Embedding Norm",
                          tooltip="Rescales each trained embedding to the median embedding norm")
         components.switch(frame, 1, 1, self.ui_state, "preserve_embedding_norm")
+
+    def __create_clip_chunking_frame(self, master, row):
+        frame = ctk.CTkFrame(master=master, corner_radius=5)
+        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
+
+        # use clip token chunks
+        components.label(frame, 0, 0, "Use Clip Token Chunks",
+                         tooltip="Enables processing long prompts by splitting them into chunks.")
+        components.switch(frame, 0, 1, self.ui_state, "use_clip_token_chunks")
+
+        # clip max chunks
+        components.label(frame, 1, 0, "Clip Max Chunks",
+                         tooltip="The maximum number of chunks to process.")
+        components.entry(frame, 1, 1, self.ui_state, "clip_max_chunks",
+                         extra_validate=check_range(lower=1, message="Max chunks must be at least 1"))
+
+        # clip chunk split on comma
+        components.label(frame, 2, 0, "Split on Comma",
+                         tooltip="If enabled, attempts to split text at commas to avoid splitting words between chunks.")
+        components.switch(frame, 2, 1, self.ui_state, "clip_chunk_split_on_comma")
+
+        # pooled output handling
+        components.label(frame, 3, 0, "Pooled Output Handling",
+                         tooltip="How to combine pooled outputs from multiple chunks.")
+        components.options(frame, 3, 1, [str(x) for x in list(PooledOutputHandling)], self.ui_state, "clip_chunk_pooled_output_handling")
 
     def __create_unet_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
