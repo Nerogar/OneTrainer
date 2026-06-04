@@ -23,6 +23,8 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.WUERSTCHEN_2)
+@factory.register(BaseDataLoader, ModelType.STABLE_CASCADE_1)
 class WuerstchenBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -156,6 +158,3 @@ class WuerstchenBaseDataLoader(
             aspect_bucketing_quantization=128,
             supports_inpainting=False,
         )
-
-factory.register(BaseDataLoader, WuerstchenBaseDataLoader, ModelType.WUERSTCHEN_2)
-factory.register(BaseDataLoader, WuerstchenBaseDataLoader, ModelType.STABLE_CASCADE_1)

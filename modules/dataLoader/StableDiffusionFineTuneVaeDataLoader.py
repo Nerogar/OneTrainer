@@ -39,6 +39,14 @@ from mgds.pipelineModules.VariationSorting import VariationSorting
 import torch
 
 
+@factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE_VAE)
 class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
     def _setup_cache_device(
             self,
@@ -293,12 +301,3 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             train_progress,
             is_validation,
         )
-
-factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseDataLoader, StableDiffusionFineTuneVaeDataLoader, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE_VAE)

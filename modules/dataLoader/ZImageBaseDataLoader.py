@@ -25,6 +25,7 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.Z_IMAGE)
 class ZImageBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -150,5 +151,3 @@ class ZImageBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
         )
-
-factory.register(BaseDataLoader, ZImageBaseDataLoader, ModelType.Z_IMAGE)
