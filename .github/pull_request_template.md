@@ -1,7 +1,6 @@
 <!--
 Thanks for contributing to OneTrainer.
-Please read AGENTS.md (project rules for any AI-assisted work) before opening this PR,
-and docs/Contributing.md / docs/ProjectStructure.md for the wider project guide.
+Please read docs/Contributing.md / docs/ProjectStructure.md for the project guide.
 -->
 
 ## Summary
