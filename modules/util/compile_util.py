@@ -57,5 +57,6 @@ def Mod_patched_eval(cls, p, q):
 
 
 def init_compile():
+    # cache_size_limit and recompile_limit are aliases for the same dynamo config value.
     torch._dynamo.config.cache_size_limit = 8192
     torch.utils._sympy.functions.Mod.eval = Mod_patched_eval
