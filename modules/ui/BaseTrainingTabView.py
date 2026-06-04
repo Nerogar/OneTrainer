@@ -73,7 +73,7 @@ class BaseTrainingTabView(ABC):
         self.__create_unet_frame(column_1, 1, ui_state)
         self.__create_noise_frame(column_1, 2, ui_state, supports_generalized_offset_noise=True)
 
-        if controller.train_config.training_method == TrainingMethod.FINE_TUNE_VAE:
+        if controller.config.training_method == TrainingMethod.FINE_TUNE_VAE:
             self.__create_vae_frame(column_2, 0, ui_state)
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state)
