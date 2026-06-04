@@ -45,7 +45,9 @@ class StableDiffusionXLModelEmbedding:
 class StableDiffusionXLModel(BaseModel):
     # base model data
     tokenizer_1: CLIPTokenizer | None
+    orig_tokenizer_1: CLIPTokenizer | None
     tokenizer_2: CLIPTokenizer | None
+    orig_tokenizer_2: CLIPTokenizer | None
     noise_scheduler: DDIMScheduler | None
     text_encoder_1: CLIPTextModel | None
     text_encoder_2: CLIPTextModelWithProjection | None
@@ -81,7 +83,9 @@ class StableDiffusionXLModel(BaseModel):
         )
 
         self.tokenizer_1 = None
+        self.orig_tokenizer_1 = None
         self.tokenizer_2 = None
+        self.orig_tokenizer_2 = None
         self.noise_scheduler = None
         self.text_encoder_1 = None
         self.text_encoder_2 = None
@@ -166,13 +170,13 @@ class StableDiffusionXLModel(BaseModel):
         self.text_encoder_2.eval()
         self.unet.eval()
 
-    def create_pipeline(self) -> DiffusionPipeline:
+    def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
         return StableDiffusionXLPipeline(
             vae=self.vae,
             text_encoder=self.text_encoder_1,
             text_encoder_2=self.text_encoder_2,
-            tokenizer=self.tokenizer_1,
-            tokenizer_2=self.tokenizer_2,
+            tokenizer=self.orig_tokenizer_1 if use_original_tokenizers else self.tokenizer_1,
+            tokenizer_2=self.orig_tokenizer_2 if use_original_tokenizers else self.tokenizer_2,
             unet=self.unet,
             scheduler=self.noise_scheduler,
         )
