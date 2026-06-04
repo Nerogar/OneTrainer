@@ -42,9 +42,8 @@ class BaseErnieSetup(
             model: ErnieModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_ernie_transformer(model.transformer, config)
+        if config.transformer.checkpointing_or_offloading_enabled():
+            model.transformer_offload_conductor = enable_checkpointing_for_ernie_transformer(model.transformer, config, config.transformer)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
