@@ -11,7 +11,8 @@ debug*.py
 
 # user data
 /workspace*
-/models*
+/models/*
+!/models/.gitkeep
 /training_concepts
 /training_samples
 /training_user_settings
