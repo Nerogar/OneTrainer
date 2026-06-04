@@ -14,6 +14,8 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.WUERSTCHEN_2, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_CASCADE_1, TrainingMethod.LORA)
 class WuerstchenLoRASetup(
     BaseWuerstchenSetup,
 ):
@@ -153,6 +155,3 @@ class WuerstchenLoRASetup(
             self._normalize_output_embeddings(model.all_prior_text_encoder_embeddings())
             model.prior_embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, WuerstchenLoRASetup, ModelType.WUERSTCHEN_2, TrainingMethod.LORA)
-factory.register(BaseModelSetup, WuerstchenLoRASetup, ModelType.STABLE_CASCADE_1, TrainingMethod.LORA)

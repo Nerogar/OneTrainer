@@ -23,6 +23,8 @@ from torchvision.transforms import transforms
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.FLUX_DEV_1)
+@factory.register(BaseModelSampler, ModelType.FLUX_FILL_DEV_1)
 class FluxSampler(BaseModelSampler):
     def __init__(
             self,
@@ -450,6 +452,3 @@ class FluxSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, FluxSampler, ModelType.FLUX_DEV_1)
-factory.register(BaseModelSampler, FluxSampler, ModelType.FLUX_FILL_DEV_1)

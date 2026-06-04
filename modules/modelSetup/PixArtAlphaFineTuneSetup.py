@@ -13,6 +13,8 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.PIXART_ALPHA, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.PIXART_SIGMA, TrainingMethod.FINE_TUNE)
 class PixArtAlphaFineTuneSetup(
     BasePixArtAlphaSetup,
 ):
@@ -119,6 +121,3 @@ class PixArtAlphaFineTuneSetup(
             self._normalize_output_embeddings(model.all_text_encoder_embeddings())
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, PixArtAlphaFineTuneSetup, ModelType.PIXART_ALPHA, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, PixArtAlphaFineTuneSetup, ModelType.PIXART_SIGMA, TrainingMethod.FINE_TUNE)
