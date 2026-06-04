@@ -10,12 +10,14 @@ script_imports()
 
 from modules.ui.PySide6TrainUIView import PySide6TrainView
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
 
 def main():
     app = QApplication(sys.argv)
+    app.styleHints().setColorScheme(Qt.ColorScheme.Light)
 
     palette = app.palette()
     palette.setColor(QPalette.ColorRole.Base, QColor("white"))
