@@ -556,7 +556,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta2": 0.99,
         "cautious_wd": False,
         "weight_decay": 0.0,
-        "clip_threshold": None,
         "nnmf_factor": False,
         "stochastic_rounding": True,
         "compile": False,
