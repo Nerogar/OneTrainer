@@ -3,9 +3,23 @@ import platform
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
-# Single stylesheet using palette() references so it works in both light and dark mode
-# without hardcoding any colors.
-_STYLESHEET = """
+# Light mode keeps the original stylesheet unchanged.
+_LIGHT_STYLESHEET = """
+    QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit {
+        padding: 2px 2px;
+    }
+    QCheckBox::indicator {
+        width: 16px;
+        height: 16px;
+    }
+    QProgressBar {
+        background-color: #c8c8c8;
+    }
+"""
+
+# Dark mode adds tab styling (Qt renders tabs with no contrast on Windows) and uses
+# palette() references so colors follow the system theme.
+_DARK_STYLESHEET = """
     QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit {
         padding: 2px 2px;
     }
@@ -42,10 +56,11 @@ def apply_theme(app: QApplication) -> None:
     if platform.system() != "Windows":
         return
     is_dark = app.palette().color(QPalette.ColorRole.Window).lightness() < 128
-    if not is_dark:
-        # Qt's light palette leaves Base as grey which looks disabled — restore to white.
+    if is_dark:
+        app.setStyleSheet(_DARK_STYLESHEET)
+    else:
         palette = app.palette()
         palette.setColor(QPalette.ColorRole.Base, QColor("white"))
         palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Base, QColor("#e0e0e0"))
         app.setPalette(palette)
-    app.setStyleSheet(_STYLESHEET)
+        app.setStyleSheet(_LIGHT_STYLESHEET)
