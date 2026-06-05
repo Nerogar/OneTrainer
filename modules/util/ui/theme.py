@@ -1,5 +1,6 @@
 import platform
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
@@ -40,14 +41,21 @@ _WINDOWS_OVERRIDES = """
 """
 
 
+def _apply_light_base(app: QApplication) -> None:
+    palette = app.palette()
+    palette.setColor(QPalette.ColorRole.Base, QColor("white"))
+    palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Base, QColor("#e0e0e0"))
+    app.setPalette(palette)
+
+
 def apply_theme(app: QApplication) -> None:
-    stylesheet = _BASE_STYLESHEET
-    if platform.system() == "Windows":
-        is_dark = app.palette().color(QPalette.ColorRole.Window).lightness() < 128
-        if not is_dark:
-            palette = app.palette()
-            palette.setColor(QPalette.ColorRole.Base, QColor("white"))
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Base, QColor("#e0e0e0"))
-            app.setPalette(palette)
-        stylesheet += _WINDOWS_OVERRIDES
-    app.setStyleSheet(stylesheet)
+    if platform.system() != "Windows":
+        app.styleHints().setColorScheme(Qt.ColorScheme.Light)
+        _apply_light_base(app)
+        app.setStyleSheet(_BASE_STYLESHEET)
+        return
+
+    is_dark = app.palette().color(QPalette.ColorRole.Window).lightness() < 128
+    if not is_dark:
+        _apply_light_base(app)
+    app.setStyleSheet(_BASE_STYLESHEET + _WINDOWS_OVERRIDES)
