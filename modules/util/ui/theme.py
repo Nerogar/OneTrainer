@@ -37,10 +37,8 @@ _STYLESHEET = """
 
 
 def apply_theme(app: QApplication) -> None:
-    # On Linux/macOS, Qt already maps the system light/dark preference onto its
-    # palette correctly, so we leave it untouched. Qt's dark mode support on
-    # Windows is incomplete (tabs render with no contrast), so we apply explicit
-    # fixes there only.
+    # Qt's dark mode is broken on Windows (tabs render with no contrast); fix it there
+    # only — Linux/macOS map the system theme onto the palette correctly already.
     if platform.system() != "Windows":
         return
     is_dark = app.palette().color(QPalette.ColorRole.Window).lightness() < 128
