@@ -110,7 +110,7 @@ class TrainOptimizerConfig(BaseConfig):
     use_schedulefree: True
     use_orthograd: False
     nnmf_factor: False
-    orthogonal_gradient: False
+    orthogonal_gradient: str
     use_atan2: False
     beta1_warmup: int
     min_beta1: float
@@ -231,7 +231,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("use_schedulefree", True, bool, True))
         data.append(("use_orthograd", False, bool, False))
         data.append(("nnmf_factor", False, bool, False))
-        data.append(("orthogonal_gradient", False, bool, False))
+        data.append(("orthogonal_gradient", 'disabled', str, False))
         data.append(("use_atan2", False, bool, False))
         data.append(("beta1_warmup", None, int, True))
         data.append(("min_beta1", None, float, True))
