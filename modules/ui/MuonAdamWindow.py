@@ -104,7 +104,7 @@ class MuonAdamWindow(ctk.CTkToplevel):
                 components.entry(master, row, col + 1, self.adam_ui_state, key)
             elif param_type == 'StatePrecision':
                 components.options(master, row, col + 1, ["auto", "factored", "fp32", "bf16_sr", "int8_sr"], self.adam_ui_state, key)
-            elif type == 'OrthoGrad':
+            elif param_type == 'OrthoGrad':
                 components.options(master, row, col + 1, ["disabled", "flattened", "iterative"], self.adam_ui_state, key)
             else:
                 components.switch(master, row, col + 1, self.adam_ui_state, key)
