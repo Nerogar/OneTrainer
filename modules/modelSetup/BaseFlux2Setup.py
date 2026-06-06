@@ -191,7 +191,7 @@ class BaseFlux2Setup(
         ).mean()
 
     def prepare_text_caching(self, model: FluxModel, config: TrainConfig):
-        model.to(self.temp_device)
+        model.release()
         model.text_encoder_to(self.train_device)
         model.eval()
         torch_gc()

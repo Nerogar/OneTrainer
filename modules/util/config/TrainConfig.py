@@ -269,6 +269,7 @@ class TrainModelPartConfig(BaseConfig):
     gradient_checkpointing: bool
     offload_fraction: float
     activation_offloading: bool
+    load_on_demand: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -306,6 +307,7 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("gradient_checkpointing", True, bool, False))
         data.append(("offload_fraction", 0.0, float, False))
         data.append(("activation_offloading", True, bool, False))
+        data.append(("load_on_demand", False, bool, False))
 
         return TrainModelPartConfig(data)
 
@@ -893,6 +895,10 @@ class TrainConfig(BaseConfig):
             include_text_encoder_2=self.text_encoder_2.include,
             include_text_encoder_3=self.text_encoder_3.include,
             include_text_encoder_4=self.text_encoder_4.include,
+            text_encoder_on_demand=self.text_encoder_on_demand(),
+            text_encoder_2_on_demand=self.text_encoder_2_on_demand(),
+            text_encoder_3_on_demand=self.text_encoder_3_on_demand(),
+            text_encoder_4_on_demand=self.text_encoder_4_on_demand(),
         )
 
     def train_any_embedding(self) -> bool:
@@ -926,6 +932,28 @@ class TrainConfig(BaseConfig):
                 and not self.embedding.is_output_embedding) \
             or ((self.text_encoder_4.train_embedding or not self.model_type.has_multiple_text_encoders())
                 and self.train_any_embedding())
+
+    #an encoder is loaded on demand only when it is requested, frozen (not trained, no embedding
+    #training) and its conditioning is cached -- otherwise it is needed resident every step.
+    def text_encoder_on_demand(self) -> bool:
+        return self.text_encoder.load_on_demand \
+            and not self.train_text_encoder_or_embedding() \
+            and self.latent_caching
+
+    def text_encoder_2_on_demand(self) -> bool:
+        return self.text_encoder_2.load_on_demand \
+            and not self.train_text_encoder_2_or_embedding() \
+            and self.latent_caching
+
+    def text_encoder_3_on_demand(self) -> bool:
+        return self.text_encoder_3.load_on_demand \
+            and not self.train_text_encoder_3_or_embedding() \
+            and self.latent_caching
+
+    def text_encoder_4_on_demand(self) -> bool:
+        return self.text_encoder_4.load_on_demand \
+            and not self.train_text_encoder_4_or_embedding() \
+            and self.latent_caching
 
     def all_embedding_configs(self):
         if self.training_method == TrainingMethod.EMBEDDING:

@@ -72,7 +72,7 @@ class WuerstchenBaseDataLoader(
         ]
 
         def before_cache_image_fun():
-            model.to(self.temp_device)
+            model.release()
             model.effnet_encoder_to(self.train_device)
             model.eval()
             torch_gc()
@@ -107,7 +107,7 @@ class WuerstchenBaseDataLoader(
                 output_names.append('pooled_text_encoder_output')
 
         def before_cache_image_fun():
-            model.to(self.temp_device)
+            model.release()
             model.effnet_encoder_to(self.train_device)
             model.eval()
             torch_gc()

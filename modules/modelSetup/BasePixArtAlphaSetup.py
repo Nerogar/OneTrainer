@@ -338,7 +338,7 @@ class BasePixArtAlphaSetup(
         ).mean()
 
     def prepare_text_caching(self, model: PixArtAlphaModel, config: TrainConfig):
-        model.to(self.temp_device)
+        model.release()
 
         if not config.train_text_encoder_or_embedding():
             model.text_encoder_to(self.train_device)

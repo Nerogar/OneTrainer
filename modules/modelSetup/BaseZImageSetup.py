@@ -170,7 +170,7 @@ class BaseZImageSetup(
         ).mean()
 
     def prepare_text_caching(self, model: ZImageModel, config: TrainConfig):
-        model.to(self.temp_device)
+        model.release()
         model.text_encoder_to(self.train_device)
 
         model.eval()

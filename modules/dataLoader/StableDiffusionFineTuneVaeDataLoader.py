@@ -47,7 +47,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             temp_device: torch.device,
             config: TrainConfig,
     ):
-        model.to(self.temp_device)
+        model.release()
 
         model.vae_to(train_device)
 
