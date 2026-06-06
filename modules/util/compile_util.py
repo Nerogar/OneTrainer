@@ -3,9 +3,9 @@ import torch
 from sympy import S
 
 
-#code from https://github.com/pytorch/pytorch/blob/ed82d5fcfd80110565f69130f286c7bfec6db2dc/torch/utils/_sympy/functions.py#L481
-#but accepts negative numbers, to avoid https://github.com/Nerogar/OneTrainer/issues/1126
-#can be removed once https://github.com/pytorch/pytorch/pull/169726 is merged into a torch version we use
+# code from https://github.com/pytorch/pytorch/blob/ed82d5fcfd80110565f69130f286c7bfec6db2dc/torch/utils/_sympy/functions.py#L481
+# but accepts negative numbers, to avoid https://github.com/Nerogar/OneTrainer/issues/1126
+# can be removed once https://github.com/pytorch/pytorch/pull/169726 is merged into a torch version we use
 @classmethod
 def Mod_patched_eval(cls, p, q):
     # This was adapted from: sympy/core/mod.py
@@ -28,7 +28,7 @@ def Mod_patched_eval(cls, p, q):
     # Evaluate if they are both literals.
     if q.is_Number and p.is_Number:
         if p < 0:
-            #raise AssertionError(p)
+            # raise AssertionError(p)
             pass
         if q < 1:
             raise AssertionError(q)

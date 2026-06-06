@@ -18,10 +18,9 @@ from PIL import Image
 
 class ModelSamplerOutput:
     def __init__(
-            self,
-            file_type: FileType,
-            data: Image.Image | torch.Tensor | bytes,
-
+        self,
+        file_type: FileType,
+        data: Image.Image | torch.Tensor | bytes,
     ):
         self.file_type = file_type
         if isinstance(data, bytes):
@@ -30,16 +29,16 @@ class ModelSamplerOutput:
         else:
             self.data = data
 
-    #Reduce to a JPEG bytestream for cloud training:
+    # Reduce to a JPEG bytestream for cloud training:
     def __reduce__(self):
         match self.file_type:
             case FileType.IMAGE:
                 b = io.BytesIO()
-                self.data.save(b, format='JPEG')
+                self.data.save(b, format="JPEG")
                 return ModelSamplerOutput, (self.file_type, b.getvalue())
             case FileType.VIDEO:
-                #do not transfer videos; they are not shown anyway
-                #the video sample file is transferred via workspace sync
+                # do not transfer videos; they are not shown anyway
+                # the video sample file is transferred via workspace sync
                 return ModelSamplerOutput, (self.file_type, None)
             case FileType.AUDIO:
                 # TODO
@@ -49,11 +48,10 @@ class ModelSamplerOutput:
 
 
 class BaseModelSampler(metaclass=ABCMeta):
-
     def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
+        self,
+        train_device: torch.device,
+        temp_device: torch.device,
     ):
         super().__init__()
 
@@ -62,14 +60,14 @@ class BaseModelSampler(metaclass=ABCMeta):
 
     @abstractmethod
     def sample(
-            self,
-            sample_config: SampleConfig,
-            destination: str,
-            image_format: ImageFormat,
-            video_format: VideoFormat,
-            audio_format: AudioFormat,
-            on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
-            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+        self,
+        sample_config: SampleConfig,
+        destination: str,
+        image_format: ImageFormat,
+        video_format: VideoFormat,
+        audio_format: AudioFormat,
+        on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
+        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         pass
 
@@ -79,12 +77,12 @@ class BaseModelSampler(metaclass=ABCMeta):
 
     @staticmethod
     def save_sampler_output(
-            sampler_output: ModelSamplerOutput,
-            destination: str,
-            image_format: ImageFormat | None,
-            video_format: VideoFormat | None,
-            audio_format: AudioFormat | None,
-            fps: int = 24,
+        sampler_output: ModelSamplerOutput,
+        destination: str,
+        image_format: ImageFormat | None,
+        video_format: VideoFormat | None,
+        audio_format: AudioFormat | None,
+        fps: int = 24,
     ):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
 
@@ -105,27 +103,25 @@ class BaseModelSampler(metaclass=ABCMeta):
                     # (T, H, W, C) if last dim is channels, otherwise assume (C, T, H, W)
                     frames = video_tensor.numpy() if shape[-1] == 3 else video_tensor.permute(1, 2, 3, 0).numpy()
 
-                    frames = (
-                        (frames * 255).astype('uint8')
-                        if frames.max() <= 1.0
-                        else frames.astype('uint8')
-                    )
+                    frames = (frames * 255).astype("uint8") if frames.max() <= 1.0 else frames.astype("uint8")
 
-                    with av.open(destination + video_format.extension(), 'w') as container:
-                        stream = container.add_stream('libx264', rate=fps)
-                        stream.options = {'crf': '17'}
+                    with av.open(destination + video_format.extension(), "w") as container:
+                        stream = container.add_stream("libx264", rate=fps)
+                        stream.options = {"crf": "17"}
                         stream.width = frames.shape[2]
                         stream.height = frames.shape[1]
-                        stream.pix_fmt = 'yuv420p'  # Required pixel format for H.264
+                        stream.pix_fmt = "yuv420p"  # Required pixel format for H.264
 
                         for frame_data in frames:
-                            frame = av.VideoFrame.from_ndarray(frame_data, format='rgb24')
+                            frame = av.VideoFrame.from_ndarray(frame_data, format="rgb24")
                             for packet in stream.encode(frame):
                                 container.mux(packet)
 
                         for packet in stream.encode():
                             container.mux(packet)
                 else:
-                    raise ValueError(f"Expected 4D video tensor (T, H, W, C) or (C, T, H, W), got shape {video_tensor.shape}")
+                    raise ValueError(
+                        f"Expected 4D video tensor (T, H, W, C) or (C, T, H, W), got shape {video_tensor.shape}"
+                    )
         elif sampler_output.file_type == FileType.AUDIO:
-            pass # TODO
+            pass  # TODO

@@ -6,9 +6,7 @@ from modules.util.convert.lora.convert_stable_cascade_lora import convert_stable
 from modules.util.ModelNames import ModelNames
 
 
-class WuerstchenLoRALoader(
-    LoRALoaderMixin
-):
+class WuerstchenLoRALoader(LoRALoaderMixin):
     def __init__(self):
         super().__init__()
 
@@ -18,8 +16,8 @@ class WuerstchenLoRALoader(
         return None
 
     def load(
-            self,
-            model: WuerstchenModel,
-            model_names: ModelNames,
+        self,
+        model: WuerstchenModel,
+        model_names: ModelNames,
     ):
         return self._load(model, model_names)

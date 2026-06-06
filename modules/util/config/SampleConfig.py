@@ -23,111 +23,139 @@ def _get_model_defaults(model_type) -> dict:
         return defaults
 
     if model_type.is_sd_v1():
-        defaults.update({
-            "width": 512,
-            "height": 512,
-            "diffusion_steps": 30,
-            "cfg_scale": 7.5,
-            "noise_scheduler": NoiseScheduler.EULER_A,
-        })
+        defaults.update(
+            {
+                "width": 512,
+                "height": 512,
+                "diffusion_steps": 30,
+                "cfg_scale": 7.5,
+                "noise_scheduler": NoiseScheduler.EULER_A,
+            }
+        )
     elif model_type.is_sd_v2():
-        defaults.update({
-            "width": 768,
-            "height": 768,
-            "diffusion_steps": 30,
-            "cfg_scale": 7.5,
-            "noise_scheduler": NoiseScheduler.DDIM,
-        })
+        defaults.update(
+            {
+                "width": 768,
+                "height": 768,
+                "diffusion_steps": 30,
+                "cfg_scale": 7.5,
+                "noise_scheduler": NoiseScheduler.DDIM,
+            }
+        )
     elif model_type.is_stable_diffusion_xl():
-        defaults.update({
-            "width": 1024,
-            "height": 1024,
-            "diffusion_steps": 30,
-            "cfg_scale": 7.5,
-            "noise_scheduler": NoiseScheduler.EULER_A,
-        })
+        defaults.update(
+            {
+                "width": 1024,
+                "height": 1024,
+                "diffusion_steps": 30,
+                "cfg_scale": 7.5,
+                "noise_scheduler": NoiseScheduler.EULER_A,
+            }
+        )
     elif model_type.is_stable_diffusion_3():
-        defaults.update({
-            "width": 1024,
-            "height": 1024,
-            "diffusion_steps": 28,
-            "cfg_scale": 7.0,
-        })
+        defaults.update(
+            {
+                "width": 1024,
+                "height": 1024,
+                "diffusion_steps": 28,
+                "cfg_scale": 7.0,
+            }
+        )
     elif model_type.is_flux_1():
-        defaults.update({
-            "width": 1024,
-            "height": 1024,
-            "diffusion_steps": 30,
-            "cfg_scale": 3.5,
-        })
+        defaults.update(
+            {
+                "width": 1024,
+                "height": 1024,
+                "diffusion_steps": 30,
+                "cfg_scale": 3.5,
+            }
+        )
     elif model_type.is_chroma():
-        defaults.update({
-            "width": 1024,
-            "height": 1024,
-            "diffusion_steps": 30,
-            "cfg_scale": 3.5,
-            "negative_prompt": (
-                "This low-quality, greyscale, unfinished sketch is inaccurate and flawed. "
-                "The image is very blurred and lacks detail, with excessive chromatic "
-                "aberrations and artifacts. The image is overly saturated with excessive bloom."
-            ),
-        })
+        defaults.update(
+            {
+                "width": 1024,
+                "height": 1024,
+                "diffusion_steps": 30,
+                "cfg_scale": 3.5,
+                "negative_prompt": (
+                    "This low-quality, greyscale, unfinished sketch is inaccurate and flawed. "
+                    "The image is very blurred and lacks detail, with excessive chromatic "
+                    "aberrations and artifacts. The image is overly saturated with excessive bloom."
+                ),
+            }
+        )
     elif model_type.is_flux_2():
-        defaults.update({
-            "width": 1024,
-            "height": 1024,
-            "diffusion_steps": 30,
-            "cfg_scale": 4.0,
-        })
+        defaults.update(
+            {
+                "width": 1024,
+                "height": 1024,
+                "diffusion_steps": 30,
+                "cfg_scale": 4.0,
+            }
+        )
     elif model_type.is_qwen():
-        defaults.update({
-            "width": 1024,
-            "height": 1024,
-            "diffusion_steps": 25,
-            "cfg_scale": 3.5,
-        })
+        defaults.update(
+            {
+                "width": 1024,
+                "height": 1024,
+                "diffusion_steps": 25,
+                "cfg_scale": 3.5,
+            }
+        )
     elif model_type.is_z_image():
-        defaults.update({
-            "width": 1024,
-            "height": 1024,
-            "diffusion_steps": 28,
-            "cfg_scale": 4.0,
-        })
+        defaults.update(
+            {
+                "width": 1024,
+                "height": 1024,
+                "diffusion_steps": 28,
+                "cfg_scale": 4.0,
+            }
+        )
     elif model_type.is_hunyuan_video():
-        defaults.update({
-            "width": 848,
-            "height": 480,
-            "diffusion_steps": 30,
-            "cfg_scale": 6.0,
-        })
+        defaults.update(
+            {
+                "width": 848,
+                "height": 480,
+                "diffusion_steps": 30,
+                "cfg_scale": 6.0,
+            }
+        )
     elif model_type.is_sana():
-        defaults.update({
-            "width": 1024,
-            "height": 1024,
-            "diffusion_steps": 20,
-            "cfg_scale": 4.5,
-        })
+        defaults.update(
+            {
+                "width": 1024,
+                "height": 1024,
+                "diffusion_steps": 20,
+                "cfg_scale": 4.5,
+            }
+        )
     elif model_type.is_hi_dream():
-        defaults.update({
-            "width": 1024,
-            "height": 1024,
-            "diffusion_steps": 28,
-            "cfg_scale": 5.0,
-        })
+        defaults.update(
+            {
+                "width": 1024,
+                "height": 1024,
+                "diffusion_steps": 28,
+                "cfg_scale": 5.0,
+            }
+        )
     elif model_type.is_pixart():
-        defaults.update({
-            "width": 1024,
-            "height": 1024,
-            "diffusion_steps": 25,
-            "cfg_scale": 4.5,
-        })
+        defaults.update(
+            {
+                "width": 1024,
+                "height": 1024,
+                "diffusion_steps": 25,
+                "cfg_scale": 4.5,
+            }
+        )
     elif model_type.is_wuerstchen():
-        defaults.update({
-            "width": 1024,
-            "height": 1024,
-            "diffusion_steps": 25,
-            "cfg_scale": 4.0,
-        })
+        defaults.update(
+            {
+                "width": 1024,
+                "height": 1024,
+                "diffusion_steps": 25,
+                "cfg_scale": 4.0,
+            }
+        )
 
     return defaults
 

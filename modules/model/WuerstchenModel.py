@@ -22,11 +22,11 @@ from transformers import CLIPTextModel, CLIPTokenizer
 class WuerstchenEfficientNetEncoder(ModelMixin, ConfigMixin):
     @register_to_config
     def __init__(
-            self,
-            c_latent: int = 16,
-            c_cond: int = 1280,
-            effnet: str = "efficientnet_v2_s",
-            affine_batch_norm: bool = True,
+        self,
+        c_latent: int = 16,
+        c_cond: int = 1280,
+        effnet: str = "efficientnet_v2_s",
+        affine_batch_norm: bool = True,
     ):
         super().__init__()
 
@@ -46,11 +46,11 @@ class WuerstchenEfficientNetEncoder(ModelMixin, ConfigMixin):
 
 class WuerstchenModelEmbedding:
     def __init__(
-            self,
-            uuid: str,
-            prior_text_encoder_vector: Tensor | None,
-            placeholder: str,
-            is_output_embedding: bool,
+        self,
+        uuid: str,
+        prior_text_encoder_vector: Tensor | None,
+        placeholder: str,
+        is_output_embedding: bool,
     ):
         self.prior_text_encoder_embedding = BaseModelEmbedding(
             uuid=uuid,
@@ -91,8 +91,8 @@ class WuerstchenModel(BaseModel):
     lora_state_dict: dict | None
 
     def __init__(
-            self,
-            model_type: ModelType,
+        self,
+        model_type: ModelType,
     ):
         super().__init__(
             model_type=model_type,
@@ -124,18 +124,22 @@ class WuerstchenModel(BaseModel):
         self.lora_state_dict = None
 
     def adapters(self) -> list[LoRAModuleWrapper]:
-        return [a for a in [
-            self.prior_text_encoder_lora,
-            self.prior_prior_lora,
-        ] if a is not None]
+        return [
+            a
+            for a in [
+                self.prior_text_encoder_lora,
+                self.prior_prior_lora,
+            ]
+            if a is not None
+        ]
 
     def all_embeddings(self) -> list[WuerstchenModelEmbedding]:
-        return self.additional_embeddings \
-               + ([self.embedding] if self.embedding is not None else [])
+        return self.additional_embeddings + ([self.embedding] if self.embedding is not None else [])
 
     def all_prior_text_encoder_embeddings(self) -> list[BaseModelEmbedding]:
-        return [embedding.text_encoder_embedding for embedding in self.additional_embeddings] \
-               + ([self.embedding.prior_text_encoder_embedding] if self.embedding is not None else [])
+        return [embedding.text_encoder_embedding for embedding in self.additional_embeddings] + (
+            [self.embedding.prior_text_encoder_embedding] if self.embedding is not None else []
+        )
 
     def decoder_text_encoder_to(self, device: torch.device):
         self.decoder_text_encoder.to(device=device)
@@ -210,22 +214,22 @@ class WuerstchenModel(BaseModel):
         return self._add_embeddings_to_prompt(self.all_prior_text_encoder_embeddings(), prompt)
 
     def encode_text(
-            self,
-            train_device: torch.device,
-            batch_size: int = 1,
-            rand: Random | None = None,
-            text: str = None,
-            tokens: Tensor = None,
-            tokens_mask: Tensor = None,
-            text_encoder_layer_skip: int = 0,
-            text_encoder_dropout_probability: float | None = None,
-            text_encoder_output: Tensor | None = None,
-            pooled_text_encoder_output: Tensor | None = None,
+        self,
+        train_device: torch.device,
+        batch_size: int = 1,
+        rand: Random | None = None,
+        text: str = None,
+        tokens: Tensor = None,
+        tokens_mask: Tensor = None,
+        text_encoder_layer_skip: int = 0,
+        text_encoder_dropout_probability: float | None = None,
+        text_encoder_output: Tensor | None = None,
+        pooled_text_encoder_output: Tensor | None = None,
     ) -> tuple[Tensor, Tensor]:
         if tokens is None and text is not None:
             tokenizer_output = self.prior_tokenizer(
                 self.add_prior_text_encoder_embeddings_to_prompt(text),
-                padding='max_length',
+                padding="max_length",
                 truncation=True,
                 max_length=77,
                 return_tensors="pt",
@@ -262,9 +266,11 @@ class WuerstchenModel(BaseModel):
 
         # apply dropout
         if text_encoder_dropout_probability is not None:
-            dropout_text_encoder_mask = (torch.tensor(
-                [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)],
-                device=train_device)).float()
+            dropout_text_encoder_mask = (
+                torch.tensor(
+                    [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)], device=train_device
+                )
+            ).float()
 
             if self.model_type.is_wuerstchen_v2():
                 text_encoder_output = text_encoder_output * dropout_text_encoder_mask[:, None, None]

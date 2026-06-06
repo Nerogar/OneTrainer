@@ -31,13 +31,14 @@ from PIL import Image
 
 class SampleWindow(ctk.CTkToplevel):
     def __init__(
-            self,
-            parent,
-            train_config: TrainConfig,
-            use_external_model: bool,
-            callbacks: TrainCallbacks | None = None,
-            commands: TrainCommands | None = None,
-            *args, **kwargs
+        self,
+        parent,
+        train_config: TrainConfig,
+        use_external_model: bool,
+        callbacks: TrainCallbacks | None = None,
+        commands: TrainCommands | None = None,
+        *args,
+        **kwargs,
     ):
         super().__init__(parent, *args, **kwargs)
 
@@ -53,8 +54,8 @@ class SampleWindow(ctk.CTkToplevel):
         else:
             self.initial_train_config = None
 
-        #TODO why is there a current_train_config and an initial_train_config?
-        #current_train_config doesn't seem to ever change
+        # TODO why is there a current_train_config and an initial_train_config?
+        # current_train_config doesn't seem to ever change
         self.current_train_config = train_config
         self.callbacks = callbacks
         self.commands = commands
@@ -85,10 +86,7 @@ class SampleWindow(ctk.CTkToplevel):
         settings_frame.grid(row=1, column=0, padx=0, pady=0, sticky="nsew")
 
         # image
-        self.image = ctk.CTkImage(
-            light_image=self.__dummy_image(),
-            size=(512, 512)
-        )
+        self.image = ctk.CTkImage(light_image=self.__dummy_image(), size=(512, 512))
 
         image_label = ctk.CTkLabel(master=self, text="", image=self.image, height=512, width=512)
         image_label.grid(row=1, column=1, rowspan=3, sticky="nsew")
@@ -193,8 +191,7 @@ class SampleWindow(ctk.CTkToplevel):
 
             progress = self.model.train_progress
             sample_path = os.path.join(
-                sample_dir,
-                f"{get_string_timestamp()}-training-sample-{progress.filename_string()}"
+                sample_dir, f"{get_string_timestamp()}-training-sample-{progress.filename_string()}"
             )
 
             self.model.eval()
@@ -215,7 +212,7 @@ class SampleWindow(ctk.CTkToplevel):
                 del self._icon_image_ref
 
             # Remove any pending after callbacks
-            for after_id in self.tk.call('after', 'info'):
+            for after_id in self.tk.call("after", "info"):
                 with contextlib.suppress(tk.TclError, RuntimeError):
                     self.after_cancel(after_id)
 

@@ -24,6 +24,7 @@ DEFAULT_PROMPT_TEMPLATE = "<|im_start|>system\nDescribe the image by detailing t
 DEFAULT_PROMPT_TEMPLATE_CROP_START = 34
 PROMPT_MAX_LENGTH = 512
 
+
 class QwenModel(BaseModel):
     # base model data
     tokenizer: Qwen2Tokenizer | None
@@ -46,8 +47,8 @@ class QwenModel(BaseModel):
     lora_state_dict: dict | None
 
     def __init__(
-            self,
-            model_type: ModelType,
+        self,
+        model_type: ModelType,
     ):
         super().__init__(
             model_type=model_type,
@@ -71,18 +72,24 @@ class QwenModel(BaseModel):
         self.lora_state_dict = None
 
     def adapters(self) -> list[LoRAModuleWrapper]:
-        return [a for a in [
-            self.text_encoder_lora,
-            self.transformer_lora,
-        ] if a is not None]
+        return [
+            a
+            for a in [
+                self.text_encoder_lora,
+                self.transformer_lora,
+            ]
+            if a is not None
+        ]
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
 
-    def text_encoder_to(self, device: torch.device): #TODO share more code between models
+    def text_encoder_to(self, device: torch.device):  # TODO share more code between models
         if self.text_encoder is not None:
-            if self.text_encoder_offload_conductor is not None and \
-                    self.text_encoder_offload_conductor.layer_offload_activated():
+            if (
+                self.text_encoder_offload_conductor is not None
+                and self.text_encoder_offload_conductor.layer_offload_activated()
+            ):
                 self.text_encoder_offload_conductor.to(device)
             else:
                 self.text_encoder.to(device=device)
@@ -91,8 +98,10 @@ class QwenModel(BaseModel):
             self.text_encoder_lora.to(device)
 
     def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None and \
-                self.transformer_offload_conductor.layer_offload_activated():
+        if (
+            self.transformer_offload_conductor is not None
+            and self.transformer_offload_conductor.layer_offload_activated()
+        ):
             self.transformer_offload_conductor.to(device)
         else:
             self.transformer.to(device=device)
@@ -121,16 +130,16 @@ class QwenModel(BaseModel):
         )
 
     def encode_text(
-            self,
-            train_device: torch.device,
-            batch_size: int = 1,
-            rand: Random | None = None,
-            text: str | list[str] = None,
-            tokens: Tensor = None,
-            tokens_mask: Tensor = None,
-            text_encoder_layer_skip: int = 0,
-            text_encoder_dropout_probability: float | None = None,
-            text_encoder_output: Tensor = None,
+        self,
+        train_device: torch.device,
+        batch_size: int = 1,
+        rand: Random | None = None,
+        text: str | list[str] = None,
+        tokens: Tensor = None,
+        tokens_mask: Tensor = None,
+        text_encoder_layer_skip: int = 0,
+        text_encoder_dropout_probability: float | None = None,
+        text_encoder_output: Tensor = None,
     ) -> tuple[Tensor, Tensor]:
         if tokens is None and text is not None:
             if isinstance(text, str):
@@ -140,9 +149,9 @@ class QwenModel(BaseModel):
             tokenizer_output = self.tokenizer(
                 text,
                 max_length=PROMPT_MAX_LENGTH + DEFAULT_PROMPT_TEMPLATE_CROP_START,
-                padding='max_length',
+                padding="max_length",
                 truncation=True,
-                return_tensors="pt"
+                return_tensors="pt",
             )
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
             tokens_mask = tokenizer_output.attention_mask.to(self.text_encoder.device)
@@ -158,27 +167,29 @@ class QwenModel(BaseModel):
                 text_encoder_output = text_encoder_output.hidden_states[-1]
                 tokens_mask = tokens_mask[:, DEFAULT_PROMPT_TEMPLATE_CROP_START:]
 
-                #TODO diffusers splits the prompts and stacks them again. Why?
-                #https://github.com/huggingface/diffusers/blob/fc337d585309c4b032e8d0180bea683007219df1/src/diffusers/pipelines/qwenimage/pipeline_qwenimage.py#L211
-                #https://github.com/huggingface/diffusers/issues/12295
+                # TODO diffusers splits the prompts and stacks them again. Why?
+                # https://github.com/huggingface/diffusers/blob/fc337d585309c4b032e8d0180bea683007219df1/src/diffusers/pipelines/qwenimage/pipeline_qwenimage.py#L211
+                # https://github.com/huggingface/diffusers/issues/12295
 
-                #set masked state to 0 should not make a difference, but this seems to be the only effect of the diffusers code links above
-                text_encoder_output = text_encoder_output[:, DEFAULT_PROMPT_TEMPLATE_CROP_START:,:] * tokens_mask.unsqueeze(-1)
+                # set masked state to 0 should not make a difference, but this seems to be the only effect of the diffusers code links above
+                text_encoder_output = text_encoder_output[
+                    :, DEFAULT_PROMPT_TEMPLATE_CROP_START:, :
+                ] * tokens_mask.unsqueeze(-1)
 
         if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
-            raise NotImplementedError #https://github.com/Nerogar/OneTrainer/issues/957
+            raise NotImplementedError  # https://github.com/Nerogar/OneTrainer/issues/957
 
-        #prune tokens that are masked in all batch samples:
-        #this is good for efficiency, but also FIXME currently required by the diffusers pipeline:
-        #https://github.com/huggingface/diffusers/issues/12344
+        # prune tokens that are masked in all batch samples:
+        # this is good for efficiency, but also FIXME currently required by the diffusers pipeline:
+        # https://github.com/huggingface/diffusers/issues/12344
         seq_lengths = tokens_mask.sum(dim=1)
         max_seq_length = seq_lengths.max().item()
 
-        #pad to 16 because attention processors and/or torch.compile can have issues with uneven sequence lengths, but only pad if an attention mask has to be used anyway:
-        #TODO the second condition could trigger https://github.com/pytorch/pytorch/issues/165506 again, but try like this because no attention mask
-        #is preferable: https://github.com/Nerogar/OneTrainer/pull/1109
+        # pad to 16 because attention processors and/or torch.compile can have issues with uneven sequence lengths, but only pad if an attention mask has to be used anyway:
+        # TODO the second condition could trigger https://github.com/pytorch/pytorch/issues/165506 again, but try like this because no attention mask
+        # is preferable: https://github.com/Nerogar/OneTrainer/pull/1109
         if max_seq_length % 16 > 0 and (seq_lengths != max_seq_length).any():
-            max_seq_length += (16 - max_seq_length % 16)
+            max_seq_length += 16 - max_seq_length % 16
 
         text_encoder_output = text_encoder_output[:, :max_seq_length, :]
         bool_attention_mask = tokens_mask[:, :max_seq_length].bool()
@@ -211,13 +222,21 @@ class QwenModel(BaseModel):
         return latents
 
     def scale_latents(self, latents: Tensor) -> Tensor:
-        latents_mean = torch.tensor(self.vae.config.latents_mean, device=latents.device, dtype=latents.dtype).view(1, self.vae.config.z_dim, 1, 1, 1)
-        latents_std = 1.0 / torch.tensor(self.vae.config.latents_std, device=latents.device, dtype=latents.dtype).view(1, self.vae.config.z_dim, 1, 1, 1)
+        latents_mean = torch.tensor(self.vae.config.latents_mean, device=latents.device, dtype=latents.dtype).view(
+            1, self.vae.config.z_dim, 1, 1, 1
+        )
+        latents_std = 1.0 / torch.tensor(self.vae.config.latents_std, device=latents.device, dtype=latents.dtype).view(
+            1, self.vae.config.z_dim, 1, 1, 1
+        )
         return (latents - latents_mean) * latents_std
 
     def unscale_latents(self, latents: Tensor) -> Tensor:
-        latents_mean = torch.tensor(self.vae.config.latents_mean, device=latents.device, dtype=latents.dtype).view(1, self.vae.config.z_dim, 1, 1, 1)
-        latents_std = 1.0 / torch.tensor(self.vae.config.latents_std, device=latents.device, dtype=latents.dtype).view(1, self.vae.config.z_dim, 1, 1, 1)
+        latents_mean = torch.tensor(self.vae.config.latents_mean, device=latents.device, dtype=latents.dtype).view(
+            1, self.vae.config.z_dim, 1, 1, 1
+        )
+        latents_std = 1.0 / torch.tensor(self.vae.config.latents_std, device=latents.device, dtype=latents.dtype).view(
+            1, self.vae.config.z_dim, 1, 1, 1
+        )
         return latents / latents_std + latents_mean
 
     def calculate_timestep_shift(self, latent_width: int, latent_height: int):

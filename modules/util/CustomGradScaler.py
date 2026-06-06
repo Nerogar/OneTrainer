@@ -4,9 +4,7 @@ from torch.amp.grad_scaler import GradScaler, OptState
 
 class DummyOptimizer:
     def __init__(self, parameter):
-        self.param_groups = [
-            {"params": [parameter]}
-        ]
+        self.param_groups = [{"params": [parameter]}]
 
 
 class CustomGradScaler(GradScaler):
@@ -22,9 +20,7 @@ class CustomGradScaler(GradScaler):
         optimizer_state = self._per_optimizer_states[id(optimizer)]
 
         if optimizer_state["stage"] is OptState.UNSCALED:
-            raise RuntimeError(
-                "unscale_() has already been called on this optimizer since the last update()."
-            )
+            raise RuntimeError("unscale_() has already been called on this optimizer since the last update().")
         if optimizer_state["stage"] is OptState.STEPPED:
             raise RuntimeError("unscale_() is being called after step().")
 
@@ -50,15 +46,11 @@ class CustomGradScaler(GradScaler):
         self._check_scale_growth_tracker("step")
 
         if optimizer_state["stage"] is OptState.STEPPED:
-            raise RuntimeError(
-                "step() has already been called since the last update()."
-            )
+            raise RuntimeError("step() has already been called since the last update().")
 
         if optimizer_state["stage"] is OptState.READY:
             self.unscale_(optimizer)
 
-        assert (
-                len(optimizer_state["found_inf_per_device"]) > 0
-        ), "No inf checks were recorded for this optimizer."
+        assert len(optimizer_state["found_inf_per_device"]) > 0, "No inf checks were recorded for this optimizer."
 
         optimizer_state["stage"] = OptState.STEPPED

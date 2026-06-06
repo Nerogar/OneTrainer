@@ -23,8 +23,8 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
         super().__init__()
 
     def _remove_added_embeddings_from_tokenizer(
-            self,
-            tokenizer: PreTrainedTokenizer,
+        self,
+        tokenizer: PreTrainedTokenizer,
     ):
         if tokenizer:
             added_tokens = list(filter(lambda item: not item[1].special, tokenizer._added_tokens_decoder.items()))
@@ -35,12 +35,12 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
             tokenizer._update_trie()
 
     def _create_new_embedding(
-            self,
-            model: BaseModel,
-            embedding_config: TrainEmbeddingConfig,
-            tokenizer: PreTrainedTokenizer | None,
-            text_encoder: CLIPTextModel | CLIPTextModelWithProjection | T5EncoderModel | Gemma2Model | LlamaModel | None,
-            create_output_embedding_fn: Callable[[str], Tensor] | None = None,
+        self,
+        model: BaseModel,
+        embedding_config: TrainEmbeddingConfig,
+        tokenizer: PreTrainedTokenizer | None,
+        text_encoder: CLIPTextModel | CLIPTextModelWithProjection | T5EncoderModel | Gemma2Model | LlamaModel | None,
+        create_output_embedding_fn: Callable[[str], Tensor] | None = None,
     ) -> Tensor | None:
         if tokenizer is None or text_encoder is None:
             return None
@@ -48,14 +48,14 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
         with torch.no_grad():
             initial_token_ids = tokenizer(
                 embedding_config.initial_embedding_text,
-                padding='do_not_pad',
+                padding="do_not_pad",
                 truncation=embedding_config.token_count is not None,
                 add_special_tokens=False,
                 max_length=embedding_config.token_count,
             ).input_ids
             pad_token_id = tokenizer(
-                '*',
-                padding='do_not_pad',
+                "*",
+                padding="do_not_pad",
                 truncation=True,
                 add_special_tokens=False,
                 max_length=1,
@@ -73,34 +73,36 @@ class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
 
                 with model.autocast_context:
                     vector = create_output_embedding_fn(
-                        embedding_config.initial_embedding_text + token_count * '*',
+                        embedding_config.initial_embedding_text + token_count * "*",
                     )[:token_count]
 
         return vector
 
     def _add_embeddings_to_tokenizer(
-            self,
-            tokenizer: PreTrainedTokenizer,
-            embeddings: list[BaseModelEmbedding],
+        self,
+        tokenizer: PreTrainedTokenizer,
+        embeddings: list[BaseModelEmbedding],
     ) -> (Tensor, list[bool]):
         for embedding in embeddings:
             tokenizer.add_tokens(embedding.text_tokens)
 
     def _add_embedding_param_groups(
-            self,
-            embeddings: list[BaseModelEmbedding],
-            parameter_group_collection: NamedParameterGroupCollection,
-            embedding_learning_rate: float,
-            prefix: str,
+        self,
+        embeddings: list[BaseModelEmbedding],
+        parameter_group_collection: NamedParameterGroupCollection,
+        embedding_learning_rate: float,
+        prefix: str,
     ):
         for embedding in embeddings:
             parameter = embedding.output_vector if embedding.is_output_embedding else embedding.vector
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name=f"{prefix}/{embedding.uuid}",
-                display_name=f"{prefix}/{embedding.placeholder}",
-                parameters=[parameter],
-                learning_rate=embedding_learning_rate,
-            ))
+            parameter_group_collection.add_group(
+                NamedParameterGroup(
+                    unique_name=f"{prefix}/{embedding.uuid}",
+                    display_name=f"{prefix}/{embedding.placeholder}",
+                    parameters=[parameter],
+                    learning_rate=embedding_learning_rate,
+                )
+            )
 
     def _normalize_output_embeddings(self, embeddings: list[BaseModelEmbedding]):
         with torch.no_grad():

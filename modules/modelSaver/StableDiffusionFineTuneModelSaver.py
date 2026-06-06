@@ -19,12 +19,12 @@ class StableDiffusionFineTuneModelSaver(
         super().__init__()
 
     def save(
-            self,
-            model: StableDiffusionModel,
-            model_type: ModelType,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
+        self,
+        model: StableDiffusionModel,
+        model_type: ModelType,
+        output_model_format: ModelFormat,
+        output_model_destination: str,
+        dtype: torch.dtype | None,
     ):
         base_model_saver = StableDiffusionModelSaver()
         embedding_model_saver = StableDiffusionEmbeddingSaver()
@@ -36,8 +36,16 @@ class StableDiffusionFineTuneModelSaver(
             self._save_internal_data(model, output_model_destination)
 
 
-model_types = [ModelType.STABLE_DIFFUSION_15, ModelType.STABLE_DIFFUSION_15_INPAINTING, ModelType.STABLE_DIFFUSION_20, ModelType.STABLE_DIFFUSION_20_BASE,
-              ModelType.STABLE_DIFFUSION_20_INPAINTING, ModelType.STABLE_DIFFUSION_20_DEPTH, ModelType.STABLE_DIFFUSION_21, ModelType.STABLE_DIFFUSION_21_BASE]
+model_types = [
+    ModelType.STABLE_DIFFUSION_15,
+    ModelType.STABLE_DIFFUSION_15_INPAINTING,
+    ModelType.STABLE_DIFFUSION_20,
+    ModelType.STABLE_DIFFUSION_20_BASE,
+    ModelType.STABLE_DIFFUSION_20_INPAINTING,
+    ModelType.STABLE_DIFFUSION_20_DEPTH,
+    ModelType.STABLE_DIFFUSION_21,
+    ModelType.STABLE_DIFFUSION_21_BASE,
+]
 
 for model_type in model_types:
     factory.register(BaseModelSaver, StableDiffusionFineTuneModelSaver, model_type, TrainingMethod.FINE_TUNE)

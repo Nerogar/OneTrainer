@@ -26,12 +26,12 @@ from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokeniz
 
 class FluxModelEmbedding:
     def __init__(
-            self,
-            uuid: str,
-            text_encoder_1_vector: Tensor | None,
-            text_encoder_2_vector: Tensor | None,
-            placeholder: str,
-            is_output_embedding: bool,
+        self,
+        uuid: str,
+        text_encoder_1_vector: Tensor | None,
+        text_encoder_2_vector: Tensor | None,
+        placeholder: str,
+        is_output_embedding: bool,
     ):
         self.text_encoder_1_embedding = BaseModelEmbedding(
             uuid=uuid,
@@ -46,6 +46,7 @@ class FluxModelEmbedding:
             vector=text_encoder_2_vector,
             is_output_embedding=is_output_embedding,
         )
+
 
 class FluxModel(BaseModel):
     # base model data
@@ -78,8 +79,8 @@ class FluxModel(BaseModel):
     lora_state_dict: dict | None
 
     def __init__(
-            self,
-            model_type: ModelType,
+        self,
+        model_type: ModelType,
     ):
         super().__init__(
             model_type=model_type,
@@ -111,23 +112,28 @@ class FluxModel(BaseModel):
         self.lora_state_dict = None
 
     def adapters(self) -> list[LoRAModuleWrapper]:
-        return [a for a in [
-            self.text_encoder_1_lora,
-            self.text_encoder_2_lora,
-            self.transformer_lora,
-        ] if a is not None]
+        return [
+            a
+            for a in [
+                self.text_encoder_1_lora,
+                self.text_encoder_2_lora,
+                self.transformer_lora,
+            ]
+            if a is not None
+        ]
 
     def all_embeddings(self) -> list[FluxModelEmbedding]:
-        return self.additional_embeddings \
-               + ([self.embedding] if self.embedding is not None else [])
+        return self.additional_embeddings + ([self.embedding] if self.embedding is not None else [])
 
     def all_text_encoder_1_embeddings(self) -> list[BaseModelEmbedding]:
-        return [embedding.text_encoder_1_embedding for embedding in self.additional_embeddings] \
-               + ([self.embedding.text_encoder_1_embedding] if self.embedding is not None else [])
+        return [embedding.text_encoder_1_embedding for embedding in self.additional_embeddings] + (
+            [self.embedding.text_encoder_1_embedding] if self.embedding is not None else []
+        )
 
     def all_text_encoder_2_embeddings(self) -> list[BaseModelEmbedding]:
-        return [embedding.text_encoder_2_embedding for embedding in self.additional_embeddings] \
-               + ([self.embedding.text_encoder_2_embedding] if self.embedding is not None else [])
+        return [embedding.text_encoder_2_embedding for embedding in self.additional_embeddings] + (
+            [self.embedding.text_encoder_2_embedding] if self.embedding is not None else []
+        )
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
@@ -145,8 +151,10 @@ class FluxModel(BaseModel):
 
     def text_encoder_2_to(self, device: torch.device):
         if self.text_encoder_2 is not None:
-            if self.text_encoder_2_offload_conductor is not None and \
-                    self.text_encoder_2_offload_conductor.layer_offload_activated():
+            if (
+                self.text_encoder_2_offload_conductor is not None
+                and self.text_encoder_2_offload_conductor.layer_offload_activated()
+            ):
                 self.text_encoder_2_offload_conductor.to(device)
             else:
                 self.text_encoder_2.to(device=device)
@@ -155,8 +163,10 @@ class FluxModel(BaseModel):
             self.text_encoder_2_lora.to(device)
 
     def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None and \
-                self.transformer_offload_conductor.layer_offload_activated():
+        if (
+            self.transformer_offload_conductor is not None
+            and self.transformer_offload_conductor.layer_offload_activated()
+        ):
             self.transformer_offload_conductor.to(device)
         else:
             self.transformer.to(device=device)
@@ -195,28 +205,28 @@ class FluxModel(BaseModel):
         return self._add_embeddings_to_prompt(self.all_text_encoder_2_embeddings(), prompt)
 
     def encode_text(
-            self,
-            train_device: torch.device,
-            batch_size: int = 1,
-            rand: Random | None = None,
-            text: str = None,
-            tokens_1: Tensor = None,
-            tokens_2: Tensor = None,
-            tokens_mask_2: Tensor = None,
-            text_encoder_1_layer_skip: int = 0,
-            text_encoder_2_layer_skip: int = 0,
-            text_encoder_2_sequence_length: int | None = None,
-            text_encoder_1_dropout_probability: float | None = None,
-            text_encoder_2_dropout_probability: float | None = None,
-            apply_attention_mask: bool = False,
-            pooled_text_encoder_1_output: Tensor = None,
-            text_encoder_2_output: Tensor = None,
+        self,
+        train_device: torch.device,
+        batch_size: int = 1,
+        rand: Random | None = None,
+        text: str = None,
+        tokens_1: Tensor = None,
+        tokens_2: Tensor = None,
+        tokens_mask_2: Tensor = None,
+        text_encoder_1_layer_skip: int = 0,
+        text_encoder_2_layer_skip: int = 0,
+        text_encoder_2_sequence_length: int | None = None,
+        text_encoder_1_dropout_probability: float | None = None,
+        text_encoder_2_dropout_probability: float | None = None,
+        apply_attention_mask: bool = False,
+        pooled_text_encoder_1_output: Tensor = None,
+        text_encoder_2_output: Tensor = None,
     ) -> tuple[Tensor, Tensor]:
         # tokenize prompt
         if tokens_1 is None and text is not None and self.tokenizer_1 is not None:
             tokenizer_output = self.tokenizer_1(
                 self.add_text_encoder_1_embeddings_to_prompt(text),
-                padding='max_length',
+                padding="max_length",
                 truncation=True,
                 max_length=77,
                 return_tensors="pt",
@@ -226,7 +236,7 @@ class FluxModel(BaseModel):
         if tokens_2 is None and text is not None and self.tokenizer_2 is not None:
             tokenizer_output = self.tokenizer_2(
                 self.add_text_encoder_2_embeddings_to_prompt(text),
-                padding='max_length',
+                padding="max_length",
                 truncation=True,
                 max_length=text_encoder_2_sequence_length,
                 return_tensors="pt",
@@ -264,9 +274,13 @@ class FluxModel(BaseModel):
             )
             if text_encoder_2_output is None:
                 text_encoder_2_output = torch.zeros(
-                    size=(batch_size,
-                          self.tokenizer_2.model_max_length if text_encoder_2_sequence_length is None else text_encoder_2_sequence_length,
-                          4096),
+                    size=(
+                        batch_size,
+                        self.tokenizer_2.model_max_length
+                        if text_encoder_2_sequence_length is None
+                        else text_encoder_2_sequence_length,
+                        4096,
+                    ),
                     device=train_device,
                     dtype=self.train_dtype.torch_dtype(),
                 )
@@ -288,25 +302,29 @@ class FluxModel(BaseModel):
 
         # apply dropout
         if text_encoder_1_dropout_probability is not None:
-            dropout_text_encoder_1_mask = (torch.tensor(
-                [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)],
-                device=train_device)).float()
+            dropout_text_encoder_1_mask = (
+                torch.tensor(
+                    [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)], device=train_device
+                )
+            ).float()
             pooled_text_encoder_1_output = pooled_text_encoder_1_output * dropout_text_encoder_1_mask[:, None]
 
         if text_encoder_2_dropout_probability is not None:
-            dropout_text_encoder_2_mask = (torch.tensor(
-                [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)],
-                device=train_device)).float()
+            dropout_text_encoder_2_mask = (
+                torch.tensor(
+                    [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)], device=train_device
+                )
+            ).float()
             text_encoder_2_output = text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None]
 
         return text_encoder_2_output, pooled_text_encoder_1_output
 
     def prepare_latent_image_ids(
-            self,
-            height: int,
-            width: int,
-            device: torch.device,
-            dtype: torch.dtype,
+        self,
+        height: int,
+        width: int,
+        device: torch.device,
+        dtype: torch.dtype,
     ) -> Tensor:
         latent_image_ids = torch.zeros(height // 2, width // 2, 3)
         latent_image_ids[..., 1] = latent_image_ids[..., 1] + torch.arange(height // 2)[:, None]

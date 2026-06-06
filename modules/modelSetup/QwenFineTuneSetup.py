@@ -17,10 +17,10 @@ class QwenFineTuneSetup(
     BaseQwenSetup,
 ):
     def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
+        self,
+        train_device: torch.device,
+        temp_device: torch.device,
+        debug_mode: bool,
     ):
         super().__init__(
             train_device=train_device,
@@ -29,14 +29,23 @@ class QwenFineTuneSetup(
         )
 
     def create_parameters(
-            self,
-            model: QwenModel,
-            config: TrainConfig,
+        self,
+        model: QwenModel,
+        config: TrainConfig,
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        self._create_model_part_parameters(parameter_group_collection, "text_encoder", model.text_encoder, config.text_encoder)
-        self._create_model_part_parameters(parameter_group_collection,  "transformer", model.transformer,  config.transformer, freeze=ModuleFilter.create(config), debug=config.debug_mode)
+        self._create_model_part_parameters(
+            parameter_group_collection, "text_encoder", model.text_encoder, config.text_encoder
+        )
+        self._create_model_part_parameters(
+            parameter_group_collection,
+            "transformer",
+            model.transformer,
+            config.transformer,
+            freeze=ModuleFilter.create(config),
+            debug=config.debug_mode,
+        )
 
         if config.train_any_embedding() or config.train_any_output_embedding():
             raise NotImplementedError("Embeddings not implemented for Qwen")
@@ -44,34 +53,33 @@ class QwenFineTuneSetup(
         return parameter_group_collection
 
     def __setup_requires_grad(
-            self,
-            model: QwenModel,
-            config: TrainConfig,
+        self,
+        model: QwenModel,
+        config: TrainConfig,
     ):
-        self._setup_model_part_requires_grad("text_encoder", model.text_encoder, config.text_encoder, model.train_progress)
+        self._setup_model_part_requires_grad(
+            "text_encoder", model.text_encoder, config.text_encoder, model.train_progress
+        )
         self._setup_model_part_requires_grad("transformer", model.transformer, config.transformer, model.train_progress)
 
         model.vae.requires_grad_(False)
 
-
     def setup_model(
-            self,
-            model: QwenModel,
-            config: TrainConfig,
+        self,
+        model: QwenModel,
+        config: TrainConfig,
     ):
         params = self.create_parameters(model, config)
         self.__setup_requires_grad(model, config)
         init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
-            self,
-            model: QwenModel,
-            config: TrainConfig,
+        self,
+        model: QwenModel,
+        config: TrainConfig,
     ):
         vae_on_train_device = not config.latent_caching
-        text_encoder_on_train_device = \
-            config.train_text_encoder_or_embedding() \
-            or not config.latent_caching
+        text_encoder_on_train_device = config.train_text_encoder_or_embedding() or not config.latent_caching
 
         model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
@@ -90,12 +98,8 @@ class QwenFineTuneSetup(
         else:
             model.transformer.eval()
 
-    def after_optimizer_step(
-            self,
-            model: QwenModel,
-            config: TrainConfig,
-            train_progress: TrainProgress
-    ):
+    def after_optimizer_step(self, model: QwenModel, config: TrainConfig, train_progress: TrainProgress):
         self.__setup_requires_grad(model, config)
+
 
 factory.register(BaseModelSetup, QwenFineTuneSetup, ModelType.QWEN, TrainingMethod.FINE_TUNE)

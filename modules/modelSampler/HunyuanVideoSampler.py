@@ -22,11 +22,11 @@ from tqdm import tqdm
 
 class HunyuanVideoSampler(BaseModelSampler):
     def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            model: HunyuanVideoModel,
-            model_type: ModelType,
+        self,
+        train_device: torch.device,
+        temp_device: torch.device,
+        model: HunyuanVideoModel,
+        model_type: ModelType,
     ):
         super().__init__(train_device, temp_device)
 
@@ -36,21 +36,21 @@ class HunyuanVideoSampler(BaseModelSampler):
 
     @torch.no_grad()
     def __sample_base(
-            self,
-            prompt: str,
-            negative_prompt: str,
-            height: int,
-            width: int,
-            num_frames: int,
-            seed: int,
-            random_seed: bool,
-            diffusion_steps: int,
-            cfg_scale: float,
-            noise_scheduler: NoiseScheduler,
-            text_encoder_1_layer_skip: int = 0,
-            text_encoder_2_layer_skip: int = 0,
-            transformer_attention_mask: bool = False,
-            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+        self,
+        prompt: str,
+        negative_prompt: str,
+        height: int,
+        width: int,
+        num_frames: int,
+        seed: int,
+        random_seed: bool,
+        diffusion_steps: int,
+        cfg_scale: float,
+        noise_scheduler: NoiseScheduler,
+        text_encoder_1_layer_skip: int = 0,
+        text_encoder_2_layer_skip: int = 0,
+        transformer_attention_mask: bool = False,
+        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
@@ -84,11 +84,11 @@ class HunyuanVideoSampler(BaseModelSampler):
             num_latent_frames = (num_frames - 1) // vae_temporal_scale_factor + 1
             latent_image = torch.randn(
                 size=(
-                    1, # batch size
+                    1,  # batch size
                     num_latent_channels,
                     num_latent_frames,
                     height // vae_spacial_scale_factor,
-                    width // vae_spacial_scale_factor
+                    width // vae_spacial_scale_factor,
                 ),
                 generator=generator,
                 device=self.train_device,
@@ -125,10 +125,16 @@ class HunyuanVideoSampler(BaseModelSampler):
                         hidden_states=latent_model_input.to(dtype=self.model.transformer_train_dtype.torch_dtype()),
                         timestep=expanded_timestep,
                         guidance=guidance.to(dtype=self.model.transformer_train_dtype.torch_dtype()),
-                        pooled_projections=pooled_prompt_embedding.to(dtype=self.model.transformer_train_dtype.torch_dtype()),
-                        encoder_hidden_states=prompt_embedding.to(dtype=self.model.transformer_train_dtype.torch_dtype()),
-                        encoder_attention_mask=prompt_attention_mask.to(dtype=self.model.transformer_train_dtype.torch_dtype()),
-                        return_dict=True
+                        pooled_projections=pooled_prompt_embedding.to(
+                            dtype=self.model.transformer_train_dtype.torch_dtype()
+                        ),
+                        encoder_hidden_states=prompt_embedding.to(
+                            dtype=self.model.transformer_train_dtype.torch_dtype()
+                        ),
+                        encoder_attention_mask=prompt_attention_mask.to(
+                            dtype=self.model.transformer_train_dtype.torch_dtype()
+                        ),
+                        return_dict=True,
                     ).sample
 
                 # compute the previous noisy sample x_t -> x_t-1
@@ -147,7 +153,7 @@ class HunyuanVideoSampler(BaseModelSampler):
             latents = latent_image / vae.config.scaling_factor
             image = vae.decode(latents, return_dict=False)[0]
 
-            image = video_processor.postprocess(image, output_type='pt')
+            image = video_processor.postprocess(image, output_type="pt")
 
             self.model.vae_to(self.temp_device)
             torch_gc()
@@ -174,14 +180,14 @@ class HunyuanVideoSampler(BaseModelSampler):
                 )
 
     def sample(
-            self,
-            sample_config: SampleConfig,
-            destination: str,
-            image_format: ImageFormat | None = None,
-            video_format: VideoFormat | None = None,
-            audio_format: AudioFormat | None = None,
-            on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
-            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+        self,
+        sample_config: SampleConfig,
+        destination: str,
+        image_format: ImageFormat | None = None,
+        video_format: VideoFormat | None = None,
+        audio_format: AudioFormat | None = None,
+        on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
+        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         sampler_output = self.__sample_base(
             prompt=sample_config.prompt,
@@ -203,11 +209,15 @@ class HunyuanVideoSampler(BaseModelSampler):
         fps = self.model.NATIVE_FPS
 
         self.save_sampler_output(
-            sampler_output, destination,
-            image_format, video_format, audio_format,
+            sampler_output,
+            destination,
+            image_format,
+            video_format,
+            audio_format,
             fps=fps,
         )
 
         on_sample(sampler_output)
+
 
 factory.register(BaseModelSampler, HunyuanVideoSampler, ModelType.HUNYUAN_VIDEO)

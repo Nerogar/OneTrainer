@@ -16,10 +16,10 @@ class FluxEmbeddingSetup(
     BaseFluxSetup,
 ):
     def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
+        self,
+        train_device: torch.device,
+        temp_device: torch.device,
+        debug_mode: bool,
     ):
         super().__init__(
             train_device=train_device,
@@ -28,30 +28,34 @@ class FluxEmbeddingSetup(
         )
 
     def create_parameters(
-            self,
-            model: FluxModel,
-            config: TrainConfig,
+        self,
+        model: FluxModel,
+        config: TrainConfig,
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
         if config.text_encoder.train_embedding and model.text_encoder_1 is not None:
             self._add_embedding_param_groups(
-                model.all_text_encoder_1_embeddings(), parameter_group_collection, config.embedding_learning_rate,
-                "embeddings_1"
+                model.all_text_encoder_1_embeddings(),
+                parameter_group_collection,
+                config.embedding_learning_rate,
+                "embeddings_1",
             )
 
         if config.text_encoder_2.train_embedding and model.text_encoder_2 is not None:
             self._add_embedding_param_groups(
-                model.all_text_encoder_2_embeddings(), parameter_group_collection, config.embedding_learning_rate,
-                "embeddings_2"
+                model.all_text_encoder_2_embeddings(),
+                parameter_group_collection,
+                config.embedding_learning_rate,
+                "embeddings_2",
             )
 
         return parameter_group_collection
 
     def __setup_requires_grad(
-            self,
-            model: FluxModel,
-            config: TrainConfig,
+        self,
+        model: FluxModel,
+        config: TrainConfig,
     ):
         self._setup_embeddings_requires_grad(model, config)
         if model.text_encoder_1 is not None:
@@ -62,9 +66,9 @@ class FluxEmbeddingSetup(
         model.vae.requires_grad_(False)
 
     def setup_model(
-            self,
-            model: FluxModel,
-            config: TrainConfig,
+        self,
+        model: FluxModel,
+        config: TrainConfig,
     ):
         if model.text_encoder_1 is not None:
             model.text_encoder_1.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
@@ -81,9 +85,9 @@ class FluxEmbeddingSetup(
         init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
-            self,
-            model: FluxModel,
-            config: TrainConfig,
+        self,
+        model: FluxModel,
+        config: TrainConfig,
     ):
         vae_on_train_device = not config.latent_caching
 
@@ -99,12 +103,7 @@ class FluxEmbeddingSetup(
         model.vae.eval()
         model.transformer.eval()
 
-    def after_optimizer_step(
-            self,
-            model: FluxModel,
-            config: TrainConfig,
-            train_progress: TrainProgress
-    ):
+    def after_optimizer_step(self, model: FluxModel, config: TrainConfig, train_progress: TrainProgress):
         if config.preserve_embedding_norm:
             self._normalize_output_embeddings(model.all_text_encoder_2_embeddings())
             if model.embedding_wrapper_1 is not None:
@@ -112,6 +111,7 @@ class FluxEmbeddingSetup(
             if model.embedding_wrapper_2 is not None:
                 model.embedding_wrapper_2.normalize_embeddings()
         self.__setup_requires_grad(model, config)
+
 
 factory.register(BaseModelSetup, FluxEmbeddingSetup, ModelType.FLUX_DEV_1, TrainingMethod.EMBEDDING)
 factory.register(BaseModelSetup, FluxEmbeddingSetup, ModelType.FLUX_FILL_DEV_1, TrainingMethod.EMBEDDING)

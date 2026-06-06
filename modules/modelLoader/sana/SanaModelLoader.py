@@ -19,13 +19,13 @@ class SanaModelLoader(
         super().__init__()
 
     def __load_internal(
-            self,
-            model: SanaModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: SanaModel,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name, quantization)
@@ -33,13 +33,13 @@ class SanaModelLoader(
             raise Exception("not an internal model")
 
     def __load_diffusers(
-            self,
-            model: SanaModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: SanaModel,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
         tokenizer = GemmaTokenizer.from_pretrained(
             base_model_name,
@@ -92,12 +92,12 @@ class SanaModelLoader(
         model.transformer = transformer
 
     def load(
-            self,
-            model: SanaModel,
-            model_type: ModelType,
-            model_names: ModelNames,
-            weight_dtypes: ModelWeightDtypes,
-            quantization: QuantizationConfig,
+        self,
+        model: SanaModel,
+        model_type: ModelType,
+        model_names: ModelNames,
+        weight_dtypes: ModelWeightDtypes,
+        quantization: QuantizationConfig,
     ) -> SanaModel | None:
         stacktraces = []
 
@@ -110,7 +110,9 @@ class SanaModelLoader(
             stacktraces.append(traceback.format_exc())
 
         try:
-            self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, model_names.vae_model, quantization)
+            self.__load_diffusers(
+                model, model_type, weight_dtypes, base_model_name, model_names.vae_model, quantization
+            )
             return
         except Exception:
             stacktraces.append(traceback.format_exc())

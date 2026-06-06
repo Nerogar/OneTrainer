@@ -26,31 +26,37 @@ class ChromaModelLoader(
         super().__init__()
 
     def __load_internal(
-            self,
-            model: ChromaModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            transformer_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: ChromaModel,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        transformer_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(
-                model, model_type, weight_dtypes, base_model_name, transformer_model_name, vae_model_name, quantization,
+                model,
+                model_type,
+                weight_dtypes,
+                base_model_name,
+                transformer_model_name,
+                vae_model_name,
+                quantization,
             )
         else:
             raise Exception("not an internal model")
 
     def __load_diffusers(
-            self,
-            model: ChromaModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            transformer_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: ChromaModel,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        transformer_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
         diffusers_sub = []
         if not transformer_model_name:
@@ -101,12 +107,19 @@ class ChromaModelLoader(
         if transformer_model_name:
             transformer = ChromaTransformer2DModel.from_single_file(
                 transformer_model_name,
-                #avoid loading the transformer in float32:
-                torch_dtype = torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype(),
-                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16) if weight_dtypes.transformer.is_gguf() else None,
+                # avoid loading the transformer in float32:
+                torch_dtype=torch.bfloat16
+                if weight_dtypes.transformer.torch_dtype() is None
+                else weight_dtypes.transformer.torch_dtype(),
+                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16)
+                if weight_dtypes.transformer.is_gguf()
+                else None,
             )
             transformer = self._convert_diffusers_sub_module_to_dtype(
-                transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization,
+                transformer,
+                weight_dtypes.transformer,
+                weight_dtypes.train_dtype,
+                quantization,
             )
         else:
             transformer = self._load_diffusers_sub_module(
@@ -126,31 +139,39 @@ class ChromaModelLoader(
         model.transformer = transformer
 
     def __load_safetensors(
-            self,
-            model: ChromaModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            transformer_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: ChromaModel,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        transformer_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
-        #no single file .safetensors for Chroma available at the time of writing this code
-        raise NotImplementedError("Loading of single file Chroma models not supported. Use the diffusers model instead. Optionally, transformer-only safetensor files can be loaded by overriding the transformer.")
+        # no single file .safetensors for Chroma available at the time of writing this code
+        raise NotImplementedError(
+            "Loading of single file Chroma models not supported. Use the diffusers model instead. Optionally, transformer-only safetensor files can be loaded by overriding the transformer."
+        )
 
     def load(
-            self,
-            model: ChromaModel,
-            model_type: ModelType,
-            model_names: ModelNames,
-            weight_dtypes: ModelWeightDtypes,
-            quantization: QuantizationConfig,
+        self,
+        model: ChromaModel,
+        model_type: ModelType,
+        model_names: ModelNames,
+        weight_dtypes: ModelWeightDtypes,
+        quantization: QuantizationConfig,
     ):
         stacktraces = []
 
         try:
             self.__load_internal(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model, quantization,
+                model,
+                model_type,
+                weight_dtypes,
+                model_names.base_model,
+                model_names.transformer_model,
+                model_names.vae_model,
+                quantization,
             )
             return
         except Exception:
@@ -158,7 +179,13 @@ class ChromaModelLoader(
 
         try:
             self.__load_diffusers(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model, quantization,
+                model,
+                model_type,
+                weight_dtypes,
+                model_names.base_model,
+                model_names.transformer_model,
+                model_names.vae_model,
+                quantization,
             )
             return
         except Exception:
@@ -166,7 +193,13 @@ class ChromaModelLoader(
 
         try:
             self.__load_safetensors(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model, quantization,
+                model,
+                model_type,
+                weight_dtypes,
+                model_names.base_model,
+                model_names.transformer_model,
+                model_names.vae_model,
+                quantization,
             )
             return
         except Exception:

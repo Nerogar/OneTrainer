@@ -52,21 +52,26 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
         return sanitized
 
     def _create_mgds(
-            self,
-            config: TrainConfig,
-            definition: list,
-            train_progress: TrainProgress,
-            is_validation: bool = False,
+        self,
+        config: TrainConfig,
+        definition: list,
+        train_progress: TrainProgress,
+        is_validation: bool = False,
     ):
         concepts = config.concepts
         if concepts is None:
-            with open(config.concept_file_name, 'r') as f:
+            with open(config.concept_file_name, "r") as f:
                 concepts = [ConceptConfig.default_values().from_dict(c) for c in json.load(f)]
 
         if is_validation:
             valid_types = {ConceptType.VALIDATION, ConceptType.DPO_CHOSEN_VAL, ConceptType.DPO_REJECTED_VAL}
         else:
-            valid_types = {ConceptType.STANDARD, ConceptType.PRIOR_PREDICTION, ConceptType.DPO_CHOSEN, ConceptType.DPO_REJECTED}
+            valid_types = {
+                ConceptType.STANDARD,
+                ConceptType.PRIOR_PREDICTION,
+                ConceptType.DPO_CHOSEN,
+                ConceptType.DPO_REJECTED,
+            }
         concepts = [
             self.__sanitize_dpo_concept(concept) if is_dpo_concept_type(ConceptType(concept.type)) else concept
             for concept in concepts

@@ -13,10 +13,10 @@ class PairByFilename(
     RandomAccessPipelineModule,
 ):
     def __init__(
-            self,
-            concept_pairs: list[tuple[str, str]],
-            chosen_names: list[str | tuple[str, str]],
-            rejected_names: list[str | tuple[str, str]],
+        self,
+        concept_pairs: list[tuple[str, str]],
+        chosen_names: list[str | tuple[str, str]],
+        rejected_names: list[str | tuple[str, str]],
     ):
         super().__init__()
 
@@ -38,14 +38,14 @@ class PairByFilename(
         chosen_indices = {}
         rejected_indices = {}
 
-        for index in range(self._get_previous_length('image_path')):
-            concept_path = self.__canonical_path(self._get_previous_item(0, 'concept.path', index))
+        for index in range(self._get_previous_length("image_path")):
+            concept_path = self.__canonical_path(self._get_previous_item(0, "concept.path", index))
             pair_info = self.concept_lookup.get(concept_path)
             if pair_info is None:
                 continue
 
             pair_id, is_chosen = pair_info
-            image_path = self._get_previous_item(0, 'image_path', index)
+            image_path = self._get_previous_item(0, "image_path", index)
             key = (pair_id, dpo_pair_key(image_path, concept_path))
 
             if is_chosen:
@@ -71,7 +71,9 @@ class PairByFilename(
 
         pair_indices.sort(key=lambda x: x[0])
         if not pair_indices:
-            raise RuntimeError("No DPO pairs could be matched by filename between the configured chosen/rejected concepts.")
+            raise RuntimeError(
+                "No DPO pairs could be matched by filename between the configured chosen/rejected concepts."
+            )
 
         self._pair_indices = pair_indices
 
@@ -84,7 +86,7 @@ class PairByFilename(
         return len(self.__get_pair_indices())
 
     def get_inputs(self) -> list[str]:
-        names = ['concept.path', 'image_path', 'prompt', 'crop_resolution']
+        names = ["concept.path", "image_path", "prompt", "crop_resolution"]
         names += [in_name for in_name, _ in self.chosen_names]
         names += [in_name for in_name, _ in self.rejected_names]
         return list(dict.fromkeys(names))
@@ -95,19 +97,23 @@ class PairByFilename(
     def get_item(self, variation: int, index: int, requested_name: str = None) -> dict:
         chosen_index, rejected_index = self.__get_pair_indices()[index]
 
-        chosen_prompt = self._get_previous_item(variation, 'prompt', chosen_index)
-        rejected_prompt = self._get_previous_item(variation, 'prompt', rejected_index)
+        chosen_prompt = self._get_previous_item(variation, "prompt", chosen_index)
+        rejected_prompt = self._get_previous_item(variation, "prompt", rejected_index)
         if chosen_prompt != rejected_prompt:
-            raise RuntimeError("RLHF DPO paired samples must use identical prompts/captions in chosen and rejected concepts.")
+            raise RuntimeError(
+                "RLHF DPO paired samples must use identical prompts/captions in chosen and rejected concepts."
+            )
 
-        chosen_crop_resolution = self._get_previous_item(variation, 'crop_resolution', chosen_index)
-        rejected_crop_resolution = self._get_previous_item(variation, 'crop_resolution', rejected_index)
+        chosen_crop_resolution = self._get_previous_item(variation, "crop_resolution", chosen_index)
+        rejected_crop_resolution = self._get_previous_item(variation, "crop_resolution", rejected_index)
         if isinstance(chosen_crop_resolution, torch.Tensor) and isinstance(rejected_crop_resolution, torch.Tensor):
             same_resolution = torch.equal(chosen_crop_resolution, rejected_crop_resolution)
         else:
             same_resolution = chosen_crop_resolution == rejected_crop_resolution
         if not same_resolution:
-            raise RuntimeError("RLHF DPO paired samples must have matching crop resolutions in chosen and rejected concepts.")
+            raise RuntimeError(
+                "RLHF DPO paired samples must have matching crop resolutions in chosen and rejected concepts."
+            )
 
         item = {}
         for in_name, out_name in self.chosen_names:

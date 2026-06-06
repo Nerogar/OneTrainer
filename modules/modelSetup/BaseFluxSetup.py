@@ -35,7 +35,7 @@ class BaseFluxSetup(
     ModelSetupFlowMatchingMixin,
     ModelSetupEmbeddingMixin,
     ModelSetupText2ImageMixin,
-    metaclass=ABCMeta
+    metaclass=ABCMeta,
 ):
     LAYER_PRESETS = {
         "attn-mlp": ["attn", "ff.net"],
@@ -45,40 +45,44 @@ class BaseFluxSetup(
     }
 
     def setup_optimizations(
-            self,
-            model: FluxModel,
-            config: TrainConfig,
+        self,
+        model: FluxModel,
+        config: TrainConfig,
     ):
         if config.gradient_checkpointing.enabled():
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_flux_transformer(model.transformer, config)
+            model.transformer_offload_conductor = enable_checkpointing_for_flux_transformer(model.transformer, config)
             if model.text_encoder_1 is not None:
                 enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config)
             if model.text_encoder_2 is not None:
-                model.text_encoder_2_offload_conductor = \
-                    enable_checkpointing_for_t5_encoder_layers(model.text_encoder_2, config)
+                model.text_encoder_2_offload_conductor = enable_checkpointing_for_t5_encoder_layers(
+                    model.text_encoder_2, config
+                )
 
-        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().transformer,
-            config.weight_dtypes().text_encoder,
-            config.weight_dtypes().text_encoder_2,
-            config.weight_dtypes().vae,
-            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-            config.weight_dtypes().embedding if config.train_any_embedding() else None,
-        ], config.enable_autocast_cache)
+        model.autocast_context, model.train_dtype = create_autocast_context(
+            self.train_device,
+            config.train_dtype,
+            [
+                config.weight_dtypes().transformer,
+                config.weight_dtypes().text_encoder,
+                config.weight_dtypes().text_encoder_2,
+                config.weight_dtypes().vae,
+                config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+                config.weight_dtypes().embedding if config.train_any_embedding() else None,
+            ],
+            config.enable_autocast_cache,
+        )
 
-        model.text_encoder_2_autocast_context, model.text_encoder_2_train_dtype = \
-            disable_fp16_autocast_context(
-                self.train_device,
-                config.train_dtype,
-                config.fallback_train_dtype,
-                [
-                    config.weight_dtypes().text_encoder_2,
-                    config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-                    config.weight_dtypes().embedding if config.train_any_embedding() else None,
-                ],
-                config.enable_autocast_cache,
-            )
+        model.text_encoder_2_autocast_context, model.text_encoder_2_train_dtype = disable_fp16_autocast_context(
+            self.train_device,
+            config.train_dtype,
+            config.fallback_train_dtype,
+            [
+                config.weight_dtypes().text_encoder_2,
+                config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+                config.weight_dtypes().embedding if config.train_any_embedding() else None,
+            ],
+            config.enable_autocast_cache,
+        )
 
         quantize_layers(model.text_encoder_1, self.train_device, model.train_dtype, config)
         quantize_layers(model.text_encoder_2, self.train_device, model.text_encoder_2_train_dtype, config)
@@ -86,9 +90,9 @@ class BaseFluxSetup(
         quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
 
     def _setup_embeddings(
-            self,
-            model: FluxModel,
-            config: TrainConfig,
+        self,
+        model: FluxModel,
+        config: TrainConfig,
     ):
         additional_embeddings = []
         for embedding_config in config.all_embedding_configs():
@@ -109,7 +113,7 @@ class BaseFluxSetup(
                         model.text_encoder_2,
                         lambda text: model.encode_text(
                             text=text,
-                            text_encoder_2_sequence_length = config.text_encoder_2_sequence_length,
+                            text_encoder_2_sequence_length=config.text_encoder_2_sequence_length,
                             train_device=self.temp_device,
                         )[0][0][1:],
                     )
@@ -149,9 +153,9 @@ class BaseFluxSetup(
             self._add_embeddings_to_tokenizer(model.tokenizer_2, model.all_text_encoder_2_embeddings())
 
     def _setup_embedding_wrapper(
-            self,
-            model: FluxModel,
-            config: TrainConfig,
+        self,
+        model: FluxModel,
+        config: TrainConfig,
     ):
         if model.tokenizer_1 is not None and model.text_encoder_1 is not None:
             model.embedding_wrapper_1 = AdditionalEmbeddingWrapper(
@@ -172,36 +176,40 @@ class BaseFluxSetup(
             model.embedding_wrapper_2.hook_to_module()
 
     def _setup_embeddings_requires_grad(
-            self,
-            model: FluxModel,
-            config: TrainConfig,
+        self,
+        model: FluxModel,
+        config: TrainConfig,
     ):
         if model.text_encoder_1 is not None:
-            for embedding, embedding_config in zip(model.all_text_encoder_1_embeddings(),
-                                                   config.all_embedding_configs(), strict=True):
-                train_embedding_1 = \
-                    embedding_config.train \
-                    and config.text_encoder.train_embedding \
+            for embedding, embedding_config in zip(
+                model.all_text_encoder_1_embeddings(), config.all_embedding_configs(), strict=True
+            ):
+                train_embedding_1 = (
+                    embedding_config.train
+                    and config.text_encoder.train_embedding
                     and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
+                )
                 embedding.requires_grad_(train_embedding_1)
 
         if model.text_encoder_2 is not None:
-            for embedding, embedding_config in zip(model.all_text_encoder_2_embeddings(),
-                                                   config.all_embedding_configs(), strict=True):
-                train_embedding_2 = \
-                    embedding_config.train \
-                    and config.text_encoder_2.train_embedding \
+            for embedding, embedding_config in zip(
+                model.all_text_encoder_2_embeddings(), config.all_embedding_configs(), strict=True
+            ):
+                train_embedding_2 = (
+                    embedding_config.train
+                    and config.text_encoder_2.train_embedding
                     and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
+                )
                 embedding.requires_grad_(train_embedding_2)
 
     def predict(
-            self,
-            model: FluxModel,
-            batch: dict,
-            config: TrainConfig,
-            train_progress: TrainProgress,
-            *,
-            deterministic: bool = False,
+        self,
+        model: FluxModel,
+        batch: dict,
+        config: TrainConfig,
+        train_progress: TrainProgress,
+        *,
+        deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
             batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
@@ -209,12 +217,12 @@ class BaseFluxSetup(
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
 
-            vae_scaling_factor = model.vae.config['scaling_factor']
-            vae_shift_factor = model.vae.config['shift_factor']
+            vae_scaling_factor = model.vae.config["scaling_factor"]
+            vae_shift_factor = model.vae.config["shift_factor"]
 
             text_encoder_output, pooled_text_encoder_output = model.encode_text(
                 train_device=self.train_device,
-                batch_size=batch['latent_image'].shape[0],
+                batch_size=batch["latent_image"].shape[0],
                 rand=rand,
                 tokens_1=batch.get("tokens_1"),
                 tokens_2=batch.get("tokens_2"),
@@ -222,33 +230,40 @@ class BaseFluxSetup(
                 text_encoder_1_layer_skip=config.text_encoder_layer_skip,
                 text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
                 text_encoder_2_sequence_length=config.text_encoder_2_sequence_length,
-                pooled_text_encoder_1_output=batch['text_encoder_1_pooled_state'] \
-                    if 'text_encoder_1_pooled_state' in batch and not config.train_text_encoder_or_embedding() else None,
-                text_encoder_2_output=batch['text_encoder_2_hidden_state'] \
-                    if 'text_encoder_2_hidden_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
-                text_encoder_1_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
-                text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability if not deterministic else None,
+                pooled_text_encoder_1_output=batch["text_encoder_1_pooled_state"]
+                if "text_encoder_1_pooled_state" in batch and not config.train_text_encoder_or_embedding()
+                else None,
+                text_encoder_2_output=batch["text_encoder_2_hidden_state"]
+                if "text_encoder_2_hidden_state" in batch and not config.train_text_encoder_2_or_embedding()
+                else None,
+                text_encoder_1_dropout_probability=config.text_encoder.dropout_probability
+                if not deterministic
+                else None,
+                text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability
+                if not deterministic
+                else None,
                 apply_attention_mask=config.transformer.attention_mask,
             )
 
-            latent_image = batch['latent_image']
+            latent_image = batch["latent_image"]
             scaled_latent_image = (latent_image - vae_shift_factor) * vae_scaling_factor
 
             scaled_latent_conditioning_image = None
             if config.model_type.has_conditioning_image_input():
-                scaled_latent_conditioning_image = \
-                    (batch['latent_conditioning_image'] - vae_shift_factor) * vae_scaling_factor
+                scaled_latent_conditioning_image = (
+                    batch["latent_conditioning_image"] - vae_shift_factor
+                ) * vae_scaling_factor
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
             shift = model.calculate_timestep_shift(scaled_latent_image.shape[-2], scaled_latent_image.shape[-1])
             timestep = self._get_timestep_discrete(
-                model.noise_scheduler.config['num_train_timesteps'],
+                model.noise_scheduler.config["num_train_timesteps"],
                 deterministic,
                 generator,
                 scaled_latent_image.shape[0],
                 config,
-                shift = shift if config.dynamic_timestep_shifting else config.timestep_shift,
+                shift=shift if config.dynamic_timestep_shifting else config.timestep_shift,
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(
@@ -260,7 +275,7 @@ class BaseFluxSetup(
 
             if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
                 latent_input = torch.concat(
-                    [scaled_noisy_latent_image, scaled_latent_conditioning_image, batch['latent_mask']], 1
+                    [scaled_noisy_latent_image, scaled_latent_conditioning_image, batch["latent_mask"]], 1
                 )
             else:
                 latent_input = scaled_noisy_latent_image
@@ -277,10 +292,7 @@ class BaseFluxSetup(
             )
 
             image_ids = model.prepare_latent_image_ids(
-                latent_input.shape[2],
-                latent_input.shape[3],
-                self.train_device,
-                model.train_dtype.torch_dtype()
+                latent_input.shape[2], latent_input.shape[3], self.train_device, model.train_dtype.torch_dtype()
             )
 
             packed_latent_input = model.pack_latents(latent_input)
@@ -293,7 +305,7 @@ class BaseFluxSetup(
                 txt_ids=text_ids,
                 img_ids=image_ids,
                 joint_attention_kwargs=None,
-                return_dict=True
+                return_dict=True,
             ).sample
 
             predicted_flow = model.unpack_latents(
@@ -304,16 +316,16 @@ class BaseFluxSetup(
 
             flow = latent_noise - scaled_latent_image
             model_output_data = {
-                'loss_type': 'target',
-                'timestep': timestep,
-                'predicted': predicted_flow,
-                'target': flow,
+                "loss_type": "target",
+                "timestep": timestep,
+                "predicted": predicted_flow,
+                "target": flow,
             }
 
             if config.debug_mode:
                 with torch.no_grad():
                     predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
-                    self._save_tokens("7-prompt", batch['tokens_1'], model.tokenizer_1, config, train_progress)
+                    self._save_tokens("7-prompt", batch["tokens_1"], model.tokenizer_1, config, train_progress)
                     self._save_latent("1-noise", latent_noise, config, train_progress)
                     self._save_latent("2-noisy_image", scaled_noisy_latent_image, config, train_progress)
                     self._save_latent("3-predicted_flow", predicted_flow, config, train_progress)
@@ -324,11 +336,11 @@ class BaseFluxSetup(
         return model_output_data
 
     def calculate_loss(
-            self,
-            model: FluxModel,
-            batch: dict,
-            data: dict,
-            config: TrainConfig,
+        self,
+        model: FluxModel,
+        batch: dict,
+        data: dict,
+        config: TrainConfig,
     ) -> Tensor:
         return self._flow_matching_losses(
             batch=batch,

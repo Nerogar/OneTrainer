@@ -4,22 +4,23 @@ from transformers import CLIPTextModel, CLIPTextModelWithProjection
 
 
 def encode_clip(
-        text_encoder: CLIPTextModel | CLIPTextModelWithProjection,
-        tokens: Tensor | None = None,
-        default_layer: int = -1,
-        layer_skip: int = 0,
-        add_output: bool = True,
-        text_encoder_output: Tensor | None = None,
-        add_pooled_output: bool = False,
-        pooled_text_encoder_output: Tensor | None = None,
-        use_attention_mask: bool = True,
-        attention_mask: Tensor | None = None,
-        add_layer_norm: bool = True,
+    text_encoder: CLIPTextModel | CLIPTextModelWithProjection,
+    tokens: Tensor | None = None,
+    default_layer: int = -1,
+    layer_skip: int = 0,
+    add_output: bool = True,
+    text_encoder_output: Tensor | None = None,
+    add_pooled_output: bool = False,
+    pooled_text_encoder_output: Tensor | None = None,
+    use_attention_mask: bool = True,
+    attention_mask: Tensor | None = None,
+    add_layer_norm: bool = True,
 ) -> tuple[Tensor, Tensor]:
-    if (add_output and text_encoder_output is None) \
-            or (add_pooled_output and pooled_text_encoder_output is None) \
-            and text_encoder is not None:
-
+    if (
+        (add_output and text_encoder_output is None)
+        or (add_pooled_output and pooled_text_encoder_output is None)
+        and text_encoder is not None
+    ):
         text_encoder_output = text_encoder(
             tokens,
             attention_mask=attention_mask if use_attention_mask else None,

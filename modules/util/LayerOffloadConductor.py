@@ -23,7 +23,7 @@ from torch import nn
 MESSAGES = []
 
 
-def log(msg: str = ''):
+def log(msg: str = ""):
     pass
     # print(msg)
     # MESSAGES.append(msg)
@@ -44,10 +44,10 @@ def floor_16(number: int) -> int:
 
 class StaticLayerTensorAllocator:
     def __init__(
-            self,
-            layer_allocator: 'StaticLayerAllocator',
-            allocate_forward: bool,
-            layer_index: int,
+        self,
+        layer_allocator: "StaticLayerAllocator",
+        allocate_forward: bool,
+        layer_index: int,
     ):
         self.__layer_allocator = layer_allocator
         self.__allocate_forward = allocate_forward
@@ -56,11 +56,15 @@ class StaticLayerTensorAllocator:
         if allocate_forward:
             self.__allocation_start = layer_allocator.allocation_end
             self.__allocation_end = layer_allocator.allocation_end
-            log(f"{self.__layer_allocator.device}/allocating layer {self.__layer_index}, allocation_start {self.__allocation_end:_}")
+            log(
+                f"{self.__layer_allocator.device}/allocating layer {self.__layer_index}, allocation_start {self.__allocation_end:_}"
+            )
         else:
             self.__allocation_start = layer_allocator.allocation_start
             self.__allocation_end = layer_allocator.allocation_start
-            log(f"{self.__layer_allocator.device}/allocating layer {self.__layer_index}, allocation_end {self.__allocation_start:_}")
+            log(
+                f"{self.__layer_allocator.device}/allocating layer {self.__layer_index}, allocation_end {self.__allocation_start:_}"
+            )
 
     def allocate_like(self, source_tensor: torch.Tensor) -> torch.Tensor:
         num_bytes = source_tensor.numel() * source_tensor.element_size()
@@ -83,7 +87,7 @@ class StaticLayerTensorAllocator:
             self.__allocation_end = cache_tensor_index * cache_tensor_size + cache_tensor_allocation_end
             self.__layer_allocator.ensure_allocation(cache_tensor_index)
             cache_tensor = self.__layer_allocator.cache_tensors[cache_tensor_index]
-            allocated_tensor = cache_tensor[cache_tensor_allocation_end:cache_tensor_allocation_end + num_bytes]
+            allocated_tensor = cache_tensor[cache_tensor_allocation_end : cache_tensor_allocation_end + num_bytes]
             # log(f"--allocated: {self.__layer_allocator.cache_tensors[cache_tensor_index].device}/{num_bytes} bytes, between {self.__allocation_end} - {self.__allocation_end + num_bytes}/[{cache_tensor_index}] {cache_tensor_allocation_end} for layer {self.__layer_index}")
             self.__allocation_end += num_bytes
             self.__layer_allocator.allocation_end = self.__allocation_end
@@ -103,7 +107,7 @@ class StaticLayerTensorAllocator:
             new_allocation_start = floor_16(cache_tensor_allocation_start - num_bytes)
             self.__layer_allocator.ensure_allocation(cache_tensor_index)
             cache_tensor = self.__layer_allocator.cache_tensors[cache_tensor_index]
-            allocated_tensor = cache_tensor[new_allocation_start:new_allocation_start + num_bytes]
+            allocated_tensor = cache_tensor[new_allocation_start : new_allocation_start + num_bytes]
             self.__allocation_start = cache_tensor_index * cache_tensor_size + new_allocation_start
             # log(f"--allocated: {self.__layer_allocator.cache_tensors[cache_tensor_index].device}/{num_bytes} bytes, between {self.__allocation_start - num_bytes} - {self.__allocation_start}/[{cache_tensor_index}] {cache_tensor_allocation_start - num_bytes} for layer {self.__layer_index}")
             self.__layer_allocator.allocation_start = self.__allocation_start
@@ -112,10 +116,14 @@ class StaticLayerTensorAllocator:
 
     def deallocate(self, deallocate_forward):
         if deallocate_forward:
-            log(f"{self.__layer_allocator.device}/deallocating layer {self.__layer_index}, allocation_start {self.__allocation_end:_}")
+            log(
+                f"{self.__layer_allocator.device}/deallocating layer {self.__layer_index}, allocation_start {self.__allocation_end:_}"
+            )
             self.__layer_allocator.allocation_start = self.__allocation_end
         else:
-            log(f"{self.__layer_allocator.device}/deallocating layer {self.__layer_index}, allocation_end {self.__allocation_start:_}")
+            log(
+                f"{self.__layer_allocator.device}/deallocating layer {self.__layer_index}, allocation_end {self.__allocation_start:_}"
+            )
             self.__layer_allocator.allocation_end = self.__allocation_start
 
 
@@ -135,8 +143,8 @@ class StaticLayerAllocator:
     __tensor_allocators: list[StaticLayerTensorAllocator | None]
 
     def __init__(
-            self,
-            device: torch.device,
+        self,
+        device: torch.device,
     ):
         self.device = device
         self.__allocate_statically = True
@@ -173,7 +181,7 @@ class StaticLayerAllocator:
             # at least twice self.__max_tensor_bytes for each tensor
             math.ceil(cache_bytes / (self.__max_tensor_bytes * 2)),
             # no more than 10 cache tensors
-            10
+            10,
         )
         # add self.__max_tensor_bytes to ensure even the largest tensors can be allocated in the remaining space
         # add 4kb for the alignment overhead
@@ -188,8 +196,9 @@ class StaticLayerAllocator:
         if self.cache_tensors[cache_tensor_index] is None:
             torch_gc()
 
-            self.cache_tensors[cache_tensor_index] = \
-                torch.zeros((self.cache_tensor_size,), dtype=torch.int8, device=self.device)
+            self.cache_tensors[cache_tensor_index] = torch.zeros(
+                (self.cache_tensor_size,), dtype=torch.int8, device=self.device
+            )
 
             log(f"tensor {cache_tensor_index} not allocated, allocating {self.cache_tensor_size} bytes")
 
@@ -233,8 +242,8 @@ class StaticActivationAllocator:
     __max_allocated_bytes: int
 
     def __init__(
-            self,
-            device: torch.device,
+        self,
+        device: torch.device,
     ):
         self.__device = device
         self.__allocate_statically = True
@@ -247,8 +256,9 @@ class StaticActivationAllocator:
         self.__max_allocated_bytes = 0
 
     def reserve_cache(self, tensors: list[torch.Tensor]):
-        num_bytes = sum(tensor.element_size() * tensor.numel() for tensor in tensors) \
-                    + len(tensors) * 16  # add enough padding for alignment
+        num_bytes = (
+            sum(tensor.element_size() * tensor.numel() for tensor in tensors) + len(tensors) * 16
+        )  # add enough padding for alignment
 
         if num_bytes == 0:
             return
@@ -258,8 +268,10 @@ class StaticActivationAllocator:
 
         cache_found = False
         while self.__current_cache_tensor < len(self.__cache_tensors):
-            if self.__cache_tensors[self.__current_cache_tensor].shape[0] - self.__current_cache_tensor_offset \
-                    >= num_bytes:
+            if (
+                self.__cache_tensors[self.__current_cache_tensor].shape[0] - self.__current_cache_tensor_offset
+                >= num_bytes
+            ):
                 cache_found = True
                 break
 
@@ -269,7 +281,9 @@ class StaticActivationAllocator:
         if not cache_found:
             torch_gc()
             cache_tensor = torch.zeros((num_bytes,), dtype=torch.int8, device=self.__device)
-            log(f"{self.__device}/allocating activations cache {num_bytes:_}, total: {self.__allocated_bytes:_}, max: {self.__max_allocated_bytes:_}")
+            log(
+                f"{self.__device}/allocating activations cache {num_bytes:_}, total: {self.__allocated_bytes:_}, max: {self.__max_allocated_bytes:_}"
+            )
 
             if self.__is_pinned:
                 pin_tensor_(cache_tensor)
@@ -282,8 +296,9 @@ class StaticActivationAllocator:
     def allocate_like(self, source_tensor: torch.Tensor) -> torch.Tensor:
         num_bytes = source_tensor.element_size() * source_tensor.numel()
         cache_tensor = self.__cache_tensors[self.__current_cache_tensor]
-        allocated_tensor = \
-            cache_tensor[self.__current_cache_tensor_offset:self.__current_cache_tensor_offset + num_bytes]
+        allocated_tensor = cache_tensor[
+            self.__current_cache_tensor_offset : self.__current_cache_tensor_offset + num_bytes
+        ]
         self.__current_cache_tensor_offset += ceil_16(num_bytes)
 
         return allocated_tensor.view(dtype=source_tensor.dtype).view(size=source_tensor.shape)
@@ -301,7 +316,9 @@ class StaticActivationAllocator:
             # add 4kb for the alignment overhead
             num_bytes = self.__allocated_bytes + 4096
             cache_tensor = torch.zeros((num_bytes,), dtype=torch.int8, device=self.__device)
-            log(f"{self.__device}/condensing activations cache {num_bytes:_}, total: {self.__allocated_bytes:_}, max: {self.__max_allocated_bytes:_}")
+            log(
+                f"{self.__device}/condensing activations cache {num_bytes:_}, total: {self.__allocated_bytes:_}, max: {self.__max_allocated_bytes:_}"
+            )
 
             if self.__is_pinned:
                 pin_tensor_(cache_tensor)
@@ -322,11 +339,11 @@ class StaticActivationAllocator:
 
 class SyncEvent:
     def __init__(
-            self,
-            torch_event: torch.cuda.Event | torch.mps.Event | None = None,
-            log_msg: str | None = None,
+        self,
+        torch_event: torch.cuda.Event | torch.mps.Event | None = None,
+        log_msg: str | None = None,
     ):
-        self.id = str(random.randint(0, 2 << 30)) if torch_event is not None else '-'
+        self.id = str(random.randint(0, 2 << 30)) if torch_event is not None else "-"
         self.__torch_event = torch_event
         self.__log_msg = log_msg
 
@@ -375,9 +392,9 @@ class SyncEvent:
 
 class LayerOffloadStrategy:
     def __init__(
-            self,
-            layers: list[nn.Module],
-            layer_offload_fraction: float,
+        self,
+        layers: list[nn.Module],
+        layer_offload_fraction: float,
     ):
         layer_bytes = [sum([get_offload_tensor_bytes(x) for x in layer.modules()]) for layer in layers]
         total_bytes = sum(layer_bytes)
@@ -401,33 +418,44 @@ class LayerOffloadStrategy:
         #     same as case 1, but in reversed order
 
         # calculate a list of loaded layers before execution of each layer
-        self.forward_backward_loaded_layers = [self.__get_layers_below(
-            layer_bytes=layer_bytes,
-            start_layer=i,
-            max_bytes=target_loaded_bytes,
-            is_forward=True,
-            is_cyclic=False,
-        ) for i in range(len(layers))]
+        self.forward_backward_loaded_layers = [
+            self.__get_layers_below(
+                layer_bytes=layer_bytes,
+                start_layer=i,
+                max_bytes=target_loaded_bytes,
+                is_forward=True,
+                is_cyclic=False,
+            )
+            for i in range(len(layers))
+        ]
 
-        self.forward_forward_loaded_layers = [self.__get_layers_below(
-            layer_bytes=layer_bytes,
-            start_layer=i,
-            max_bytes=target_loaded_bytes,
-            is_forward=True,
-            is_cyclic=True,
-        ) for i in range(len(layers))]
+        self.forward_forward_loaded_layers = [
+            self.__get_layers_below(
+                layer_bytes=layer_bytes,
+                start_layer=i,
+                max_bytes=target_loaded_bytes,
+                is_forward=True,
+                is_cyclic=True,
+            )
+            for i in range(len(layers))
+        ]
 
-        self.backward_forward_loaded_layers = [self.__get_layers_below(
-            layer_bytes=layer_bytes,
-            start_layer=i,
-            max_bytes=target_loaded_bytes,
-            is_forward=False,
-            is_cyclic=False,
-        ) for i in range(len(layers))]
+        self.backward_forward_loaded_layers = [
+            self.__get_layers_below(
+                layer_bytes=layer_bytes,
+                start_layer=i,
+                max_bytes=target_loaded_bytes,
+                is_forward=False,
+                is_cyclic=False,
+            )
+            for i in range(len(layers))
+        ]
 
-        all_loaded_layers = self.forward_backward_loaded_layers \
-                            + self.forward_forward_loaded_layers \
-                            + self.backward_forward_loaded_layers
+        all_loaded_layers = (
+            self.forward_backward_loaded_layers
+            + self.forward_forward_loaded_layers
+            + self.backward_forward_loaded_layers
+        )
 
         self.max_loaded_bytes = max(sum([layer_bytes[i] for i in loaded_layers]) for loaded_layers in all_loaded_layers)
         min_loaded_bytes = min(sum([layer_bytes[i] for i in loaded_layers]) for loaded_layers in all_loaded_layers)
@@ -435,11 +463,11 @@ class LayerOffloadStrategy:
 
     @staticmethod
     def __get_layers_below(
-            layer_bytes: list[int],
-            start_layer: int,
-            max_bytes: int,
-            is_forward: bool,
-            is_cyclic: bool,
+        layer_bytes: list[int],
+        start_layer: int,
+        max_bytes: int,
+        is_forward: bool,
+        is_cyclic: bool,
     ) -> list[int]:
         accumulator = 0
         layers = []
@@ -479,11 +507,11 @@ class LayerOffloadStrategy:
         return sorted(layers)
 
     def get_layers_to_offload(
-            self,
-            layer_index: int,
-            is_forward: bool,
-            is_next_forward: bool,
-            loaded_layers: list[int],
+        self,
+        layer_index: int,
+        is_forward: bool,
+        is_next_forward: bool,
+        loaded_layers: list[int],
     ) -> list[int]:
         layers = []
         if is_forward and is_next_forward:
@@ -491,8 +519,9 @@ class LayerOffloadStrategy:
         if is_forward and not is_next_forward:
             layers = sorted([i for i in loaded_layers if i not in self.forward_backward_loaded_layers[layer_index]])
         if not is_forward:
-            layers = sorted([i for i in loaded_layers if i not in self.backward_forward_loaded_layers[layer_index]],
-                            reverse=True)
+            layers = sorted(
+                [i for i in loaded_layers if i not in self.backward_forward_loaded_layers[layer_index]], reverse=True
+            )
 
         if is_forward:
             return [x for x in layers if x >= layer_index] + [x for x in layers if x < layer_index]
@@ -500,11 +529,11 @@ class LayerOffloadStrategy:
             return [x for x in layers if x < layer_index] + [x for x in layers if x >= layer_index]
 
     def get_layers_to_load(
-            self,
-            layer_index: int,
-            is_forward: bool,
-            is_next_forward: bool,
-            loaded_layers: list[int],
+        self,
+        layer_index: int,
+        is_forward: bool,
+        is_next_forward: bool,
+        loaded_layers: list[int],
     ) -> list[int]:
         layers = []
         if is_forward and is_next_forward:
@@ -512,8 +541,9 @@ class LayerOffloadStrategy:
         if is_forward and not is_next_forward:
             layers = sorted([i for i in self.forward_backward_loaded_layers[layer_index] if i not in loaded_layers])
         if not is_forward:
-            layers = sorted([i for i in self.backward_forward_loaded_layers[layer_index] if i not in loaded_layers],
-                            reverse=True)
+            layers = sorted(
+                [i for i in self.backward_forward_loaded_layers[layer_index] if i not in loaded_layers], reverse=True
+            )
 
         if is_forward:
             return [x for x in layers if x >= layer_index] + [x for x in layers if x < layer_index]
@@ -563,9 +593,9 @@ class LayerOffloadConductor:
     __config: TrainConfig
 
     def __init__(
-            self,
-            module: nn.Module,
-            config: TrainConfig,
+        self,
+        module: nn.Module,
+        config: TrainConfig,
     ):
         super().__init__()
 
@@ -648,10 +678,10 @@ class LayerOffloadConductor:
 
             self.__offload_strategy = LayerOffloadStrategy(self.__layers, self.__layer_offload_fraction)
 
-            self.__train_device_layer_allocator.allocate_cache(
-                self.__layers, self.__offload_strategy.max_loaded_bytes)
+            self.__train_device_layer_allocator.allocate_cache(self.__layers, self.__offload_strategy.max_loaded_bytes)
             self.__temp_device_layer_allocator.allocate_cache(
-                self.__layers, self.__offload_strategy.max_offloaded_bytes)
+                self.__layers, self.__offload_strategy.max_offloaded_bytes
+            )
             self.__module_to_device_except_layers(self.__train_device)
 
             # move all layers to the train device, then move offloadable tensors back to the temp device
@@ -662,7 +692,8 @@ class LayerOffloadConductor:
 
                     if layer_index in self.__offload_strategy.initial_loaded_layers:
                         allocator = self.__train_device_layer_allocator.get_allocator(
-                            layer_index, allocate_forward=True)
+                            layer_index, allocate_forward=True
+                        )
                         for module in layer.modules():
                             offload_quantized(module, self.__train_device, allocator=allocator.allocate_like)
                         self.__layer_device_map[layer_index] = self.__train_device
@@ -730,19 +761,18 @@ class LayerOffloadConductor:
                 replace_tensors_(activations, self.__activations_map.pop(call_index), tensor_indices)
 
             # if current activations are not on train_device, move them now
-            if not tensors_match_device(
-                    activations, self.__train_device,
-                    tensor_indices):
+            if not tensors_match_device(activations, self.__train_device, tensor_indices):
                 log(f"activations for layer {layer_index} not loaded to train device, transferring now")
                 self.__schedule_activations_to_device(
-                    activations, self.__train_device, call_index, wait_train_stream=False)
+                    activations, self.__train_device, call_index, wait_train_stream=False
+                )
                 self.__wait_activations_transfer(call_index)
 
             # schedule previous activations to the train device
             if call_index - 1 in self.__activations_map:
                 self.__schedule_activations_to_device(
-                    self.__activations_map[call_index - 1], self.__train_device, call_index - 1,
-                    wait_train_stream=False)
+                    self.__activations_map[call_index - 1], self.__train_device, call_index - 1, wait_train_stream=False
+                )
 
         # schedule loading of the next layer and offloading of the previous layer
         if self.__offload_layers:
@@ -750,18 +780,18 @@ class LayerOffloadConductor:
 
             self.__schedule_deferred_layers_to_temp(except_layer=layer_index)
             for i in self.__offload_strategy.get_layers_to_offload(
-                    layer_index=layer_index,
-                    is_forward=self.__is_forward_pass,
-                    is_next_forward=not self.__keep_graph,
-                    loaded_layers=self.__get_loaded_layers(),
+                layer_index=layer_index,
+                is_forward=self.__is_forward_pass,
+                is_next_forward=not self.__keep_graph,
+                loaded_layers=self.__get_loaded_layers(),
             ):
                 self.__schedule_layer_to(i, self.__temp_device, is_forward=self.__is_forward_pass)
 
             for i in self.__offload_strategy.get_layers_to_load(
-                    layer_index=layer_index,
-                    is_forward=self.__is_forward_pass,
-                    is_next_forward=not self.__keep_graph,
-                    loaded_layers=self.__get_loaded_layers(),
+                layer_index=layer_index,
+                is_forward=self.__is_forward_pass,
+                is_next_forward=not self.__keep_graph,
+                loaded_layers=self.__get_loaded_layers(),
             ):
                 self.__schedule_layer_to(i, self.__train_device, is_forward=self.__is_forward_pass)
 
@@ -791,8 +821,8 @@ class LayerOffloadConductor:
         return [i for i in range(len(self.__layers)) if device_equals(self.__layer_device_map[i], self.__train_device)]
 
     def __module_to_device_except_layers(
-            self,
-            device: torch.device,
+        self,
+        device: torch.device,
     ):
         sub_module_parameters = set(sum([list(x.parameters()) for x in self.__layers], []))
 
@@ -824,14 +854,12 @@ class LayerOffloadConductor:
             self.__wait_activations_transfer(call_index)
 
     def __wait_layer_train(self, layer_index: int):
-        self.__layer_train_event_map[layer_index] \
-            .wait(self.__layer_transfer_stream, f"wait layer train {layer_index}")
+        self.__layer_train_event_map[layer_index].wait(self.__layer_transfer_stream, f"wait layer train {layer_index}")
         self.__layer_train_event_map[layer_index] = SyncEvent()
 
     def __wait_layer_transfer(self, layer_index: int):
         if self.__async_transfer:
-            self.__layer_transfer_event_map[layer_index] \
-                .wait(self.__train_stream, f"wait layer transfer {layer_index}")
+            self.__layer_transfer_event_map[layer_index].wait(self.__train_stream, f"wait layer transfer {layer_index}")
             self.__layer_transfer_event_map[layer_index] = SyncEvent()
 
     def __wait_activations_transfer(self, call_index: int):
@@ -841,23 +869,27 @@ class LayerOffloadConductor:
             event.wait(self.__train_stream, f"wait activations transfer {call_index}")
 
     def __schedule_layer_to(
-            self,
-            layer_index: int,
-            device: torch.device,
-            is_forward: bool,
+        self,
+        layer_index: int,
+        device: torch.device,
+        is_forward: bool,
     ):
         current_device = self.__layer_device_map[layer_index]
         if device_equals(device, current_device):
             log(f"schedule layer {layer_index} to {str(device)}, skipping")
             return
 
-        layer_deallocator = self.__temp_device_layer_allocator \
-            if device_equals(device, self.__train_device) \
+        layer_deallocator = (
+            self.__temp_device_layer_allocator
+            if device_equals(device, self.__train_device)
             else self.__train_device_layer_allocator
+        )
 
-        layer_allocator = self.__train_device_layer_allocator \
-            if device_equals(device, self.__train_device) \
+        layer_allocator = (
+            self.__train_device_layer_allocator
+            if device_equals(device, self.__train_device)
             else self.__temp_device_layer_allocator
+        )
         allocator = layer_allocator.get_allocator(layer_index, is_forward)
 
         allocator_fn = allocator.allocate_like if allocator is not None else None
@@ -867,17 +899,21 @@ class LayerOffloadConductor:
             for module in layer.modules():
                 for parameter in module.parameters():
                     if parameter.grad is not None:
-                        #Layers to be offloaded usually do not have gradients. Model weights only have gradients in full-finetuning,
-                        #and then a fused backpass is required for offloading, which sets all gradients to None before a layer is offloaded.
-                        #There is only once exception:
-                        #In Multi-GPU training, when the gradient reduction has been started during the fused back pass, but
-                        #has not finished yet. The gradients are then set to None during the backward of one of the next layers.
-                        #Record which layers were ready to be offloaded, and offload them later:
-                        if (not self.__config.multi_gpu or not self.__config.optimizer.fused_back_pass
-                            or not self.__config.fused_gradient_reduce or not self.__config.async_gradient_reduce):
+                        # Layers to be offloaded usually do not have gradients. Model weights only have gradients in full-finetuning,
+                        # and then a fused backpass is required for offloading, which sets all gradients to None before a layer is offloaded.
+                        # There is only once exception:
+                        # In Multi-GPU training, when the gradient reduction has been started during the fused back pass, but
+                        # has not finished yet. The gradients are then set to None during the backward of one of the next layers.
+                        # Record which layers were ready to be offloaded, and offload them later:
+                        if (
+                            not self.__config.multi_gpu
+                            or not self.__config.optimizer.fused_back_pass
+                            or not self.__config.fused_gradient_reduce
+                            or not self.__config.async_gradient_reduce
+                        ):
                             raise RuntimeError("Gradients are still active while attempting to offload a layer")
 
-                        #TODO deferring layer offloading appears to work for multi-GPU training, but there might be edge cases because offloading depends on the exact same order of layer execution. It's possible that when communication between GPU lags, more layers are deferred and this fails silently.
+                        # TODO deferring layer offloading appears to work for multi-GPU training, but there might be edge cases because offloading depends on the exact same order of layer execution. It's possible that when communication between GPU lags, more layers are deferred and this fails silently.
                         self.__deferred_layers.append(layer_index)
                         return
 
@@ -899,30 +935,30 @@ class LayerOffloadConductor:
             self.__layer_device_map[layer_index] = device
 
     def __schedule_deferred_layers_to_temp(
-            self,
-            except_layer: int,
+        self,
+        except_layer: int,
     ):
         layers = self.__deferred_layers
         self.__deferred_layers = []
         for layer_index in layers:
             if layer_index == except_layer:
-                #don't offload this layer, because it is needed now #TODO can this even happen?
+                # don't offload this layer, because it is needed now #TODO can this even happen?
                 continue
             self.__schedule_layer_to(layer_index, device=self.__temp_device, is_forward=False)
 
     def __schedule_activations_to_device(
-            self,
-            activations: Any,
-            device: torch.device,
-            call_index: int,
-            wait_train_stream: bool,
+        self,
+        activations: Any,
+        device: torch.device,
+        call_index: int,
+        wait_train_stream: bool,
     ):
         log(f"schedule {call_index} activations to {str(device)}")
         layer_index = self.__call_index_layer_index_map[call_index]
 
-        activations_allocator = self.__temp_device_activations_allocator \
-            if device_equals(device, self.__temp_device) \
-            else None
+        activations_allocator = (
+            self.__temp_device_activations_allocator if device_equals(device, self.__temp_device) else None
+        )
 
         allocator_fn = activations_allocator.allocate_like if activations_allocator is not None else None
 
@@ -939,11 +975,14 @@ class LayerOffloadConductor:
             tensors = get_tensor_data(activations, tensor_indices)
             if activations_allocator is not None:
                 activations_allocator.reserve_cache(tensors)
-            tensors_to_device_(activations, device, tensor_indices, non_blocking=self.__async_transfer, allocator=allocator_fn)
+            tensors_to_device_(
+                activations, device, tensor_indices, non_blocking=self.__async_transfer, allocator=allocator_fn
+            )
 
             if self.__async_transfer:
                 tensors_record_stream(self.__activations_transfer_stream, tensors)
-                self.__activations_transfer_event_map[call_index] = \
-                    SyncEvent(self.__activations_transfer_stream.record_event(), f"transfer to {device}")
+                self.__activations_transfer_event_map[call_index] = SyncEvent(
+                    self.__activations_transfer_stream.record_event(), f"transfer to {device}"
+                )
 
             del tensors

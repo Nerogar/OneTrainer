@@ -13,12 +13,12 @@ class EncodeWuerstchenEffnet(
     RandomAccessPipelineModule,
 ):
     def __init__(
-            self,
-            in_name: str,
-            out_name: str,
-            effnet_encoder: WuerstchenEfficientNetEncoder,
-            autocast_contexts: list[torch.autocast | None] = None,
-            dtype: torch.dtype | None = None,
+        self,
+        in_name: str,
+        out_name: str,
+        effnet_encoder: WuerstchenEfficientNetEncoder,
+        autocast_contexts: list[torch.autocast | None] = None,
+        dtype: torch.dtype | None = None,
     ):
         super().__init__()
         self.in_name = in_name
@@ -46,6 +46,4 @@ class EncodeWuerstchenEffnet(
         with self._all_contexts(self.autocast_contexts):
             image_embeddings = self.effnet_encoder(image.unsqueeze(0)).squeeze()
 
-        return {
-            self.out_name: image_embeddings
-        }
+        return {self.out_name: image_embeddings}

@@ -12,10 +12,18 @@ class ConversionPattern:
     to_patterns: list[str]
     convert_fn: Callable | None
     reverse_convert_fn: Callable | None
-    children : list["ConversionPattern"]
+    children: list["ConversionPattern"]
 
 
-def _convert_item(in_key: str, input: dict, conversions: list[ConversionPattern], in_prefix: str="", out_prefix: str="", in_separator='.', out_separator='.'):
+def _convert_item(
+    in_key: str,
+    input: dict,
+    conversions: list[ConversionPattern],
+    in_prefix: str = "",
+    out_prefix: str = "",
+    in_separator=".",
+    out_separator=".",
+):
     for conversion in conversions:
         if conversion.children:
             if len(conversion.from_patterns) > 1:
@@ -27,8 +35,18 @@ def _convert_item(in_key: str, input: dict, conversions: list[ConversionPattern]
             if match is None:
                 continue
             child_in_prefix = in_prefix + conversion.from_patterns[0].format(*match.fixed, **match.named) + in_separator
-            child_out_prefix = out_prefix + conversion.to_patterns[0].format(*match.fixed, **match.named) + out_separator
-            return _convert_item(in_key, input, conversion.children, in_prefix=child_in_prefix, out_prefix=child_out_prefix, in_separator=in_separator, out_separator=out_separator)
+            child_out_prefix = (
+                out_prefix + conversion.to_patterns[0].format(*match.fixed, **match.named) + out_separator
+            )
+            return _convert_item(
+                in_key,
+                input,
+                conversion.children,
+                in_prefix=child_in_prefix,
+                out_prefix=child_out_prefix,
+                in_separator=in_separator,
+                out_separator=out_separator,
+            )
         else:
             for pattern in conversion.from_patterns:
                 match = parse.parse(in_prefix + pattern, in_key)
@@ -37,13 +55,13 @@ def _convert_item(in_key: str, input: dict, conversions: list[ConversionPattern]
 
             if match is None:
                 for pattern in conversion.from_patterns:
-                    match =  parse.parse(in_prefix + pattern + in_separator + "{post__}", in_key)
+                    match = parse.parse(in_prefix + pattern + in_separator + "{post__}", in_key)
                     if match is not None:
                         break
                 if match is None:
                     continue
-                in_postfix = in_separator + match.named['post__']
-                out_postfix = out_separator + match.named['post__']
+                in_postfix = in_separator + match.named["post__"]
+                out_postfix = out_separator + match.named["post__"]
             else:
                 in_postfix = ""
                 out_postfix = ""
@@ -56,14 +74,17 @@ def _convert_item(in_key: str, input: dict, conversions: list[ConversionPattern]
                     in_keys.append(new_in_key)
                     in_values.append(input[new_in_key])
             except KeyError:
-                #not a match, because not all from_patterns were found:
+                # not a match, because not all from_patterns were found:
                 continue
 
-            out_keys = [out_prefix + pattern.format(*match.fixed, **match.named) + out_postfix for pattern in conversion.to_patterns]
+            out_keys = [
+                out_prefix + pattern.format(*match.fixed, **match.named) + out_postfix
+                for pattern in conversion.to_patterns
+            ]
             if conversion.convert_fn is not None:
                 out_values = conversion.convert_fn(*in_values)
                 if not isinstance(out_values, tuple):
-                    out_values = (out_values, )
+                    out_values = (out_values,)
 
                 if len(out_values) != len(out_keys):
                     raise RuntimeError("convert_fn returned invalid number of outputs, for key " + in_key)
@@ -79,11 +100,14 @@ def _convert_item(in_key: str, input: dict, conversions: list[ConversionPattern]
 
     return [in_key], None
 
+
 def _is_conversion_pattern_list(conversions: list):
     return all(isinstance(entry, ConversionPattern) for entry in conversions)
 
+
 def _is_tuple_list(input: list):
     return isinstance(input, list) and all(isinstance(entry, tuple) for entry in input)
+
 
 def _create_conversions_list(conversion_input: list):
     if _is_tuple_list(conversion_input):
@@ -99,7 +123,13 @@ def _create_conversions_list(conversion_input: list):
     return output
 
 
-def convert(input_orig: dict, conversion_input: list[ConversionPattern] | list, strict: bool=True, in_separator='.', out_separator='.'):
+def convert(
+    input_orig: dict,
+    conversion_input: list[ConversionPattern] | list,
+    strict: bool = True,
+    in_separator=".",
+    out_separator=".",
+):
     conversions_list = _create_conversions_list(conversion_input)
 
     input = input_orig.copy()
@@ -107,7 +137,9 @@ def convert(input_orig: dict, conversion_input: list[ConversionPattern] | list, 
         output = {}
         while len(input) > 0:
             in_key = next(iter(input))
-            input_keys, output_items = _convert_item(in_key, input, conversions, in_separator=in_separator, out_separator=out_separator)
+            input_keys, output_items = _convert_item(
+                in_key, input, conversions, in_separator=in_separator, out_separator=out_separator
+            )
             if output_items is None:
                 if strict:
                     raise RuntimeError("No conversion found for key " + in_key)
@@ -141,8 +173,10 @@ def reverse_conversion_pattern(input: ConversionPattern):
         children=reverse_conversion(input.children),
     )
 
+
 def reverse_conversion(input: list[ConversionPattern]):
     return [reverse_conversion_pattern(entry) for entry in input]
+
 
 def _create_pattern_list(input: str | list[str]):
     pattern = input
@@ -181,23 +215,28 @@ def _create_conversion_pattern_from_tuple(input: tuple | ConversionPattern):
 
     return ConversionPattern(from_patterns, to_patterns, convert_fn, reverse_convert_fn, children)
 
+
 def _create_conversion_from_tuple_list(input: list):
     return [_create_conversion_pattern_from_tuple(entry) for entry in input]
 
+
 def fuse_qkv(q, k, v):
     return torch.cat([q, k, v], dim=0)
+
 
 def fuse_qkv_mlp(q, k, v, mlp):
     return torch.cat([q, k, v, mlp], dim=0)
 
 
-def remove_prefix(prefix: str | None = None, separator: str='.'):
+def remove_prefix(prefix: str | None = None, separator: str = "."):
     if prefix is None:
         prefix = "{prefix__}"
     return [(prefix + separator + "{key}", "{key}")]
 
-def add_prefix(prefix: str, separator: str='.'):
+
+def add_prefix(prefix: str, separator: str = "."):
     return [("{}", prefix + separator + "{}")]
+
 
 def lora_fuse_qkv(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha):
     dim, rank = q_up.shape
@@ -207,9 +246,9 @@ def lora_fuse_qkv(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_
         device=q_up.device,
         dtype=q_up.dtype,
     )
-    qkv_up[dim*0:dim*1, rank*0:rank*1] = q_up
-    qkv_up[dim*1:dim*2, rank*1:rank*2] = k_up
-    qkv_up[dim*2:dim*3, rank*2:rank*3] = v_up
+    qkv_up[dim * 0 : dim * 1, rank * 0 : rank * 1] = q_up
+    qkv_up[dim * 1 : dim * 2, rank * 1 : rank * 2] = k_up
+    qkv_up[dim * 2 : dim * 3, rank * 2 : rank * 3] = v_up
     qkv_down = torch.cat([q_down, k_down, v_down], dim=0)
 
     qkv_alpha = q_alpha * 3
@@ -217,6 +256,7 @@ def lora_fuse_qkv(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_
         raise NotImplementedError("fused layers must have the same alpha")
 
     return qkv_up, qkv_down, qkv_alpha
+
 
 def lora_fuse_qkv_mlp(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha, mlp_up, mlp_down, mlp_alpha):
     dim, rank = q_up.shape
@@ -227,10 +267,10 @@ def lora_fuse_qkv_mlp(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down
         device=q_up.device,
         dtype=q_up.dtype,
     )
-    qkv_up[dim*0:dim*1, rank*0:rank*1] = q_up
-    qkv_up[dim*1:dim*2, rank*1:rank*2] = k_up
-    qkv_up[dim*2:dim*3, rank*2:rank*3] = v_up
-    qkv_up[dim*3:,      rank*3:rank*4] = mlp_up
+    qkv_up[dim * 0 : dim * 1, rank * 0 : rank * 1] = q_up
+    qkv_up[dim * 1 : dim * 2, rank * 1 : rank * 2] = k_up
+    qkv_up[dim * 2 : dim * 3, rank * 2 : rank * 3] = v_up
+    qkv_up[dim * 3 :, rank * 3 : rank * 4] = mlp_up
     qkv_down = torch.cat([q_down, k_down, v_down, mlp_down], dim=0)
 
     qkv_alpha = q_alpha * 4
@@ -239,56 +279,92 @@ def lora_fuse_qkv_mlp(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down
 
     return qkv_up, qkv_down, qkv_alpha
 
+
 def lora_fuse_qkv_to_qkv_mlp(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha):
-    #TODO where to get output shape from, if there is no MLP dim?
+    # TODO where to get output shape from, if there is no MLP dim?
     raise NotImplementedError
+
 
 def lora_fuse_mlp_to_qkv_mlp(mlp_up, mlp_down, mlp_alpha):
-    #TODO where to get output shape from, if there is no qkv dim?
+    # TODO where to get output shape from, if there is no qkv dim?
     raise NotImplementedError
 
-def swap_chunks(input: torch.Tensor, dim: int=0) -> torch.Tensor:
+
+def swap_chunks(input: torch.Tensor, dim: int = 0) -> torch.Tensor:
     chunks = input.chunk(2, dim=dim)
     return torch.cat([chunks[1], chunks[0]], dim=dim)
 
+
 def lora_qkv_fusion(q: str, k: str, v: str, qkv: str):
     return [
-        ([f"{q}.lora_up.weight", f"{q}.lora_down.weight", f"{q}.alpha",
-          f"{k}.lora_up.weight", f"{k}.lora_down.weight", f"{k}.alpha",
-          f"{v}.lora_up.weight", f"{v}.lora_down.weight", f"{v}.alpha"],
-         [f"{qkv}.lora_up.weight", f"{qkv}.lora_down.weight", f"{qkv}.alpha"], lora_fuse_qkv),
-    ]
-
-def lora_qkv_mlp_fusion(q: str, k: str, v: str, mlp: str, qkv_mlp: str, separator: str='.'):
-    return [
-        ([f"{q}.lora_up.weight",   f"{q}.lora_down.weight", f"{q}.alpha",
-          f"{k}.lora_up.weight",   f"{k}.lora_down.weight", f"{k}.alpha",
-          f"{v}.lora_up.weight",   f"{v}.lora_down.weight", f"{v}.alpha",
-          f"{mlp}.lora_up.weight", f"{mlp}.lora_down.weight", f"{mlp}.alpha"],
-         [f"{qkv_mlp}.lora_up.weight", f"{qkv_mlp}.lora_down.weight", f"{qkv_mlp}.alpha"], lora_fuse_qkv_mlp
-        ),
-
-        #qkv only, in case there are no mlp layers:
-        ([f"{q}.lora_up.weight",   f"{q}.lora_down.weight", f"{q}.alpha",
-          f"{k}.lora_up.weight",   f"{k}.lora_down.weight", f"{k}.alpha",
-          f"{v}.lora_up.weight",   f"{v}.lora_down.weight", f"{v}.alpha"],
-         [f"{qkv_mlp}.lora_up.weight", f"{qkv_mlp}.lora_down.weight", f"{qkv_mlp}.alpha"],
-          lambda q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha: lora_fuse_qkv_to_qkv_mlp(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha)
-        ),
-
-        #mlp only, in case there are no qkv layers:
-        ([f"{mlp}.lora_up.weight", f"{mlp}.lora_down.weight", f"{mlp}.alpha"],
-         [f"{qkv_mlp}.lora_up.weight", f"{qkv_mlp}.lora_down.weight", f"{qkv_mlp}.alpha"],
-          lambda mlp_up, mlp_down, mlp_alpha: lora_fuse_mlp_to_qkv_mlp(mlp_up, mlp_down, mlp_alpha)
+        (
+            [
+                f"{q}.lora_up.weight",
+                f"{q}.lora_down.weight",
+                f"{q}.alpha",
+                f"{k}.lora_up.weight",
+                f"{k}.lora_down.weight",
+                f"{k}.alpha",
+                f"{v}.lora_up.weight",
+                f"{v}.lora_down.weight",
+                f"{v}.alpha",
+            ],
+            [f"{qkv}.lora_up.weight", f"{qkv}.lora_down.weight", f"{qkv}.alpha"],
+            lora_fuse_qkv,
         ),
     ]
 
-def qkv_fusion(q: str, k: str, v: str, qkv: str, separator: str='.'):
+
+def lora_qkv_mlp_fusion(q: str, k: str, v: str, mlp: str, qkv_mlp: str, separator: str = "."):
     return [
-        ([q, k, v], qkv, fuse_qkv)
+        (
+            [
+                f"{q}.lora_up.weight",
+                f"{q}.lora_down.weight",
+                f"{q}.alpha",
+                f"{k}.lora_up.weight",
+                f"{k}.lora_down.weight",
+                f"{k}.alpha",
+                f"{v}.lora_up.weight",
+                f"{v}.lora_down.weight",
+                f"{v}.alpha",
+                f"{mlp}.lora_up.weight",
+                f"{mlp}.lora_down.weight",
+                f"{mlp}.alpha",
+            ],
+            [f"{qkv_mlp}.lora_up.weight", f"{qkv_mlp}.lora_down.weight", f"{qkv_mlp}.alpha"],
+            lora_fuse_qkv_mlp,
+        ),
+        # qkv only, in case there are no mlp layers:
+        (
+            [
+                f"{q}.lora_up.weight",
+                f"{q}.lora_down.weight",
+                f"{q}.alpha",
+                f"{k}.lora_up.weight",
+                f"{k}.lora_down.weight",
+                f"{k}.alpha",
+                f"{v}.lora_up.weight",
+                f"{v}.lora_down.weight",
+                f"{v}.alpha",
+            ],
+            [f"{qkv_mlp}.lora_up.weight", f"{qkv_mlp}.lora_down.weight", f"{qkv_mlp}.alpha"],
+            lambda q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha: lora_fuse_qkv_to_qkv_mlp(
+                q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha
+            ),
+        ),
+        # mlp only, in case there are no qkv layers:
+        (
+            [f"{mlp}.lora_up.weight", f"{mlp}.lora_down.weight", f"{mlp}.alpha"],
+            [f"{qkv_mlp}.lora_up.weight", f"{qkv_mlp}.lora_down.weight", f"{qkv_mlp}.alpha"],
+            lambda mlp_up, mlp_down, mlp_alpha: lora_fuse_mlp_to_qkv_mlp(mlp_up, mlp_down, mlp_alpha),
+        ),
     ]
 
-def qkv_mlp_fusion(q: str, k: str, v: str, mlp: str, qkv: str, separator: str='.'):
-    return [
-        ([q, k, v, mlp], qkv, fuse_qkv_mlp)
-    ]
+
+def qkv_fusion(q: str, k: str, v: str, qkv: str, separator: str = "."):
+    return [([q, k, v], qkv, fuse_qkv)]
+
+
+def qkv_mlp_fusion(q: str, k: str, v: str, mlp: str, qkv: str, separator: str = "."):
+    return [([q, k, v, mlp], qkv, fuse_qkv_mlp)]

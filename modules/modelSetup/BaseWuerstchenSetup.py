@@ -53,9 +53,9 @@ class BaseWuerstchenSetup(
     }
 
     def setup_optimizations(
-            self,
-            model: WuerstchenModel,
-            config: TrainConfig,
+        self,
+        model: WuerstchenModel,
+        config: TrainConfig,
     ):
         if config.gradient_checkpointing.enabled():
             if model.model_type.is_wuerstchen_v2():
@@ -72,16 +72,21 @@ class BaseWuerstchenSetup(
             if model.prior_prior_lora is not None:
                 apply_circular_padding_to_conv2d(model.prior_prior_lora)
 
-        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().decoder_text_encoder,
-            config.weight_dtypes().decoder,
-            config.weight_dtypes().decoder_vqgan,
-            config.weight_dtypes().effnet_encoder,
-            config.weight_dtypes().text_encoder,
-            config.weight_dtypes().prior,
-            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-            config.weight_dtypes().embedding if config.train_any_embedding() else None,
-        ], config.enable_autocast_cache)
+        model.autocast_context, model.train_dtype = create_autocast_context(
+            self.train_device,
+            config.train_dtype,
+            [
+                config.weight_dtypes().decoder_text_encoder,
+                config.weight_dtypes().decoder,
+                config.weight_dtypes().decoder_vqgan,
+                config.weight_dtypes().effnet_encoder,
+                config.weight_dtypes().text_encoder,
+                config.weight_dtypes().prior,
+                config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+                config.weight_dtypes().embedding if config.train_any_embedding() else None,
+            ],
+            config.enable_autocast_cache,
+        )
 
         if model.model_type.is_stable_cascade():
             model.prior_autocast_context, model.prior_train_dtype = disable_fp16_autocast_context(
@@ -115,9 +120,9 @@ class BaseWuerstchenSetup(
         quantize_layers(model.prior_prior, self.train_device, model.prior_train_dtype, config)
 
     def _setup_embeddings(
-            self,
-            model: WuerstchenModel,
-            config: TrainConfig,
+        self,
+        model: WuerstchenModel,
+        config: TrainConfig,
     ):
         additional_embeddings = []
         for embedding_config in config.all_embedding_configs():
@@ -157,9 +162,9 @@ class BaseWuerstchenSetup(
             self._add_embeddings_to_tokenizer(model.prior_tokenizer, model.all_prior_text_encoder_embeddings())
 
     def _setup_embedding_wrapper(
-            self,
-            model: WuerstchenModel,
-            config: TrainConfig,
+        self,
+        model: WuerstchenModel,
+        config: TrainConfig,
     ):
         model.prior_embedding_wrapper = AdditionalEmbeddingWrapper(
             tokenizer=model.prior_tokenizer,
@@ -169,20 +174,22 @@ class BaseWuerstchenSetup(
         model.prior_embedding_wrapper.hook_to_module()
 
     def _setup_embeddings_requires_grad(
-            self,
-            model: WuerstchenModel,
-            config: TrainConfig,
+        self,
+        model: WuerstchenModel,
+        config: TrainConfig,
     ):
-        for embedding, embedding_config in zip(model.all_prior_text_encoder_embeddings(),
-                                               config.all_embedding_configs(), strict=True):
-            train_embedding = embedding_config.train and \
-                              not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
+        for embedding, embedding_config in zip(
+            model.all_prior_text_encoder_embeddings(), config.all_embedding_configs(), strict=True
+        ):
+            train_embedding = embedding_config.train and not self.stop_embedding_training_elapsed(
+                embedding_config, model.train_progress
+            )
             embedding.requires_grad_(train_embedding)
 
     def __alpha_cumprod(
-            self,
-            timesteps: Tensor,
-            dim: int,
+        self,
+        timesteps: Tensor,
+        dim: int,
     ):
         # copied and modified from https://github.com/dome272/wuerstchen
         s = torch.tensor([0.008], device=timesteps.device, dtype=torch.float32)
@@ -195,16 +202,16 @@ class BaseWuerstchenSetup(
         return alpha_cumprod
 
     def predict(
-            self,
-            model: WuerstchenModel,
-            batch: dict,
-            config: TrainConfig,
-            train_progress: TrainProgress,
-            *,
-            deterministic: bool = False,
+        self,
+        model: WuerstchenModel,
+        batch: dict,
+        config: TrainConfig,
+        train_progress: TrainProgress,
+        *,
+        deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
-            latent_image = batch['latent_image']
+            latent_image = batch["latent_image"]
             if model.model_type.is_wuerstchen_v2():
                 scaled_latent_image = latent_image.add(1.0).div(42.0)
             elif model.model_type.is_stable_cascade():
@@ -238,15 +245,17 @@ class BaseWuerstchenSetup(
 
             text_embedding, pooled_text_text_embedding = model.encode_text(
                 train_device=self.train_device,
-                batch_size=batch['latent_image'].shape[0],
+                batch_size=batch["latent_image"].shape[0],
                 rand=rand,
-                tokens=batch['tokens'],
-                tokens_mask=batch['tokens_mask'],
+                tokens=batch["tokens"],
+                tokens_mask=batch["tokens_mask"],
                 text_encoder_layer_skip=config.text_encoder_layer_skip,
-                text_encoder_output=batch[
-                    'text_encoder_hidden_state'] if not config.train_text_encoder_or_embedding() else None,
-                pooled_text_encoder_output=batch[
-                    'pooled_text_encoder_output'] if not config.train_text_encoder_or_embedding() else None,
+                text_encoder_output=batch["text_encoder_hidden_state"]
+                if not config.train_text_encoder_or_embedding()
+                else None,
+                pooled_text_encoder_output=batch["pooled_text_encoder_output"]
+                if not config.train_text_encoder_or_embedding()
+                else None,
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
 
@@ -254,7 +263,7 @@ class BaseWuerstchenSetup(
 
             if model.model_type.is_wuerstchen_v2():
                 prior_kwargs = {
-                    'c': text_embedding.to(dtype=model.prior_train_dtype.torch_dtype()),
+                    "c": text_embedding.to(dtype=model.prior_train_dtype.torch_dtype()),
                 }
             elif model.model_type.is_stable_cascade():
                 clip_img = torch.zeros(
@@ -263,9 +272,9 @@ class BaseWuerstchenSetup(
                     device=self.train_device,
                 )
                 prior_kwargs = {
-                    'clip_text': text_embedding.to(dtype=model.prior_train_dtype.torch_dtype()),
-                    'clip_text_pooled': pooled_text_text_embedding.to(dtype=model.prior_train_dtype.torch_dtype()),
-                    'clip_img': clip_img,
+                    "clip_text": text_embedding.to(dtype=model.prior_train_dtype.torch_dtype()),
+                    "clip_text_pooled": pooled_text_text_embedding.to(dtype=model.prior_train_dtype.torch_dtype()),
+                    "clip_img": clip_img,
                 }
 
             with model.prior_autocast_context:
@@ -278,17 +287,17 @@ class BaseWuerstchenSetup(
                     predicted_latent_noise = predicted_latent_noise.sample
 
             model_output_data = {
-                'loss_type': 'target',
-                'predicted': predicted_latent_noise,
-                'prediction_type': 'epsilon',  # the DDPMWuerstchenScheduler only supports eps prediction
-                'target': latent_noise,
-                'timestep': timestep,
+                "loss_type": "target",
+                "predicted": predicted_latent_noise,
+                "prediction_type": "epsilon",  # the DDPMWuerstchenScheduler only supports eps prediction
+                "target": latent_noise,
+                "timestep": timestep,
             }
 
             if config.debug_mode:
                 with torch.no_grad():
                     self._save_text(
-                        self._decode_tokens(batch['tokens'], model.prior_tokenizer),
+                        self._decode_tokens(batch["tokens"], model.prior_tokenizer),
                         config.debug_dir + "/training_batches",
                         "7-prompt",
                         train_progress.global_step,
@@ -299,7 +308,7 @@ class BaseWuerstchenSetup(
                         self._project_latent_to_image(latent_noise).clamp(-1, 1),
                         config.debug_dir + "/training_batches",
                         "1-noise",
-                        train_progress.global_step
+                        train_progress.global_step,
                     )
 
                     # predicted noise
@@ -307,7 +316,7 @@ class BaseWuerstchenSetup(
                         self._project_latent_to_image(predicted_latent_noise).clamp(-1, 1),
                         config.debug_dir + "/training_batches",
                         "2-predicted_noise",
-                        train_progress.global_step
+                        train_progress.global_step,
                     )
 
                     # noisy image
@@ -315,25 +324,25 @@ class BaseWuerstchenSetup(
                         self._project_latent_to_image(scaled_noisy_latent_image).clamp(-1, 1),
                         config.debug_dir + "/training_batches",
                         "3-noisy_image",
-                        train_progress.global_step
+                        train_progress.global_step,
                     )
 
                     # predicted image
                     alpha_cumprod = self.__alpha_cumprod(timestep, latent_noise.dim())
-                    sqrt_alpha_prod = alpha_cumprod ** 0.5
+                    sqrt_alpha_prod = alpha_cumprod**0.5
                     sqrt_alpha_prod = sqrt_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
                     sqrt_one_minus_alpha_prod = (1 - alpha_cumprod) ** 0.5
                     sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
-                    scaled_predicted_latent_image = \
-                        (scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) \
-                        / sqrt_alpha_prod
+                    scaled_predicted_latent_image = (
+                        scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod
+                    ) / sqrt_alpha_prod
                     self._save_image(
                         self._project_latent_to_image(scaled_predicted_latent_image).clamp(-1, 1),
                         config.debug_dir + "/training_batches",
                         "4-predicted_image",
-                        model.train_progress.global_step
+                        model.train_progress.global_step,
                     )
 
                     # image
@@ -341,17 +350,17 @@ class BaseWuerstchenSetup(
                         self._project_latent_to_image(scaled_latent_image).clamp(-1, 1),
                         config.debug_dir + "/training_batches",
                         "5-image",
-                        model.train_progress.global_step
+                        model.train_progress.global_step,
                     )
 
         return model_output_data
 
     def calculate_loss(
-            self,
-            model: WuerstchenModel,
-            batch: dict,
-            data: dict,
-            config: TrainConfig,
+        self,
+        model: WuerstchenModel,
+        batch: dict,
+        data: dict,
+        config: TrainConfig,
     ) -> Tensor:
         return self._diffusion_losses(
             batch=batch,

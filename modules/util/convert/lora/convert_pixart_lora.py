@@ -24,11 +24,19 @@ def __map_transformer_attention_block(key_prefix: LoraConversionKeySet) -> list[
 def __map_transformer(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 
-    keys += [LoraConversionKeySet("ar_embedder.mlp.0", "adaln_single.emb.aspect_ratio_embedder.linear_1", parent=key_prefix)]
-    keys += [LoraConversionKeySet("ar_embedder.mlp.2", "adaln_single.emb.aspect_ratio_embedder.linear_2", parent=key_prefix)]
+    keys += [
+        LoraConversionKeySet("ar_embedder.mlp.0", "adaln_single.emb.aspect_ratio_embedder.linear_1", parent=key_prefix)
+    ]
+    keys += [
+        LoraConversionKeySet("ar_embedder.mlp.2", "adaln_single.emb.aspect_ratio_embedder.linear_2", parent=key_prefix)
+    ]
 
-    keys += [LoraConversionKeySet("csize_embedder.mlp.0", "adaln_single.emb.resolution_embedder.linear_1", parent=key_prefix)]
-    keys += [LoraConversionKeySet("csize_embedder.mlp.2", "adaln_single.emb.resolution_embedder.linear_2", parent=key_prefix)]
+    keys += [
+        LoraConversionKeySet("csize_embedder.mlp.0", "adaln_single.emb.resolution_embedder.linear_1", parent=key_prefix)
+    ]
+    keys += [
+        LoraConversionKeySet("csize_embedder.mlp.2", "adaln_single.emb.resolution_embedder.linear_2", parent=key_prefix)
+    ]
 
     keys += [LoraConversionKeySet("y_embedder.y_proj.fc1", "caption_projection.linear_1", parent=key_prefix)]
     keys += [LoraConversionKeySet("y_embedder.y_proj.fc2", "caption_projection.linear_2", parent=key_prefix)]

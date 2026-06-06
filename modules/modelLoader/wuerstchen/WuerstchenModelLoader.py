@@ -26,14 +26,14 @@ class WuerstchenModelLoader(
         super().__init__()
 
     def __load_internal(
-            self,
-            model: WuerstchenModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            prior_model_name: str,
-            effnet_encoder_model_name: str,
-            decoder_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: WuerstchenModel,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        prior_model_name: str,
+        effnet_encoder_model_name: str,
+        decoder_model_name: str,
+        quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(prior_model_name, "meta.json")):
             self.__load_diffusers(
@@ -50,15 +50,15 @@ class WuerstchenModelLoader(
             raise Exception("not an internal model")
 
     def __load_diffusers(
-            self,
-            model: WuerstchenModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            prior_model_name: str,
-            prior_prior_model_name: str,
-            effnet_encoder_model_name: str,
-            decoder_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: WuerstchenModel,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        prior_model_name: str,
+        prior_prior_model_name: str,
+        effnet_encoder_model_name: str,
+        decoder_model_name: str,
+        quantization: QuantizationConfig,
     ):
         if model_type.is_wuerstchen_v2():
             decoder_tokenizer = CLIPTokenizer.from_pretrained(
@@ -145,7 +145,10 @@ class WuerstchenModelLoader(
                 prior_prior = StableCascadeUNet(**prior_config)
                 prior_prior.load_state_dict(convert_stable_cascade_ckpt_to_diffusers(load_file(prior_prior_model_name)))
                 prior_prior = self._convert_diffusers_sub_module_to_dtype(
-                    prior_prior, weight_dtypes.prior, weight_dtypes.fallback_train_dtype, quantization,
+                    prior_prior,
+                    weight_dtypes.prior,
+                    weight_dtypes.fallback_train_dtype,
+                    quantization,
                 )
             else:
                 prior_prior = self._load_diffusers_sub_module(
@@ -197,12 +200,12 @@ class WuerstchenModelLoader(
         model.prior_prior = prior_prior
 
     def load(
-            self,
-            model: WuerstchenModel,
-            model_type: ModelType,
-            model_names: ModelNames,
-            weight_dtypes: ModelWeightDtypes,
-            quantization: QuantizationConfig,
+        self,
+        model: WuerstchenModel,
+        model_type: ModelType,
+        model_names: ModelNames,
+        weight_dtypes: ModelWeightDtypes,
+        quantization: QuantizationConfig,
     ):
         stacktraces = []
 
@@ -218,7 +221,8 @@ class WuerstchenModelLoader(
                 weight_dtypes,
                 prior_model_name,
                 effnet_encoder_model_name,
-                decoder_model_name, quantization,
+                decoder_model_name,
+                quantization,
             )
             return
         except Exception:
@@ -232,7 +236,8 @@ class WuerstchenModelLoader(
                 prior_model_name,
                 prior_prior_model_name,
                 effnet_encoder_model_name,
-                decoder_model_name, quantization,
+                decoder_model_name,
+                quantization,
             )
             return
         except Exception:

@@ -12,16 +12,17 @@ class InternalModelSaverMixin(metaclass=ABCMeta):
         super().__init__()
 
     def _save_internal_data(
-            self,
-            model: BaseModel,
-            destination: str,
+        self,
+        model: BaseModel,
+        destination: str,
     ):
         # optimizer
         os.makedirs(os.path.join(destination, "optimizer"), exist_ok=True)
         optimizer_state_dict = model.optimizer.state_dict()
         optimizer_state_dict["param_group_mapping"] = model.param_group_mapping
-        optimizer_state_dict["param_group_optimizer_mapping"] = \
-            [str(model.train_config.optimizer.optimizer) for _ in model.param_group_mapping]
+        optimizer_state_dict["param_group_optimizer_mapping"] = [
+            str(model.train_config.optimizer.optimizer) for _ in model.param_group_mapping
+        ]
 
         torch.save(optimizer_state_dict, os.path.join(destination, "optimizer", "optimizer.pt"))
 
@@ -32,11 +33,14 @@ class InternalModelSaverMixin(metaclass=ABCMeta):
 
         # meta
         with open(os.path.join(destination, "meta.json"), "w") as meta_file:
-            json.dump({
-                'train_progress': {
-                    'epoch': model.train_progress.epoch,
-                    'epoch_step': model.train_progress.epoch_step,
-                    'epoch_sample': model.train_progress.epoch_sample,
-                    'global_step': model.train_progress.global_step,
+            json.dump(
+                {
+                    "train_progress": {
+                        "epoch": model.train_progress.epoch,
+                        "epoch_step": model.train_progress.epoch_step,
+                        "epoch_sample": model.train_progress.epoch_sample,
+                        "global_step": model.train_progress.global_step,
+                    },
                 },
-            }, meta_file)
+                meta_file,
+            )

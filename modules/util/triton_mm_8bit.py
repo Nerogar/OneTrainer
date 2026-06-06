@@ -1,15 +1,15 @@
-#This is a 8bit matmul kernel adapted from the Triton tutorial here:
-#https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html
+# This is a 8bit matmul kernel adapted from the Triton tutorial here:
+# https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html
 
-#It is not optimized and about 10% slower than torch._int_mm and torch._scaled_mm
-#However, the torch functions don't work on row-major rhs matrices:
-#_scaled_mm fails, _int_mm automatically converts to column-major
+# It is not optimized and about 10% slower than torch._int_mm and torch._scaled_mm
+# However, the torch functions don't work on row-major rhs matrices:
+# _scaled_mm fails, _int_mm automatically converts to column-major
 #
-#Converting to column-major is slow, which is significant because the weights matrix
-#of a Linear layer is always column-major during the backward pass.
+# Converting to column-major is slow, which is significant because the weights matrix
+# of a Linear layer is always column-major during the backward pass.
 #
-#In these cases, this Triton kernel is *much* faster because it can access the
-#row-major weight matrix directly, using strided memory access
+# In these cases, this Triton kernel is *much* faster because it can access the
+# row-major weight matrix directly, using strided memory access
 
 import torch
 
@@ -19,43 +19,49 @@ import triton.language as tl
 
 @triton.autotune(
     configs=[
-        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 128}, num_stages=4,num_warps=4),
-        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K':  32}, num_stages=4,num_warps=4),
-        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 256, 'BLOCK_SIZE_K': 128}, num_stages=3,num_warps=8),
-        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 256, 'BLOCK_SIZE_K':  64}, num_stages=3,num_warps=8),
-        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N':  32, 'BLOCK_SIZE_K':  32}, num_stages=4,num_warps=4),
-        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N':  32, 'BLOCK_SIZE_K':  64}, num_stages=4,num_warps=4),
-        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N':  64, 'BLOCK_SIZE_K':  32}, num_stages=4,num_warps=4),
-        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N':  64, 'BLOCK_SIZE_K':  64}, num_stages=4,num_warps=4),
-        triton.Config({'BLOCK_SIZE_M': 256, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 128}, num_stages=3,num_warps=8),
-        triton.Config({'BLOCK_SIZE_M': 256, 'BLOCK_SIZE_N':  64, 'BLOCK_SIZE_K': 128}, num_stages=4,num_warps=4),
-        triton.Config({'BLOCK_SIZE_M':  32, 'BLOCK_SIZE_N':  64, 'BLOCK_SIZE_K':  32}, num_stages=5,num_warps=2),
-        triton.Config({'BLOCK_SIZE_M':  64, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K':  32}, num_stages=4,num_warps=4),
-        triton.Config({'BLOCK_SIZE_M':  64, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K':  64}, num_stages=4,num_warps=4),
-        triton.Config({'BLOCK_SIZE_M':  64, 'BLOCK_SIZE_N': 256, 'BLOCK_SIZE_K': 128}, num_stages=4,num_warps=4),
-        triton.Config({'BLOCK_SIZE_M':  64, 'BLOCK_SIZE_N': 256, 'BLOCK_SIZE_K':  32}, num_stages=4,num_warps=4),
-        triton.Config({'BLOCK_SIZE_M':  64, 'BLOCK_SIZE_N':  32, 'BLOCK_SIZE_K':  32}, num_stages=5,num_warps=2),
-
-
+        triton.Config({"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 128, "BLOCK_SIZE_K": 128}, num_stages=4, num_warps=4),
+        triton.Config({"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 128, "BLOCK_SIZE_K": 32}, num_stages=4, num_warps=4),
+        triton.Config({"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 128}, num_stages=3, num_warps=8),
+        triton.Config({"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 64}, num_stages=3, num_warps=8),
+        triton.Config({"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 32}, num_stages=4, num_warps=4),
+        triton.Config({"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 64}, num_stages=4, num_warps=4),
+        triton.Config({"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 64, "BLOCK_SIZE_K": 32}, num_stages=4, num_warps=4),
+        triton.Config({"BLOCK_SIZE_M": 128, "BLOCK_SIZE_N": 64, "BLOCK_SIZE_K": 64}, num_stages=4, num_warps=4),
+        triton.Config({"BLOCK_SIZE_M": 256, "BLOCK_SIZE_N": 128, "BLOCK_SIZE_K": 128}, num_stages=3, num_warps=8),
+        triton.Config({"BLOCK_SIZE_M": 256, "BLOCK_SIZE_N": 64, "BLOCK_SIZE_K": 128}, num_stages=4, num_warps=4),
+        triton.Config({"BLOCK_SIZE_M": 32, "BLOCK_SIZE_N": 64, "BLOCK_SIZE_K": 32}, num_stages=5, num_warps=2),
+        triton.Config({"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 128, "BLOCK_SIZE_K": 32}, num_stages=4, num_warps=4),
+        triton.Config({"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 128, "BLOCK_SIZE_K": 64}, num_stages=4, num_warps=4),
+        triton.Config({"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 128}, num_stages=4, num_warps=4),
+        triton.Config({"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 256, "BLOCK_SIZE_K": 32}, num_stages=4, num_warps=4),
+        triton.Config({"BLOCK_SIZE_M": 64, "BLOCK_SIZE_N": 32, "BLOCK_SIZE_K": 32}, num_stages=5, num_warps=2),
     ],
     key=[
-        'QUANTIZED_M', #only tune roughly on M, because M is the transformer sequence length - can vary on data
-        'N',
-        'K',
-        'stride_bk'    #use stride of b as key, to autotune again for a strided rhs matrix (backward pass)
+        "QUANTIZED_M",  # only tune roughly on M, because M is the transformer sequence length - can vary on data
+        "N",
+        "K",
+        "stride_bk",  # use stride of b as key, to autotune again for a strided rhs matrix (backward pass)
     ],
 )
-
 @triton.jit
 def _mm_kernel(
-        a_ptr, b_ptr, c_ptr,
-        M, N, K,
-        stride_am, stride_ak,
-        stride_bk, stride_bn,
-        stride_cm, stride_cn,
-        BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
-        QUANTIZED_M,
-        FLOAT: tl.constexpr,
+    a_ptr,
+    b_ptr,
+    c_ptr,
+    M,
+    N,
+    K,
+    stride_am,
+    stride_ak,
+    stride_bk,
+    stride_bn,
+    stride_cm,
+    stride_cn,
+    BLOCK_SIZE_M: tl.constexpr,
+    BLOCK_SIZE_N: tl.constexpr,
+    BLOCK_SIZE_K: tl.constexpr,
+    QUANTIZED_M,
+    FLOAT: tl.constexpr,
 ):
 
     pid_n = tl.program_id(axis=0)
@@ -79,8 +85,8 @@ def _mm_kernel(
     accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32 if FLOAT else tl.int32)
 
     for k in range(tl.cdiv(K, BLOCK_SIZE_K)):
-        a_mask = (offs_am[:, None] < M) & (offs_k[None, :] < K - k*BLOCK_SIZE_K)
-        b_mask = (offs_bn[None, :] < N) & (offs_k[:, None] < K - k*BLOCK_SIZE_K)
+        a_mask = (offs_am[:, None] < M) & (offs_k[None, :] < K - k * BLOCK_SIZE_K)
+        b_mask = (offs_bn[None, :] < N) & (offs_k[:, None] < K - k * BLOCK_SIZE_K)
         a = tl.load(a_ptrs, mask=a_mask, other=0.0)
         b = tl.load(b_ptrs, mask=b_mask, other=0.0)
 
@@ -95,27 +101,39 @@ def _mm_kernel(
     c_mask = (offs_cm[:, None] < M) & (offs_cn[None, :] < N)
     tl.store(c_ptrs, accumulator, mask=c_mask)
 
+
 def mm_8bit(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     assert a.shape[1] == b.shape[0], "Incompatible dimensions"
     assert a.is_contiguous(), "Matrix A must be contiguous"
     assert a.dtype == b.dtype, "Incompatible dtypes"
     assert a.dtype in [torch.int8, torch.float8_e4m3fn]
 
-    FLOAT = (a.dtype == torch.float8_e4m3fn)
+    FLOAT = a.dtype == torch.float8_e4m3fn
 
     M, K = a.shape
     K, N = b.shape
     c = torch.empty((M, N), device=a.device, dtype=torch.float32 if FLOAT else torch.int32)
 
     def grid(META):
-        return (triton.cdiv(N, META['BLOCK_SIZE_N']) , triton.cdiv(M, META['BLOCK_SIZE_M']), )
+        return (
+            triton.cdiv(N, META["BLOCK_SIZE_N"]),
+            triton.cdiv(M, META["BLOCK_SIZE_M"]),
+        )
+
     _mm_kernel[grid](
-        a, b, c,
-        M, N, K,
-        a.stride(0), a.stride(1),
-        b.stride(0), b.stride(1),
-        c.stride(0), c.stride(1),
-        QUANTIZED_M = M // 64,
-        FLOAT = FLOAT
+        a,
+        b,
+        c,
+        M,
+        N,
+        K,
+        a.stride(0),
+        a.stride(1),
+        b.stride(0),
+        b.stride(1),
+        c.stride(0),
+        c.stride(1),
+        QUANTIZED_M=M // 64,
+        FLOAT=FLOAT,
     )
     return c

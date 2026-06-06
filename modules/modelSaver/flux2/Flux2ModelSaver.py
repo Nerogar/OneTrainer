@@ -19,15 +19,15 @@ class Flux2ModelSaver(
         super().__init__()
 
     def __save_diffusers(
-            self,
-            model: Flux2Model,
-            destination: str,
-            dtype: torch.dtype | None,
+        self,
+        model: Flux2Model,
+        destination: str,
+        dtype: torch.dtype | None,
     ):
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
         pipeline = model.create_pipeline()
         pipeline.to("cpu")
-        if dtype is not None: #TODO necessary?
+        if dtype is not None:  # TODO necessary?
             # replace the tokenizers __deepcopy__ before calling deepcopy, to prevent a copy being made.
             # the tokenizer tries to reload from the file system otherwise
             tokenizer = pipeline.tokenizer
@@ -36,7 +36,7 @@ class Flux2ModelSaver(
             save_pipeline = copy.deepcopy(pipeline)
             save_pipeline.to(device="cpu", dtype=dtype, silence_dtype_warnings=True)
 
-            delattr(tokenizer, '__deepcopy__')
+            delattr(tokenizer, "__deepcopy__")
         else:
             save_pipeline = pipeline
 
@@ -47,10 +47,10 @@ class Flux2ModelSaver(
             del save_pipeline
 
     def __save_safetensors(
-            self,
-            model: Flux2Model,
-            destination: str,
-            dtype: torch.dtype | None,
+        self,
+        model: Flux2Model,
+        destination: str,
+        dtype: torch.dtype | None,
     ):
         state_dict = model.transformer.state_dict()
         state_dict = convert(state_dict, diffusers_checkpoint_to_original)
@@ -63,18 +63,18 @@ class Flux2ModelSaver(
         save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
 
     def __save_internal(
-            self,
-            model: Flux2Model,
-            destination: str,
+        self,
+        model: Flux2Model,
+        destination: str,
     ):
         self.__save_diffusers(model, destination, None)
 
     def save(
-            self,
-            model: Flux2Model,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
+        self,
+        model: Flux2Model,
+        output_model_format: ModelFormat,
+        output_model_destination: str,
+        dtype: torch.dtype | None,
     ):
         match output_model_format:
             case ModelFormat.DIFFUSERS:

@@ -50,18 +50,17 @@ class DPOReviewWindow(ctk.CTkToplevel):
             self.destroy()
             return
 
-        orphans = [p for p in self._pairs if p['is_orphan']]
+        orphans = [p for p in self._pairs if p["is_orphan"]]
         if orphans:
             result = messagebox.askyesno(
                 "Orphaned Pairs Found",
-                f"Found {len(orphans)} pair(s) with a missing chosen or rejected image.\n\n"
-                f"Remove them now?",
+                f"Found {len(orphans)} pair(s) with a missing chosen or rejected image.\n\nRemove them now?",
                 parent=self,
             )
             if result:
                 for entry in orphans:
-                    remove_finalized_pair(entry.get('chosen_path'), entry.get('rejected_path'))
-                self._pairs = [p for p in self._pairs if not p['is_orphan']]
+                    remove_finalized_pair(entry.get("chosen_path"), entry.get("rejected_path"))
+                self._pairs = [p for p in self._pairs if not p["is_orphan"]]
                 self._removed += len(orphans)
                 if not self._pairs:
                     self._show_summary()
@@ -83,12 +82,11 @@ class DPOReviewWindow(ctk.CTkToplevel):
         # Header
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=10, pady=5)
-        ctk.CTkLabel(header, text=f"Pair {self._index + 1} / {total}",
-                     font=("", 14, "bold")).pack(side="left", padx=15)
-        ctk.CTkLabel(header, text=f"Key: {entry['key']}",
-                     font=("", 12), text_color="gray").pack(side="left", padx=15)
-        ctk.CTkLabel(header, text=f"Removed: {self._removed}",
-                     font=("", 12), text_color="red").pack(side="left", padx=15)
+        ctk.CTkLabel(header, text=f"Pair {self._index + 1} / {total}", font=("", 14, "bold")).pack(side="left", padx=15)
+        ctk.CTkLabel(header, text=f"Key: {entry['key']}", font=("", 12), text_color="gray").pack(side="left", padx=15)
+        ctk.CTkLabel(header, text=f"Removed: {self._removed}", font=("", 12), text_color="red").pack(
+            side="left", padx=15
+        )
 
         # Images side by side
         img_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -98,36 +96,42 @@ class DPOReviewWindow(ctk.CTkToplevel):
         img_frame.grid_rowconfigure(0, weight=0)
         img_frame.grid_rowconfigure(1, weight=1)
 
-        ctk.CTkLabel(img_frame, text="Chosen", font=("", 14, "bold"),
-                     text_color="green").grid(row=0, column=0, pady=(0, 5))
-        ctk.CTkLabel(img_frame, text="Rejected", font=("", 14, "bold"),
-                     text_color="red").grid(row=0, column=1, pady=(0, 5))
+        ctk.CTkLabel(img_frame, text="Chosen", font=("", 14, "bold"), text_color="green").grid(
+            row=0, column=0, pady=(0, 5)
+        )
+        ctk.CTkLabel(img_frame, text="Rejected", font=("", 14, "bold"), text_color="red").grid(
+            row=0, column=1, pady=(0, 5)
+        )
 
-        chosen_path = entry.get('chosen_path')
-        rejected_path = entry.get('rejected_path')
+        chosen_path = entry.get("chosen_path")
+        rejected_path = entry.get("rejected_path")
 
         if chosen_path and os.path.isfile(chosen_path):
             self._display_image(img_frame, chosen_path, row=1, col=0)
         else:
-            ctk.CTkLabel(img_frame, text="(missing)", font=("", 14),
-                         text_color="gray").grid(row=1, column=0)
+            ctk.CTkLabel(img_frame, text="(missing)", font=("", 14), text_color="gray").grid(row=1, column=0)
         if rejected_path and os.path.isfile(rejected_path):
             self._display_image(img_frame, rejected_path, row=1, col=1)
         else:
-            ctk.CTkLabel(img_frame, text="(missing)", font=("", 14),
-                         text_color="gray").grid(row=1, column=1)
+            ctk.CTkLabel(img_frame, text="(missing)", font=("", 14), text_color="gray").grid(row=1, column=1)
 
         # Buttons
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.pack(fill="x", padx=10, pady=10)
 
-        ctk.CTkButton(btn_frame, text="\u2190 Back", width=150,
-                      command=lambda: self._advance(-1),
-                      state="normal" if self._index > 0 else "disabled").pack(side="left", padx=10)
-        ctk.CTkButton(btn_frame, text="Remove", width=150, fg_color="#B22222",
-                      command=self._remove_current).pack(side="left", padx=10, expand=True)
-        ctk.CTkButton(btn_frame, text="Keep \u2192", width=150,
-                      command=lambda: self._advance(1)).pack(side="right", padx=10)
+        ctk.CTkButton(
+            btn_frame,
+            text="\u2190 Back",
+            width=150,
+            command=lambda: self._advance(-1),
+            state="normal" if self._index > 0 else "disabled",
+        ).pack(side="left", padx=10)
+        ctk.CTkButton(btn_frame, text="Remove", width=150, fg_color="#B22222", command=self._remove_current).pack(
+            side="left", padx=10, expand=True
+        )
+        ctk.CTkButton(btn_frame, text="Keep \u2192", width=150, command=lambda: self._advance(1)).pack(
+            side="right", padx=10
+        )
 
         # Keyboard bindings
         self.bind("<Left>", lambda e: self._advance(-1) if self._index > 0 else None)
@@ -142,7 +146,7 @@ class DPOReviewWindow(ctk.CTkToplevel):
 
     def _remove_current(self):
         entry = self._pairs[self._index]
-        remove_finalized_pair(entry.get('chosen_path'), entry.get('rejected_path'))
+        remove_finalized_pair(entry.get("chosen_path"), entry.get("rejected_path"))
         self._pairs.pop(self._index)
         self._removed += 1
         if self._index >= len(self._pairs):
@@ -184,8 +188,6 @@ class DPOReviewWindow(ctk.CTkToplevel):
 
         remaining = len(self._pairs)
         ctk.CTkLabel(frame, text=f"Kept: {remaining} pairs", font=("", 14)).pack(pady=5)
-        ctk.CTkLabel(frame, text=f"Removed: {self._removed} pairs",
-                     font=("", 14), text_color="red").pack(pady=5)
+        ctk.CTkLabel(frame, text=f"Removed: {self._removed} pairs", font=("", 14), text_color="red").pack(pady=5)
 
-        ctk.CTkButton(frame, text="Close", width=250, fg_color="gray",
-                      command=self.destroy).pack(pady=20)
+        ctk.CTkButton(frame, text="Close", width=250, fg_color="gray", command=self.destroy).pack(pady=20)

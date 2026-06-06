@@ -21,11 +21,13 @@ class DPOCurationUtilExportTest(unittest.TestCase):
             Image.new("RGB", (8, 8), color="red").save(chosen_path)
             Image.new("RGB", (8, 8), color="blue").save(rejected_path)
 
-            groups = [{
-                "prompt": "portrait, <wildcard:hair>, cinematic light, <segment:face>, sharp focus",
-                "aspectratio": "1:1",
-                "images": [str(chosen_path), str(rejected_path)],
-            }]
+            groups = [
+                {
+                    "prompt": "portrait, <wildcard:hair>, cinematic light, <segment:face>, sharp focus",
+                    "aspectratio": "1:1",
+                    "images": [str(chosen_path), str(rejected_path)],
+                }
+            ]
             results = {
                 0: [
                     {
@@ -35,8 +37,9 @@ class DPOCurationUtilExportTest(unittest.TestCase):
                 ]
             }
 
-            chosen_dir, rejected_dir, chosen_val_dir, rejected_val_dir, skipped, val_count, train_count = \
+            chosen_dir, rejected_dir, chosen_val_dir, rejected_val_dir, skipped, val_count, train_count = (
                 export_curated_pairs(groups, results, str(output_dir), val_percentage=0.0)
+            )
 
             self.assertEqual(skipped, 0)
 
@@ -99,8 +102,10 @@ class DPOCurationUtilExportTest(unittest.TestCase):
             self.assertEqual(manifest, {"pairs": []})
 
             export_single_pair(
-                str(output_dir), manifest,
-                str(chosen_path), str(rejected_path),
+                str(output_dir),
+                manifest,
+                str(chosen_path),
+                str(rejected_path),
                 "portrait, <wildcard:hair>, sharp focus",
                 "1:1",
             )
@@ -173,9 +178,12 @@ class DPOCurationUtilExportTest(unittest.TestCase):
                 Image.new("RGB", (8, 8), color="red").save(chosen)
                 Image.new("RGB", (8, 8), color="blue").save(rejected)
                 export_single_pair(
-                    str(output_dir), manifest,
-                    str(chosen), str(rejected),
-                    f"prompt {i}", "1:1",
+                    str(output_dir),
+                    manifest,
+                    str(chosen),
+                    str(rejected),
+                    f"prompt {i}",
+                    "1:1",
                 )
 
             # All 4 pairs in flat chosen/rejected dirs

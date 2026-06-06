@@ -15,25 +15,31 @@ class BaseLinearSVD(
         super().__init__(*args, **kwargs)
 
     @abstractmethod
-    def forward_with_lora(self, x: torch.Tensor, lora_down: torch.nn.Linear, lora_up: torch.nn.Linear, dropout: torch.nn.Dropout, alpha: float) -> torch.Tensor:
+    def forward_with_lora(
+        self,
+        x: torch.Tensor,
+        lora_down: torch.nn.Linear,
+        lora_up: torch.nn.Linear,
+        dropout: torch.nn.Dropout,
+        alpha: float,
+    ) -> torch.Tensor:
         pass
+
 
 def _get_tensor_hash(t: torch.Tensor) -> str:
     t = t.flatten().to(torch.float32)
-    vals = torch.stack([
-        torch.sum(t),
-        torch.sum(t**2),
-        torch.sum(torch.sin(t)),
-        torch.sum(torch.cos(t))
-    ])
+    vals = torch.stack([torch.sum(t), torch.sum(t**2), torch.sum(torch.sin(t)), torch.sum(torch.cos(t))])
     return vals.cpu().numpy().tobytes().hex()
+
 
 def make_svd_linear(linear_class):
     class LinearSVD(
         linear_class,
         BaseLinearSVD,
     ):
-        def __init__(self, rank: int, svd_dtype: torch.dtype, cache_dir: str | None, max_cache_rank: int=128, *args, **kwargs):
+        def __init__(
+            self, rank: int, svd_dtype: torch.dtype, cache_dir: str | None, max_cache_rank: int = 128, *args, **kwargs
+        ):
             super().__init__(*args, **kwargs)
             self.__svd_is_quantized = False
             self.rank = rank
@@ -41,7 +47,7 @@ def make_svd_linear(linear_class):
             self.cache_dir = cache_dir
             self.max_cache_rank = max_cache_rank
 
-            #use parameters instead of buffer to allow offloading:
+            # use parameters instead of buffer to allow offloading:
             self.svd_up = torch.nn.Parameter(torch.empty(()), requires_grad=False)
             self.svd_down = torch.nn.Parameter(torch.empty(()), requires_grad=False)
 
@@ -69,19 +75,22 @@ def make_svd_linear(linear_class):
                     U, S, Vh = torch.load(filename, map_location=W.device)
 
             if U is None:
-                #use full svd - torch.svd_lowrank is not reducing the quant range nearly as much:
+                # use full svd - torch.svd_lowrank is not reducing the quant range nearly as much:
                 U, S, Vh = torch.linalg.svd(W, full_matrices=False)
 
                 if self.cache_dir is not None:
-                    torch.save((
-                        U[:, :self.max_cache_rank].clone(),
-                        S[:self.max_cache_rank].clone(),
-                        Vh[:self.max_cache_rank, :].clone(),
-                    ), filename)
+                    torch.save(
+                        (
+                            U[:, : self.max_cache_rank].clone(),
+                            S[: self.max_cache_rank].clone(),
+                            Vh[: self.max_cache_rank, :].clone(),
+                        ),
+                        filename,
+                    )
 
-            U_r = U[:, :self.rank]
-            S_r = S[:self.rank]
-            Vh_r = Vh[:self.rank, :]
+            U_r = U[:, : self.rank]
+            S_r = S[: self.rank]
+            Vh_r = Vh[: self.rank, :]
 
             svd_down = Vh_r.clone().contiguous().to(self.svd_dtype)
             svd_up = (U_r * S_r.unsqueeze(0)).clone().contiguous().to(self.svd_dtype)
@@ -105,7 +114,14 @@ def make_svd_linear(linear_class):
             x_up = torch.nn.functional.linear(x_down, self.svd_up)
             return x_up + super().forward(x)
 
-        def forward_with_lora(self, x: torch.Tensor, lora_down: torch.nn.Linear, lora_up: torch.nn.Linear, dropout: torch.nn.Dropout, alpha: float) -> torch.Tensor:
+        def forward_with_lora(
+            self,
+            x: torch.Tensor,
+            lora_down: torch.nn.Linear,
+            lora_up: torch.nn.Linear,
+            dropout: torch.nn.Dropout,
+            alpha: float,
+        ) -> torch.Tensor:
             assert self.__svd_is_quantized
             assert not self.svd_down.requires_grad and not self.svd_up.requires_grad
             assert lora_down.bias is None and lora_up.bias is None

@@ -19,10 +19,10 @@ class WuerstchenModelSaver(
         super().__init__()
 
     def __save_diffusers(
-            self,
-            model: WuerstchenModel,
-            destination: str,
-            dtype: torch.dtype | None,
+        self,
+        model: WuerstchenModel,
+        destination: str,
+        dtype: torch.dtype | None,
     ):
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
         pipeline = model.create_pipeline().prior_pipe
@@ -39,10 +39,10 @@ class WuerstchenModelSaver(
         del pipeline_copy
 
     def __save_safetensors(
-            self,
-            model: WuerstchenModel,
-            destination: str,
-            dtype: torch.dtype | None,
+        self,
+        model: WuerstchenModel,
+        destination: str,
+        dtype: torch.dtype | None,
     ):
         if model.model_type.is_stable_cascade():
             os.makedirs(Path(destination).absolute(), exist_ok=True)
@@ -55,7 +55,7 @@ class WuerstchenModelSaver(
             save_file(
                 unet_save_state_dict,
                 os.path.join(destination, "stage_c.safetensors"),
-                self._create_safetensors_header(model, unet_save_state_dict)
+                self._create_safetensors_header(model, unet_save_state_dict),
             )
 
             te_state_dict = model.prior_text_encoder.state_dict()
@@ -64,24 +64,24 @@ class WuerstchenModelSaver(
             save_file(
                 te_save_state_dict,
                 os.path.join(destination, "text_encoder.safetensors"),
-                self._create_safetensors_header(model, te_save_state_dict)
+                self._create_safetensors_header(model, te_save_state_dict),
             )
         else:
             raise NotImplementedError
 
     def __save_internal(
-            self,
-            model: WuerstchenModel,
-            destination: str,
+        self,
+        model: WuerstchenModel,
+        destination: str,
     ):
         self.__save_diffusers(model, destination, None)
 
     def save(
-            self,
-            model: WuerstchenModel,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
+        self,
+        model: WuerstchenModel,
+        output_model_format: ModelFormat,
+        output_model_destination: str,
+        dtype: torch.dtype | None,
     ):
         match output_model_format:
             case ModelFormat.DIFFUSERS:

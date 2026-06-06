@@ -9,13 +9,13 @@ import customtkinter as ctk
 
 class SampleFrame(ctk.CTkFrame):
     def __init__(
-            self,
-            parent,
-            sample: SampleConfig,
-            ui_state: UIState,
-            model_type: ModelType,
-            include_prompt: bool = True,
-            include_settings: bool = True,
+        self,
+        parent,
+        sample: SampleConfig,
+        ui_state: UIState,
+        model_type: ModelType,
+        include_prompt: bool = True,
+        include_settings: bool = True,
     ):
         ctk.CTkFrame.__init__(self, parent, fg_color="transparent")
 
@@ -68,13 +68,17 @@ class SampleFrame(ctk.CTkFrame):
 
             if is_video_model:
                 # frames
-                components.label(bottom_frame, 1, 0, "frames:",
-                                tooltip="Number of frames to generate. Only used when generating videos.")
+                components.label(
+                    bottom_frame,
+                    1,
+                    0,
+                    "frames:",
+                    tooltip="Number of frames to generate. Only used when generating videos.",
+                )
                 components.entry(bottom_frame, 1, 1, self.ui_state, "frames")
 
                 # length
-                components.label(bottom_frame, 1, 2, "length:",
-                                tooltip="Length in seconds of audio output.")
+                components.label(bottom_frame, 1, 2, "length:", tooltip="Length in seconds of audio output.")
                 components.entry(bottom_frame, 1, 3, self.ui_state, "length")
 
             # seed
@@ -92,18 +96,25 @@ class SampleFrame(ctk.CTkFrame):
             # sampler
             if not is_flow_matching:
                 components.label(bottom_frame, 4, 2, "sampler:")
-                components.options_kv(bottom_frame, 4, 3, [
-                    ("DDIM", NoiseScheduler.DDIM),
-                    ("Euler", NoiseScheduler.EULER),
-                    ("Euler A", NoiseScheduler.EULER_A),
-                    # ("DPM++", NoiseScheduler.DPMPP), # TODO: produces noisy samples
-                    # ("DPM++ SDE", NoiseScheduler.DPMPP_SDE), # TODO: produces noisy samples
-                    ("UniPC", NoiseScheduler.UNIPC),
-                    ("Euler Karras", NoiseScheduler.EULER_KARRAS),
-                    ("DPM++ Karras", NoiseScheduler.DPMPP_KARRAS),
-                    ("DPM++ SDE Karras", NoiseScheduler.DPMPP_SDE_KARRAS),
-                    ("UniPC Karras", NoiseScheduler.UNIPC_KARRAS)
-                ], self.ui_state, "noise_scheduler")
+                components.options_kv(
+                    bottom_frame,
+                    4,
+                    3,
+                    [
+                        ("DDIM", NoiseScheduler.DDIM),
+                        ("Euler", NoiseScheduler.EULER),
+                        ("Euler A", NoiseScheduler.EULER_A),
+                        # ("DPM++", NoiseScheduler.DPMPP), # TODO: produces noisy samples
+                        # ("DPM++ SDE", NoiseScheduler.DPMPP_SDE), # TODO: produces noisy samples
+                        ("UniPC", NoiseScheduler.UNIPC),
+                        ("Euler Karras", NoiseScheduler.EULER_KARRAS),
+                        ("DPM++ Karras", NoiseScheduler.DPMPP_KARRAS),
+                        ("DPM++ SDE Karras", NoiseScheduler.DPMPP_SDE_KARRAS),
+                        ("UniPC Karras", NoiseScheduler.UNIPC_KARRAS),
+                    ],
+                    self.ui_state,
+                    "noise_scheduler",
+                )
 
             # steps
             components.label(bottom_frame, 4, 0, "steps:")
@@ -111,24 +122,37 @@ class SampleFrame(ctk.CTkFrame):
 
             # inpainting
             if is_inpainting_model:
-                components.label(bottom_frame, 5, 0, "inpainting:",
-                                tooltip="Enables inpainting sampling. Only available when sampling from an inpainting model.")
+                components.label(
+                    bottom_frame,
+                    5,
+                    0,
+                    "inpainting:",
+                    tooltip="Enables inpainting sampling. Only available when sampling from an inpainting model.",
+                )
                 components.switch(bottom_frame, 5, 1, self.ui_state, "sample_inpainting")
 
                 # base image path
-                components.label(bottom_frame, 6, 0, "base image path:",
-                                tooltip="The base image used when inpainting.")
-                components.file_entry(bottom_frame, 6, 1, self.ui_state, "base_image_path",
-                                    mode="file",
-                                    allow_model_files=False,
-                                    allow_image_files=True,
-                                    )
+                components.label(bottom_frame, 6, 0, "base image path:", tooltip="The base image used when inpainting.")
+                components.file_entry(
+                    bottom_frame,
+                    6,
+                    1,
+                    self.ui_state,
+                    "base_image_path",
+                    mode="file",
+                    allow_model_files=False,
+                    allow_image_files=True,
+                )
 
                 # mask image path
-                components.label(bottom_frame, 6, 2, "mask image path:",
-                                tooltip="The mask used when inpainting.")
-                components.file_entry(bottom_frame, 6, 3, self.ui_state, "mask_image_path",
-                                    mode="file",
-                                    allow_model_files=False,
-                                    allow_image_files=True,
-                                    )
+                components.label(bottom_frame, 6, 2, "mask image path:", tooltip="The mask used when inpainting.")
+                components.file_entry(
+                    bottom_frame,
+                    6,
+                    3,
+                    self.ui_state,
+                    "mask_image_path",
+                    mode="file",
+                    allow_model_files=False,
+                    allow_image_files=True,
+                )

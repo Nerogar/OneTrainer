@@ -26,11 +26,11 @@ from transformers import CLIPTextModel, CLIPTokenizer, DPTForDepthEstimation, DP
 
 class StableDiffusionModelEmbedding:
     def __init__(
-            self,
-            uuid: str,
-            text_encoder_vector: Tensor | None,
-            placeholder: str,
-            is_output_embedding: bool,
+        self,
+        uuid: str,
+        text_encoder_vector: Tensor | None,
+        placeholder: str,
+        is_output_embedding: bool,
     ):
         self.text_encoder_embedding = BaseModelEmbedding(
             uuid=uuid,
@@ -64,8 +64,8 @@ class StableDiffusionModel(BaseModel):
     sd_config_filename: str | None
 
     def __init__(
-            self,
-            model_type: ModelType,
+        self,
+        model_type: ModelType,
     ):
         super().__init__(
             model_type=model_type,
@@ -91,18 +91,22 @@ class StableDiffusionModel(BaseModel):
         self.sd_config_filename = None
 
     def adapters(self) -> list[LoRAModuleWrapper]:
-        return [a for a in [
-            self.text_encoder_lora,
-            self.unet_lora,
-        ] if a is not None]
+        return [
+            a
+            for a in [
+                self.text_encoder_lora,
+                self.unet_lora,
+            ]
+            if a is not None
+        ]
 
     def all_embeddings(self) -> list[StableDiffusionModelEmbedding]:
-        return self.additional_embeddings \
-               + ([self.embedding] if self.embedding is not None else [])
+        return self.additional_embeddings + ([self.embedding] if self.embedding is not None else [])
 
     def all_text_encoder_embeddings(self) -> list[BaseModelEmbedding]:
-        return [embedding.text_encoder_embedding for embedding in self.additional_embeddings] \
-               + ([self.embedding.text_encoder_embedding] if self.embedding is not None else [])
+        return [embedding.text_encoder_embedding for embedding in self.additional_embeddings] + (
+            [self.embedding.text_encoder_embedding] if self.embedding is not None else []
+        )
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
@@ -171,12 +175,12 @@ class StableDiffusionModel(BaseModel):
             )
 
     def force_v_prediction(self):
-        self.noise_scheduler.config.prediction_type = 'v_prediction'
-        self.sd_config['model']['params']['parameterization'] = 'v'
+        self.noise_scheduler.config.prediction_type = "v_prediction"
+        self.sd_config["model"]["params"]["parameterization"] = "v"
 
     def force_epsilon_prediction(self):
-        self.noise_scheduler.config.prediction_type = 'epsilon'
-        self.sd_config['model']['params']['parameterization'] = 'epsilon'
+        self.noise_scheduler.config.prediction_type = "epsilon"
+        self.sd_config["model"]["params"]["parameterization"] = "epsilon"
 
     def rescale_noise_scheduler_to_zero_terminal_snr(self):
         rescale_noise_scheduler_to_zero_terminal_snr(self.noise_scheduler)
@@ -185,20 +189,20 @@ class StableDiffusionModel(BaseModel):
         return self._add_embeddings_to_prompt(self.all_text_encoder_embeddings(), prompt)
 
     def encode_text(
-            self,
-            train_device: torch.device,
-            batch_size: int = 1,
-            rand: Random | None = None,
-            text: str = None,
-            tokens: Tensor = None,
-            text_encoder_layer_skip: int = 0,
-            text_encoder_dropout_probability: float | None = None,
-            text_encoder_output: Tensor | None = None,
+        self,
+        train_device: torch.device,
+        batch_size: int = 1,
+        rand: Random | None = None,
+        text: str = None,
+        tokens: Tensor = None,
+        text_encoder_layer_skip: int = 0,
+        text_encoder_dropout_probability: float | None = None,
+        text_encoder_output: Tensor | None = None,
     ):
         if tokens is None:
             tokenizer_output = self.tokenizer(
                 self.add_text_encoder_embeddings_to_prompt(text),
-                padding='max_length',
+                padding="max_length",
                 truncation=True,
                 max_length=self.text_encoder.config.max_position_embeddings,
                 return_tensors="pt",
@@ -225,9 +229,11 @@ class StableDiffusionModel(BaseModel):
 
         # apply dropout
         if text_encoder_dropout_probability is not None:
-            dropout_text_encoder_mask = (torch.tensor(
-                [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)],
-                device=train_device)).float()
+            dropout_text_encoder_mask = (
+                torch.tensor(
+                    [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)], device=train_device
+                )
+            ).float()
             text_encoder_output = text_encoder_output * dropout_text_encoder_mask[:, None, None]
 
         return text_encoder_output

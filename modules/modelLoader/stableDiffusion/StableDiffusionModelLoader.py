@@ -26,8 +26,8 @@ class StableDiffusionModelLoader(
         super().__init__()
 
     def _default_sd_config_name(
-            self,
-            model_type: ModelType,
+        self,
+        model_type: ModelType,
     ) -> str | None:
         match model_type:
             case ModelType.STABLE_DIFFUSION_15:
@@ -50,13 +50,13 @@ class StableDiffusionModelLoader(
                 return None
 
     def __load_internal(
-            self,
-            model: StableDiffusionModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: StableDiffusionModel,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name, quantization)
@@ -64,13 +64,13 @@ class StableDiffusionModelLoader(
             raise Exception("not an internal model")
 
     def __load_diffusers(
-            self,
-            model: StableDiffusionModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: StableDiffusionModel,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
         tokenizer = CLIPTokenizer.from_pretrained(
             base_model_name,
@@ -119,16 +119,24 @@ class StableDiffusionModelLoader(
             quantization,
         )
 
-        image_depth_processor = DPTImageProcessor.from_pretrained(
-            base_model_name,
-            subfolder="feature_extractor",
-        ) if model_type.has_depth_input() else None
+        image_depth_processor = (
+            DPTImageProcessor.from_pretrained(
+                base_model_name,
+                subfolder="feature_extractor",
+            )
+            if model_type.has_depth_input()
+            else None
+        )
 
-        depth_estimator = DPTForDepthEstimation.from_pretrained(
-            base_model_name,
-            subfolder="depth_estimator",
-            torch_dtype=weight_dtypes.unet.torch_dtype(),  # TODO: use depth estimator dtype
-        ) if model_type.has_depth_input() else None
+        depth_estimator = (
+            DPTForDepthEstimation.from_pretrained(
+                base_model_name,
+                subfolder="depth_estimator",
+                torch_dtype=weight_dtypes.unet.torch_dtype(),  # TODO: use depth estimator dtype
+            )
+            if model_type.has_depth_input()
+            else None
+        )
 
         model.model_type = model_type
         model.tokenizer = tokenizer
@@ -141,28 +149,29 @@ class StableDiffusionModelLoader(
 
     def __fix_nai_model(self, state_dict: dict) -> dict:
         # fix for loading models with an empty state_dict key
-        while 'state_dict' in state_dict and len(state_dict['state_dict']) > 0:
-            state_dict = state_dict['state_dict']
-        if 'state_dict' in state_dict:
-            state_dict.pop('state_dict')
+        while "state_dict" in state_dict and len(state_dict["state_dict"]) > 0:
+            state_dict = state_dict["state_dict"]
+        if "state_dict" in state_dict:
+            state_dict.pop("state_dict")
 
         converted_state_dict = {}
         for key, value in state_dict.items():
-            if key.startswith('cond_stage_model.transformer') and not key.startswith(
-                    'cond_stage_model.transformer.text_model'):
-                key = key.replace('cond_stage_model.transformer', 'cond_stage_model.transformer.text_model')
+            if key.startswith("cond_stage_model.transformer") and not key.startswith(
+                "cond_stage_model.transformer.text_model"
+            ):
+                key = key.replace("cond_stage_model.transformer", "cond_stage_model.transformer.text_model")
             converted_state_dict[key] = value
 
         return converted_state_dict
 
     def __load_ckpt(
-            self,
-            model: StableDiffusionModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: StableDiffusionModel,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
         state_dict = torch.load(base_model_name, weights_only=True)
         state_dict = self.__fix_nai_model(state_dict)
@@ -201,7 +210,10 @@ class StableDiffusionModelLoader(
             pipeline.text_encoder, weight_dtypes.text_encoder, weight_dtypes.train_dtype
         )
         unet = self._convert_diffusers_sub_module_to_dtype(
-            pipeline.unet, weight_dtypes.unet, weight_dtypes.train_dtype, quantization,
+            pipeline.unet,
+            weight_dtypes.unet,
+            weight_dtypes.train_dtype,
+            quantization,
         )
 
         model.model_type = model_type
@@ -214,13 +226,13 @@ class StableDiffusionModelLoader(
         model.depth_estimator = None  # TODO
 
     def __load_safetensors(
-            self,
-            model: StableDiffusionModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: StableDiffusionModel,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
         num_in_channels = 4
         if model_type.has_mask_input():
@@ -257,7 +269,10 @@ class StableDiffusionModelLoader(
             pipeline.text_encoder, weight_dtypes.text_encoder, weight_dtypes.train_dtype
         )
         unet = self._convert_diffusers_sub_module_to_dtype(
-            pipeline.unet, weight_dtypes.unet, weight_dtypes.train_dtype, quantization,
+            pipeline.unet,
+            weight_dtypes.unet,
+            weight_dtypes.train_dtype,
+            quantization,
         )
 
         model.model_type = model_type
@@ -270,12 +285,12 @@ class StableDiffusionModelLoader(
         model.depth_estimator = None  # TODO
 
     def load(
-            self,
-            model: StableDiffusionModel,
-            model_type: ModelType,
-            model_names: ModelNames,
-            weight_dtypes: ModelWeightDtypes,
-            quantization: QuantizationConfig,
+        self,
+        model: StableDiffusionModel,
+        model_type: ModelType,
+        model_names: ModelNames,
+        weight_dtypes: ModelWeightDtypes,
+        quantization: QuantizationConfig,
     ):
         stacktraces = []
 
@@ -283,19 +298,25 @@ class StableDiffusionModelLoader(
         model.sd_config_filename = self._get_sd_config_name(model_type, model_names.base_model)
 
         try:
-            self.__load_internal(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)
+            self.__load_internal(
+                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization
+            )
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
-            self.__load_diffusers(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)
+            self.__load_diffusers(
+                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization
+            )
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
-            self.__load_safetensors(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)
+            self.__load_safetensors(
+                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization
+            )
             return
         except Exception:
             stacktraces.append(traceback.format_exc())

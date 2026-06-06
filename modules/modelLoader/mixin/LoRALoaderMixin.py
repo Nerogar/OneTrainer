@@ -20,9 +20,9 @@ class LoRALoaderMixin(metaclass=ABCMeta):
         pass
 
     def __load_safetensors(
-            self,
-            model: BaseModel,
-            lora_name: str,
+        self,
+        model: BaseModel,
+        lora_name: str,
     ):
         state_dict = load_file(lora_name)
 
@@ -33,9 +33,9 @@ class LoRALoaderMixin(metaclass=ABCMeta):
         model.lora_state_dict = state_dict
 
     def __load_ckpt(
-            self,
-            model: BaseModel,
-            lora_name: str,
+        self,
+        model: BaseModel,
+        lora_name: str,
     ):
         state_dict = torch.load(lora_name, weights_only=True)
 
@@ -46,9 +46,9 @@ class LoRALoaderMixin(metaclass=ABCMeta):
         model.lora_state_dict = state_dict
 
     def __load_internal(
-            self,
-            model: BaseModel,
-            lora_name: str,
+        self,
+        model: BaseModel,
+        lora_name: str,
     ):
         if os.path.exists(os.path.join(lora_name, "meta.json")):
             safetensors_lora_name = os.path.join(lora_name, "lora", "lora.safetensors")
@@ -58,9 +58,9 @@ class LoRALoaderMixin(metaclass=ABCMeta):
             raise Exception("not an internal model")
 
     def _load(
-            self,
-            model: BaseModel,
-            model_names: ModelNames,
+        self,
+        model: BaseModel,
+        model_names: ModelNames,
     ):
         stacktraces = []
 

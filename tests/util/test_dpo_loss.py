@@ -46,8 +46,10 @@ class TestDPOLossMath:
         ref_rejected_logp = torch.randn(B)
 
         loss, dpo_loss, _, _, _ = _dpo_loss(
-            policy_chosen_logp, policy_rejected_logp,
-            ref_chosen_logp, ref_rejected_logp,
+            policy_chosen_logp,
+            policy_rejected_logp,
+            ref_chosen_logp,
+            ref_rejected_logp,
             beta=0.0,
         )
         assert abs(loss.item() - math.log(2)) < 1e-6
@@ -61,8 +63,10 @@ class TestDPOLossMath:
         ref_rejected_logp = torch.tensor([-5.0] * B)
 
         loss, _, chosen_reward, rejected_reward, accuracy = _dpo_loss(
-            policy_chosen_logp, policy_rejected_logp,
-            ref_chosen_logp, ref_rejected_logp,
+            policy_chosen_logp,
+            policy_rejected_logp,
+            ref_chosen_logp,
+            ref_rejected_logp,
             beta=5000.0,
         )
         assert accuracy.item() == 1.0
@@ -78,8 +82,10 @@ class TestDPOLossMath:
         ref_rejected_logp = torch.tensor([-5.0] * B)
 
         loss, _, _, _, accuracy = _dpo_loss(
-            policy_chosen_logp, policy_rejected_logp,
-            ref_chosen_logp, ref_rejected_logp,
+            policy_chosen_logp,
+            policy_rejected_logp,
+            ref_chosen_logp,
+            ref_rejected_logp,
             beta=5000.0,
         )
         assert accuracy.item() == 0.0
@@ -94,14 +100,20 @@ class TestDPOLossMath:
         ref_rejected_logp = torch.tensor([-5.0] * B)
 
         loss_no_smooth, _, _, _, _ = _dpo_loss(
-            policy_chosen_logp, policy_rejected_logp,
-            ref_chosen_logp, ref_rejected_logp,
-            beta=5000.0, label_smoothing=0.0,
+            policy_chosen_logp,
+            policy_rejected_logp,
+            ref_chosen_logp,
+            ref_rejected_logp,
+            beta=5000.0,
+            label_smoothing=0.0,
         )
         loss_smooth, _, _, _, _ = _dpo_loss(
-            policy_chosen_logp, policy_rejected_logp,
-            ref_chosen_logp, ref_rejected_logp,
-            beta=5000.0, label_smoothing=0.1,
+            policy_chosen_logp,
+            policy_rejected_logp,
+            ref_chosen_logp,
+            ref_rejected_logp,
+            beta=5000.0,
+            label_smoothing=0.1,
         )
         assert loss_smooth.item() > loss_no_smooth.item()
 

@@ -116,15 +116,14 @@ def dpo_concept_pairs(concepts: list[ConceptConfig], is_validation: bool = False
     rejected = [concept for concept in enabled if ConceptType(concept.type) == rejected_type]
 
     if not chosen and not rejected:
-        raise RuntimeError(
-            f"Need explicit {chosen_type.value}/{rejected_type.value} concepts for RLHF DPO pairs."
-        )
+        raise RuntimeError(f"Need explicit {chosen_type.value}/{rejected_type.value} concepts for RLHF DPO pairs.")
     if len(chosen) != len(rejected):
-        raise RuntimeError(
-            f"Mismatched DPO concept counts: {len(chosen)} chosen, {len(rejected)} rejected."
-        )
+        raise RuntimeError(f"Mismatched DPO concept counts: {len(chosen)} chosen, {len(rejected)} rejected.")
 
-    return [(chosen_concept.path, rejected_concept.path) for chosen_concept, rejected_concept in zip(chosen, rejected, strict=True)]
+    return [
+        (chosen_concept.path, rejected_concept.path)
+        for chosen_concept, rejected_concept in zip(chosen, rejected, strict=True)
+    ]
 
 
 def load_manifest(output_dir: str) -> dict:
@@ -182,19 +181,21 @@ def export_single_pair(
         with open(os.path.join(subdir, safe_name + ".txt"), "w", encoding="utf-8") as f:
             f.write(caption)
 
-    manifest.setdefault("pairs", []).append({
-        "pair_id": pair_id,
-        "prompt": prompt,
-        "aspectratio": aspectratio,
-        "chosen_file": safe_name + chosen_ext,
-        "rejected_file": safe_name + rejected_ext,
-        # Source paths let us filter already-used images out of future groups,
-        # so the same file can't be picked again on the opposite side of a
-        # pair (especially relevant for unconditional groups, which have no
-        # pairs-per-group cap to skip them on resume).
-        "chosen_source": _normalize_source_path(chosen_path),
-        "rejected_source": _normalize_source_path(rejected_path),
-    })
+    manifest.setdefault("pairs", []).append(
+        {
+            "pair_id": pair_id,
+            "prompt": prompt,
+            "aspectratio": aspectratio,
+            "chosen_file": safe_name + chosen_ext,
+            "rejected_file": safe_name + rejected_ext,
+            # Source paths let us filter already-used images out of future groups,
+            # so the same file can't be picked again on the opposite side of a
+            # pair (especially relevant for unconditional groups, which have no
+            # pairs-per-group cap to skip them on resume).
+            "chosen_source": _normalize_source_path(chosen_path),
+            "rejected_source": _normalize_source_path(rejected_path),
+        }
+    )
     save_manifest(output_dir, manifest)
 
 
@@ -384,8 +385,15 @@ def export_curated_pairs(
     with open(os.path.join(abs_output, "concepts.json"), "w", encoding="utf-8") as f:
         json.dump(concepts, f, indent=2)
 
-    return (chosen_train_dir, rejected_train_dir, chosen_val_dir, rejected_val_dir,
-            skipped_count, val_count, train_count)
+    return (
+        chosen_train_dir,
+        rejected_train_dir,
+        chosen_val_dir,
+        rejected_val_dir,
+        skipped_count,
+        val_count,
+        train_count,
+    )
 
 
 def dpo_pair_key(image_path: str, concept_path: str) -> str:
@@ -393,7 +401,7 @@ def dpo_pair_key(image_path: str, concept_path: str) -> str:
         relative = os.path.relpath(image_path, concept_path)
     except ValueError:
         relative = os.path.basename(image_path)
-    return os.path.splitext(relative.replace('\\', '/'))[0]
+    return os.path.splitext(relative.replace("\\", "/"))[0]
 
 
 def check_dpo_pairs(concept_pairs: list[tuple[str, str]]) -> dict:
@@ -429,19 +437,19 @@ def check_dpo_pairs(concept_pairs: list[tuple[str, str]]) -> dict:
 
         for key in matched_keys:
             for img_path in (chosen_keys[key], rejected_keys[key]):
-                ext = os.path.splitext(img_path)[1].lower().lstrip('.')
+                ext = os.path.splitext(img_path)[1].lower().lstrip(".")
                 format_stats[ext] = format_stats.get(ext, 0) + 1
 
         # Check caption files for multiline content
         for concept_path in (chosen_path, rejected_path):
             for root, _dirs, files in os.walk(concept_path):
                 for fname in files:
-                    if fname.endswith('.txt'):
+                    if fname.endswith(".txt"):
                         full = os.path.join(root, fname)
                         try:
-                            with open(full, 'r', encoding='utf-8') as f:
+                            with open(full, "r", encoding="utf-8") as f:
                                 content = f.read()
-                            if '\n' in content.rstrip('\n'):
+                            if "\n" in content.rstrip("\n"):
                                 multiline_captions += 1
                         except OSError:
                             pass
@@ -449,21 +457,23 @@ def check_dpo_pairs(concept_pairs: list[tuple[str, str]]) -> dict:
         all_matched += len(matched_keys)
         all_chosen_stray += chosen_stray
         all_rejected_stray += rejected_stray
-        pairs_info.append({
-            'chosen_path': chosen_path,
-            'rejected_path': rejected_path,
-            'matched': len(matched_keys),
-            'chosen_stray': chosen_stray,
-            'rejected_stray': rejected_stray,
-        })
+        pairs_info.append(
+            {
+                "chosen_path": chosen_path,
+                "rejected_path": rejected_path,
+                "matched": len(matched_keys),
+                "chosen_stray": chosen_stray,
+                "rejected_stray": rejected_stray,
+            }
+        )
 
     return {
-        'total_matched': all_matched,
-        'total_chosen_stray': all_chosen_stray,
-        'total_rejected_stray': all_rejected_stray,
-        'multiline_captions': multiline_captions,
-        'format_stats': format_stats,
-        'pairs': pairs_info,
+        "total_matched": all_matched,
+        "total_chosen_stray": all_chosen_stray,
+        "total_rejected_stray": all_rejected_stray,
+        "multiline_captions": multiline_captions,
+        "format_stats": format_stats,
+        "pairs": pairs_info,
     }
 
 
@@ -474,19 +484,19 @@ def fix_multiline_captions(concept_pairs: list[tuple[str, str]]) -> int:
         for concept_path in (chosen_path, rejected_path):
             for root, _dirs, files in os.walk(concept_path):
                 for fname in files:
-                    if not fname.endswith('.txt'):
+                    if not fname.endswith(".txt"):
                         continue
                     full = os.path.join(root, fname)
                     try:
-                        with open(full, 'r', encoding='utf-8') as f:
+                        with open(full, "r", encoding="utf-8") as f:
                             content = f.read()
                     except OSError:
                         continue
-                    stripped = content.rstrip('\n')
-                    if '\n' not in stripped:
+                    stripped = content.rstrip("\n")
+                    if "\n" not in stripped:
                         continue
-                    fixed_content = re.sub(r'\s*\n\s*', ', ', stripped)
-                    with open(full, 'w', encoding='utf-8') as f:
+                    fixed_content = re.sub(r"\s*\n\s*", ", ", stripped)
+                    with open(full, "w", encoding="utf-8") as f:
                         f.write(fixed_content)
                     fixed += 1
     return fixed
@@ -523,10 +533,10 @@ def scan_finalized_pairs(concept_pairs: list[tuple[str, str]]) -> list[dict]:
             c = chosen_keys.get(key)
             r = rejected_keys.get(key)
             all_pairs[key] = {
-                'key': key,
-                'chosen_path': c,
-                'rejected_path': r,
-                'is_orphan': c is None or r is None,
+                "key": key,
+                "chosen_path": c,
+                "rejected_path": r,
+                "is_orphan": c is None or r is None,
             }
 
     return list(all_pairs.values())

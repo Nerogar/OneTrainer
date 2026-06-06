@@ -4,12 +4,12 @@ import modules.util.multi_gpu_util as multi
 
 
 class LossScaler(Enum):
-    NONE = 'NONE'
-    BATCH = 'BATCH'
-    GLOBAL_BATCH = 'GLOBAL_BATCH'
-    GRADIENT_ACCUMULATION = 'GRADIENT_ACCUMULATION'
-    BOTH = 'BOTH'
-    GLOBAL_BOTH = 'GLOBAL_BOTH'
+    NONE = "NONE"
+    BATCH = "BATCH"
+    GLOBAL_BATCH = "GLOBAL_BATCH"
+    GRADIENT_ACCUMULATION = "GRADIENT_ACCUMULATION"
+    BOTH = "BOTH"
+    GLOBAL_BOTH = "GLOBAL_BOTH"
 
     def __str__(self):
         return self.value

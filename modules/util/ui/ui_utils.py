@@ -29,9 +29,7 @@ def bind_mousewheel(
         if raw_event.type == EventType.MouseWheel:  # Windows and Mac.
             # Positive sign means scroll up, negative sign means scroll down.
             # Windows uses a multiple of 120. Macs use the raw number of steps.
-            delta = (
-                raw_event.delta if is_mac else int(raw_event.delta / 120)
-            )
+            delta = raw_event.delta if is_mac else int(raw_event.delta / 120)
         elif raw_event.type == EventType.ButtonPress:  # Linux.
             # Button 4 means scroll up. Button 5 means scroll down.
             # NOTE: Tk only supports binding mouse buttons 1, 2 and 3. The 4/5
@@ -47,6 +45,7 @@ def bind_mousewheel(
     if sys.platform == "linux":
         widget.bind("<Button-4>", process_mousewheel)
         widget.bind("<Button-5>", process_mousewheel)
+
 
 def set_window_icon(window: tk.Tk | tk.Toplevel | CTk | CTkToplevel) -> None:
     """Set the application window icon based on the current platform
@@ -82,7 +81,7 @@ def set_window_icon(window: tk.Tk | tk.Toplevel | CTk | CTkToplevel) -> None:
                     window.iconphoto(False, window._icon_image_ref)
                 else:
                     # For toplevels - use delayed setting
-                    window.wm_iconbitmap() # Clear any existing icon
+                    window.wm_iconbitmap()  # Clear any existing icon
 
                     def set_icon():
                         try:
@@ -91,7 +90,7 @@ def set_window_icon(window: tk.Tk | tk.Toplevel | CTk | CTkToplevel) -> None:
                         except Exception as e:
                             print(f"Failed to set Linux window icon: {e}")
 
-                    window.after(100, set_icon) # Delay on linux as found less reliable
+                    window.after(100, set_icon)  # Delay on linux as found less reliable
 
         elif system == "Darwin":  # macOS
             # macOS uses app bundles for icons, Tkinter support is limited

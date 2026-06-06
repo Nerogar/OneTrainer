@@ -24,11 +24,11 @@ from tqdm import tqdm
 
 class Flux2Sampler(BaseModelSampler):
     def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            model: Flux2Model,
-            model_type: ModelType,
+        self,
+        train_device: torch.device,
+        temp_device: torch.device,
+        model: Flux2Model,
+        model_type: ModelType,
     ):
         super().__init__(train_device, temp_device)
 
@@ -38,18 +38,18 @@ class Flux2Sampler(BaseModelSampler):
 
     @torch.no_grad()
     def __sample_base(
-            self,
-            prompt: str,
-            negative_prompt: str,
-            height: int,
-            width: int,
-            seed: int,
-            random_seed: bool,
-            diffusion_steps: int,
-            cfg_scale: float,
-            noise_scheduler: NoiseScheduler,
-            text_encoder_sequence_length: int | None = None,
-            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+        self,
+        prompt: str,
+        negative_prompt: str,
+        height: int,
+        width: int,
+        seed: int,
+        random_seed: bool,
+        diffusion_steps: int,
+        cfg_scale: float,
+        noise_scheduler: NoiseScheduler,
+        text_encoder_sequence_length: int | None = None,
+        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
@@ -96,26 +96,27 @@ class Flux2Sampler(BaseModelSampler):
             mu = compute_empirical_mu(image_seq_len, diffusion_steps)
 
             # prepare timesteps
-            #TODO for other models, too? This is different than with sigmas=None
+            # TODO for other models, too? This is different than with sigmas=None
             sigmas = np.linspace(1.0, 1 / diffusion_steps, diffusion_steps)
             noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=mu, sigmas=sigmas)
             timesteps = noise_scheduler.timesteps
 
             # denoising loop
-            extra_step_kwargs = {} #TODO remove
+            extra_step_kwargs = {}  # TODO remove
             if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
                 extra_step_kwargs["generator"] = generator
 
             text_ids = self.model.prepare_text_ids(prompt_embedding)
 
-
             self.model.transformer_to(self.train_device)
-            guidance = (torch.tensor([cfg_scale], device=self.train_device, dtype=self.model.train_dtype.torch_dtype())
-                        if transformer.config.guidance_embeds else None)
+            guidance = (
+                torch.tensor([cfg_scale], device=self.train_device, dtype=self.model.train_dtype.torch_dtype())
+                if transformer.config.guidance_embeds
+                else None
+            )
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 latent_model_input = torch.cat([latent_image] * batch_size)
                 expanded_timestep = timestep.expand(latent_model_input.shape[0])
-
 
                 noise_pred = transformer(
                     hidden_states=latent_model_input.to(dtype=self.model.train_dtype.torch_dtype()),
@@ -125,14 +126,16 @@ class Flux2Sampler(BaseModelSampler):
                     txt_ids=text_ids,
                     img_ids=image_ids,
                     joint_attention_kwargs=None,
-                    return_dict=True
+                    return_dict=True,
                 ).sample
 
                 if batch_size == 2:
                     noise_pred_positive, noise_pred_negative = noise_pred.chunk(2)
                     noise_pred = noise_pred_negative + cfg_scale * (noise_pred_positive - noise_pred_negative)
 
-                latent_image = noise_scheduler.step(noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs)[0]
+                latent_image = noise_scheduler.step(
+                    noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs
+                )[0]
 
                 on_update_progress(i + 1, len(timesteps))
 
@@ -150,7 +153,7 @@ class Flux2Sampler(BaseModelSampler):
 
             image = vae.decode(latents, return_dict=False)[0]
 
-            image = image_processor.postprocess(image, output_type='pil')
+            image = image_processor.postprocess(image, output_type="pil")
 
             self.model.vae_to(self.temp_device)
             torch_gc()
@@ -161,14 +164,14 @@ class Flux2Sampler(BaseModelSampler):
             )
 
     def sample(
-            self,
-            sample_config: SampleConfig,
-            destination: str,
-            image_format: ImageFormat | None = None,
-            video_format: VideoFormat | None = None,
-            audio_format: AudioFormat | None = None,
-            on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
-            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+        self,
+        sample_config: SampleConfig,
+        destination: str,
+        image_format: ImageFormat | None = None,
+        video_format: VideoFormat | None = None,
+        audio_format: AudioFormat | None = None,
+        on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
+        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         sampler_output = self.__sample_base(
             prompt=sample_config.prompt,
@@ -185,10 +188,14 @@ class Flux2Sampler(BaseModelSampler):
         )
 
         self.save_sampler_output(
-            sampler_output, destination,
-            image_format, video_format, audio_format,
+            sampler_output,
+            destination,
+            image_format,
+            video_format,
+            audio_format,
         )
 
         on_sample(sampler_output)
+
 
 factory.register(BaseModelSampler, Flux2Sampler, ModelType.FLUX_2)

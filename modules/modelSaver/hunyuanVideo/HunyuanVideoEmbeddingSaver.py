@@ -10,17 +10,15 @@ import torch
 from torch import Tensor
 
 
-class HunyuanVideoEmbeddingSaver(
-    EmbeddingSaverMixin
-):
+class HunyuanVideoEmbeddingSaver(EmbeddingSaverMixin):
     def __init__(self):
         super().__init__()
 
     def _to_state_dict(
-            self,
-            embedding: HunyuanVideoModelEmbedding | None,
-            embedding_state_dict: dict[str, Tensor] | None,
-            dtype: torch.dtype | None,
+        self,
+        embedding: HunyuanVideoModelEmbedding | None,
+        embedding_state_dict: dict[str, Tensor] | None,
+        dtype: torch.dtype | None,
     ):
         state_dict = copy(embedding_state_dict) if embedding_state_dict is not None else {}
 
@@ -32,19 +30,24 @@ class HunyuanVideoEmbeddingSaver(
             if embedding.text_encoder_1_embedding.output_vector is not None:
                 state_dict["llama_out"] = embedding.text_encoder_1_embedding.output_vector.to(device="cpu", dtype=dtype)
             if embedding.text_encoder_2_embedding.output_vector is not None:
-                state_dict["clip_l_out"] = embedding.text_encoder_2_embedding.output_vector.to(device="cpu", dtype=dtype)
+                state_dict["clip_l_out"] = embedding.text_encoder_2_embedding.output_vector.to(
+                    device="cpu", dtype=dtype
+                )
 
         return state_dict
 
     def save_single(
-            self,
-            model: HunyuanVideoModel,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
+        self,
+        model: HunyuanVideoModel,
+        output_model_format: ModelFormat,
+        output_model_destination: str,
+        dtype: torch.dtype | None,
     ):
-        embedding_uuid = list(model.embedding_state_dicts.keys())[0] if model.embedding is None \
+        embedding_uuid = (
+            list(model.embedding_state_dicts.keys())[0]
+            if model.embedding is None
             else model.embedding.text_encoder_1_embedding.uuid
+        )
 
         embedding = model.embedding
         embedding_state = list(model.embedding_state_dicts.values())[0]
@@ -68,14 +71,15 @@ class HunyuanVideoEmbeddingSaver(
                 )
 
     def save_multiple(
-            self,
-            model: HunyuanVideoModel,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
+        self,
+        model: HunyuanVideoModel,
+        output_model_format: ModelFormat,
+        output_model_destination: str,
+        dtype: torch.dtype | None,
     ):
-        embedding_uuids = set(model.embedding_state_dicts.keys() \
-                              | {x.text_encoder_1_embedding.uuid for x in model.additional_embeddings})
+        embedding_uuids = set(
+            model.embedding_state_dicts.keys() | {x.text_encoder_1_embedding.uuid for x in model.additional_embeddings}
+        )
 
         if model.embedding is not None:
             embedding_uuids.discard(model.embedding.text_encoder_1_embedding.uuid)
@@ -89,8 +93,9 @@ class HunyuanVideoEmbeddingSaver(
             if embedding is None and embedding_state is None:
                 continue
 
-            embedding_name = safe_filename(embedding.text_encoder_1_embedding.placeholder,
-                                           allow_spaces=False, max_length=None)
+            embedding_name = safe_filename(
+                embedding.text_encoder_1_embedding.placeholder, allow_spaces=False, max_length=None
+            )
 
             match output_model_format:
                 case ModelFormat.DIFFUSERS:

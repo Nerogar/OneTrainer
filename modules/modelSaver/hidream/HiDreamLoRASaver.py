@@ -18,8 +18,8 @@ class HiDreamLoRASaver(
         return convert_hidream_lora_key_sets()
 
     def _get_state_dict(
-            self,
-            model: HiDreamModel,
+        self,
+        model: HiDreamModel,
     ) -> dict[str, Tensor]:
         state_dict = {}
         if model.text_encoder_1_lora is not None:
@@ -48,9 +48,13 @@ class HiDreamLoRASaver(
                 if embedding.text_encoder_4_embedding.vector is not None:
                     state_dict[f"bundle_emb.{placeholder}.llama"] = embedding.text_encoder_4_embedding.vector
                 if embedding.text_encoder_1_embedding.output_vector is not None:
-                    state_dict[f"bundle_emb.{placeholder}.clip_l_out"] = embedding.text_encoder_1_embedding.output_vector
+                    state_dict[f"bundle_emb.{placeholder}.clip_l_out"] = (
+                        embedding.text_encoder_1_embedding.output_vector
+                    )
                 if embedding.text_encoder_2_embedding.output_vector is not None:
-                    state_dict[f"bundle_emb.{placeholder}.clip_g_out"] = embedding.text_encoder_2_embedding.output_vector
+                    state_dict[f"bundle_emb.{placeholder}.clip_g_out"] = (
+                        embedding.text_encoder_2_embedding.output_vector
+                    )
                 if embedding.text_encoder_3_embedding.output_vector is not None:
                     state_dict[f"bundle_emb.{placeholder}.t5_out"] = embedding.text_encoder_3_embedding.output_vector
                 if embedding.text_encoder_4_embedding.output_vector is not None:
@@ -59,10 +63,10 @@ class HiDreamLoRASaver(
         return state_dict
 
     def save(
-            self,
-            model: HiDreamModel,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
+        self,
+        model: HiDreamModel,
+        output_model_format: ModelFormat,
+        output_model_destination: str,
+        dtype: torch.dtype | None,
     ):
         self._save(model, output_model_format, output_model_destination, dtype, enable_omi_format=True)

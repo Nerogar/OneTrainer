@@ -20,8 +20,20 @@ def __map_transformer_block(key_prefix: LoraConversionKeySet) -> list[LoraConver
 
     keys += [LoraConversionKeySet("x_block.adaLN_modulation.1", "norm1.linear", parent=key_prefix)]
 
-    keys += [LoraConversionKeySet("context_block.adaLN_modulation.1", "norm1_context.linear", parent=key_prefix, filter_is_last=False)]
-    keys += [LoraConversionKeySet("context_block.adaLN_modulation.1", "norm1_context.linear", parent=key_prefix, swap_chunks=True, filter_is_last=True)]
+    keys += [
+        LoraConversionKeySet(
+            "context_block.adaLN_modulation.1", "norm1_context.linear", parent=key_prefix, filter_is_last=False
+        )
+    ]
+    keys += [
+        LoraConversionKeySet(
+            "context_block.adaLN_modulation.1",
+            "norm1_context.linear",
+            parent=key_prefix,
+            swap_chunks=True,
+            filter_is_last=True,
+        )
+    ]
 
     keys += [LoraConversionKeySet("x_block.mlp.fc1", "ff.net.0.proj", parent=key_prefix)]
     keys += [LoraConversionKeySet("x_block.mlp.fc2", "ff.net.2", parent=key_prefix)]
@@ -43,7 +55,9 @@ def __map_transformer(key_prefix: LoraConversionKeySet) -> list[LoraConversionKe
 
     keys += [LoraConversionKeySet("x_embedder.proj", "pos_embed.proj", parent=key_prefix)]
     keys += [LoraConversionKeySet("context_embedder", "context_embedder", parent=key_prefix)]
-    keys += [LoraConversionKeySet("final_layer.adaLN_modulation.1", "norm_out.linear", parent=key_prefix, swap_chunks=True)]
+    keys += [
+        LoraConversionKeySet("final_layer.adaLN_modulation.1", "norm_out.linear", parent=key_prefix, swap_chunks=True)
+    ]
     keys += [LoraConversionKeySet("final_layer.linear", "proj_out", parent=key_prefix)]
     keys += [LoraConversionKeySet("t_embedder.mlp.0", "time_text_embed.timestep_embedder.linear_1", parent=key_prefix)]
     keys += [LoraConversionKeySet("t_embedder.mlp.2", "time_text_embed.timestep_embedder.linear_2", parent=key_prefix)]

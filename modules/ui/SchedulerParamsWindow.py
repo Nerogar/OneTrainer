@@ -17,7 +17,7 @@ class KvParams(ConfigList):
             attr_name="scheduler_params",
             from_external_file=False,
             add_button_text="add parameter",
-            is_full_width=True
+            is_full_width=True,
         )
 
     def refresh_ui(self):
@@ -52,20 +52,19 @@ class KvWidget(ctk.CTkFrame):
             text="X",
             corner_radius=2,
             fg_color="#C00000",
-            command=lambda: remove_command(self.i))
+            command=lambda: remove_command(self.i),
+        )
         close_button.grid(row=0, column=0)
 
         # Key
         tooltip_key = "Key name for an argument in your scheduler"
-        self.key = components.entry(self, 0, 1, self.ui_state, "key",
-                                    tooltip=tooltip_key, wide_tooltip=True)
+        self.key = components.entry(self, 0, 1, self.ui_state, "key", tooltip=tooltip_key, wide_tooltip=True)
         self.key.bind("<FocusOut>", lambda _: save_command())
         self.key.configure(width=50)
 
         # Value
         tooltip_val = "Value for an argument in your scheduler. Some special values can be used, wrapped in percent signs: LR, EPOCHS, STEPS_PER_EPOCH, TOTAL_STEPS, SCHEDULER_STEPS. Note that OneTrainer calls step() after every individual learning step, not every epoch, so what Torch calls 'epoch' you should treat as 'step'."
-        self.value = components.entry(self, 0, 2, self.ui_state, "value",
-                                      tooltip=tooltip_val, wide_tooltip=True)
+        self.value = components.entry(self, 0, 2, self.ui_state, "value", tooltip=tooltip_val, wide_tooltip=True)
         self.value.bind("<FocusOut>", lambda _: save_command())
         self.value.configure(width=50)
 
@@ -105,11 +104,15 @@ class SchedulerParamsWindow(ctk.CTkToplevel):
         self.focus_set()
         self.after(200, lambda: set_window_icon(self))
 
-
     def main_frame(self, master):
         if self.train_config.learning_rate_scheduler is LearningRateScheduler.CUSTOM:
-            components.label(master, 0, 0, "Class Name",
-                             tooltip="Python class module and name for the custom scheduler class, in the form of <module>.<class_name>.")
+            components.label(
+                master,
+                0,
+                0,
+                "Class Name",
+                tooltip="Python class module and name for the custom scheduler class, in the form of <module>.<class_name>.",
+            )
             components.entry(master, 0, 1, self.ui_state, "custom_learning_rate_scheduler")
 
         # Any additional parameters, in key-value form.

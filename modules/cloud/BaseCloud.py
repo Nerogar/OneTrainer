@@ -13,8 +13,7 @@ class BaseCloud(metaclass=ABCMeta):
     def __init__(self, config: TrainConfig):
         super().__init__()
         self.config = config
-        self.file_sync=None
-
+        self.file_sync = None
 
     def setup(self):
         self._connect()
@@ -26,61 +25,75 @@ class BaseCloud(metaclass=ABCMeta):
             self._make_tensorboard_tunnel()
 
     def download_output_model(self):
-        local=Path(self.config.local_output_model_destination)
-        remote=Path(self.config.output_model_destination)
-        self.file_sync.sync_down_file(local=local,remote=remote)
-        self.file_sync.sync_down_dir(local=local.with_suffix(local.suffix+"_embeddings"),
-                           remote=remote.with_suffix(remote.suffix+"_embeddings"))
+        local = Path(self.config.local_output_model_destination)
+        remote = Path(self.config.output_model_destination)
+        self.file_sync.sync_down_file(local=local, remote=remote)
+        self.file_sync.sync_down_dir(
+            local=local.with_suffix(local.suffix + "_embeddings"),
+            remote=remote.with_suffix(remote.suffix + "_embeddings"),
+        )
 
-    def upload_config(self,commands : TrainCommands=None):
-        local_config_path=Path(self.config.local_workspace_dir,f"remote_config-{get_string_timestamp()}.json")
-        #no need to upload secrets - hugging face token is transferred via environment variable:
+    def upload_config(self, commands: TrainCommands = None):
+        local_config_path = Path(self.config.local_workspace_dir, f"remote_config-{get_string_timestamp()}.json")
+        # no need to upload secrets - hugging face token is transferred via environment variable:
         with local_config_path.open(mode="w") as f:
             json.dump(self.config.to_pack_dict(secrets=False), f, indent=4)
         self._upload_config_file(local_config_path)
 
-        if hasattr(self.config,"local_base_model_name"):
-            self.file_sync.sync_up(local=Path(self.config.local_base_model_name),remote=Path(self.config.base_model_name))
-        if hasattr(self.config.prior,"local_model_name"):
-            self.file_sync.sync_up(local=Path(self.config.prior.local_model_name),remote=Path(self.config.prior.model_name))
-        if hasattr(self.config.transformer,"local_model_name"):
-            self.file_sync.sync_up(local=Path(self.config.transformer.local_model_name),remote=Path(self.config.transformer.model_name))
-        if hasattr(self.config,"local_lora_model_name"):
-            self.file_sync.sync_up(local=Path(self.config.local_lora_model_name),remote=Path(self.config.lora_model_name))
+        if hasattr(self.config, "local_base_model_name"):
+            self.file_sync.sync_up(
+                local=Path(self.config.local_base_model_name), remote=Path(self.config.base_model_name)
+            )
+        if hasattr(self.config.prior, "local_model_name"):
+            self.file_sync.sync_up(
+                local=Path(self.config.prior.local_model_name), remote=Path(self.config.prior.model_name)
+            )
+        if hasattr(self.config.transformer, "local_model_name"):
+            self.file_sync.sync_up(
+                local=Path(self.config.transformer.local_model_name), remote=Path(self.config.transformer.model_name)
+            )
+        if hasattr(self.config, "local_lora_model_name"):
+            self.file_sync.sync_up(
+                local=Path(self.config.local_lora_model_name), remote=Path(self.config.lora_model_name)
+            )
 
-        if hasattr(self.config.embedding,"local_model_name"):
-            self.file_sync.sync_up(local=Path(self.config.embedding.local_model_name),remote=Path(self.config.embedding.model_name))
+        if hasattr(self.config.embedding, "local_model_name"):
+            self.file_sync.sync_up(
+                local=Path(self.config.embedding.local_model_name), remote=Path(self.config.embedding.model_name)
+            )
         for add_embedding in self.config.additional_embeddings:
-            if hasattr(add_embedding,"local_model_name"):
-                self.file_sync.sync_up(local=Path(add_embedding.local_model_name),remote=Path(add_embedding.model_name))
+            if hasattr(add_embedding, "local_model_name"):
+                self.file_sync.sync_up(
+                    local=Path(add_embedding.local_model_name), remote=Path(add_embedding.model_name)
+                )
 
         for concept in self.config.concepts:
             print(f"uploading concept {concept.name}...")
             if commands and commands.get_stop_command():
                 return
 
-            if hasattr(concept,"local_path"):
+            if hasattr(concept, "local_path"):
                 self.file_sync.sync_up_dir(
-                    local=Path(concept.local_path),
-                    remote=Path(concept.path),
-                    recursive=concept.include_subdirectories)
+                    local=Path(concept.local_path), remote=Path(concept.path), recursive=concept.include_subdirectories
+                )
 
-            if hasattr(concept.text,"local_prompt_path"):
-                self.file_sync.sync_up_file(local=Path(concept.text.local_prompt_path),remote=Path(concept.text.prompt_path))
+            if hasattr(concept.text, "local_prompt_path"):
+                self.file_sync.sync_up_file(
+                    local=Path(concept.text.local_prompt_path), remote=Path(concept.text.prompt_path)
+                )
 
     @staticmethod
-    def _filter_download(config : CloudConfig,path : Path):
-        if 'samples' in path.parts:
+    def _filter_download(config: CloudConfig, path: Path):
+        if "samples" in path.parts:
             return config.download_samples
-        elif 'save' in path.parts:
+        elif "save" in path.parts:
             return config.download_saves
-        elif 'backup' in path.parts:
+        elif "backup" in path.parts:
             return config.download_backups
-        elif 'tensorboard' in path.parts:
+        elif "tensorboard" in path.parts:
             return config.download_tensorboard
         else:
             return True
-
 
     @abstractmethod
     def run_trainer(self):
@@ -91,11 +104,11 @@ class BaseCloud(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def exec_callback(self,callbacks : TrainCallbacks):
+    def exec_callback(self, callbacks: TrainCallbacks):
         pass
 
     @abstractmethod
-    def send_commands(self,commands : TrainCommands):
+    def send_commands(self, commands: TrainCommands):
         pass
 
     @abstractmethod
@@ -116,7 +129,7 @@ class BaseCloud(metaclass=ABCMeta):
         raise NotImplementedError("stopping this cloud type not supported")
 
     @abstractmethod
-    def _install_onetrainer(self, update: bool=False):
+    def _install_onetrainer(self, update: bool = False):
         pass
 
     @abstractmethod
@@ -124,7 +137,7 @@ class BaseCloud(metaclass=ABCMeta):
         raise NotImplementedError("Tensorboard tunnel not supported on this cloud type")
 
     @abstractmethod
-    def _upload_config_file(self,local : Path):
+    def _upload_config_file(self, local: Path):
         pass
 
     @abstractmethod

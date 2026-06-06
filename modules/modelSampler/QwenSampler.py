@@ -22,11 +22,11 @@ from tqdm import tqdm
 
 class QwenSampler(BaseModelSampler):
     def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            model: QwenModel,
-            model_type: ModelType,
+        self,
+        train_device: torch.device,
+        temp_device: torch.device,
+        model: QwenModel,
+        model_type: ModelType,
     ):
         super().__init__(train_device, temp_device)
 
@@ -36,17 +36,17 @@ class QwenSampler(BaseModelSampler):
 
     @torch.no_grad()
     def __sample_base(
-            self,
-            prompt: str,
-            negative_prompt: str,
-            height: int,
-            width: int,
-            seed: int,
-            random_seed: bool,
-            diffusion_steps: int,
-            cfg_scale: float,
-            noise_scheduler: NoiseScheduler,
-            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+        self,
+        prompt: str,
+        negative_prompt: str,
+        height: int,
+        width: int,
+        seed: int,
+        random_seed: bool,
+        diffusion_steps: int,
+        cfg_scale: float,
+        noise_scheduler: NoiseScheduler,
+        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
@@ -66,7 +66,7 @@ class QwenSampler(BaseModelSampler):
             # prepare prompt
             self.model.text_encoder_to(self.train_device)
 
-            #unlike other models, Qwen benefits from CFG but is still quite good at CFG 1. Optimize for that:
+            # unlike other models, Qwen benefits from CFG but is still quite good at CFG 1. Optimize for that:
             batch_size = 2 if cfg_scale > 1.0 else 1
             combined_prompt_embedding, text_attention_mask = self.model.encode_text(
                 text=[prompt, negative_prompt] if cfg_scale > 1.0 else prompt,
@@ -93,18 +93,22 @@ class QwenSampler(BaseModelSampler):
 
             # denoising loop
             extra_step_kwargs = {}
-            #TODO always True for FlowMatchEulerDiscreteScheduler - remove and pass directly?
-            #If so, also remove for other models
+            # TODO always True for FlowMatchEulerDiscreteScheduler - remove and pass directly?
+            # If so, also remove for other models
             if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
-                extra_step_kwargs["generator"] = generator #TODO purpose?
+                extra_step_kwargs["generator"] = generator  # TODO purpose?
 
-            #FIXME list of lists is not according to type hint, but according to diffusers code
-            #https://github.com/huggingface/diffusers/issues/12295
-            img_shapes = [[(
-                1, #frame for future video model - not batch size
-                height // vae_scale_factor // 2,
-                width // vae_scale_factor // 2)
-            ]] * batch_size
+            # FIXME list of lists is not according to type hint, but according to diffusers code
+            # https://github.com/huggingface/diffusers/issues/12295
+            img_shapes = [
+                [
+                    (
+                        1,  # frame for future video model - not batch size
+                        height // vae_scale_factor // 2,
+                        width // vae_scale_factor // 2,
+                    )
+                ]
+            ] * batch_size
 
             if torch.all(text_attention_mask):
                 text_attention_mask = None
@@ -149,7 +153,7 @@ class QwenSampler(BaseModelSampler):
             image = vae.decode(latents, return_dict=False)[0].squeeze(-3)
 
             do_denormalize = [True] * image.shape[0]
-            image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
+            image = image_processor.postprocess(image, output_type="pil", do_denormalize=do_denormalize)
 
             self.model.vae_to(self.temp_device)
             torch_gc()
@@ -160,14 +164,14 @@ class QwenSampler(BaseModelSampler):
             )
 
     def sample(
-            self,
-            sample_config: SampleConfig,
-            destination: str,
-            image_format: ImageFormat | None = None,
-            video_format: VideoFormat | None = None,
-            audio_format: AudioFormat | None = None,
-            on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
-            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+        self,
+        sample_config: SampleConfig,
+        destination: str,
+        image_format: ImageFormat | None = None,
+        video_format: VideoFormat | None = None,
+        audio_format: AudioFormat | None = None,
+        on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
+        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         sampler_output = self.__sample_base(
             prompt=sample_config.prompt,
@@ -183,10 +187,14 @@ class QwenSampler(BaseModelSampler):
         )
 
         self.save_sampler_output(
-            sampler_output, destination,
-            image_format, video_format, audio_format,
+            sampler_output,
+            destination,
+            image_format,
+            video_format,
+            audio_format,
         )
 
         on_sample(sampler_output)
+
 
 factory.register(BaseModelSampler, QwenSampler, ModelType.QWEN)

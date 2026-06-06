@@ -17,8 +17,8 @@ class ZImageLoRASaver(
         return None
 
     def _get_state_dict(
-            self,
-            model: ZImageModel,
+        self,
+        model: ZImageModel,
     ) -> dict[str, Tensor]:
         state_dict = {}
         if model.transformer_lora is not None:
@@ -28,10 +28,10 @@ class ZImageLoRASaver(
         return state_dict
 
     def save(
-            self,
-            model: ZImageModel,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
+        self,
+        model: ZImageModel,
+        output_model_format: ModelFormat,
+        output_model_destination: str,
+        dtype: torch.dtype | None,
     ):
         self._save(model, output_model_format, output_model_destination, dtype)

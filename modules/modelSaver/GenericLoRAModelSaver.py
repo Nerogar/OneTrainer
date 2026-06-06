@@ -26,21 +26,21 @@ def make_lora_model_saver(
             super().__init__()
 
         def save(
-                self,
-                model: model_class,
-                model_type: ModelType,
-                output_model_format: ModelFormat,
-                output_model_destination: str,
-                dtype: torch.dtype | None,
+            self,
+            model: model_class,
+            model_type: ModelType,
+            output_model_format: ModelFormat,
+            output_model_destination: str,
+            dtype: torch.dtype | None,
         ):
             lora_model_saver = lora_saver_class()
             lora_model_saver.save(model, output_model_format, output_model_destination, dtype)
 
             if embedding_saver_class is not None:
                 embedding_model_saver = embedding_saver_class()
-                if ((model.train_config is not None and not model.train_config.bundle_additional_embeddings) \
-                    or output_model_format == ModelFormat.INTERNAL
-                ):
+                if (
+                    model.train_config is not None and not model.train_config.bundle_additional_embeddings
+                ) or output_model_format == ModelFormat.INTERNAL:
                     embedding_model_saver.save_multiple(model, output_model_format, output_model_destination, dtype)
 
             if output_model_format == ModelFormat.INTERNAL:

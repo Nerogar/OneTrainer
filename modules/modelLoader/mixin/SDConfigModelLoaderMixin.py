@@ -11,25 +11,25 @@ class SDConfigModelLoaderMixin(metaclass=ABCMeta):
         super().__init__()
 
     def _default_sd_config_name(
-            self,
-            model_type: ModelType,
+        self,
+        model_type: ModelType,
     ) -> str | None:
         return None
 
     def _get_sd_config_name(
-            self,
-            model_type: ModelType,
-            base_model_name: str | None = None,
+        self,
+        model_type: ModelType,
+        base_model_name: str | None = None,
     ) -> str | None:
         yaml_name = None
 
         if base_model_name:
-            new_yaml_name = os.path.splitext(base_model_name)[0] + '.yaml'
+            new_yaml_name = os.path.splitext(base_model_name)[0] + ".yaml"
             if os.path.exists(new_yaml_name):
                 yaml_name = new_yaml_name
 
             if not yaml_name:
-                new_yaml_name = os.path.splitext(base_model_name)[0] + '.yml'
+                new_yaml_name = os.path.splitext(base_model_name)[0] + ".yml"
                 if os.path.exists(new_yaml_name):
                     yaml_name = new_yaml_name
 
@@ -41,9 +41,9 @@ class SDConfigModelLoaderMixin(metaclass=ABCMeta):
         return yaml_name
 
     def _load_sd_config(
-            self,
-            model_type: ModelType,
-            base_model_name: str | None = None,
+        self,
+        model_type: ModelType,
+        base_model_name: str | None = None,
     ) -> dict | None:
         yaml_name = self._get_sd_config_name(model_type, base_model_name)
 

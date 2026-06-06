@@ -6,9 +6,7 @@ from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.ModelNames import ModelNames
 
 
-class ChromaLoRALoader(
-    LoRALoaderMixin
-):
+class ChromaLoRALoader(LoRALoaderMixin):
     def __init__(self):
         super().__init__()
 
@@ -16,8 +14,8 @@ class ChromaLoRALoader(
         return convert_chroma_lora_key_sets()
 
     def load(
-            self,
-            model: ChromaModel,
-            model_names: ModelNames,
+        self,
+        model: ChromaModel,
+        model_names: ModelNames,
     ):
         return self._load(model, model_names)

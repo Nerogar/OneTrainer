@@ -12,13 +12,27 @@ class CaptionUIArgs(BaseArgs):
         super().__init__(data)
 
     @staticmethod
-    def parse_args() -> 'CaptionUIArgs':
+    def parse_args() -> "CaptionUIArgs":
         parser = argparse.ArgumentParser(description="One Trainer Caption UI Script.")
 
         # @formatter:off
 
-        parser.add_argument("--dir", type=str, required=False, default=None, dest="dir", help="The initial directory to load training data from")
-        parser.add_argument("--include-subdirectories", action="store_true", required=False, default=False, dest="include_subdirectories", help="Whether to include subdirectories when processing samples")
+        parser.add_argument(
+            "--dir",
+            type=str,
+            required=False,
+            default=None,
+            dest="dir",
+            help="The initial directory to load training data from",
+        )
+        parser.add_argument(
+            "--include-subdirectories",
+            action="store_true",
+            required=False,
+            default=False,
+            dest="include_subdirectories",
+            help="Whether to include subdirectories when processing samples",
+        )
 
         # @formatter:on
 
@@ -27,7 +41,7 @@ class CaptionUIArgs(BaseArgs):
         return args
 
     @staticmethod
-    def default_values() -> 'CaptionUIArgs':
+    def default_values() -> "CaptionUIArgs":
         data = []
 
         # name, default value, data type, nullable

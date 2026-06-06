@@ -36,31 +36,37 @@ class Flux2ModelLoader(
         super().__init__()
 
     def __load_internal(
-            self,
-            model: Flux2Model,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            transformer_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: Flux2Model,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        transformer_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(
-                model, model_type, weight_dtypes, base_model_name, transformer_model_name, vae_model_name, quantization,
+                model,
+                model_type,
+                weight_dtypes,
+                base_model_name,
+                transformer_model_name,
+                vae_model_name,
+                quantization,
             )
         else:
             raise Exception("not an internal model")
 
     def __load_diffusers(
-            self,
-            model: Flux2Model,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            transformer_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: Flux2Model,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        transformer_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
         diffusers_sub = []
         transformers_sub = ["text_encoder"]
@@ -80,12 +86,19 @@ class Flux2ModelLoader(
                 transformer_model_name,
                 config=base_model_name,
                 subfolder="transformer",
-                #avoid loading the transformer in float32:
-                torch_dtype=torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype(),
-                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16) if weight_dtypes.transformer.is_gguf() else None,
+                # avoid loading the transformer in float32:
+                torch_dtype=torch.bfloat16
+                if weight_dtypes.transformer.torch_dtype() is None
+                else weight_dtypes.transformer.torch_dtype(),
+                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16)
+                if weight_dtypes.transformer.is_gguf()
+                else None,
             )
             transformer = self._convert_diffusers_sub_module_to_dtype(
-                transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization,
+                transformer,
+                weight_dtypes.transformer,
+                weight_dtypes.train_dtype,
+                quantization,
             )
         else:
             transformer = self._load_diffusers_sub_module(
@@ -97,7 +110,7 @@ class Flux2ModelLoader(
                 quantization,
             )
 
-        if transformer.config.num_attention_heads == 48: #Flux2.Dev
+        if transformer.config.num_attention_heads == 48:  # Flux2.Dev
             tokenizer = PixtralProcessor.from_pretrained(
                 base_model_name,
                 subfolder="tokenizer",
@@ -110,7 +123,7 @@ class Flux2ModelLoader(
                 base_model_name,
                 "text_encoder",
             )
-        else: #Flux2.Klein
+        else:  # Flux2.Klein
             tokenizer = Qwen2Tokenizer.from_pretrained(
                 base_model_name,
                 subfolder="tokenizer",
@@ -122,9 +135,9 @@ class Flux2ModelLoader(
                 base_model_name,
                 "text_encoder",
             )
-            #TODO this is a tied weight. The dtype conversion code in _load_transformers_sub_module
-            #currently does not support tied weights. Reconstruct but clone, because the quantization code
-            #doesn't support tied weights either:
+            # TODO this is a tied weight. The dtype conversion code in _load_transformers_sub_module
+            # currently does not support tied weights. Reconstruct but clone, because the quantization code
+            # doesn't support tied weights either:
             text_encoder.lm_head.weight = type(text_encoder.lm_head.weight)(text_encoder.model.embed_tokens.weight)
 
         noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
@@ -156,31 +169,39 @@ class Flux2ModelLoader(
         model.transformer = transformer
 
     def __load_safetensors(
-            self,
-            model: Flux2Model,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            transformer_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: Flux2Model,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        transformer_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
-        #no single file .safetensors for Qwen available at the time of writing this code
-        raise NotImplementedError("Loading of single file Flux2 models not supported. Use the diffusers model instead. Optionally, transformer-only safetensor files can be loaded by overriding the transformer.")
+        # no single file .safetensors for Qwen available at the time of writing this code
+        raise NotImplementedError(
+            "Loading of single file Flux2 models not supported. Use the diffusers model instead. Optionally, transformer-only safetensor files can be loaded by overriding the transformer."
+        )
 
     def load(
-            self,
-            model: Flux2Model,
-            model_type: ModelType,
-            model_names: ModelNames,
-            weight_dtypes: ModelWeightDtypes,
-            quantization: QuantizationConfig,
+        self,
+        model: Flux2Model,
+        model_type: ModelType,
+        model_names: ModelNames,
+        weight_dtypes: ModelWeightDtypes,
+        quantization: QuantizationConfig,
     ):
         stacktraces = []
 
         try:
             self.__load_internal(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model, quantization,
+                model,
+                model_type,
+                weight_dtypes,
+                model_names.base_model,
+                model_names.transformer_model,
+                model_names.vae_model,
+                quantization,
             )
             return
         except Exception:
@@ -188,7 +209,13 @@ class Flux2ModelLoader(
 
         try:
             self.__load_diffusers(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model, quantization,
+                model,
+                model_type,
+                weight_dtypes,
+                model_names.base_model,
+                model_names.transformer_model,
+                model_names.vae_model,
+                quantization,
             )
             return
         except Exception:
@@ -196,7 +223,13 @@ class Flux2ModelLoader(
 
         try:
             self.__load_safetensors(
-                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model, quantization,
+                model,
+                model_type,
+                weight_dtypes,
+                model_names.base_model,
+                model_names.transformer_model,
+                model_names.vae_model,
+                quantization,
             )
             return
         except Exception:
@@ -207,21 +240,18 @@ class Flux2ModelLoader(
         raise Exception("could not load model: " + model_names.base_model)
 
 
-
-class Flux2LoRALoader(
-    LoRALoaderMixin
-):
+class Flux2LoRALoader(LoRALoaderMixin):
     def __init__(self):
         super().__init__()
 
     def _get_convert_key_sets(self, model: BaseModel) -> list[LoraConversionKeySet] | None:
-        return None #TODO
-        #return convert_flux_lora_key_sets()
+        return None  # TODO
+        # return convert_flux_lora_key_sets()
 
     def load(
-            self,
-            model: Flux2Model,
-            model_names: ModelNames,
+        self,
+        model: Flux2Model,
+        model_names: ModelNames,
     ):
         return self._load(model, model_names)
 

@@ -21,11 +21,11 @@ from tqdm import tqdm
 
 class SanaSampler(BaseModelSampler):
     def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            model: SanaModel,
-            model_type: ModelType,
+        self,
+        train_device: torch.device,
+        temp_device: torch.device,
+        model: SanaModel,
+        model_type: ModelType,
     ):
         super().__init__(train_device, temp_device)
 
@@ -35,18 +35,18 @@ class SanaSampler(BaseModelSampler):
 
     @torch.no_grad()
     def __sample_base(
-            self,
-            prompt: str,
-            negative_prompt: str,
-            height: int,
-            width: int,
-            seed: int,
-            random_seed: bool,
-            diffusion_steps: int,
-            cfg_scale: float,
-            noise_scheduler: NoiseScheduler,
-            text_encoder_layer_skip: int = 0,
-            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+        self,
+        prompt: str,
+        negative_prompt: str,
+        height: int,
+        width: int,
+        seed: int,
+        random_seed: bool,
+        diffusion_steps: int,
+        cfg_scale: float,
+        noise_scheduler: NoiseScheduler,
+        text_encoder_layer_skip: int = 0,
+        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
@@ -88,12 +88,15 @@ class SanaSampler(BaseModelSampler):
 
             # prepare latent image
             num_channels_latents = transformer.config.in_channels
-            latent_image = torch.randn(
-                size=(1, num_channels_latents, height // vae_scale_factor, width // vae_scale_factor),
-                generator=generator,
-                device=self.train_device,
-                dtype=torch.float32
-            ) * noise_scheduler.init_noise_sigma
+            latent_image = (
+                torch.randn(
+                    size=(1, num_channels_latents, height // vae_scale_factor, width // vae_scale_factor),
+                    generator=generator,
+                    device=self.train_device,
+                    dtype=torch.float32,
+                )
+                * noise_scheduler.init_noise_sigma
+            )
 
             # denoising loop
             extra_step_kwargs = {}
@@ -108,10 +111,10 @@ class SanaSampler(BaseModelSampler):
                 # predict the noise residual
                 noise_pred = transformer(
                     latent_model_input.to(dtype=self.model.train_dtype.torch_dtype()),
-                    encoder_hidden_states=combined_prompt_embedding \
-                        .to(dtype=self.model.train_dtype.torch_dtype()),
-                    encoder_attention_mask=combined_prompt_attention_mask \
-                        .to(dtype=self.model.train_dtype.torch_dtype()),
+                    encoder_hidden_states=combined_prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
+                    encoder_attention_mask=combined_prompt_attention_mask.to(
+                        dtype=self.model.train_dtype.torch_dtype()
+                    ),
                     timestep=timestep.expand(latent_model_input.shape[0]),
                 ).sample
 
@@ -137,7 +140,7 @@ class SanaSampler(BaseModelSampler):
                 image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
             do_denormalize = [True] * image.shape[0]
-            image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
+            image = image_processor.postprocess(image, output_type="pil", do_denormalize=do_denormalize)
 
             self.model.vae_to(self.temp_device)
             torch_gc()
@@ -148,14 +151,14 @@ class SanaSampler(BaseModelSampler):
             )
 
     def sample(
-            self,
-            sample_config: SampleConfig,
-            destination: str,
-            image_format: ImageFormat | None = None,
-            video_format: VideoFormat | None = None,
-            audio_format: AudioFormat | None = None,
-            on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
-            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+        self,
+        sample_config: SampleConfig,
+        destination: str,
+        image_format: ImageFormat | None = None,
+        video_format: VideoFormat | None = None,
+        audio_format: AudioFormat | None = None,
+        on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
+        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         sampler_output = self.__sample_base(
             prompt=sample_config.prompt,
@@ -172,10 +175,14 @@ class SanaSampler(BaseModelSampler):
         )
 
         self.save_sampler_output(
-            sampler_output, destination,
-            image_format, video_format, audio_format,
+            sampler_output,
+            destination,
+            image_format,
+            video_format,
+            audio_format,
         )
 
         on_sample(sampler_output)
+
 
 factory.register(BaseModelSampler, SanaSampler, ModelType.SANA)

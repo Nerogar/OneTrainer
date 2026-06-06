@@ -31,12 +31,12 @@ from PIL import Image, ImageDraw
 
 class CaptionUI(ctk.CTkToplevel):
     def __init__(
-            self,
-            parent,
-            initial_dir: str | None,
-            initial_include_subdirectories: bool,
-            *args,
-            **kwargs,
+        self,
+        parent,
+        initial_dir: str | None,
+        initial_include_subdirectories: bool,
+        *args,
+        **kwargs,
     ) -> None:
         super().__init__(parent, *args, **kwargs)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -74,22 +74,19 @@ class CaptionUI(ctk.CTkToplevel):
         self.display_only_mask = False
         self.image = None
         self.image_label = None
-        self.mask_editing_mode = 'draw'
+        self.mask_editing_mode = "draw"
         self.enable_mask_editing_var = ctk.BooleanVar()
         self.mask_editing_alpha = None
         self.prompt_var = None
         self.prompt_component = None
 
-
         self.title("OneTrainer")
         self.geometry("1280x980")
         self.resizable(False, False)
 
-
         self.grid_rowconfigure(0, weight=0)
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
-
 
         self.top_bar(self)
 
@@ -111,24 +108,36 @@ class CaptionUI(ctk.CTkToplevel):
         top_frame = ctk.CTkFrame(master)
         top_frame.grid(row=0, column=0, sticky="nsew")
 
-        components.button(top_frame, 0, 0, "Open", self.open_directory,
-                          tooltip="open a new directory")
-        components.button(top_frame, 0, 1, "Generate Masks", self.open_mask_window,
-                          tooltip="open a dialog to automatically generate masks")
-        components.button(top_frame, 0, 2, "Generate Captions", self.open_caption_window,
-                          tooltip="open a dialog to automatically generate captions")
+        components.button(top_frame, 0, 0, "Open", self.open_directory, tooltip="open a new directory")
+        components.button(
+            top_frame,
+            0,
+            1,
+            "Generate Masks",
+            self.open_mask_window,
+            tooltip="open a dialog to automatically generate masks",
+        )
+        components.button(
+            top_frame,
+            0,
+            2,
+            "Generate Captions",
+            self.open_caption_window,
+            tooltip="open a dialog to automatically generate captions",
+        )
 
         if platform.system() == "Windows":
-            components.button(top_frame, 0, 3, "Open in Explorer", self.open_in_explorer,
-                              tooltip="open the current image in Explorer")
+            components.button(
+                top_frame, 0, 3, "Open in Explorer", self.open_in_explorer, tooltip="open the current image in Explorer"
+            )
 
-        components.switch(top_frame, 0, 4, self.config_ui_state, "include_subdirectories",
-                          text="include subdirectories")
+        components.switch(
+            top_frame, 0, 4, self.config_ui_state, "include_subdirectories", text="include subdirectories"
+        )
 
         top_frame.grid_columnconfigure(5, weight=1)
 
-        components.button(top_frame, 0, 6, "Help", self.print_help,
-                          tooltip=self.help_text)
+        components.button(top_frame, 0, 6, "Help", self.print_help, tooltip=self.help_text)
 
     def file_list_column(self, master):
         if self.file_list is not None:
@@ -139,6 +148,7 @@ class CaptionUI(ctk.CTkToplevel):
         self.file_list.grid(row=0, column=0, sticky="nsew")
 
         for i, filename in enumerate(self.image_rel_paths):
+
             def __create_switch_image(index):
                 def __switch_image(event):
                     self.switch_image(index)
@@ -160,16 +170,17 @@ class CaptionUI(ctk.CTkToplevel):
         right_frame.grid_columnconfigure(4, weight=1)
         right_frame.grid_rowconfigure(1, weight=1)
 
-        components.button(right_frame, 0, 0, "Draw", self.draw_mask_editing_mode,
-                          tooltip="draw a mask using a brush")
-        components.button(right_frame, 0, 1, "Fill", self.fill_mask_editing_mode,
-                          tooltip="draw a mask using a fill tool")
+        components.button(right_frame, 0, 0, "Draw", self.draw_mask_editing_mode, tooltip="draw a mask using a brush")
+        components.button(
+            right_frame, 0, 1, "Fill", self.fill_mask_editing_mode, tooltip="draw a mask using a fill tool"
+        )
 
         # checkbox to enable mask editing
         self.enable_mask_editing_var = ctk.BooleanVar()
         self.enable_mask_editing_var.set(False)
         enable_mask_editing_checkbox = ctk.CTkCheckBox(
-            right_frame, text="Enable Mask Editing", variable=self.enable_mask_editing_var, width=50)
+            right_frame, text="Enable Mask Editing", variable=self.enable_mask_editing_var, width=50
+        )
         enable_mask_editing_checkbox.grid(row=0, column=2, padx=25, pady=5, sticky="w")
 
         # mask alpha textbox
@@ -182,10 +193,7 @@ class CaptionUI(ctk.CTkToplevel):
         mask_editing_alpha_label.grid(row=0, column=4, padx=0, pady=5, sticky="w")
 
         # image
-        self.image = ctk.CTkImage(
-            light_image=image,
-            size=(self.image_size, self.image_size)
-        )
+        self.image = ctk.CTkImage(light_image=image, size=(self.image_size, self.image_size))
         self.image_label = ctk.CTkLabel(
             master=right_frame, text="", image=self.image, height=self.image_size, width=self.image_size
         )
@@ -225,7 +233,11 @@ class CaptionUI(ctk.CTkToplevel):
     def scan_directory(self, include_subdirectories: bool = False):
         def __is_supported_image_extension(filename):
             name, ext = os.path.splitext(filename)
-            return path_util.is_supported_image_extension(ext) and not name.endswith("-masklabel") and not name.endswith("-condlabel")
+            return (
+                path_util.is_supported_image_extension(ext)
+                and not name.endswith("-masklabel")
+                and not name.endswith("-condlabel")
+            )
 
         self.image_rel_paths = []
 
@@ -236,15 +248,11 @@ class CaptionUI(ctk.CTkToplevel):
             for root, _, files in os.walk(self.dir):
                 for filename in files:
                     if __is_supported_image_extension(filename):
-                        self.image_rel_paths.append(
-                            os.path.relpath(os.path.join(root, filename), self.dir)
-                        )
+                        self.image_rel_paths.append(os.path.relpath(os.path.join(root, filename), self.dir))
         else:
             for _, filename in enumerate(os.listdir(self.dir)):
                 if __is_supported_image_extension(filename):
-                    self.image_rel_paths.append(
-                        os.path.relpath(os.path.join(self.dir, filename), self.dir)
-                    )
+                    self.image_rel_paths.append(os.path.relpath(os.path.join(self.dir, filename), self.dir))
 
     def load_image(self):
         image_name = "resources/icons/icon.png"
@@ -256,7 +264,7 @@ class CaptionUI(ctk.CTkToplevel):
         try:
             return load_image(image_name, convert_mode="RGB")
         except Exception:
-            print(f'Could not open image {image_name}')
+            print(f"Could not open image {image_name}")
 
     def load_mask(self):
         if len(self.image_rel_paths) > 0 and self.current_image_index < len(self.image_rel_paths):
@@ -265,7 +273,7 @@ class CaptionUI(ctk.CTkToplevel):
             mask_name = os.path.join(self.dir, mask_name)
 
             try:
-                return load_image(mask_name, convert_mode='RGB')
+                return load_image(mask_name, convert_mode="RGB")
             except Exception:
                 return None
         else:
@@ -278,7 +286,7 @@ class CaptionUI(ctk.CTkToplevel):
             prompt_name = os.path.join(self.dir, prompt_name)
 
             try:
-                with open(prompt_name, "r", encoding='utf-8') as f:
+                with open(prompt_name, "r", encoding="utf-8") as f:
                     return f.readlines()[0].strip()
             except Exception:
                 return ""
@@ -296,7 +304,8 @@ class CaptionUI(ctk.CTkToplevel):
     def switch_image(self, index):
         if len(self.image_labels) > 0 and self.current_image_index < len(self.image_labels):
             self.image_labels[self.current_image_index].configure(
-                text_color=ThemeManager.theme["CTkLabel"]["text_color"])
+                text_color=ThemeManager.theme["CTkLabel"]["text_color"]
+            )
 
         self.current_image_index = index
         if index >= 0:
@@ -323,8 +332,7 @@ class CaptionUI(ctk.CTkToplevel):
     def refresh_image(self):
         if self.pil_mask:
             resized_pil_mask = self.pil_mask.resize(
-                (self.pil_image.width, self.pil_image.height),
-                Image.Resampling.NEAREST
+                (self.pil_image.width, self.pil_image.height), Image.Resampling.NEAREST
             )
 
             if self.display_only_mask:
@@ -344,7 +352,7 @@ class CaptionUI(ctk.CTkToplevel):
                     np_mask = (np_mask - np_mask_min) / (1.0 - np_mask_min) * (1.0 - norm_min) + norm_min
 
                 np_masked_image = (np_image * np_mask * 255.0).astype(np.uint8)
-                masked_image = Image.fromarray(np_masked_image, mode='RGB')
+                masked_image = Image.fromarray(np_masked_image, mode="RGB")
 
                 self.image.configure(light_image=masked_image, size=masked_image.size)
         else:
@@ -385,9 +393,9 @@ class CaptionUI(ctk.CTkToplevel):
         elif event.state & 0x0400 or event.num == 3:  # right mouse button
             is_right = True
 
-        if self.mask_editing_mode == 'draw':
+        if self.mask_editing_mode == "draw":
             self.draw_mask(start_x, start_y, end_x, end_y, is_left, is_right)
-        if self.mask_editing_mode == 'fill':
+        if self.mask_editing_mode == "fill":
             self.fill_mask(start_x, start_y, end_x, end_y, is_left, is_right)
 
     def draw_mask(self, start_x, start_y, end_x, end_y, is_left, is_right):
@@ -409,19 +417,18 @@ class CaptionUI(ctk.CTkToplevel):
         if color is not None:
             if self.pil_mask is None:
                 if adding_to_mask:
-                    self.pil_mask = Image.new('RGB', size=(self.image_width, self.image_height), color=(0, 0, 0))
+                    self.pil_mask = Image.new("RGB", size=(self.image_width, self.image_height), color=(0, 0, 0))
                 else:
-                    self.pil_mask = Image.new('RGB', size=(self.image_width, self.image_height), color=(255, 255, 255))
+                    self.pil_mask = Image.new("RGB", size=(self.image_width, self.image_height), color=(255, 255, 255))
 
             radius = int(self.mask_draw_radius * max(self.pil_mask.width, self.pil_mask.height))
 
             draw = ImageDraw.Draw(self.pil_mask)
-            draw.line((start_x, start_y, end_x, end_y), fill=color,
-                      width=radius + radius + 1)
-            draw.ellipse((start_x - radius, start_y - radius,
-                          start_x + radius, start_y + radius), fill=color, outline=None)
-            draw.ellipse((end_x - radius, end_y - radius, end_x + radius,
-                          end_y + radius), fill=color, outline=None)
+            draw.line((start_x, start_y, end_x, end_y), fill=color, width=radius + radius + 1)
+            draw.ellipse(
+                (start_x - radius, start_y - radius, start_x + radius, start_y + radius), fill=color, outline=None
+            )
+            draw.ellipse((end_x - radius, end_y - radius, end_x + radius, end_y + radius), fill=color, outline=None)
 
             self.refresh_image()
 
@@ -444,13 +451,13 @@ class CaptionUI(ctk.CTkToplevel):
         if color is not None:
             if self.pil_mask is None:
                 if adding_to_mask:
-                    self.pil_mask = Image.new('RGB', size=(self.image_width, self.image_height), color=(0, 0, 0))
+                    self.pil_mask = Image.new("RGB", size=(self.image_width, self.image_height), color=(0, 0, 0))
                 else:
-                    self.pil_mask = Image.new('RGB', size=(self.image_width, self.image_height), color=(255, 255, 255))
+                    self.pil_mask = Image.new("RGB", size=(self.image_width, self.image_height), color=(255, 255, 255))
 
             np_mask = np.array(self.pil_mask).astype(np.uint8)
             cv2.floodFill(np_mask, None, (start_x, start_y), color)
-            self.pil_mask = Image.fromarray(np_mask, 'RGB')
+            self.pil_mask = Image.fromarray(np_mask, "RGB")
 
             self.refresh_image()
 
@@ -465,7 +472,7 @@ class CaptionUI(ctk.CTkToplevel):
             mask_name = os.path.join(self.dir, mask_name)
 
             try:
-                with open(prompt_name, "w", encoding='utf-8') as f:
+                with open(prompt_name, "w", encoding="utf-8") as f:
                     f.write(self.prompt_var.get())
             except Exception:
                 return
@@ -474,7 +481,7 @@ class CaptionUI(ctk.CTkToplevel):
                 self.pil_mask.save(mask_name)
 
     def draw_mask_editing_mode(self, *args):
-        self.mask_editing_mode = 'draw'
+        self.mask_editing_mode = "draw"
 
         if args:
             # disable default event
@@ -482,7 +489,7 @@ class CaptionUI(ctk.CTkToplevel):
         return None
 
     def fill_mask_editing_mode(self, *args):
-        self.mask_editing_mode = 'fill'
+        self.mask_editing_mode = "fill"
 
     def toggle_mask(self, *args):
         self.display_only_mask = not self.display_only_mask

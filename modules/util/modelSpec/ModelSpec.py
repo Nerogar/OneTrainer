@@ -3,19 +3,19 @@ from datetime import datetime
 
 class ModelSpec:
     def __init__(
-            self,
-            architecture: str = "",
-            implementation: str = "",
-            title: str = "",
-            description: str = "",
-            author: str = "",
-            date: str = datetime.now().strftime("%Y-%m-%d"),
-            hash_sha256: str = "",
-            license: str = "",
-            thumbnail: str = "",
-            resolution: str = "",
-            prediction_type: str = "",
-            usage_hint: str = "",
+        self,
+        architecture: str = "",
+        implementation: str = "",
+        title: str = "",
+        description: str = "",
+        author: str = "",
+        date: str = datetime.now().strftime("%Y-%m-%d"),
+        hash_sha256: str = "",
+        license: str = "",
+        thumbnail: str = "",
+        resolution: str = "",
+        prediction_type: str = "",
+        usage_hint: str = "",
     ):
         self.sai_model_spec = "1.0.0"
         self.architecture = architecture
@@ -41,16 +41,16 @@ class ModelSpec:
 
     def to_dict(self):
         data = {}
-        for (key, value) in vars(self).items():
+        for key, value in vars(self).items():
             if self.__is_required(key) or (value is not None and value != ""):
                 data["modelspec." + key] = value
 
         return data
 
     @staticmethod
-    def from_dict(data) -> 'ModelSpec':
+    def from_dict(data) -> "ModelSpec":
         model_spec = ModelSpec()
-        for (key, value) in vars(model_spec).items():
+        for key, value in vars(model_spec).items():
             try:
                 if isinstance(value, str):
                     setattr(model_spec, key, data["modelspec." + key])

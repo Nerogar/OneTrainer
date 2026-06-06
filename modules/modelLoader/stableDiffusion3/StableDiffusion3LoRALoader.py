@@ -6,9 +6,7 @@ from modules.util.convert.lora.convert_sd3_lora import convert_sd3_lora_key_sets
 from modules.util.ModelNames import ModelNames
 
 
-class StableDiffusion3LoRALoader(
-    LoRALoaderMixin
-):
+class StableDiffusion3LoRALoader(LoRALoaderMixin):
     def __init__(self):
         super().__init__()
 
@@ -16,8 +14,8 @@ class StableDiffusion3LoRALoader(
         return convert_sd3_lora_key_sets()
 
     def load(
-            self,
-            model: StableDiffusion3Model,
-            model_names: ModelNames,
+        self,
+        model: StableDiffusion3Model,
+        model_names: ModelNames,
     ):
         return self._load(model, model_names)

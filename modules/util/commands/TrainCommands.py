@@ -1,32 +1,31 @@
-
 from modules.util.config.SampleConfig import SampleConfig
 
 
 class TrainCommands:
     def __init__(
-            self,
-            on_command=None# Callable[[TrainCommands], None] = lambda _: None
+        self,
+        on_command=None,  # Callable[[TrainCommands], None] = lambda _: None
     ):
         self.reset()
         self.__stop_command = False
         self.__on_command = on_command
 
     def reset(self):
-        #don't reset stop
+        # don't reset stop
         self.__sample_custom_commands = []
         self.__sample_default_command = False
         self.__backup_command = False
         self.__save_command = False
 
     def set_on_command(
-            self,
-            on_command#: Callable[[TrainCommands], None] = lambda _: None
+        self,
+        on_command,  #: Callable[[TrainCommands], None] = lambda _: None
     ):
         self.__on_command = on_command
 
     def get_and_reset_on_command(self):
         on_command = self.__on_command
-        self.__on_command=None
+        self.__on_command = None
         return on_command
 
     def stop(self):

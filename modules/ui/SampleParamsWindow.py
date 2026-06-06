@@ -9,7 +9,9 @@ import customtkinter as ctk
 
 
 class SampleParamsWindow(ctk.CTkToplevel):
-    def __init__(self, parent, sample: SampleConfig, ui_state: UIState, model_type: ModelType | None = None, *args, **kwargs):
+    def __init__(
+        self, parent, sample: SampleConfig, ui_state: UIState, model_type: ModelType | None = None, *args, **kwargs
+    ):
         super().__init__(parent, *args, **kwargs)
 
         self.sample = sample
@@ -33,7 +35,6 @@ class SampleParamsWindow(ctk.CTkToplevel):
         self.grab_set()
         self.focus_set()
         self.after(200, lambda: set_window_icon(self))
-
 
     def __ok(self):
         self.destroy()

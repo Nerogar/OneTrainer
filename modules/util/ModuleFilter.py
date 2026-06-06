@@ -18,7 +18,6 @@ class ModuleFilter:
     _compiled: Pattern[str] | None
     _used: bool
 
-
     def __init__(self, pattern: str, use_regex: bool = False):
         self._pattern = pattern.strip()
         if not pattern.isprintable():
@@ -38,10 +37,8 @@ class ModuleFilter:
     @staticmethod
     def create(config: TrainConfig):
         return [
-            ModuleFilter(pattern, use_regex=config.layer_filter_regex)
-            for pattern in config.layer_filter.split(",")
+            ModuleFilter(pattern, use_regex=config.layer_filter_regex) for pattern in config.layer_filter.split(",")
         ]
-
 
     def matches(self, module_name: str) -> bool:
         """
@@ -56,7 +53,9 @@ class ModuleFilter:
         if not self._pattern:
             is_match = True
         else:
-            is_match = self._compiled.search(module_name) is not None if self._compiled else self._pattern in module_name
+            is_match = (
+                self._compiled.search(module_name) is not None if self._compiled else self._pattern in module_name
+            )
 
         if is_match:
             self._used = True
@@ -73,16 +72,16 @@ def test_simple_substring_list():
     print("Running test_simple_substring_list...")
 
     module_names = [
-        'lora.unet.down_blocks.0.attentions.0.attn1.to_v',  # Should match 'attentions'
-        'lora.unet.down_blocks.1.resnets.0.conv1',          # Should match 'conv1'
-        'lora.unet.down_blocks.1.resnets.0.conv2',          # Should NOT match
-        'lora.unet.mid_block.resnets.0.time_emb_proj',      # Should match 'time_emb'
-        'lora.unet.up_blocks.2.resnets.1.conv_shortcut',    # Should NOT match
+        "lora.unet.down_blocks.0.attentions.0.attn1.to_v",  # Should match 'attentions'
+        "lora.unet.down_blocks.1.resnets.0.conv1",  # Should match 'conv1'
+        "lora.unet.down_blocks.1.resnets.0.conv2",  # Should NOT match
+        "lora.unet.mid_block.resnets.0.time_emb_proj",  # Should match 'time_emb'
+        "lora.unet.up_blocks.2.resnets.1.conv_shortcut",  # Should NOT match
     ]
 
     filter_string = "attentions, conv1, time_emb"
 
-    filters = [ModuleFilter(p, use_regex=False) for p in filter_string.split(',')]
+    filters = [ModuleFilter(p, use_regex=False) for p in filter_string.split(",")]
 
     # Should match
     assert any(f.matches(module_names[0]) for f in filters), f"'{module_names[0]}' should match"
@@ -97,81 +96,81 @@ def test_simple_substring_list():
 def tests():
     # --- Existing tests ---
     block_names = [
-        'down_blocks.1.resnets.0.conv2',
-        'down_blocks',
-        'mid_block',
-        'up_blocks.0.attentions.1.transformer_blocks.5',
+        "down_blocks.1.resnets.0.conv2",
+        "down_blocks",
+        "mid_block",
+        "up_blocks.0.attentions.1.transformer_blocks.5",
     ]
     for name in block_names:
         f = ModuleFilter(name)
         assert not f.was_used()
-        _ = f.matches('up_blocks.0.attentions.2.transformer_blocks.5.attn2.to_v') # just to hit more of the code
+        _ = f.matches("up_blocks.0.attentions.2.transformer_blocks.5.attn2.to_v")  # just to hit more of the code
         assert f.matches(name)
         assert f.was_used()
 
-    asterisk = ModuleFilter('.*', use_regex=True)
+    asterisk = ModuleFilter(".*", use_regex=True)
     assert not asterisk.was_used()
     for name in block_names:
         assert asterisk.matches(name)
     assert asterisk.was_used()
 
-    f = ModuleFilter('attentions')
-    assert f.matches('lora.unet.up_blocks.0.attentions.2.transformer_blocks.4.attn1.to_v')
+    f = ModuleFilter("attentions")
+    assert f.matches("lora.unet.up_blocks.0.attentions.2.transformer_blocks.4.attn1.to_v")
     assert f.was_used()
-    assert f.matches('lora.unet.up_blocks.0.attentions.2.transformer_blocks.4.foo.bar')
+    assert f.matches("lora.unet.up_blocks.0.attentions.2.transformer_blocks.4.foo.bar")
 
-    f = ModuleFilter('attn')
+    f = ModuleFilter("attn")
     assert not f.was_used()
-    assert f.matches('lora.unet.up_blocks.0.attentions.2.transformer_blocks.4.attn1.to_v')
+    assert f.matches("lora.unet.up_blocks.0.attentions.2.transformer_blocks.4.attn1.to_v")
     assert f.was_used()
-    assert f.matches('lora.unet.down_blocks.2.attentions.0.transformer_blocks.8.attn2.to_v')
-    assert not f.matches('lora.unet.up_blocks.0.attentions.2.transformer_blocks.4.foo.bar')
+    assert f.matches("lora.unet.down_blocks.2.attentions.0.transformer_blocks.8.attn2.to_v")
+    assert not f.matches("lora.unet.up_blocks.0.attentions.2.transformer_blocks.4.foo.bar")
 
-    f = ModuleFilter('down_blocks.1.resnets.0.conv2')
-    assert f.matches('lora.unet.down_blocks.1.resnets.0.conv2')
-    assert not f.matches('lora.unet.up_blocks.1.resnets.0.conv2')
-    assert f.was_used()
-
-    f = ModuleFilter('up_blocks.0.attentions.2.transformer_blocks.[56].attn[12].to_v', use_regex=True)
-    assert f.matches('lora.unet.up_blocks.0.attentions.2.transformer_blocks.5.attn2.to_v')
-    assert f.matches('lora.unet.up_blocks.0.attentions.2.transformer_blocks.6.attn1.to_v')
-    assert not f.matches('lora.unet.up_blocks.0.attentions.2.transformer_blocks.6.attn1.to_k')
-    assert not f.matches('lora.unet.up_blocks.0.attentions.2.transformer_blocks.4.attn1.to_v')
+    f = ModuleFilter("down_blocks.1.resnets.0.conv2")
+    assert f.matches("lora.unet.down_blocks.1.resnets.0.conv2")
+    assert not f.matches("lora.unet.up_blocks.1.resnets.0.conv2")
     assert f.was_used()
 
-    f = ModuleFilter('down_blocks.2.attentions.0.transformer_blocks.[468].attn2.to_v', use_regex=True)
-    assert not f.matches('down_blocks.2.attentions.0.transformer_blocks.5.attn2.to_v')
+    f = ModuleFilter("up_blocks.0.attentions.2.transformer_blocks.[56].attn[12].to_v", use_regex=True)
+    assert f.matches("lora.unet.up_blocks.0.attentions.2.transformer_blocks.5.attn2.to_v")
+    assert f.matches("lora.unet.up_blocks.0.attentions.2.transformer_blocks.6.attn1.to_v")
+    assert not f.matches("lora.unet.up_blocks.0.attentions.2.transformer_blocks.6.attn1.to_k")
+    assert not f.matches("lora.unet.up_blocks.0.attentions.2.transformer_blocks.4.attn1.to_v")
+    assert f.was_used()
+
+    f = ModuleFilter("down_blocks.2.attentions.0.transformer_blocks.[468].attn2.to_v", use_regex=True)
+    assert not f.matches("down_blocks.2.attentions.0.transformer_blocks.5.attn2.to_v")
     assert not f.was_used()
-    assert f.matches('down_blocks.2.attentions.0.transformer_blocks.4.attn2.to_v')
+    assert f.matches("down_blocks.2.attentions.0.transformer_blocks.4.attn2.to_v")
     assert f.was_used()
 
     try:
-        ModuleFilter('invalid_regex_(foo|bar', use_regex=True)
-        raise AssertionError('The line above should have raised an error')
+        ModuleFilter("invalid_regex_(foo|bar", use_regex=True)
+        raise AssertionError("The line above should have raised an error")
     except ValueError:
         pass
 
-    f = ModuleFilter('up_bl..ks', use_regex=True)
-    assert f.matches('up_blocks.0.attentions.1')
+    f = ModuleFilter("up_bl..ks", use_regex=True)
+    assert f.matches("up_blocks.0.attentions.1")
 
-    f = ModuleFilter('down_blocks.2.attentions.[01].transformer_blocks.[0-9].ff.net.0.proj', use_regex=True)
-    assert f.matches('lora.unet.down_blocks.2.attentions.0.transformer_blocks.0.ff.net.0.proj')
-    assert f.matches('lora.unet.down_blocks.2.attentions.1.transformer_blocks.6.ff.net.0.proj')
+    f = ModuleFilter("down_blocks.2.attentions.[01].transformer_blocks.[0-9].ff.net.0.proj", use_regex=True)
+    assert f.matches("lora.unet.down_blocks.2.attentions.0.transformer_blocks.0.ff.net.0.proj")
+    assert f.matches("lora.unet.down_blocks.2.attentions.1.transformer_blocks.6.ff.net.0.proj")
 
-    empty = ModuleFilter('')
+    empty = ModuleFilter("")
     for name in block_names:
         assert empty.matches(name)
     assert empty.was_used()
 
-    my_filters = '''
+    my_filters = """
     up_blocks.0.(attentions|resnets|upsamplers).[02], up_blocks.1.*(conv|time.embed|attn2.to.v), up_blocks.2.resnets.[012].(conv|time)
-    '''
+    """
     filters = [ModuleFilter(pattern, use_regex=True) for pattern in my_filters.strip().split(",")]
-    assert filters[0].matches('up_blocks.0.attentions.0')
-    assert filters[0].matches('up_blocks.0.resnets.2')
-    assert not filters[0].matches('up_blocks.1.attentions.2')
-    assert filters[1].matches('up_blocks.1.foo.bar.attn2.to.v')
-    assert filters[2].matches('up_blocks.2.resnets.1.conv')
+    assert filters[0].matches("up_blocks.0.attentions.0")
+    assert filters[0].matches("up_blocks.0.resnets.2")
+    assert not filters[0].matches("up_blocks.1.attentions.2")
+    assert filters[1].matches("up_blocks.1.foo.bar.attn2.to.v")
+    assert filters[2].matches("up_blocks.2.resnets.1.conv")
 
     # --- Call the new test function ---
     test_simple_substring_list()
@@ -179,8 +178,8 @@ def tests():
 
 def main():
     tests()
-    print('All tests passed OK')
+    print("All tests passed OK")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

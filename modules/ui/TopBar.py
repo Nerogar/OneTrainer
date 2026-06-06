@@ -20,13 +20,13 @@ import customtkinter as ctk
 
 class TopBar:
     def __init__(
-            self,
-            master,
-            train_config: TrainConfig,
-            ui_state: UIState,
-            change_model_type_callback: Callable[[ModelType], None],
-            change_training_method_callback: Callable[[TrainingMethod], None],
-            load_preset_callback: Callable[[], None],
+        self,
+        master,
+        train_config: TrainConfig,
+        ui_state: UIState,
+        change_model_type_callback: Callable[[ModelType], None],
+        change_training_method_callback: Callable[[TrainingMethod], None],
+        load_preset_callback: Callable[[], None],
     ):
         self.master = master
         self.train_config = train_config
@@ -37,9 +37,7 @@ class TopBar:
 
         self.dir = "training_presets"
 
-        self.config_ui_data = {
-            "config_name": path_util.canonical_join(self.dir, "#.json")
-        }
+        self.config_ui_data = {"config_name": path_util.canonical_join(self.dir, "#.json")}
         self.config_ui_state = UIState(master, self.config_ui_data)
 
         self.configs = [("", path_util.canonical_join(self.dir, "#.json"))]
@@ -67,8 +65,15 @@ class TopBar:
         components.button(self.frame, 0, 4, "Wiki", self.open_wiki, width=50)
 
         # save button
-        components.button(self.frame, 0, 3, "Save config", self.__save_config,
-                          tooltip="Save the current configuration in a custom preset", width=90)
+        components.button(
+            self.frame,
+            0,
+            3,
+            "Save config",
+            self.__save_config,
+            tooltip="Save the current configuration in a custom preset",
+            width=90,
+        )
 
         # padding
         self.frame.grid_columnconfigure(5, weight=1)
@@ -78,7 +83,7 @@ class TopBar:
             master=self.frame,
             row=0,
             column=6,
-            values=[ #TODO simplify
+            values=[  # TODO simplify
                 ("SD1.5", ModelType.STABLE_DIFFUSION_15),
                 ("SD1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
                 ("SD2.0", ModelType.STABLE_DIFFUSION_20),
@@ -112,7 +117,7 @@ class TopBar:
             self.training_method.destroy()
 
         values = []
-        #TODO simplify
+        # TODO simplify
         if self.train_config.model_type.is_stable_diffusion():
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
@@ -120,23 +125,27 @@ class TopBar:
                 ("Embedding", TrainingMethod.EMBEDDING),
                 ("Fine Tune VAE", TrainingMethod.FINE_TUNE_VAE),
             ]
-        elif self.train_config.model_type.is_stable_diffusion_3() \
-                or self.train_config.model_type.is_stable_diffusion_xl() \
-                or self.train_config.model_type.is_wuerstchen() \
-                or self.train_config.model_type.is_pixart() \
-                or self.train_config.model_type.is_flux_1() \
-                or self.train_config.model_type.is_sana() \
-                or self.train_config.model_type.is_hunyuan_video() \
-                or self.train_config.model_type.is_hi_dream() \
-                or self.train_config.model_type.is_chroma():
+        elif (
+            self.train_config.model_type.is_stable_diffusion_3()
+            or self.train_config.model_type.is_stable_diffusion_xl()
+            or self.train_config.model_type.is_wuerstchen()
+            or self.train_config.model_type.is_pixart()
+            or self.train_config.model_type.is_flux_1()
+            or self.train_config.model_type.is_sana()
+            or self.train_config.model_type.is_hunyuan_video()
+            or self.train_config.model_type.is_hi_dream()
+            or self.train_config.model_type.is_chroma()
+        ):
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),
                 ("Embedding", TrainingMethod.EMBEDDING),
             ]
-        elif self.train_config.model_type.is_qwen() \
-             or self.train_config.model_type.is_z_image() \
-             or self.train_config.model_type.is_flux_2():
+        elif (
+            self.train_config.model_type.is_qwen()
+            or self.train_config.model_type.is_z_image()
+            or self.train_config.model_type.is_flux_2()
+        ):
             values = [
                 ("Fine Tune", TrainingMethod.FINE_TUNE),
                 ("LoRA", TrainingMethod.LORA),
@@ -208,7 +217,7 @@ class TopBar:
 
     def __save_config(self):
         default_value = self.configs_dropdown.get()
-        while default_value.startswith('#'):
+        while default_value.startswith("#"):
             default_value = default_value[1:]
 
         dialogs.StringInputDialog(
@@ -217,7 +226,7 @@ class TopBar:
             question="Config Name",
             callback=self.__save_new_config,
             default_value=default_value,
-            validate_callback=lambda x: not x.startswith("#")
+            validate_callback=lambda x: not x.startswith("#"),
         )
 
     def __load_current_config(self, filename):
@@ -234,7 +243,7 @@ class TopBar:
                 loaded_config = default_config.from_dict(loaded_dict).to_unpacked_config()
 
             with suppress(FileNotFoundError), open("secrets.json", "r") as f:
-                secrets_dict=json.load(f)
+                secrets_dict = json.load(f)
                 loaded_config.secrets = SecretsConfig.default_values().from_dict(secrets_dict)
 
             self.train_config.from_dict(loaded_config.to_dict())

@@ -47,37 +47,73 @@ class RLHFTab:
         mode_options = [
             ("DPO", RLHFMode.DPO),
         ]
-        components.label(self.scroll_frame, 0, 0, "RLHF Mode",
-                         tooltip="Preference training method. DPO is the current option.")
+        components.label(
+            self.scroll_frame, 0, 0, "RLHF Mode", tooltip="Preference training method. DPO is the current option."
+        )
         components.options_kv(self.scroll_frame, 0, 1, mode_options, self.ui_state, "rlhf_mode")
 
-        components.label(self.scroll_frame, 1, 0, "Beta",
-                         tooltip="How strongly the model follows your preferences. Higher values make changes more conservative, "
-                                 "lower values make them more aggressive. Start with the default unless you have a reason to change it.")
+        components.label(
+            self.scroll_frame,
+            1,
+            0,
+            "Beta",
+            tooltip="How strongly the model follows your preferences. Higher values make changes more conservative, "
+            "lower values make them more aggressive. Start with the default unless you have a reason to change it.",
+        )
         components.entry(self.scroll_frame, 1, 1, self.ui_state, "rlhf_dpo_beta")
 
-        components.label(self.scroll_frame, 1, 3, "Enable RLHF",
-                         tooltip="Turns on preference training. Use this with LoRA training and chosen/rejected concept pairs.")
+        components.label(
+            self.scroll_frame,
+            1,
+            3,
+            "Enable RLHF",
+            tooltip="Turns on preference training. Use this with LoRA training and chosen/rejected concept pairs.",
+        )
         components.switch(self.scroll_frame, 1, 4, self.ui_state, "rlhf_enabled")
 
-        components.label(self.scroll_frame, 2, 0, "Label Smoothing",
-                         tooltip="Helps when your choices were a bit uncertain. Increase it slightly if you were not fully confident in some of the chosen/rejected picks.")
+        components.label(
+            self.scroll_frame,
+            2,
+            0,
+            "Label Smoothing",
+            tooltip="Helps when your choices were a bit uncertain. Increase it slightly if you were not fully confident in some of the chosen/rejected picks.",
+        )
         components.entry(self.scroll_frame, 2, 1, self.ui_state, "rlhf_dpo_label_smoothing")
 
-        components.label(self.scroll_frame, 2, 3, "DPO Validation",
-                         tooltip="Checks DPO on a held-out set of chosen/rejected pairs so you can see whether preference training is generalizing.")
+        components.label(
+            self.scroll_frame,
+            2,
+            3,
+            "DPO Validation",
+            tooltip="Checks DPO on a held-out set of chosen/rejected pairs so you can see whether preference training is generalizing.",
+        )
         components.switch(self.scroll_frame, 2, 4, self.ui_state, "rlhf_dpo_validation")
 
-        components.label(self.scroll_frame, 3, 0, "Supervised Mix",
-                         tooltip="Blends regular training with preference training. Higher values keep the model closer to what it already learned.")
+        components.label(
+            self.scroll_frame,
+            3,
+            0,
+            "Supervised Mix",
+            tooltip="Blends regular training with preference training. Higher values keep the model closer to what it already learned.",
+        )
         components.entry(self.scroll_frame, 3, 1, self.ui_state, "rlhf_supervised_mix")
 
-        components.label(self.scroll_frame, 3, 3, "Validation %",
-                         tooltip="How many prompt groups the DPO Pair Tool leaves out for validation.")
+        components.label(
+            self.scroll_frame,
+            3,
+            3,
+            "Validation %",
+            tooltip="How many prompt groups the DPO Pair Tool leaves out for validation.",
+        )
         components.entry(self.scroll_frame, 3, 4, self.ui_state, "rlhf_dpo_validation_percentage")
 
-        components.label(self.scroll_frame, 4, 0, "Shared Noise",
-                         tooltip="Uses the same noise for chosen and rejected comparisons, which makes the comparison fairer. Leave it on unless you're experimenting.")
+        components.label(
+            self.scroll_frame,
+            4,
+            0,
+            "Shared Noise",
+            tooltip="Uses the same noise for chosen and rejected comparisons, which makes the comparison fairer. Leave it on unless you're experimenting.",
+        )
         components.switch(self.scroll_frame, 4, 1, self.ui_state, "rlhf_dpo_shared_noise")
 
         execution_options = [
@@ -85,37 +121,85 @@ class RLHFTab:
             ("Policy Concurrent", DPOExecutionMode.POLICY_CONCURRENT),
             ("Full Concurrent", DPOExecutionMode.FULL_CONCURRENT),
         ]
-        components.label(self.scroll_frame, 5, 0, "Execution Mode",
-                         tooltip="VRAM/speed trade-off for DPO. Sequential runs 4 separate forward passes per step — lowest VRAM. "
-                                 "Policy Concurrent batches the two policy forwards together for 3 passes total — medium. "
-                                 "Full Concurrent batches the reference forwards too for 2 passes total — fastest. "
-                                 "Batching requires Shared Noise enabled (the default); with shared noise off, all modes fall back to 4 passes.")
+        components.label(
+            self.scroll_frame,
+            5,
+            0,
+            "Execution Mode",
+            tooltip="VRAM/speed trade-off for DPO. Sequential runs 4 separate forward passes per step — lowest VRAM. "
+            "Policy Concurrent batches the two policy forwards together for 3 passes total — medium. "
+            "Full Concurrent batches the reference forwards too for 2 passes total — fastest. "
+            "Batching requires Shared Noise enabled (the default); with shared noise off, all modes fall back to 4 passes.",
+        )
         components.options_kv(self.scroll_frame, 5, 1, execution_options, self.ui_state, "rlhf_dpo_execution_mode")
 
-        components.label(self.scroll_frame, 4, 3, "Early Stopping",
-                         tooltip="Stops DPO training when the validation signal stops improving.")
+        components.label(
+            self.scroll_frame,
+            4,
+            3,
+            "Early Stopping",
+            tooltip="Stops DPO training when the validation signal stops improving.",
+        )
         components.switch(self.scroll_frame, 4, 4, self.ui_state, "rlhf_dpo_patience_enabled")
 
-        components.label(self.scroll_frame, 5, 3, "Patience",
-                         tooltip="How many validation checks can pass without improvement before training stops.")
+        components.label(
+            self.scroll_frame,
+            5,
+            3,
+            "Patience",
+            tooltip="How many validation checks can pass without improvement before training stops.",
+        )
         components.entry(self.scroll_frame, 5, 4, self.ui_state, "rlhf_dpo_patience_value")
 
-        components.label(self.scroll_frame, 6, 3, "Save Best",
-                         tooltip="Saves a checkpoint when validation accuracy hits a new high. "
-                                 "The best checkpoint is restored at the end of training.")
+        components.label(
+            self.scroll_frame,
+            6,
+            3,
+            "Save Best",
+            tooltip="Saves a checkpoint when validation accuracy hits a new high. "
+            "The best checkpoint is restored at the end of training.",
+        )
         components.switch(self.scroll_frame, 6, 4, self.ui_state, "rlhf_dpo_save_best")
 
-        components.button(self.scroll_frame, 7, 0, "Check Pairs", command=self._check_pairs,
-                          tooltip="Check that your chosen and rejected concept folders line up before training.")
-        components.button(self.scroll_frame, 7, 1, "Review Pairs", command=self._review_pairs,
-                          tooltip="Visually review your chosen/rejected image pairs. Remove bad pairs and their counterparts.")
-        components.button(self.scroll_frame, 7, 3, "DPO Bucket Analysis", command=self._bucket_analysis,
-                          tooltip="Show per-aspect-bucket pair counts and what to add or remove for clean batches at a given batch size.")
+        components.button(
+            self.scroll_frame,
+            7,
+            0,
+            "Check Pairs",
+            command=self._check_pairs,
+            tooltip="Check that your chosen and rejected concept folders line up before training.",
+        )
+        components.button(
+            self.scroll_frame,
+            7,
+            1,
+            "Review Pairs",
+            command=self._review_pairs,
+            tooltip="Visually review your chosen/rejected image pairs. Remove bad pairs and their counterparts.",
+        )
+        components.button(
+            self.scroll_frame,
+            7,
+            3,
+            "DPO Bucket Analysis",
+            command=self._bucket_analysis,
+            tooltip="Show per-aspect-bucket pair counts and what to add or remove for clean batches at a given batch size.",
+        )
 
-        components.label(self.scroll_frame, 8, 0, "Training Type:",
-                         tooltip="Shows whether DPO is starting from a fresh adapter or refining a loaded adapter. The output is always an adapter file.")
-        components.label(self.scroll_frame, 8, 1, training_type,
-                         tooltip="DPO always writes an adapter file. New Adapter means the adapter starts from scratch. Existing Adapter means DPO refines a loaded adapter.")
+        components.label(
+            self.scroll_frame,
+            8,
+            0,
+            "Training Type:",
+            tooltip="Shows whether DPO is starting from a fresh adapter or refining a loaded adapter. The output is always an adapter file.",
+        )
+        components.label(
+            self.scroll_frame,
+            8,
+            1,
+            training_type,
+            tooltip="DPO always writes an adapter file. New Adapter means the adapter starts from scratch. Existing Adapter means DPO refines a loaded adapter.",
+        )
 
     def _check_pairs(self):
         try:
@@ -140,11 +224,11 @@ class RLHFTab:
         if total_rejected_stray > 0:
             lines.append(f"Rejected strays (no chosen match): {total_rejected_stray}")
 
-        if result['format_stats']:
-            fmt_parts = [f"{ext}: {count}" for ext, count in sorted(result['format_stats'].items())]
+        if result["format_stats"]:
+            fmt_parts = [f"{ext}: {count}" for ext, count in sorted(result["format_stats"].items())]
             lines.append(f"\nFormats: {', '.join(fmt_parts)}")
 
-        for pair_info in result['pairs']:
+        for pair_info in result["pairs"]:
             lines.append("\n--- Pair ---")
             chosen_path = pair_info.get("chosen_path")
             rejected_path = pair_info.get("rejected_path")
@@ -152,9 +236,9 @@ class RLHFTab:
             rejected_stray = pair_info.get("rejected_stray", 0)
             lines.append(f"  Chosen: {chosen_path}")
             lines.append(f"  Rejected: {rejected_path}")
-            lines.append(f"  Matched: {pair_info['matched']}, "
-                         f"Chosen stray: {chosen_stray}, "
-                         f"Rejected stray: {rejected_stray}")
+            lines.append(
+                f"  Matched: {pair_info['matched']}, Chosen stray: {chosen_stray}, Rejected stray: {rejected_stray}"
+            )
 
         multiline = result.get("multiline_captions", 0)
         if multiline:
@@ -190,12 +274,13 @@ class RLHFTab:
     def _remove_strays(self, concept_pairs, result) -> int:
         from modules.util.dpo_curation_util import dpo_pair_key
         from modules.util.path_util import supported_image_extensions
+
         exts = supported_image_extensions()
         removed = 0
 
         for i, (chosen_path, rejected_path) in enumerate(concept_pairs):
-            pair_info = result['pairs'][i]
-            if pair_info.get('chosen_stray', 0) == 0 and pair_info.get('rejected_stray', 0) == 0:
+            pair_info = result["pairs"][i]
+            if pair_info.get("chosen_stray", 0) == 0 and pair_info.get("rejected_stray", 0) == 0:
                 continue
 
             chosen_keys: dict[str, str] = {}
@@ -236,10 +321,12 @@ class RLHFTab:
             return
 
         from modules.ui.DPOReviewWindow import DPOReviewWindow
+
         DPOReviewWindow(self.master.winfo_toplevel(), concept_pairs)
 
     def _bucket_analysis(self):
         from modules.ui.DPOBucketAnalysisWindow import DPOBucketAnalysisWindow
+
         DPOBucketAnalysisWindow(self.master.winfo_toplevel(), self.train_config)
 
     def _load_concept_pairs(self):
@@ -270,6 +357,7 @@ class RLHFTab:
             if not concept_file or not os.path.isfile(concept_file):
                 raise RuntimeError("No concepts configured. Set up concepts in the Concepts tab first.")
             from modules.util.config.ConceptConfig import ConceptConfig
-            with open(concept_file, 'r') as f:
+
+            with open(concept_file, "r") as f:
                 concepts = [ConceptConfig.default_values().from_dict(c) for c in json.load(f)]
         return concepts

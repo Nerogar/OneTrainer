@@ -16,10 +16,10 @@ class HiDreamEmbeddingSetup(
     BaseHiDreamSetup,
 ):
     def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
+        self,
+        train_device: torch.device,
+        temp_device: torch.device,
+        debug_mode: bool,
     ):
         super().__init__(
             train_device=train_device,
@@ -28,42 +28,50 @@ class HiDreamEmbeddingSetup(
         )
 
     def create_parameters(
-            self,
-            model: HiDreamModel,
-            config: TrainConfig,
+        self,
+        model: HiDreamModel,
+        config: TrainConfig,
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
         if config.text_encoder.train_embedding and model.text_encoder_1 is not None:
             self._add_embedding_param_groups(
-                model.all_text_encoder_1_embeddings(), parameter_group_collection, config.embedding_learning_rate,
-                "embeddings_1"
+                model.all_text_encoder_1_embeddings(),
+                parameter_group_collection,
+                config.embedding_learning_rate,
+                "embeddings_1",
             )
 
         if config.text_encoder_2.train_embedding and model.text_encoder_2 is not None:
             self._add_embedding_param_groups(
-                model.all_text_encoder_2_embeddings(), parameter_group_collection, config.embedding_learning_rate,
-                "embeddings_2"
+                model.all_text_encoder_2_embeddings(),
+                parameter_group_collection,
+                config.embedding_learning_rate,
+                "embeddings_2",
             )
 
         if config.text_encoder_3.train_embedding and model.text_encoder_3 is not None:
             self._add_embedding_param_groups(
-                model.all_text_encoder_3_embeddings(), parameter_group_collection, config.embedding_learning_rate,
-                "embeddings_3"
+                model.all_text_encoder_3_embeddings(),
+                parameter_group_collection,
+                config.embedding_learning_rate,
+                "embeddings_3",
             )
 
         if config.text_encoder_4.train_embedding and model.text_encoder_4 is not None:
             self._add_embedding_param_groups(
-                model.all_text_encoder_4_embeddings(), parameter_group_collection, config.embedding_learning_rate,
-                "embeddings_4"
+                model.all_text_encoder_4_embeddings(),
+                parameter_group_collection,
+                config.embedding_learning_rate,
+                "embeddings_4",
             )
 
         return parameter_group_collection
 
     def __setup_requires_grad(
-            self,
-            model: HiDreamModel,
-            config: TrainConfig,
+        self,
+        model: HiDreamModel,
+        config: TrainConfig,
     ):
         self._setup_embeddings_requires_grad(model, config)
         if model.text_encoder_1 is not None:
@@ -78,9 +86,9 @@ class HiDreamEmbeddingSetup(
         model.vae.requires_grad_(False)
 
     def setup_model(
-            self,
-            model: HiDreamModel,
-            config: TrainConfig,
+        self,
+        model: HiDreamModel,
+        config: TrainConfig,
     ):
         if model.text_encoder_1 is not None:
             model.text_encoder_1.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
@@ -99,9 +107,9 @@ class HiDreamEmbeddingSetup(
         init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
-            self,
-            model: HiDreamModel,
-            config: TrainConfig,
+        self,
+        model: HiDreamModel,
+        config: TrainConfig,
     ):
         vae_on_train_device = not config.latent_caching
 
@@ -123,12 +131,7 @@ class HiDreamEmbeddingSetup(
         model.vae.eval()
         model.transformer.eval()
 
-    def after_optimizer_step(
-            self,
-            model: HiDreamModel,
-            config: TrainConfig,
-            train_progress: TrainProgress
-    ):
+    def after_optimizer_step(self, model: HiDreamModel, config: TrainConfig, train_progress: TrainProgress):
         if config.preserve_embedding_norm:
             self._normalize_output_embeddings(model.all_text_encoder_3_embeddings())
             self._normalize_output_embeddings(model.all_text_encoder_4_embeddings())
@@ -141,5 +144,6 @@ class HiDreamEmbeddingSetup(
             if model.embedding_wrapper_4 is not None:
                 model.embedding_wrapper_4.normalize_embeddings()
         self.__setup_requires_grad(model, config)
+
 
 factory.register(BaseModelSetup, HiDreamEmbeddingSetup, ModelType.HI_DREAM_FULL, TrainingMethod.EMBEDDING)

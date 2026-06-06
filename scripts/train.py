@@ -23,7 +23,7 @@ def main():
 
     try:
         with open("secrets.json" if args.secrets_path is None else args.secrets_path, "r") as f:
-            secrets_dict=json.load(f)
+            secrets_dict = json.load(f)
             train_config.secrets = SecretsConfig.default_values().from_dict(secrets_dict)
     except FileNotFoundError:
         if args.secrets_path is not None:
@@ -43,5 +43,5 @@ def main():
         trainer.end()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

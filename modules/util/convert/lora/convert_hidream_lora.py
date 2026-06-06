@@ -76,12 +76,30 @@ def __map_single_stream_block(key_prefix: LoraConversionKeySet) -> list[LoraConv
 def __map_transformer(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 
-    keys += [LoraConversionKeySet("final_layer.adaLN_modulation.1", "final_layer.adaLN_modulation.1", parent=key_prefix)]
+    keys += [
+        LoraConversionKeySet("final_layer.adaLN_modulation.1", "final_layer.adaLN_modulation.1", parent=key_prefix)
+    ]
     keys += [LoraConversionKeySet("final_layer.linear", "final_layer.linear", parent=key_prefix)]
-    keys += [LoraConversionKeySet("p_embedder.pooled_embedder.linear_1", "p_embedder.pooled_embedder.linear_1", parent=key_prefix)]
-    keys += [LoraConversionKeySet("p_embedder.pooled_embedder.linear_2", "p_embedder.pooled_embedder.linear_2", parent=key_prefix)]
-    keys += [LoraConversionKeySet("t_embedder.timestep_embedder.linear_1", "t_embedder.timestep_embedder.linear_1", parent=key_prefix)]
-    keys += [LoraConversionKeySet("t_embedder.timestep_embedder.linear_2", "t_embedder.timestep_embedder.linear_2", parent=key_prefix)]
+    keys += [
+        LoraConversionKeySet(
+            "p_embedder.pooled_embedder.linear_1", "p_embedder.pooled_embedder.linear_1", parent=key_prefix
+        )
+    ]
+    keys += [
+        LoraConversionKeySet(
+            "p_embedder.pooled_embedder.linear_2", "p_embedder.pooled_embedder.linear_2", parent=key_prefix
+        )
+    ]
+    keys += [
+        LoraConversionKeySet(
+            "t_embedder.timestep_embedder.linear_1", "t_embedder.timestep_embedder.linear_1", parent=key_prefix
+        )
+    ]
+    keys += [
+        LoraConversionKeySet(
+            "t_embedder.timestep_embedder.linear_2", "t_embedder.timestep_embedder.linear_2", parent=key_prefix
+        )
+    ]
     keys += [LoraConversionKeySet("x_embedder.proj", "x_embedder.proj", parent=key_prefix)]
 
     for k in map_prefix_range("caption_projection", "caption_projection", parent=key_prefix):

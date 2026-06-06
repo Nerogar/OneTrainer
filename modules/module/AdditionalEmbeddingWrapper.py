@@ -16,10 +16,10 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
     embeddings: list[BaseModelEmbedding]
 
     def __init__(
-            self,
-            tokenizer: PreTrainedTokenizer,
-            orig_module: nn.Embedding,
-            embeddings: list[BaseModelEmbedding],
+        self,
+        tokenizer: PreTrainedTokenizer,
+        orig_module: nn.Embedding,
+        embeddings: list[BaseModelEmbedding],
     ):
         super().__init__()
 
@@ -34,21 +34,23 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
 
     def forward(self, x, *args, **kwargs):
         # ensure that the original weights only contain as many embeddings as the unmodified tokenizer can create
-        orig_module_weight = self.orig_module.weight[0:self.original_token_count]
+        orig_module_weight = self.orig_module.weight[0 : self.original_token_count]
 
         # if the original weights don't contain enough vectors, pad with zero vectors
         pad_vector = []
         if orig_module_weight.shape[0] < self.original_token_count:
             pad_count = self.original_token_count - orig_module_weight.shape[0]
-            pad_vector = [torch.zeros(size=(pad_count, self.orig_module.weight.shape[1]),
-                                      dtype=self.orig_module.weight.dtype, device=self.orig_module.weight.device,
-                                      requires_grad=False)]
+            pad_vector = [
+                torch.zeros(
+                    size=(pad_count, self.orig_module.weight.shape[1]),
+                    dtype=self.orig_module.weight.dtype,
+                    device=self.orig_module.weight.device,
+                    requires_grad=False,
+                )
+            ]
 
         weight = torch.cat(
-            [orig_module_weight] \
-            + pad_vector \
-            + [embedding.vector for embedding in self.embeddings],
-            dim=0
+            [orig_module_weight] + pad_vector + [embedding.vector for embedding in self.embeddings], dim=0
         )
 
         return F.embedding(

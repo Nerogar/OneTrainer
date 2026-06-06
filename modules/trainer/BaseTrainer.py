@@ -22,7 +22,6 @@ class BaseTrainer(
     TimedActionMixin,
     metaclass=ABCMeta,
 ):
-
     tensorboard_subprocess: subprocess.Popen
 
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
@@ -57,7 +56,9 @@ class BaseTrainer(
             self.config.debug_mode,
         )
 
-    def create_data_loader(self, model: BaseModel, model_setup: BaseModelSetup, train_progress: TrainProgress, is_validation=False):
+    def create_data_loader(
+        self, model: BaseModel, model_setup: BaseModelSetup, train_progress: TrainProgress, is_validation=False
+    ):
         return create.create_data_loader(
             self.train_device,
             self.temp_device,
@@ -75,12 +76,9 @@ class BaseTrainer(
 
     def create_model_sampler(self, model: BaseModel) -> BaseModelSampler:
         return create.create_model_sampler(
-            self.train_device,
-            self.temp_device,
-            model,
-            self.config.model_type,
-            self.config.training_method
+            self.train_device, self.temp_device, model, self.config.model_type, self.config.training_method
         )
+
     def _start_tensorboard(self):
         tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
         tensorboard_log_dir = os.path.join(self.config.workspace_dir, "tensorboard")

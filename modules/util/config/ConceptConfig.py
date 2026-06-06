@@ -98,7 +98,6 @@ class ConceptTextConfig(BaseConfig):
     caps_randomize_mode: str
     caps_randomize_lowercase: bool
 
-
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
 
@@ -148,14 +147,14 @@ class ConceptConfig(BaseConfig):
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
-            }
+            },
         )
 
     def __migration_0(self, data: dict) -> dict:
         migrated_data = {}
         for key, value in data.items():
-            if key == 'repeats':
-                migrated_data['balancing'] = value
+            if key == "repeats":
+                migrated_data["balancing"] = value
             else:
                 migrated_data[key] = value
 
@@ -164,8 +163,8 @@ class ConceptConfig(BaseConfig):
     def __migration_1(self, data: dict) -> dict:
         migrated_data = {}
         for key, value in data.items():
-            if key == 'validation_concept':
-                migrated_data['type'] = ConceptType.VALIDATION if value else ConceptType.STANDARD
+            if key == "validation_concept":
+                migrated_data["type"] = ConceptType.VALIDATION if value else ConceptType.STANDARD
             else:
                 migrated_data[key] = value
 
@@ -173,8 +172,8 @@ class ConceptConfig(BaseConfig):
 
     def to_dict(self):
         as_dict = super().to_dict()
-        as_dict['image'] = self.image.to_dict()
-        as_dict['text'] = self.text.to_dict()
+        as_dict["image"] = self.image.to_dict()
+        as_dict["text"] = self.text.to_dict()
         return as_dict
 
     @staticmethod

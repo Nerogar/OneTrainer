@@ -20,5 +20,5 @@ def main():
     trainer.start()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -8,8 +8,8 @@ import open_clip
 
 class HPSv2ScoreModel(nn.Module):
     def __init__(
-            self,
-            dtype: torch.dtype,
+        self,
+        dtype: torch.dtype,
     ):
         super().__init__()
         self.dtype = dtype
@@ -17,11 +17,11 @@ class HPSv2ScoreModel(nn.Module):
         self.model = self.__load_open_clip_model()
         self.tokenizer = self.__load_tokenizer()
 
-        self.normalize = transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073],
-                                              std=[0.26862954, 0.26130258, 0.27577711])
+        self.normalize = transforms.Normalize(
+            mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711]
+        )
         self.resize = transforms.Resize(224)
         self.crop = transforms.CenterCrop(224)
-
 
     def __load_open_clip_model(self):
         model_name = "ViT-H-14"
@@ -35,7 +35,7 @@ class HPSv2ScoreModel(nn.Module):
 
         open_clip_model, preprocess_train, preprocess_val = open_clip.create_model_and_transforms(
             model_name,
-            'laion2B-s32B-b79K',
+            "laion2B-s32B-b79K",
             precision=precision,
             jit=False,
             force_quick_gelu=False,
@@ -49,11 +49,9 @@ class HPSv2ScoreModel(nn.Module):
             output_dict=True,
         )
 
-        model_path = huggingface_hub.hf_hub_download(
-            "xswu/HPSv2", "HPS_v2_compressed.pt"
-        )
+        model_path = huggingface_hub.hf_hub_download("xswu/HPSv2", "HPS_v2_compressed.pt")
         checkpoint = torch.load(model_path, weights_only=True)
-        open_clip_model.load_state_dict(checkpoint['state_dict'])
+        open_clip_model.load_state_dict(checkpoint["state_dict"])
 
         return open_clip_model
 

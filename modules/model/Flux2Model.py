@@ -26,6 +26,7 @@ MISTRAL_SYSTEM_MESSAGE = "You are an AI that reasons about image descriptions. Y
 MISTRAL_HIDDEN_STATES_LAYERS = [10, 20, 30]
 QWEN3_HIDDEN_STATES_LAYERS = [9, 18, 27]
 
+
 def qwen3_format_input(text: str):
     return [
         {"role": "user", "content": text},
@@ -35,43 +36,61 @@ def qwen3_format_input(text: str):
 def diffusers_to_original(qkv_fusion):
     return [
         ("context_embedder", "txt_in"),
-        ("x_embedder",       "img_in"),
-        ("time_guidance_embed.timestep_embedder", "time_in", [
-            ("linear_1", "in_layer"),
-            ("linear_2", "out_layer"),
-        ]),
-        ("time_guidance_embed.guidance_embedder", "guidance_in", [
-            ("linear_1", "in_layer"),
-            ("linear_2", "out_layer"),
-        ]),
+        ("x_embedder", "img_in"),
+        (
+            "time_guidance_embed.timestep_embedder",
+            "time_in",
+            [
+                ("linear_1", "in_layer"),
+                ("linear_2", "out_layer"),
+            ],
+        ),
+        (
+            "time_guidance_embed.guidance_embedder",
+            "guidance_in",
+            [
+                ("linear_1", "in_layer"),
+                ("linear_2", "out_layer"),
+            ],
+        ),
         ("double_stream_modulation_img.linear", "double_stream_modulation_img.lin"),
         ("double_stream_modulation_txt.linear", "double_stream_modulation_txt.lin"),
-        ("single_stream_modulation.linear",     "single_stream_modulation.lin"),
-        ("proj_out",                            "final_layer.linear"),
+        ("single_stream_modulation.linear", "single_stream_modulation.lin"),
+        ("proj_out", "final_layer.linear"),
         ("norm_out.linear", "final_layer.adaLN_modulation.1", swap_chunks, swap_chunks),
-        ("transformer_blocks.{i}", "double_blocks.{i}",
-            qkv_fusion("attn.to_q", "attn.to_k", "attn.to_v", "img_attn.qkv") + \
-            qkv_fusion("attn.add_q_proj", "attn.add_k_proj", "attn.add_v_proj", "txt_attn.qkv") + [
-            ("attn.norm_k.weight",       "img_attn.norm.key_norm.scale"),
-            ("attn.norm_q.weight",       "img_attn.norm.query_norm.scale"),
-            ("attn.to_out.0",            "img_attn.proj"),
-            ("ff.linear_in",             "img_mlp.0"),
-            ("ff.linear_out",            "img_mlp.2"),
-            ("attn.norm_added_k.weight", "txt_attn.norm.key_norm.scale"),
-            ("attn.norm_added_q.weight", "txt_attn.norm.query_norm.scale"),
-            ("attn.to_add_out",          "txt_attn.proj"),
-            ("ff_context.linear_in",     "txt_mlp.0"),
-            ("ff_context.linear_out",    "txt_mlp.2"),
-        ]),
-        ("single_transformer_blocks.{i}", "single_blocks.{i}", [
-            ("attn.to_qkv_mlp_proj", "linear1"),
-            ("attn.to_out",          "linear2"),
-            ("attn.norm_k.weight",   "norm.key_norm.scale"),
-            ("attn.norm_q.weight",   "norm.query_norm.scale"),
-        ]),
+        (
+            "transformer_blocks.{i}",
+            "double_blocks.{i}",
+            qkv_fusion("attn.to_q", "attn.to_k", "attn.to_v", "img_attn.qkv")
+            + qkv_fusion("attn.add_q_proj", "attn.add_k_proj", "attn.add_v_proj", "txt_attn.qkv")
+            + [
+                ("attn.norm_k.weight", "img_attn.norm.key_norm.scale"),
+                ("attn.norm_q.weight", "img_attn.norm.query_norm.scale"),
+                ("attn.to_out.0", "img_attn.proj"),
+                ("ff.linear_in", "img_mlp.0"),
+                ("ff.linear_out", "img_mlp.2"),
+                ("attn.norm_added_k.weight", "txt_attn.norm.key_norm.scale"),
+                ("attn.norm_added_q.weight", "txt_attn.norm.query_norm.scale"),
+                ("attn.to_add_out", "txt_attn.proj"),
+                ("ff_context.linear_in", "txt_mlp.0"),
+                ("ff_context.linear_out", "txt_mlp.2"),
+            ],
+        ),
+        (
+            "single_transformer_blocks.{i}",
+            "single_blocks.{i}",
+            [
+                ("attn.to_qkv_mlp_proj", "linear1"),
+                ("attn.to_out", "linear2"),
+                ("attn.norm_k.weight", "norm.key_norm.scale"),
+                ("attn.norm_q.weight", "norm.query_norm.scale"),
+            ],
+        ),
     ]
 
+
 diffusers_checkpoint_to_original = diffusers_to_original(qkv_fusion)
+
 
 class Flux2Model(BaseModel):
     # base model data
@@ -91,8 +110,8 @@ class Flux2Model(BaseModel):
     lora_state_dict: dict | None
 
     def __init__(
-            self,
-            model_type: ModelType,
+        self,
+        model_type: ModelType,
     ):
         super().__init__(
             model_type=model_type,
@@ -113,24 +132,32 @@ class Flux2Model(BaseModel):
         self.lora_state_dict = None
 
     def adapters(self) -> list[LoRAModuleWrapper]:
-        return [a for a in [
-            self.transformer_lora,
-        ] if a is not None]
+        return [
+            a
+            for a in [
+                self.transformer_lora,
+            ]
+            if a is not None
+        ]
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
 
     def text_encoder_to(self, device: torch.device):
         if self.text_encoder is not None:
-            if self.text_encoder_offload_conductor is not None and \
-                    self.text_encoder_offload_conductor.layer_offload_activated():
+            if (
+                self.text_encoder_offload_conductor is not None
+                and self.text_encoder_offload_conductor.layer_offload_activated()
+            ):
                 self.text_encoder_offload_conductor.to(device)
             else:
                 self.text_encoder.to(device=device)
 
     def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None and \
-                self.transformer_offload_conductor.layer_offload_activated():
+        if (
+            self.transformer_offload_conductor is not None
+            and self.transformer_offload_conductor.layer_offload_activated()
+        ):
             self.transformer_offload_conductor.to(device)
         else:
             self.transformer.to(device=device)
@@ -160,16 +187,16 @@ class Flux2Model(BaseModel):
         )
 
     def encode_text(
-            self,
-            train_device: torch.device,
-            batch_size: int = 1, #TODO unused
-            rand: Random | None = None,
-            text: str = None,
-            tokens: Tensor = None,
-            tokens_mask: Tensor = None,
-            text_encoder_sequence_length: int | None = None,
-            text_encoder_dropout_probability: float | None = None,
-            text_encoder_output: Tensor = None,
+        self,
+        train_device: torch.device,
+        batch_size: int = 1,  # TODO unused
+        rand: Random | None = None,
+        text: str = None,
+        tokens: Tensor = None,
+        tokens_mask: Tensor = None,
+        text_encoder_sequence_length: int | None = None,
+        text_encoder_dropout_probability: float | None = None,
+        text_encoder_output: Tensor = None,
     ) -> tuple[Tensor, Tensor]:
 
         if tokens is None and text is not None:
@@ -186,12 +213,12 @@ class Flux2Model(BaseModel):
 
                 tokenizer_output = self.tokenizer(
                     text,
-                    max_length=text_encoder_sequence_length, #max length is including system message
-                    padding='max_length',
+                    max_length=text_encoder_sequence_length,  # max length is including system message
+                    padding="max_length",
                     truncation=True,
-                    return_tensors="pt"
+                    return_tensors="pt",
                 )
-            else: #Flux2.Klein
+            else:  # Flux2.Klein
                 for i, prompt_item in enumerate(text):
                     messages = qwen3_format_input(prompt_item)
                     prompt_item = self.tokenizer.apply_chat_template(
@@ -205,9 +232,9 @@ class Flux2Model(BaseModel):
                 tokenizer_output = self.tokenizer(
                     text,
                     max_length=text_encoder_sequence_length,
-                    padding='max_length',
+                    padding="max_length",
                     truncation=True,
-                    return_tensors="pt"
+                    return_tensors="pt",
                 )
 
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
@@ -221,11 +248,16 @@ class Flux2Model(BaseModel):
                     output_hidden_states=True,
                     use_cache=False,
                 )
-                text_encoder_output = torch.cat([text_encoder_output.hidden_states[k]
-                                                   for k in (MISTRAL_HIDDEN_STATES_LAYERS if self.is_dev() else QWEN3_HIDDEN_STATES_LAYERS)], dim=2)
+                text_encoder_output = torch.cat(
+                    [
+                        text_encoder_output.hidden_states[k]
+                        for k in (MISTRAL_HIDDEN_STATES_LAYERS if self.is_dev() else QWEN3_HIDDEN_STATES_LAYERS)
+                    ],
+                    dim=2,
+                )
 
         if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
-            raise NotImplementedError #https://github.com/Nerogar/OneTrainer/issues/957
+            raise NotImplementedError  # https://github.com/Nerogar/OneTrainer/issues/957
 
         return text_encoder_output
 
@@ -235,7 +267,7 @@ class Flux2Model(BaseModel):
     def is_klein(self) -> bool:
         return not self.is_dev()
 
-    #code adapted from https://github.com/huggingface/diffusers/blob/c8656ed73c638e51fc2e777a5fd355d69fa5220f/src/diffusers/pipelines/flux2/pipeline_flux2.py
+    # code adapted from https://github.com/huggingface/diffusers/blob/c8656ed73c638e51fc2e777a5fd355d69fa5220f/src/diffusers/pipelines/flux2/pipeline_flux2.py
     @staticmethod
     def prepare_latent_image_ids(latents: torch.Tensor) -> torch.Tensor:
         batch_size, _, height, width = latents.shape
@@ -250,7 +282,7 @@ class Flux2Model(BaseModel):
 
         return latent_ids
 
-    #packing and unpacking on patchified latents
+    # packing and unpacking on patchified latents
     @staticmethod
     def pack_latents(latents) -> Tensor:
         batch_size, num_channels, height, width = latents.shape
@@ -261,9 +293,9 @@ class Flux2Model(BaseModel):
         batch_size, seq_len, num_channels = latents.shape
         return latents.reshape(batch_size, height, width, num_channels).permute(0, 3, 1, 2)
 
-    #inference code uses empirical mu. But that code cannot be used for training because it depends on num of inference steps, and is likely too high for training
-    #the dynamic shifting parameters of the noise schedulers are probably just the default values (taken from Flux1) and not applicable - but the best values we have:
-    #unpatchified width and height
+    # inference code uses empirical mu. But that code cannot be used for training because it depends on num of inference steps, and is likely too high for training
+    # the dynamic shifting parameters of the noise schedulers are probably just the default values (taken from Flux1) and not applicable - but the best values we have:
+    # unpatchified width and height
     def calculate_timestep_shift(self, latent_height: int, latent_width: int) -> float:
         base_seq_len = self.noise_scheduler.config.base_image_seq_len
         max_seq_len = self.noise_scheduler.config.max_image_seq_len
@@ -282,7 +314,9 @@ class Flux2Model(BaseModel):
         B, L, _ = x.shape
         out_ids = []
 
-        for _ in range(B): #TODO why iterate? can text ids have different length? according to diffusers and original inference code: no
+        for _ in range(
+            B
+        ):  # TODO why iterate? can text ids have different length? according to diffusers and original inference code: no
             t = torch.arange(1, device=x.device)
             h = torch.arange(1, device=x.device)
             w = torch.arange(1, device=x.device)
@@ -309,14 +343,13 @@ class Flux2Model(BaseModel):
         latents = latents.reshape(batch_size, num_channels_latents // (2 * 2), height * 2, width * 2)
         return latents
 
-    #scaling on patchified latents
+    # scaling on patchified latents
     def scale_latents(self, latents: Tensor) -> Tensor:
         latents_bn_mean = self.vae.bn.running_mean.view(1, -1, 1, 1).to(latents.device, latents.dtype)
         latents_bn_std = torch.sqrt(self.vae.bn.running_var.view(1, -1, 1, 1) + self.vae.config.batch_norm_eps).to(
             latents.device, latents.dtype
         )
         return (latents - latents_bn_mean) / latents_bn_std
-
 
     def unscale_latents(self, latents: Tensor) -> Tensor:
         latents_bn_mean = self.vae.bn.running_mean.view(1, -1, 1, 1).to(latents.device, latents.dtype)

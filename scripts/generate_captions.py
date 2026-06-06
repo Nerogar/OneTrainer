@@ -29,7 +29,7 @@ def main():
         caption_postfix=args.caption_postfix,
         mode=args.mode,
         error_callback=lambda filename: print("Error while processing image " + filename),
-        include_subdirectories=args.include_subdirectories
+        include_subdirectories=args.include_subdirectories,
     )
 
 

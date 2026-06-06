@@ -34,25 +34,19 @@ def step_adamw_parameter(self, p, group, i):
             else torch.tensor(0.0, dtype=_get_scalar_dtype())
         )
         # Exponential moving average of gradient values
-        state["exp_avg"] = torch.zeros_like(
-            p, memory_format=torch.preserve_format
-        )
+        state["exp_avg"] = torch.zeros_like(p, memory_format=torch.preserve_format)
         # Exponential moving average of squared gradient values
-        state["exp_avg_sq"] = torch.zeros_like(
-            p, memory_format=torch.preserve_format
-        )
-        if group['amsgrad']:
+        state["exp_avg_sq"] = torch.zeros_like(p, memory_format=torch.preserve_format)
+        if group["amsgrad"]:
             # Maintains max of all exp. moving avg. of sq. grad. values
-            state["max_exp_avg_sq"] = torch.zeros_like(
-                p, memory_format=torch.preserve_format
-            )
+            state["max_exp_avg_sq"] = torch.zeros_like(p, memory_format=torch.preserve_format)
 
-    if group['differentiable'] and state['step'].requires_grad:
-        raise RuntimeError('`requires_grad` is not supported for `step` in differentiable mode')
+    if group["differentiable"] and state["step"].requires_grad:
+        raise RuntimeError("`requires_grad` is not supported for `step` in differentiable mode")
 
     # Foreach without capturable does not support a tensor lr
-    if group['foreach'] and isinstance(group['lr'], Tensor) and not group['capturable']:
-        raise RuntimeError('lr as a Tensor is not supported for capturable=False and foreach=True')
+    if group["foreach"] and isinstance(group["lr"], Tensor) and not group["capturable"]:
+        raise RuntimeError("lr as a Tensor is not supported for capturable=False and foreach=True")
 
     if group["maximize"]:
         grad = -grad
@@ -64,15 +58,15 @@ def step_adamw_parameter(self, p, group, i):
 
     # If compiling, the compiler will handle cudagraph checks, see note [torch.compile x capturable]
     if not torch.compiler.is_compiling() and group["capturable"]:
-        assert (
-                (p.is_cuda and step_t.is_cuda) or (p.is_xla and step_t.is_xla)
-        ), "If capturable=True, params and state_steps must be CUDA or XLA tensors."
+        assert (p.is_cuda and step_t.is_cuda) or (p.is_xla and step_t.is_xla), (
+            "If capturable=True, params and state_steps must be CUDA or XLA tensors."
+        )
 
     if torch.is_complex(p):
         grad = torch.view_as_real(grad)
         exp_avg = torch.view_as_real(exp_avg)
         exp_avg_sq = torch.view_as_real(exp_avg_sq)
-        if group['amsgrad']:
+        if group["amsgrad"]:
             state["max_exp_avg_sq"] = torch.view_as_real(state["max_exp_avg_sq"])
         p = torch.view_as_real(p)
 
@@ -89,15 +83,15 @@ def step_adamw_parameter(self, p, group, i):
     if group["capturable"] or group["differentiable"]:
         step = step_t
 
-        bias_correction1 = 1 - beta1 ** step
-        bias_correction2 = 1 - beta2 ** step
+        bias_correction1 = 1 - beta1**step
+        bias_correction2 = 1 - beta2**step
 
         step_size = group["lr"] / bias_correction1
         step_size_neg = step_size.neg()
 
         bias_correction2_sqrt = bias_correction2.sqrt()
 
-        if group['amsgrad']:
+        if group["amsgrad"]:
             # Maintains the maximum of all 2nd moment running avg. till now
             max_exp_avg_sq = state["max_exp_avg_sq"].clone() if group["differentiable"] else state["max_exp_avg_sq"]
 
@@ -106,13 +100,11 @@ def step_adamw_parameter(self, p, group, i):
             # Uses the max. for normalizing running avg. of gradient
             # Folds in (admittedly ugly) 1-elem step_size math here to avoid extra param-set-sized read+write
             # (can't fold it into addcdiv_ below because addcdiv_ requires value is a Number, not a Tensor)
-            denom = (
-                    state["max_exp_avg_sq"].sqrt() / (bias_correction2_sqrt * step_size_neg)
-            ).add_(group["eps"] / step_size_neg)
+            denom = (state["max_exp_avg_sq"].sqrt() / (bias_correction2_sqrt * step_size_neg)).add_(
+                group["eps"] / step_size_neg
+            )
         else:
-            denom = (
-                    exp_avg_sq.sqrt() / (bias_correction2_sqrt * step_size_neg)
-            ).add_(group["eps"] / step_size_neg)
+            denom = (exp_avg_sq.sqrt() / (bias_correction2_sqrt * step_size_neg)).add_(group["eps"] / step_size_neg)
 
         if p.dtype == torch.bfloat16 and self.stochastic_rounding:
             addcdiv_stochastic_(p, exp_avg, denom)
@@ -121,8 +113,8 @@ def step_adamw_parameter(self, p, group, i):
     else:
         step = step_t.item()
 
-        bias_correction1 = 1 - beta1 ** step
-        bias_correction2 = 1 - beta2 ** step
+        bias_correction1 = 1 - beta1**step
+        bias_correction2 = 1 - beta2**step
 
         step_size = group["lr"] / bias_correction1
 
@@ -131,7 +123,7 @@ def step_adamw_parameter(self, p, group, i):
         else:
             bias_correction2_sqrt = math.sqrt(bias_correction2)
 
-        if group['amsgrad']:
+        if group["amsgrad"]:
             # Maintains the maximum of all 2nd moment running avg. till now
             torch.maximum(state["max_exp_avg_sq"], exp_avg_sq, out=state["max_exp_avg_sq"])
 
@@ -146,8 +138,9 @@ def step_adamw_parameter(self, p, group, i):
             p.addcdiv_(exp_avg, denom, value=-step_size)
 
     # Lastly, switch back to complex view
-    if group['amsgrad'] and torch.is_complex(p):
+    if group["amsgrad"] and torch.is_complex(p):
         state["max_exp_avg_sq"] = torch.view_as_complex(state["max_exp_avg_sq"])
+
 
 def _get_scalar_dtype(is_fused=None):
     if is_fused:
@@ -156,10 +149,10 @@ def _get_scalar_dtype(is_fused=None):
 
 
 def _single_tensor_adamw(
-        self,
-        group,
-        grad_scale: Tensor | None,
-        found_inf: Tensor | None,
+    self,
+    group,
+    grad_scale: Tensor | None,
+    found_inf: Tensor | None,
 ):
 
     assert grad_scale is None and found_inf is None
@@ -198,6 +191,7 @@ def step_adamw(self, closure=None):
         )
 
     return loss
+
 
 def patch_adamw(optimizer: AdamW, stochastic_rounding: bool):
     optimizer.stochastic_rounding = stochastic_rounding

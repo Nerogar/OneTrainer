@@ -35,7 +35,7 @@ class BaseStableDiffusionXLSetup(
     ModelSetupDiffusionMixin,
     ModelSetupEmbeddingMixin,
     ModelSetupText2ImageMixin,
-    metaclass=ABCMeta
+    metaclass=ABCMeta,
 ):
     LAYER_PRESETS = {
         "attn-mlp": ["attentions"],
@@ -44,9 +44,9 @@ class BaseStableDiffusionXLSetup(
     }
 
     def setup_optimizations(
-            self,
-            model: StableDiffusionXLModel,
-            config: TrainConfig,
+        self,
+        model: StableDiffusionXLModel,
+        config: TrainConfig,
     ):
         if config.gradient_checkpointing.enabled():
             model.unet.enable_gradient_checkpointing()
@@ -60,14 +60,19 @@ class BaseStableDiffusionXLSetup(
             if model.unet_lora is not None:
                 apply_circular_padding_to_conv2d(model.unet_lora)
 
-        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().unet,
-            config.weight_dtypes().text_encoder,
-            config.weight_dtypes().text_encoder_2,
-            config.weight_dtypes().vae,
-            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-            config.weight_dtypes().embedding if config.train_any_embedding() else None,
-        ], config.enable_autocast_cache)
+        model.autocast_context, model.train_dtype = create_autocast_context(
+            self.train_device,
+            config.train_dtype,
+            [
+                config.weight_dtypes().unet,
+                config.weight_dtypes().text_encoder,
+                config.weight_dtypes().text_encoder_2,
+                config.weight_dtypes().vae,
+                config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+                config.weight_dtypes().embedding if config.train_any_embedding() else None,
+            ],
+            config.enable_autocast_cache,
+        )
 
         model.vae_autocast_context, model.vae_train_dtype = disable_fp16_autocast_context(
             self.train_device,
@@ -85,9 +90,9 @@ class BaseStableDiffusionXLSetup(
         quantize_layers(model.unet, self.train_device, model.train_dtype, config)
 
     def _setup_embeddings(
-            self,
-            model: StableDiffusionXLModel,
-            config: TrainConfig,
+        self,
+        model: StableDiffusionXLModel,
+        config: TrainConfig,
     ):
         additional_embeddings = []
         for embedding_config in config.all_embedding_configs():
@@ -146,9 +151,9 @@ class BaseStableDiffusionXLSetup(
         self._add_embeddings_to_tokenizer(model.tokenizer_2, model.all_text_encoder_2_embeddings())
 
     def _setup_embedding_wrapper(
-            self,
-            model: StableDiffusionXLModel,
-            config: TrainConfig,
+        self,
+        model: StableDiffusionXLModel,
+        config: TrainConfig,
     ):
         model.embedding_wrapper_1 = AdditionalEmbeddingWrapper(
             tokenizer=model.tokenizer_1,
@@ -165,34 +170,38 @@ class BaseStableDiffusionXLSetup(
         model.embedding_wrapper_2.hook_to_module()
 
     def _setup_embeddings_requires_grad(
-            self,
-            model: StableDiffusionXLModel,
-            config: TrainConfig,
+        self,
+        model: StableDiffusionXLModel,
+        config: TrainConfig,
     ):
-        for embedding, embedding_config in zip(model.all_text_encoder_1_embeddings(),
-                                               config.all_embedding_configs(), strict=True):
-            train_embedding_1 = \
-                embedding_config.train \
-                and config.text_encoder.train_embedding \
+        for embedding, embedding_config in zip(
+            model.all_text_encoder_1_embeddings(), config.all_embedding_configs(), strict=True
+        ):
+            train_embedding_1 = (
+                embedding_config.train
+                and config.text_encoder.train_embedding
                 and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
+            )
             embedding.requires_grad_(train_embedding_1)
 
-        for embedding, embedding_config in zip(model.all_text_encoder_2_embeddings(),
-                                               config.all_embedding_configs(), strict=True):
-            train_embedding_2 = \
-                embedding_config.train \
-                and config.text_encoder_2.train_embedding \
+        for embedding, embedding_config in zip(
+            model.all_text_encoder_2_embeddings(), config.all_embedding_configs(), strict=True
+        ):
+            train_embedding_2 = (
+                embedding_config.train
+                and config.text_encoder_2.train_embedding
                 and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
+            )
             embedding.requires_grad_(train_embedding_2)
 
     def predict(
-            self,
-            model: StableDiffusionXLModel,
-            batch: dict,
-            config: TrainConfig,
-            train_progress: TrainProgress,
-            *,
-            deterministic: bool = False,
+        self,
+        model: StableDiffusionXLModel,
+        batch: dict,
+        config: TrainConfig,
+        train_progress: TrainProgress,
+        *,
+        deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
             batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
@@ -200,35 +209,44 @@ class BaseStableDiffusionXLSetup(
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
 
-            vae_scaling_factor = model.vae.config['scaling_factor']
+            vae_scaling_factor = model.vae.config["scaling_factor"]
 
-            text_encoder_output, pooled_text_encoder_2_output = model.combine_text_encoder_output(*model.encode_text(
-                train_device=self.train_device,
-                batch_size=batch['latent_image'].shape[0],
-                rand=rand,
-                tokens_1=batch['tokens_1'],
-                tokens_2=batch['tokens_2'],
-                text_encoder_1_layer_skip=config.text_encoder_layer_skip,
-                text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
-                text_encoder_1_output=batch[
-                    'text_encoder_1_hidden_state'] if not config.train_text_encoder_or_embedding() else None,
-                text_encoder_2_output=batch[
-                    'text_encoder_2_hidden_state'] if not config.train_text_encoder_2_or_embedding() else None,
-                pooled_text_encoder_2_output=batch[
-                    'text_encoder_2_pooled_state'] if not config.train_text_encoder_2_or_embedding() else None,
-                text_encoder_1_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
-                text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability if not deterministic else None,
-            ))
+            text_encoder_output, pooled_text_encoder_2_output = model.combine_text_encoder_output(
+                *model.encode_text(
+                    train_device=self.train_device,
+                    batch_size=batch["latent_image"].shape[0],
+                    rand=rand,
+                    tokens_1=batch["tokens_1"],
+                    tokens_2=batch["tokens_2"],
+                    text_encoder_1_layer_skip=config.text_encoder_layer_skip,
+                    text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
+                    text_encoder_1_output=batch["text_encoder_1_hidden_state"]
+                    if not config.train_text_encoder_or_embedding()
+                    else None,
+                    text_encoder_2_output=batch["text_encoder_2_hidden_state"]
+                    if not config.train_text_encoder_2_or_embedding()
+                    else None,
+                    pooled_text_encoder_2_output=batch["text_encoder_2_pooled_state"]
+                    if not config.train_text_encoder_2_or_embedding()
+                    else None,
+                    text_encoder_1_dropout_probability=config.text_encoder.dropout_probability
+                    if not deterministic
+                    else None,
+                    text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability
+                    if not deterministic
+                    else None,
+                )
+            )
 
-            latent_image = batch['latent_image']
+            latent_image = batch["latent_image"]
             scaled_latent_image = latent_image * vae_scaling_factor
 
             scaled_latent_conditioning_image = None
             if config.model_type.has_conditioning_image_input():
-                scaled_latent_conditioning_image = batch['latent_conditioning_image'] * vae_scaling_factor
+                scaled_latent_conditioning_image = batch["latent_conditioning_image"] * vae_scaling_factor
 
             timestep = self._get_timestep_discrete(
-                model.noise_scheduler.config['num_train_timesteps'],
+                model.noise_scheduler.config["num_train_timesteps"],
                 deterministic,
                 generator,
                 scaled_latent_image.shape[0],
@@ -251,21 +269,17 @@ class BaseStableDiffusionXLSetup(
             )
 
             # original size of the image
-            original_height = batch['original_resolution'][0]
-            original_width = batch['original_resolution'][1]
-            crops_coords_top = batch['crop_offset'][0]
-            crops_coords_left = batch['crop_offset'][1]
-            target_height = batch['crop_resolution'][0]
-            target_width = batch['crop_resolution'][1]
+            original_height = batch["original_resolution"][0]
+            original_width = batch["original_resolution"][1]
+            crops_coords_top = batch["crop_offset"][0]
+            crops_coords_left = batch["crop_offset"][1]
+            target_height = batch["crop_resolution"][0]
+            target_width = batch["crop_resolution"][1]
 
-            add_time_ids = torch.stack([
-                original_height,
-                original_width,
-                crops_coords_top,
-                crops_coords_left,
-                target_height,
-                target_width
-            ], dim=1)
+            add_time_ids = torch.stack(
+                [original_height, original_width, crops_coords_top, crops_coords_left, target_height, target_width],
+                dim=1,
+            )
 
             add_time_ids = add_time_ids.to(
                 dtype=scaled_noisy_latent_image.dtype,
@@ -274,7 +288,7 @@ class BaseStableDiffusionXLSetup(
 
             if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
                 latent_input = torch.concat(
-                    [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
+                    [scaled_noisy_latent_image, batch["latent_mask"], scaled_latent_conditioning_image], 1
                 )
             else:
                 latent_input = scaled_noisy_latent_image
@@ -289,26 +303,26 @@ class BaseStableDiffusionXLSetup(
 
             model_output_data = {}
 
-            if model.noise_scheduler.config.prediction_type == 'epsilon':
+            if model.noise_scheduler.config.prediction_type == "epsilon":
                 model_output_data = {
-                    'loss_type': 'target',
-                    'timestep': timestep,
-                    'predicted': predicted_latent_noise,
-                    'target': latent_noise,
+                    "loss_type": "target",
+                    "timestep": timestep,
+                    "predicted": predicted_latent_noise,
+                    "target": latent_noise,
                 }
-            elif model.noise_scheduler.config.prediction_type == 'v_prediction':
+            elif model.noise_scheduler.config.prediction_type == "v_prediction":
                 target_velocity = model.noise_scheduler.get_velocity(scaled_latent_image, latent_noise, timestep)
                 model_output_data = {
-                    'loss_type': 'target',
-                    'timestep': timestep,
-                    'predicted': predicted_latent_noise,
-                    'target': target_velocity,
+                    "loss_type": "target",
+                    "timestep": timestep,
+                    "predicted": predicted_latent_noise,
+                    "target": target_velocity,
                 }
 
             if config.debug_mode:
                 with torch.no_grad():
                     self._save_text(
-                        self._decode_tokens(batch['tokens_1'], model.tokenizer_1),
+                        self._decode_tokens(batch["tokens_1"], model.tokenizer_1),
                         config.debug_dir + "/training_batches",
                         "7-prompt",
                         train_progress.global_step,
@@ -320,7 +334,7 @@ class BaseStableDiffusionXLSetup(
                         config.debug_dir + "/training_batches",
                         "1-noise",
                         train_progress.global_step,
-                        True
+                        True,
                     )
 
                     # predicted noise
@@ -329,7 +343,7 @@ class BaseStableDiffusionXLSetup(
                         config.debug_dir + "/training_batches",
                         "2-predicted_noise",
                         train_progress.global_step,
-                        True
+                        True,
                     )
 
                     # noisy image
@@ -338,7 +352,7 @@ class BaseStableDiffusionXLSetup(
                         config.debug_dir + "/training_batches",
                         "3-noisy_image",
                         train_progress.global_step,
-                        True
+                        True,
                     )
 
                     # predicted image
@@ -349,15 +363,15 @@ class BaseStableDiffusionXLSetup(
                     sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[timestep]) ** 0.5
                     sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
-                    scaled_predicted_latent_image = \
-                        (scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod) \
-                        / sqrt_alpha_prod
+                    scaled_predicted_latent_image = (
+                        scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod
+                    ) / sqrt_alpha_prod
                     self._save_image(
                         self._project_latent_to_image_sdxl(scaled_predicted_latent_image),
                         config.debug_dir + "/training_batches",
                         "4-predicted_image",
                         model.train_progress.global_step,
-                        True
+                        True,
                     )
 
                     # image
@@ -366,18 +380,18 @@ class BaseStableDiffusionXLSetup(
                         config.debug_dir + "/training_batches",
                         "5-image",
                         model.train_progress.global_step,
-                        True
+                        True,
                     )
 
-        model_output_data['prediction_type'] = model.noise_scheduler.config.prediction_type
+        model_output_data["prediction_type"] = model.noise_scheduler.config.prediction_type
         return model_output_data
 
     def calculate_loss(
-            self,
-            model: StableDiffusionXLModel,
-            batch: dict,
-            data: dict,
-            config: TrainConfig,
+        self,
+        model: StableDiffusionXLModel,
+        batch: dict,
+        data: dict,
+        config: TrainConfig,
     ) -> Tensor:
         return self._diffusion_losses(
             batch=batch,

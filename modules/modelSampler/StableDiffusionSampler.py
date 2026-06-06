@@ -23,11 +23,11 @@ from tqdm import tqdm
 
 class StableDiffusionSampler(BaseModelSampler):
     def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            model: StableDiffusionModel,
-            model_type: ModelType,
+        self,
+        train_device: torch.device,
+        temp_device: torch.device,
+        model: StableDiffusionModel,
+        model_type: ModelType,
     ):
         super().__init__(train_device, temp_device)
 
@@ -37,20 +37,20 @@ class StableDiffusionSampler(BaseModelSampler):
 
     @torch.no_grad()
     def __sample_base(
-            self,
-            prompt: str,
-            negative_prompt: str,
-            height: int,
-            width: int,
-            seed: int,
-            random_seed: bool,
-            diffusion_steps: int,
-            cfg_scale: float,
-            noise_scheduler: NoiseScheduler,
-            cfg_rescale: float = 0.7,
-            text_encoder_layer_skip: int = 0,
-            force_last_timestep: bool = False,
-            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+        self,
+        prompt: str,
+        negative_prompt: str,
+        height: int,
+        width: int,
+        seed: int,
+        random_seed: bool,
+        diffusion_steps: int,
+        cfg_scale: float,
+        noise_scheduler: NoiseScheduler,
+        cfg_rescale: float = 0.7,
+        text_encoder_layer_skip: int = 0,
+        force_last_timestep: bool = False,
+        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
@@ -79,8 +79,9 @@ class StableDiffusionSampler(BaseModelSampler):
                 text_encoder_layer_skip=text_encoder_layer_skip,
             )
 
-            combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
-                .to(dtype=self.model.train_dtype.torch_dtype())
+            combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]).to(
+                dtype=self.model.train_dtype.torch_dtype()
+            )
 
             self.model.text_encoder_to(self.temp_device)
             torch_gc()
@@ -90,8 +91,9 @@ class StableDiffusionSampler(BaseModelSampler):
             timesteps = noise_scheduler.timesteps
 
             if force_last_timestep:
-                last_timestep = torch.ones(1, device=self.train_device, dtype=torch.int64) \
-                                * (noise_scheduler.config.num_train_timesteps - 1)
+                last_timestep = torch.ones(1, device=self.train_device, dtype=torch.int64) * (
+                    noise_scheduler.config.num_train_timesteps - 1
+                )
 
                 # add the final timestep to force predicting with zero snr if it's not already here
                 if timesteps[0] != last_timestep:
@@ -100,12 +102,15 @@ class StableDiffusionSampler(BaseModelSampler):
 
             # prepare latent image
             num_channels_latents = unet.config.in_channels
-            latent_image = torch.randn(
-                size=(1, num_channels_latents, height // vae_scale_factor, width // vae_scale_factor),
-                generator=generator,
-                device=self.train_device,
-                dtype=self.model.train_dtype.torch_dtype(),
-            ) * noise_scheduler.init_noise_sigma
+            latent_image = (
+                torch.randn(
+                    size=(1, num_channels_latents, height // vae_scale_factor, width // vae_scale_factor),
+                    generator=generator,
+                    device=self.train_device,
+                    dtype=self.model.train_dtype.torch_dtype(),
+                )
+                * noise_scheduler.init_noise_sigma
+            )
 
             # denoising loop
             extra_step_kwargs = {}
@@ -136,9 +141,7 @@ class StableDiffusionSampler(BaseModelSampler):
                     std_positive = noise_pred_positive.std(dim=list(range(1, noise_pred_positive.ndim)), keepdim=True)
                     std_pred = noise_pred.std(dim=list(range(1, noise_pred.ndim)), keepdim=True)
                     noise_pred_rescaled = noise_pred * (std_positive / std_pred)
-                    noise_pred = (
-                            cfg_rescale * noise_pred_rescaled + (1 - cfg_rescale) * noise_pred
-                    )
+                    noise_pred = cfg_rescale * noise_pred_rescaled + (1 - cfg_rescale) * noise_pred
 
                 # compute the previous noisy sample x_t -> x_t-1
                 latent_image = noise_scheduler.step(
@@ -157,7 +160,7 @@ class StableDiffusionSampler(BaseModelSampler):
             image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
             do_denormalize = [True] * image.shape[0]
-            image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
+            image = image_processor.postprocess(image, output_type="pil", do_denormalize=do_denormalize)
 
             self.model.vae_to(self.temp_device)
             torch_gc()
@@ -173,8 +176,12 @@ class StableDiffusionSampler(BaseModelSampler):
         kernel_size = kernel_radius * 2 + 1
         kernel_weights = torch.ones(1, 1, kernel_size, kernel_size, dtype=dtype) / (kernel_size * kernel_size)
         kernel = nn.Conv2d(
-            in_channels=1, out_channels=1, kernel_size=kernel_size, bias=False, padding_mode='replicate',
-            padding=kernel_radius
+            in_channels=1,
+            out_channels=1,
+            kernel_size=kernel_size,
+            bias=False,
+            padding_mode="replicate",
+            padding=kernel_radius,
         ).to(dtype)
         kernel.weight.data = kernel_weights
         kernel.requires_grad_(False)
@@ -183,23 +190,23 @@ class StableDiffusionSampler(BaseModelSampler):
 
     @torch.no_grad()
     def __sample_inpainting(
-            self,
-            prompt: str,
-            negative_prompt: str,
-            height: int,
-            width: int,
-            seed: int,
-            random_seed: bool,
-            diffusion_steps: int,
-            cfg_scale: float,
-            noise_scheduler: NoiseScheduler,
-            cfg_rescale: float = 0.7,
-            sample_inpainting: bool = False,
-            base_image_path: str = "",
-            mask_image_path: str = "",
-            text_encoder_layer_skip: int = 0,
-            force_last_timestep: bool = False,
-            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+        self,
+        prompt: str,
+        negative_prompt: str,
+        height: int,
+        width: int,
+        seed: int,
+        random_seed: bool,
+        diffusion_steps: int,
+        cfg_scale: float,
+        noise_scheduler: NoiseScheduler,
+        cfg_rescale: float = 0.7,
+        sample_inpainting: bool = False,
+        base_image_path: str = "",
+        mask_image_path: str = "",
+        text_encoder_layer_skip: int = 0,
+        force_last_timestep: bool = False,
+        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
@@ -218,12 +225,14 @@ class StableDiffusionSampler(BaseModelSampler):
             self.model.vae_to(self.train_device)
 
             if sample_inpainting:
-                t = transforms.Compose([
-                    transforms.ToTensor(),
-                    transforms.Resize(
-                        (height, width), interpolation=transforms.InterpolationMode.BILINEAR,antialias=True
-                    ),
-                ])
+                t = transforms.Compose(
+                    [
+                        transforms.ToTensor(),
+                        transforms.Resize(
+                            (height, width), interpolation=transforms.InterpolationMode.BILINEAR, antialias=True
+                        ),
+                    ]
+                )
 
                 image = load_image(base_image_path, convert_mode="RGB")
                 image = t(image).to(
@@ -231,7 +240,7 @@ class StableDiffusionSampler(BaseModelSampler):
                     device=self.train_device,
                 )
 
-                mask = load_image(mask_image_path, convert_mode='L')
+                mask = load_image(mask_image_path, convert_mode="L")
                 mask = t(mask).to(
                     dtype=self.model.train_dtype.torch_dtype(),
                     device=self.train_device,
@@ -242,16 +251,17 @@ class StableDiffusionSampler(BaseModelSampler):
                 eroded_mask = (eroded_mask > 0.5).to(dtype=self.model.train_dtype.torch_dtype())
 
                 image = (image * 2.0) - 1.0
-                conditioning_image = (image * (1 - eroded_mask))
+                conditioning_image = image * (1 - eroded_mask)
                 conditioning_image = conditioning_image.unsqueeze(0)
 
-                latent_conditioning_image = vae.encode(
-                    conditioning_image).latent_dist.mode() * vae.config.scaling_factor
+                latent_conditioning_image = (
+                    vae.encode(conditioning_image).latent_dist.mode() * vae.config.scaling_factor
+                )
 
                 rescale_mask = transforms.Resize(
                     (round(mask.shape[1] // 8), round(mask.shape[2] // 8)),
                     interpolation=transforms.InterpolationMode.BILINEAR,
-                    antialias=True
+                    antialias=True,
                 )
                 latent_mask = rescale_mask(mask)
                 latent_mask = (latent_mask > 0).to(dtype=self.model.train_dtype.torch_dtype())
@@ -262,11 +272,13 @@ class StableDiffusionSampler(BaseModelSampler):
                     dtype=self.model.train_dtype.torch_dtype(),
                     device=self.train_device,
                 )
-                latent_conditioning_image = vae.encode(conditioning_image).latent_dist.mode() * vae.config.scaling_factor
+                latent_conditioning_image = (
+                    vae.encode(conditioning_image).latent_dist.mode() * vae.config.scaling_factor
+                )
                 latent_mask = torch.ones(
                     size=(1, 1, latent_conditioning_image.shape[2], latent_conditioning_image.shape[3]),
                     dtype=self.model.train_dtype.torch_dtype(),
-                    device=self.train_device
+                    device=self.train_device,
                 )
 
             self.model.vae_to(self.temp_device)
@@ -286,8 +298,9 @@ class StableDiffusionSampler(BaseModelSampler):
                 text_encoder_layer_skip=text_encoder_layer_skip,
             )
 
-            combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
-                .to(dtype=self.model.train_dtype.torch_dtype())
+            combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]).to(
+                dtype=self.model.train_dtype.torch_dtype()
+            )
 
             self.model.text_encoder_to(self.temp_device)
             torch_gc()
@@ -297,8 +310,9 @@ class StableDiffusionSampler(BaseModelSampler):
             timesteps = noise_scheduler.timesteps
 
             if force_last_timestep:
-                last_timestep = torch.ones(1, device=self.train_device, dtype=torch.int64) \
-                                * (noise_scheduler.config.num_train_timesteps - 1)
+                last_timestep = torch.ones(1, device=self.train_device, dtype=torch.int64) * (
+                    noise_scheduler.config.num_train_timesteps - 1
+                )
 
                 # add the final timestep to force predicting with zero snr if it's not already here
                 if timesteps[0] != last_timestep:
@@ -307,12 +321,15 @@ class StableDiffusionSampler(BaseModelSampler):
 
             # prepare latent image
             num_channels_latents = latent_conditioning_image.shape[1]
-            latent_image = torch.randn(
-                size=(1, num_channels_latents, height // vae_scale_factor, width // vae_scale_factor),
-                generator=generator,
-                device=self.train_device,
-                dtype=self.model.train_dtype.torch_dtype(),
-            ) * noise_scheduler.init_noise_sigma
+            latent_image = (
+                torch.randn(
+                    size=(1, num_channels_latents, height // vae_scale_factor, width // vae_scale_factor),
+                    generator=generator,
+                    device=self.train_device,
+                    dtype=self.model.train_dtype.torch_dtype(),
+                )
+                * noise_scheduler.init_noise_sigma
+            )
 
             # denoising loop
             extra_step_kwargs = {}
@@ -323,9 +340,7 @@ class StableDiffusionSampler(BaseModelSampler):
             self.model.unet_to(self.train_device)
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 latent_model_input = noise_scheduler.scale_model_input(latent_image, timestep)
-                latent_model_input = torch.concat(
-                    [latent_model_input, latent_mask, latent_conditioning_image], 1
-                )
+                latent_model_input = torch.concat([latent_model_input, latent_mask, latent_conditioning_image], 1)
                 latent_model_input = torch.cat([latent_model_input] * 2)
 
                 # predict the noise residual
@@ -346,9 +361,7 @@ class StableDiffusionSampler(BaseModelSampler):
                     std_positive = noise_pred_positive.std(dim=list(range(1, noise_pred_positive.ndim)), keepdim=True)
                     std_pred = noise_pred.std(dim=list(range(1, noise_pred.ndim)), keepdim=True)
                     noise_pred_rescaled = noise_pred * (std_positive / std_pred)
-                    noise_pred = (
-                            cfg_rescale * noise_pred_rescaled + (1 - cfg_rescale) * noise_pred
-                    )
+                    noise_pred = cfg_rescale * noise_pred_rescaled + (1 - cfg_rescale) * noise_pred
 
                 # compute the previous noisy sample x_t -> x_t-1
                 latent_image = noise_scheduler.step(
@@ -360,14 +373,14 @@ class StableDiffusionSampler(BaseModelSampler):
             self.model.unet_to(self.temp_device)
             torch_gc()
 
-            #decode
+            # decode
             self.model.vae_to(self.train_device)
 
             latent_image = latent_image.to(dtype=vae.dtype)
             image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
             do_denormalize = [True] * image.shape[0]
-            image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
+            image = image_processor.postprocess(image, output_type="pil", do_denormalize=do_denormalize)
 
             self.model.vae_to(self.temp_device)
             torch_gc()
@@ -378,14 +391,14 @@ class StableDiffusionSampler(BaseModelSampler):
             )
 
     def sample(
-            self,
-            sample_config: SampleConfig,
-            destination: str,
-            image_format: ImageFormat | None = None,
-            video_format: VideoFormat | None = None,
-            audio_format: AudioFormat | None = None,
-            on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
-            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+        self,
+        sample_config: SampleConfig,
+        destination: str,
+        image_format: ImageFormat | None = None,
+        video_format: VideoFormat | None = None,
+        audio_format: AudioFormat | None = None,
+        on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
+        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         if self.model_type.has_conditioning_image_input():
             sampler_output = self.__sample_inpainting(
@@ -424,11 +437,15 @@ class StableDiffusionSampler(BaseModelSampler):
             )
 
         self.save_sampler_output(
-            sampler_output, destination,
-            image_format, video_format, audio_format,
+            sampler_output,
+            destination,
+            image_format,
+            video_format,
+            audio_format,
         )
 
         on_sample(sampler_output)
+
 
 factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_15)
 factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_15_INPAINTING)

@@ -101,29 +101,29 @@ class DPOCurationWindow(ctk.CTkToplevel):
         frame.pack(expand=True, fill="both", padx=40, pady=30)
 
         ctk.CTkLabel(frame, text="DPO Pair Tool", font=("", 28, "bold")).pack(pady=(0, 10))
-        ctk.CTkLabel(frame, text="Curate chosen/rejected pairs from generated images.",
-                     font=("", 13), text_color="gray").pack(pady=(0, 25))
+        ctk.CTkLabel(
+            frame, text="Curate chosen/rejected pairs from generated images.", font=("", 13), text_color="gray"
+        ).pack(pady=(0, 25))
 
         # Folders section
         folder_card = ctk.CTkFrame(frame, border_width=1, border_color="gray30", corner_radius=8)
         folder_card.pack(fill="x", pady=(0, 15), padx=20)
 
-        ctk.CTkLabel(folder_card, text="Folders", font=("", 13, "bold")).pack(
-            anchor="w", padx=15, pady=(12, 8))
+        ctk.CTkLabel(folder_card, text="Folders", font=("", 13, "bold")).pack(anchor="w", padx=15, pady=(12, 8))
 
         src_frame = ctk.CTkFrame(folder_card, fg_color="transparent")
         src_frame.pack(fill="x", padx=15, pady=(0, 8))
-        ctk.CTkButton(src_frame, text="Source Folder", width=150,
-                      command=self._select_source).pack(side="left", padx=(0, 10))
-        ctk.CTkLabel(src_frame, textvariable=self.source_path_var, anchor="w").pack(
-            side="left", fill="x", expand=True)
+        ctk.CTkButton(src_frame, text="Source Folder", width=150, command=self._select_source).pack(
+            side="left", padx=(0, 10)
+        )
+        ctk.CTkLabel(src_frame, textvariable=self.source_path_var, anchor="w").pack(side="left", fill="x", expand=True)
 
         out_frame = ctk.CTkFrame(folder_card, fg_color="transparent")
         out_frame.pack(fill="x", padx=15, pady=(0, 12))
-        ctk.CTkButton(out_frame, text="Output Folder", width=150,
-                      command=self._select_output).pack(side="left", padx=(0, 10))
-        ctk.CTkLabel(out_frame, textvariable=self.output_path_var, anchor="w").pack(
-            side="left", fill="x", expand=True)
+        ctk.CTkButton(out_frame, text="Output Folder", width=150, command=self._select_output).pack(
+            side="left", padx=(0, 10)
+        )
+        ctk.CTkLabel(out_frame, textvariable=self.output_path_var, anchor="w").pack(side="left", fill="x", expand=True)
 
         self.resume_label = ctk.CTkLabel(frame, text="", font=("", 12), text_color="green")
         self.resume_label.pack(pady=(0, 10))
@@ -136,19 +136,23 @@ class DPOCurationWindow(ctk.CTkToplevel):
         pair_count_frame.pack(padx=15, pady=12)
         ctk.CTkLabel(pair_count_frame, text="Pairs per group:").pack(side="left", padx=(0, 10))
         ctk.CTkEntry(pair_count_frame, textvariable=self.pairs_per_group_var, width=60).pack(side="left")
-        ctk.CTkLabel(pair_count_frame, text="How many pairs to collect before moving on.",
-                     anchor="w", text_color="gray").pack(side="left", padx=(10, 0))
+        ctk.CTkLabel(
+            pair_count_frame, text="How many pairs to collect before moving on.", anchor="w", text_color="gray"
+        ).pack(side="left", padx=(10, 0))
 
         # Action buttons
         btn_frame = ctk.CTkFrame(frame, fg_color="transparent")
         btn_frame.pack(pady=(0, 10))
-        ctk.CTkButton(btn_frame, text="Start (ELO)", width=250,
-                      command=lambda: self._start("elo")).pack(side="left", padx=10)
-        ctk.CTkButton(btn_frame, text="Start (Selection)", width=250,
-                      command=lambda: self._start("selection")).pack(side="left", padx=10)
+        ctk.CTkButton(btn_frame, text="Start (ELO)", width=250, command=lambda: self._start("elo")).pack(
+            side="left", padx=10
+        )
+        ctk.CTkButton(btn_frame, text="Start (Selection)", width=250, command=lambda: self._start("selection")).pack(
+            side="left", padx=10
+        )
 
-        ctk.CTkButton(frame, text="Review Pairs", width=250, fg_color="gray40",
-                      command=self._start_review).pack(pady=(5, 0))
+        ctk.CTkButton(frame, text="Review Pairs", width=250, fg_color="gray40", command=self._start_review).pack(
+            pady=(5, 0)
+        )
 
     def _select_source(self):
         self.grab_release()
@@ -183,8 +187,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
                 self.resume_label.configure(text=msg)
             else:
                 if pruned:
-                    self.resume_label.configure(
-                        text=f"Removed {pruned} orphaned entries with missing files.")
+                    self.resume_label.configure(text=f"Removed {pruned} orphaned entries with missing files.")
                 else:
                     self.resume_label.configure(text="")
 
@@ -277,13 +280,13 @@ class DPOCurationWindow(ctk.CTkToplevel):
                 # dimensions. Without this, every such image collapses into
                 # the same empty-AR bucket and pairs end up shape-mismatched
                 # at train time.
-                ar = resolve_aspect_ratio(meta.get('aspectratio', ''), path)
-                prompt = normalize_prompt_for_grouping(meta.get('prompt', ''))
+                ar = resolve_aspect_ratio(meta.get("aspectratio", ""), path)
+                prompt = normalize_prompt_for_grouping(meta.get("prompt", ""))
                 groups_dict[(prompt, ar)].append(path)
                 self._scan_count += 1
 
         raw_groups = [
-            {'prompt': prompt, 'aspectratio': ar, 'images': images}
+            {"prompt": prompt, "aspectratio": ar, "images": images}
             for (prompt, ar), images in groups_dict.items()
             if len(images) >= 2
         ]
@@ -296,20 +299,20 @@ class DPOCurationWindow(ctk.CTkToplevel):
             if self._worker_stop.is_set():
                 return
 
-            group_key = (group['prompt'], group['aspectratio'])
-            is_unconditional = group['prompt'] == "UNCONDITIONAL"
+            group_key = (group["prompt"], group["aspectratio"])
+            is_unconditional = group["prompt"] == "UNCONDITIONAL"
             if not is_unconditional and existing_counts.get(group_key, 0) >= self.pairs_per_group:
                 continue
 
             # Drop images already committed in any prior pair before dedup so
             # the content-hash pass doesn't waste work on sources we'll discard.
-            fresh = [i for i in group['images'] if not is_source_used(used_sources, i)]
+            fresh = [i for i in group["images"] if not is_source_used(used_sources, i)]
             if len(fresh) < 2:
                 continue
 
             deduped = self._dedup_by_content_hash(fresh)
             if len(deduped) >= 2:
-                group['images'] = deduped
+                group["images"] = deduped
                 self._groups_queued += 1
                 while not self._worker_stop.is_set():
                     try:
@@ -346,8 +349,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
             self._next_group()
         elif self._worker_finished:
             if self._groups_queued == 0:
-                messagebox.showwarning("No Groups",
-                                       "No images with extractable prompt metadata found.")
+                messagebox.showwarning("No Groups", "No images with extractable prompt metadata found.")
                 self._build_start_ui()
             else:
                 self._show_export()
@@ -373,9 +375,9 @@ class DPOCurationWindow(ctk.CTkToplevel):
                 return
 
             existing_counts = manifest_pair_counts(self.manifest)
-            group_key = (group['prompt'], group['aspectratio'])
+            group_key = (group["prompt"], group["aspectratio"])
             pairs_done = existing_counts.get(group_key, 0)
-            is_unconditional = group['prompt'] == "UNCONDITIONAL"
+            is_unconditional = group["prompt"] == "UNCONDITIONAL"
             if not is_unconditional and pairs_done >= self.pairs_per_group:
                 continue
 
@@ -385,7 +387,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
             # drop any sources that were committed in earlier passes so the
             # same image cannot end up on both sides of a future pair.
             used_sources = manifest_used_sources(self.manifest)
-            available = [i for i in group['images'] if not is_source_used(used_sources, i)]
+            available = [i for i in group["images"] if not is_source_used(used_sources, i)]
             if len(available) < 2:
                 continue
 
@@ -449,16 +451,17 @@ class DPOCurationWindow(ctk.CTkToplevel):
         suggested = self._elo_suggested_comparisons()
 
         # Header
-        self._build_prompt_expander(self, group['prompt'])
+        self._build_prompt_expander(self, group["prompt"])
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=10, pady=5)
-        ctk.CTkLabel(header, text=f"AR: {group['aspectratio']}",
-                     font=("", 12)).pack(side="left", padx=15)
-        ctk.CTkLabel(header, text=f"Group {self._groups_shown} / {self._groups_queued}",
-                     font=("", 12)).pack(side="left", padx=15)
-        ctk.CTkLabel(header, text=f"Comparisons: {self.elo_comparisons_done}/{suggested} suggested",
-                     font=("", 12)).pack(side="left", padx=15)
+        ctk.CTkLabel(header, text=f"AR: {group['aspectratio']}", font=("", 12)).pack(side="left", padx=15)
+        ctk.CTkLabel(header, text=f"Group {self._groups_shown} / {self._groups_queued}", font=("", 12)).pack(
+            side="left", padx=15
+        )
+        ctk.CTkLabel(
+            header, text=f"Comparisons: {self.elo_comparisons_done}/{suggested} suggested", font=("", 12)
+        ).pack(side="left", padx=15)
 
         # Images
         img_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -470,22 +473,26 @@ class DPOCurationWindow(ctk.CTkToplevel):
         for col, path in enumerate(self.elo_pair):
             self._display_image(img_frame, path, row=0, col=col)
             rating = self.elo_ratings.get(path, 1500.0)
-            ctk.CTkLabel(img_frame, text=f"ELO: {rating:.0f}",
-                         font=("", 12)).grid(row=1, column=col, pady=(0, 5))
+            ctk.CTkLabel(img_frame, text=f"ELO: {rating:.0f}", font=("", 12)).grid(row=1, column=col, pady=(0, 5))
 
         # Buttons
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.pack(fill="x", padx=10, pady=10)
-        ctk.CTkButton(btn_frame, text="A is Better (←)", width=200,
-                      command=lambda: self._elo_vote("a")).pack(side="left", padx=20, expand=True)
-        ctk.CTkButton(btn_frame, text="Tie / Skip (↓)", width=200,
-                      command=lambda: self._elo_vote("tie")).pack(side="left", padx=20, expand=True)
-        ctk.CTkButton(btn_frame, text="B is Better (→)", width=200,
-                      command=lambda: self._elo_vote("b")).pack(side="left", padx=20, expand=True)
-        ctk.CTkButton(btn_frame, text="Skip Group", width=150, fg_color="#8B4513",
-                      command=self._skip_group).pack(side="right", padx=10)
-        ctk.CTkButton(btn_frame, text="Accept Pair", width=150, fg_color="gray",
-                      command=self._elo_finish_round).pack(side="right", padx=10)
+        ctk.CTkButton(btn_frame, text="A is Better (←)", width=200, command=lambda: self._elo_vote("a")).pack(
+            side="left", padx=20, expand=True
+        )
+        ctk.CTkButton(btn_frame, text="Tie / Skip (↓)", width=200, command=lambda: self._elo_vote("tie")).pack(
+            side="left", padx=20, expand=True
+        )
+        ctk.CTkButton(btn_frame, text="B is Better (→)", width=200, command=lambda: self._elo_vote("b")).pack(
+            side="left", padx=20, expand=True
+        )
+        ctk.CTkButton(btn_frame, text="Skip Group", width=150, fg_color="#8B4513", command=self._skip_group).pack(
+            side="right", padx=10
+        )
+        ctk.CTkButton(btn_frame, text="Accept Pair", width=150, fg_color="gray", command=self._elo_finish_round).pack(
+            side="right", padx=10
+        )
 
         # Keyboard bindings
         self.bind("<Left>", lambda e: self._elo_vote("a"))
@@ -530,16 +537,18 @@ class DPOCurationWindow(ctk.CTkToplevel):
                 f"Worst: {worst_name} (ELO {worst_rating:.0f})\n\n"
                 f"Yes = Accept & keep scoring this prompt\n"
                 f"No = Accept & move to next group\n"
-                f"Cancel = Don't accept")
+                f"Cancel = Don't accept",
+            )
             if result is None:
                 return
             self._register_pair(best, worst, continue_scoring=result)
         else:
             if not messagebox.askyesno(
-                    "Accept Pair",
-                    f"Best: {best_name} (ELO {best_rating:.0f})\n"
-                    f"Worst: {worst_name} (ELO {worst_rating:.0f})\n\n"
-                    f"Accept this pair?"):
+                "Accept Pair",
+                f"Best: {best_name} (ELO {best_rating:.0f})\n"
+                f"Worst: {worst_name} (ELO {worst_rating:.0f})\n\n"
+                f"Accept this pair?",
+            ):
                 return
             self._register_pair(best, worst)
 
@@ -557,27 +566,36 @@ class DPOCurationWindow(ctk.CTkToplevel):
         group = self._current_group
 
         # Header
-        self._build_prompt_expander(self, group['prompt'])
+        self._build_prompt_expander(self, group["prompt"])
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=10, pady=5)
-        ctk.CTkLabel(header, text=f"AR: {group['aspectratio']}",
-                     font=("", 12)).pack(side="left", padx=15)
-        ctk.CTkLabel(header, text=f"Group {self._groups_shown} / {self._groups_queued}",
-                     font=("", 12)).pack(side="left", padx=15)
+        ctk.CTkLabel(header, text=f"AR: {group['aspectratio']}", font=("", 12)).pack(side="left", padx=15)
+        ctk.CTkLabel(header, text=f"Group {self._groups_shown} / {self._groups_queued}", font=("", 12)).pack(
+            side="left", padx=15
+        )
 
-        ctk.CTkButton(header, text="Skip Group", width=120, fg_color="#8B4513",
-                      command=self._skip_group).pack(side="right", padx=10)
+        ctk.CTkButton(header, text="Skip Group", width=120, fg_color="#8B4513", command=self._skip_group).pack(
+            side="right", padx=10
+        )
 
         if self.selection_phase == "best":
-            phase_text = (f"Pair {self.pairs_created_in_group + 1}/{self.pairs_per_group}. "
-                          "Click to view, then right-click to select as BEST")
+            phase_text = (
+                f"Pair {self.pairs_created_in_group + 1}/{self.pairs_per_group}. "
+                "Click to view, then right-click to select as BEST"
+            )
         else:
             best_name = os.path.basename(self.selected_best) if self.selected_best else "?"
-            phase_text = (f"Pair {self.pairs_created_in_group + 1}/{self.pairs_per_group}. "
-                          f"Best: {best_name}. Now right-click to select WORST")
-        ctk.CTkLabel(header, text=phase_text, font=("", 14, "bold"),
-                     text_color="green" if self.selection_phase == "best" else "red").pack(side="right", padx=15)
+            phase_text = (
+                f"Pair {self.pairs_created_in_group + 1}/{self.pairs_per_group}. "
+                f"Best: {best_name}. Now right-click to select WORST"
+            )
+        ctk.CTkLabel(
+            header,
+            text=phase_text,
+            font=("", 14, "bold"),
+            text_color="green" if self.selection_phase == "best" else "red",
+        ).pack(side="right", padx=15)
 
         # Thumbnail grid
         grid_frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
@@ -634,6 +652,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
             def on_select(e):
                 preview.destroy()
                 self._selection_pick(path)
+
             label.bind("<Button-3>", on_select)
         except Exception:
             ctk.CTkLabel(preview, text="Failed to load image").pack(expand=True)
@@ -652,8 +671,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
             # exported pair.
             if path == self.selected_best:
                 return
-            remaining_after = [img for img in self.current_remaining_images
-                               if img not in {self.selected_best, path}]
+            remaining_after = [img for img in self.current_remaining_images if img not in {self.selected_best, path}]
             can_continue = len(remaining_after) >= 2
 
             if can_continue:
@@ -663,7 +681,8 @@ class DPOCurationWindow(ctk.CTkToplevel):
                     f"Worst: {os.path.basename(path)}\n\n"
                     f"Yes = Accept & keep scoring this prompt\n"
                     f"No = Accept & move to next group\n"
-                    f"Cancel = Don't accept")
+                    f"Cancel = Don't accept",
+                )
                 if result is None:
                     return
                 self._register_pair(self.selected_best, path, continue_scoring=result)
@@ -675,14 +694,19 @@ class DPOCurationWindow(ctk.CTkToplevel):
     def _register_pair(self, chosen: str, rejected: str, continue_scoring: bool = False):
         group = self._current_group
         export_single_pair(
-            self.output_dir, self.manifest,
-            chosen, rejected,
-            group['prompt'], group['aspectratio'],
+            self.output_dir,
+            self.manifest,
+            chosen,
+            rejected,
+            group["prompt"],
+            group["aspectratio"],
         )
-        self.current_remaining_images = [image for image in self.current_remaining_images if image not in {chosen, rejected}]
+        self.current_remaining_images = [
+            image for image in self.current_remaining_images if image not in {chosen, rejected}
+        ]
         self.pairs_created_in_group += 1
 
-        is_unconditional = group['prompt'] == "UNCONDITIONAL"
+        is_unconditional = group["prompt"] == "UNCONDITIONAL"
         keep_going = continue_scoring or is_unconditional or self.pairs_created_in_group < self.pairs_per_group
         if keep_going and len(self.current_remaining_images) >= 2:
             if self.mode == "elo":
@@ -709,21 +733,25 @@ class DPOCurationWindow(ctk.CTkToplevel):
         frame.pack(fill="x", padx=10, pady=(5, 0))
 
         if prompt == "UNCONDITIONAL":
-            ctk.CTkLabel(frame, text="UNCONDITIONAL", font=("", 14, "bold"),
-                         text_color="#FFD700",
-                         fg_color="#3A3000", corner_radius=4).pack(side="left", padx=(0, 8), ipadx=8, ipady=2)
+            ctk.CTkLabel(
+                frame,
+                text="UNCONDITIONAL",
+                font=("", 14, "bold"),
+                text_color="#FFD700",
+                fg_color="#3A3000",
+                corner_radius=4,
+            ).pack(side="left", padx=(0, 8), ipadx=8, ipady=2)
             return frame
 
         truncated = prompt[:100] + ("..." if len(prompt) > 100 else "")
         expanded = ctk.BooleanVar(value=False)
 
-        toggle_btn = ctk.CTkButton(frame, text="Prompt [+]", width=90, height=24,
-                                    font=("", 11), fg_color="gray30",
-                                    command=lambda: _toggle())
+        toggle_btn = ctk.CTkButton(
+            frame, text="Prompt [+]", width=90, height=24, font=("", 11), fg_color="gray30", command=lambda: _toggle()
+        )
         toggle_btn.pack(side="left", padx=(0, 8))
 
-        text_label = ctk.CTkLabel(frame, text=truncated, font=("", 12),
-                                   anchor="w", wraplength=0)
+        text_label = ctk.CTkLabel(frame, text=truncated, font=("", 12), anchor="w", wraplength=0)
         text_label.pack(side="left", fill="x", expand=True)
 
         def _toggle():
@@ -764,10 +792,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         frame.pack(expand=True, fill="both", padx=40, pady=30)
 
         total_pairs = len(self.manifest.get("pairs", []))
-        unique_groups = len({
-            (e["prompt"], e.get("aspectratio", ""))
-            for e in self.manifest.get("pairs", [])
-        })
+        unique_groups = len({(e["prompt"], e.get("aspectratio", "")) for e in self.manifest.get("pairs", [])})
         skipped = max(0, self._groups_queued - unique_groups)
 
         ctk.CTkLabel(frame, text="Scoring Complete", font=("", 28, "bold")).pack(pady=(0, 20))
@@ -780,21 +805,21 @@ class DPOCurationWindow(ctk.CTkToplevel):
         if skipped > 0:
             summary += f"  ({skipped} groups skipped)"
         ctk.CTkLabel(summary_card, text=summary, font=("", 14)).pack(padx=15, pady=(12, 5))
-        ctk.CTkLabel(summary_card, text=self.output_dir, font=("", 11),
-                     text_color="gray").pack(padx=15, pady=(0, 12))
+        ctk.CTkLabel(summary_card, text=self.output_dir, font=("", 11), text_color="gray").pack(padx=15, pady=(0, 12))
 
         val_frame = ctk.CTkFrame(frame, fg_color="transparent")
         val_frame.pack(pady=(0, 20))
         ctk.CTkLabel(val_frame, text="Validation %:").pack(side="left", padx=(0, 10))
         self.val_percentage_var = ctk.StringVar(value="10")
         ctk.CTkEntry(val_frame, textvariable=self.val_percentage_var, width=60).pack(side="left")
-        ctk.CTkLabel(val_frame, text="(0 = no validation split)",
-                     text_color="gray").pack(side="left", padx=(10, 0))
+        ctk.CTkLabel(val_frame, text="(0 = no validation split)", text_color="gray").pack(side="left", padx=(10, 0))
 
-        ctk.CTkButton(frame, text="Finalize (Train/Val Split + Concepts)", width=350,
-                      command=self._finalize).pack(pady=10)
-        ctk.CTkButton(frame, text="Close (Pairs Already Saved)", width=350,
-                      fg_color="gray", command=self.destroy).pack(pady=10)
+        ctk.CTkButton(frame, text="Finalize (Train/Val Split + Concepts)", width=350, command=self._finalize).pack(
+            pady=10
+        )
+        ctk.CTkButton(frame, text="Close (Pairs Already Saved)", width=350, fg_color="gray", command=self.destroy).pack(
+            pady=10
+        )
 
     def _finalize(self):
         try:
@@ -827,8 +852,8 @@ class DPOCurationWindow(ctk.CTkToplevel):
         if orphans:
             result = messagebox.askyesno(
                 "Orphaned Pairs Found",
-                f"Found {len(orphans)} pair(s) with missing files.\n\n"
-                f"Remove them from the manifest?")
+                f"Found {len(orphans)} pair(s) with missing files.\n\nRemove them from the manifest?",
+            )
             if result:
                 for entry in orphans:
                     remove_pair(self.output_dir, self.manifest, entry)
@@ -858,12 +883,13 @@ class DPOCurationWindow(ctk.CTkToplevel):
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=10, pady=5)
-        ctk.CTkLabel(header, text=f"Pair {self._review_index + 1} / {total}",
-                     font=("", 14, "bold")).pack(side="left", padx=15)
-        ctk.CTkLabel(header, text=f"AR: {entry.get('aspectratio', '')}",
-                     font=("", 12)).pack(side="left", padx=15)
-        ctk.CTkLabel(header, text=f"Removed: {self._review_removed}",
-                     font=("", 12), text_color="red").pack(side="left", padx=15)
+        ctk.CTkLabel(header, text=f"Pair {self._review_index + 1} / {total}", font=("", 14, "bold")).pack(
+            side="left", padx=15
+        )
+        ctk.CTkLabel(header, text=f"AR: {entry.get('aspectratio', '')}", font=("", 12)).pack(side="left", padx=15)
+        ctk.CTkLabel(header, text=f"Removed: {self._review_removed}", font=("", 12), text_color="red").pack(
+            side="left", padx=15
+        )
 
         # Images side by side
         img_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -873,10 +899,12 @@ class DPOCurationWindow(ctk.CTkToplevel):
         img_frame.grid_rowconfigure(0, weight=0)
         img_frame.grid_rowconfigure(1, weight=1)
 
-        ctk.CTkLabel(img_frame, text="Chosen", font=("", 14, "bold"),
-                     text_color="green").grid(row=0, column=0, pady=(0, 5))
-        ctk.CTkLabel(img_frame, text="Rejected", font=("", 14, "bold"),
-                     text_color="red").grid(row=0, column=1, pady=(0, 5))
+        ctk.CTkLabel(img_frame, text="Chosen", font=("", 14, "bold"), text_color="green").grid(
+            row=0, column=0, pady=(0, 5)
+        )
+        ctk.CTkLabel(img_frame, text="Rejected", font=("", 14, "bold"), text_color="red").grid(
+            row=0, column=1, pady=(0, 5)
+        )
 
         chosen_dir = os.path.join(self.output_dir, "chosen")
         rejected_dir = os.path.join(self.output_dir, "rejected")
@@ -886,25 +914,29 @@ class DPOCurationWindow(ctk.CTkToplevel):
         if chosen_path:
             self._display_image(img_frame, chosen_path, row=1, col=0)
         else:
-            ctk.CTkLabel(img_frame, text="(missing)", font=("", 14),
-                         text_color="gray").grid(row=1, column=0)
+            ctk.CTkLabel(img_frame, text="(missing)", font=("", 14), text_color="gray").grid(row=1, column=0)
         if rejected_path:
             self._display_image(img_frame, rejected_path, row=1, col=1)
         else:
-            ctk.CTkLabel(img_frame, text="(missing)", font=("", 14),
-                         text_color="gray").grid(row=1, column=1)
+            ctk.CTkLabel(img_frame, text="(missing)", font=("", 14), text_color="gray").grid(row=1, column=1)
 
         # Buttons
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.pack(fill="x", padx=10, pady=10)
 
-        ctk.CTkButton(btn_frame, text="← Back", width=150,
-                      command=lambda: self._review_advance(-1),
-                      state="normal" if self._review_index > 0 else "disabled").pack(side="left", padx=10)
-        ctk.CTkButton(btn_frame, text="Remove", width=150, fg_color="#B22222",
-                      command=self._review_remove).pack(side="left", padx=10, expand=True)
-        ctk.CTkButton(btn_frame, text="Keep →", width=150,
-                      command=lambda: self._review_advance(1)).pack(side="right", padx=10)
+        ctk.CTkButton(
+            btn_frame,
+            text="← Back",
+            width=150,
+            command=lambda: self._review_advance(-1),
+            state="normal" if self._review_index > 0 else "disabled",
+        ).pack(side="left", padx=10)
+        ctk.CTkButton(btn_frame, text="Remove", width=150, fg_color="#B22222", command=self._review_remove).pack(
+            side="left", padx=10, expand=True
+        )
+        ctk.CTkButton(btn_frame, text="Keep →", width=150, command=lambda: self._review_advance(1)).pack(
+            side="right", padx=10
+        )
 
         # Keyboard bindings
         self.bind("<Left>", lambda e: self._review_advance(-1) if self._review_index > 0 else None)
@@ -937,10 +969,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
 
         remaining = len(self.manifest.get("pairs", []))
         ctk.CTkLabel(frame, text=f"Kept: {remaining} pairs", font=("", 14)).pack(pady=5)
-        ctk.CTkLabel(frame, text=f"Removed: {self._review_removed} pairs",
-                     font=("", 14), text_color="red").pack(pady=5)
+        ctk.CTkLabel(frame, text=f"Removed: {self._review_removed} pairs", font=("", 14), text_color="red").pack(pady=5)
 
-        ctk.CTkButton(frame, text="Back to Start", width=250,
-                      command=self._build_start_ui).pack(pady=20)
-        ctk.CTkButton(frame, text="Close", width=250, fg_color="gray",
-                      command=self.destroy).pack(pady=5)
+        ctk.CTkButton(frame, text="Back to Start", width=250, command=self._build_start_ui).pack(pady=20)
+        ctk.CTkButton(frame, text="Close", width=250, fg_color="gray", command=self.destroy).pack(pady=5)

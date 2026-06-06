@@ -30,9 +30,7 @@ def main():
     weight_dtypes = args.weight_dtypes()
     weight_dtypes.vae = DataType.FLOAT_32
     model = model_loader.load(
-        model_type=args.model_type,
-        model_names=ModelNames(base_model=args.base_model_name),
-        weight_dtypes=weight_dtypes
+        model_type=args.model_type, model_names=ModelNames(base_model=args.base_model_name), weight_dtypes=weight_dtypes
     )
     model.train_config = train_config
 
@@ -71,5 +69,5 @@ def main():
     )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

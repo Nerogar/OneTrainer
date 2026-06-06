@@ -2,8 +2,8 @@ from enum import Enum
 
 
 class ImageFormat(Enum):
-    PNG = 'PNG'
-    JPG = 'JPG'
+    PNG = "PNG"
+    JPG = "JPG"
 
     def __str__(self):
         return self.value

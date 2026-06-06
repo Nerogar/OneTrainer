@@ -65,7 +65,7 @@ def _extract_png_metadata(path: str) -> dict:
     }
 
 
-_PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
 def _read_png_text_chunks(path: str) -> dict[str, str]:
@@ -99,18 +99,18 @@ def _parse_png_text_chunk(chunk_type: bytes, data: bytes, info: dict[str, str]):
     try:
         sep = data.index(b"\x00")
         if chunk_type == b"tEXt":
-            info[data[:sep].decode("latin-1")] = data[sep + 1:].decode("latin-1")
+            info[data[:sep].decode("latin-1")] = data[sep + 1 :].decode("latin-1")
         elif chunk_type == b"zTXt":
             # format: keyword \x00 compression_method compressed_text
-            info[data[:sep].decode("latin-1")] = zlib.decompress(data[sep + 2:]).decode("latin-1")
+            info[data[:sep].decode("latin-1")] = zlib.decompress(data[sep + 2 :]).decode("latin-1")
         elif chunk_type == b"iTXt":
             key = data[:sep].decode("utf-8")
             compression_flag = data[sep + 1]
-            rest = data[sep + 3:]  # skip compression_flag + compression_method
+            rest = data[sep + 3 :]  # skip compression_flag + compression_method
             sep2 = rest.index(b"\x00")  # end of language tag
-            rest = rest[sep2 + 1:]
+            rest = rest[sep2 + 1 :]
             sep3 = rest.index(b"\x00")  # end of translated keyword
-            text_data = rest[sep3 + 1:]
+            text_data = rest[sep3 + 1 :]
             if compression_flag:
                 info[key] = zlib.decompress(text_data).decode("utf-8")
             else:

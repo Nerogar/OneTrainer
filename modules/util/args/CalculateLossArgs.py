@@ -12,13 +12,17 @@ class CalculateLossArgs(BaseArgs):
         super().__init__(data)
 
     @staticmethod
-    def parse_args() -> 'CalculateLossArgs':
+    def parse_args() -> "CalculateLossArgs":
         parser = argparse.ArgumentParser(description="One Trainer Loss Calculation Script.")
 
         # @formatter:off
 
-        parser.add_argument("--config-path", type=str, required=True, dest="config_path", help="The path to the config file")
-        parser.add_argument("--output-path", type=str, required=True, dest="output_path", help="The path to the output file")
+        parser.add_argument(
+            "--config-path", type=str, required=True, dest="config_path", help="The path to the config file"
+        )
+        parser.add_argument(
+            "--output-path", type=str, required=True, dest="output_path", help="The path to the output file"
+        )
 
         # @formatter:on
 
@@ -27,7 +31,7 @@ class CalculateLossArgs(BaseArgs):
         return args
 
     @staticmethod
-    def default_values() -> 'CalculateLossArgs':
+    def default_values() -> "CalculateLossArgs":
         data = []
 
         # name, default value, data type, nullable

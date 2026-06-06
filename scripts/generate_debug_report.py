@@ -32,12 +32,10 @@ import requests
 # Windows: Double-click on `export_debug.bat`
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    format="[%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
 # == Helper Classes ==
+
 
 def anonymize_config_dict(config_item):
     if isinstance(config_item, dict):
@@ -47,6 +45,7 @@ def anonymize_config_dict(config_item):
     if isinstance(config_item, str):
         return Utility.anonymize_path(config_item)
     return config_item
+
 
 def create_debug_package(output_zip_path: str, config_json_string: str):
     try:
@@ -121,6 +120,7 @@ def create_debug_package(output_zip_path: str, config_json_string: str):
     except Exception:
         logger.exception("Error generating debug package")
 
+
 def format_diff_output(diff) -> str:
     sections: list[str] = []
     sections += [
@@ -136,15 +136,15 @@ def format_diff_output(diff) -> str:
     for key, label, mapping in spec:
         data = diff.get(key, {} if mapping else [])
         if mapping:
-            sections += [
-                f"{extract_key_from_path(p)}: {label} {v}" for p, v in data.items()
-            ]
+            sections += [f"{extract_key_from_path(p)}: {label} {v}" for p, v in data.items()]
         else:
             sections += [f"{extract_key_from_path(p)}: {label}" for p in data]
     return "\n".join(sections) if sections else "No differences found."
 
+
 def extract_key_from_path(path: str) -> str:
     return ".".join(re.findall(r"\['([^]]+)'\]", path[4:] if path.startswith("root") else path))
+
 
 def generate_default_config_file(output_dir: Path):
     try:
@@ -155,11 +155,10 @@ def generate_default_config_file(output_dir: Path):
     except Exception:
         logger.exception("Could not generate default settings file")
 
+
 class Utility:
     @staticmethod
-    def subprocess_run(
-        cmd: list[str], **kwargs
-    ) -> subprocess.CompletedProcess:
+    def subprocess_run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
         """Run a subprocess with enforced locale settings and default kwargs."""
         proc_env = os.environ.copy()
         # Force external utilities to output US English ASCII with US formatting
@@ -184,13 +183,9 @@ class Utility:
             result = Utility.subprocess_run(cmd)
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
-            logger.error(
-                f'Command "{" ".join(map(shlex.quote, cmd))}" failed: {e.stderr}'
-            )
+            logger.error(f'Command "{" ".join(map(shlex.quote, cmd))}" failed: {e.stderr}')
         except Exception:
-            logger.exception(
-                f'Unexpected error running command: "{" ".join(map(shlex.quote, cmd))}"'
-            )
+            logger.exception(f'Unexpected error running command: "{" ".join(map(shlex.quote, cmd))}"')
         return None
 
     @staticmethod
@@ -243,9 +238,7 @@ class OSInfo:
                     # Use PRETTY_NAME or fallback to NAME + VERSION_ID
                     if "PRETTY_NAME" in os_release:
                         version = os_release["PRETTY_NAME"]
-                    elif (
-                        "NAME" in os_release and "VERSION_ID" in os_release
-                    ):
+                    elif "NAME" in os_release and "VERSION_ID" in os_release:
                         version = f"{os_release['NAME']} {os_release['VERSION_ID']}"
                 except Exception:
                     # Fallback to lsb_release command if available
@@ -257,9 +250,7 @@ class OSInfo:
                             check=True,
                         )
                         if result.stdout.startswith("Description:"):
-                            version = result.stdout.split(":", 1)[
-                                1
-                            ].strip()
+                            version = result.stdout.split(":", 1)[1].strip()
                     except Exception:
                         # Keep original version if both methods fail
                         pass
@@ -305,15 +296,9 @@ class CPUInfo:
             return model_name, technical_name, get_core_count()
         elif system == "Windows":
             try:
-                result = Utility.subprocess_run(
-                    ["wmic", "cpu", "get", "Name"]
-                )
+                result = Utility.subprocess_run(["wmic", "cpu", "get", "Name"])
                 # Split lines, filter empty ones, skip header
-                lines = [
-                    line.strip()
-                    for line in result.stdout.splitlines()
-                    if line.strip()
-                ]
+                lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
                 model_name = lines[1] if len(lines) > 1 else "Unavailable"
             except Exception:
                 logger.exception("Error retrieving CPU info via WMIC")
@@ -322,16 +307,12 @@ class CPUInfo:
             return model_name, technical_name, get_core_count()
         elif system == "Darwin":
             try:
-                result = Utility.subprocess_run(
-                    ["sysctl", "-n", "machdep.cpu.brand_string"]
-                )
+                result = Utility.subprocess_run(["sysctl", "-n", "machdep.cpu.brand_string"])
                 model_name = result.stdout.strip() or "Unavailable"
             except Exception:
                 logger.exception("Error retrieving CPU info via sysctl")
                 model_name = "Unavailable"
-            technical_name = (
-                platform.processor() or platform.machine() or "Unavailable"
-            )
+            technical_name = platform.processor() or platform.machine() or "Unavailable"
             # (Optional) Log if Apple Silicon is detected:
             if platform.machine() == "arm64":
                 logger.info("Apple Silicon (arm64) detected.")
@@ -439,9 +420,7 @@ class GPUCollector:
         ]
         gpus = []
         for gpu in nvidia_gpus:
-            extended = GPUCollector.query_nvidia_gpu_extended_info(
-                gpu["Index"]
-            )
+            extended = GPUCollector.query_nvidia_gpu_extended_info(gpu["Index"])
             gpus.append(
                 GPUInfo(
                     Identifier=f"NVIDIA GPU (Index {gpu['Index']})",
@@ -459,9 +438,7 @@ class GPUCollector:
         """
         try:
             # Run lshw with JSON output
-            result = Utility.subprocess_run(
-                ["lshw", "-json", "-sanitize", "-C", "display"]
-            )
+            result = Utility.subprocess_run(["lshw", "-json", "-sanitize", "-C", "display"])
             devices = json.loads(result.stdout)
 
             # Handle both single device and list of devices
@@ -486,35 +463,22 @@ class GPUCollector:
                         name_parts.append(device["product"])
                     if device.get("description"):
                         name_parts.append(device["description"])
-                    gpu["Name"] = (
-                        " ".join(name_parts) if name_parts else "Unknown"
-                    )
+                    gpu["Name"] = " ".join(name_parts) if name_parts else "Unknown"
 
                     # Determine vendor using the new helper function
                     vendor_str = device.get("vendor", "")
                     product_str = device.get("product", "")
-                    gpu["Vendor"] = GPUCollector.determine_vendor(
-                        vendor_str, product_str
-                    )
+                    gpu["Vendor"] = GPUCollector.determine_vendor(vendor_str, product_str)
 
                     # Build extended info using the new helper function
                     extended = []
                     if device.get("version"):
                         extended.append(f"Version: {device['version']}")
                     if device.get("configuration", {}).get("driver"):
-                        extended.append(
-                            f"Driver: {device['configuration']['driver']}"
-                        )
-                    if device.get("capabilities") and isinstance(
-                        device["capabilities"], dict
-                    ):
-                        extended.append(
-                            "Capabilities: "
-                            + ", ".join(device["capabilities"].keys())
-                        )
-                    gpu["ExtendedInfo"] = GPUCollector.build_extended_info(
-                        extended
-                    )
+                        extended.append(f"Driver: {device['configuration']['driver']}")
+                    if device.get("capabilities") and isinstance(device["capabilities"], dict):
+                        extended.append("Capabilities: " + ", ".join(device["capabilities"].keys()))
+                    gpu["ExtendedInfo"] = GPUCollector.build_extended_info(extended)
 
                     break  # Take first display device
 
@@ -588,9 +552,7 @@ class GPUCollector:
                     Identifier=f"PCI Slot {slot}",
                     Name=device_str,
                     Vendor=vendor,
-                    ExtendedInfo=GPUCollector.build_extended_info(
-                        [f"Vendor: {vendor_str}", f"PCI Slot: {slot}"]
-                    ),
+                    ExtendedInfo=GPUCollector.build_extended_info([f"Vendor: {vendor_str}", f"PCI Slot: {slot}"]),
                 )
             )
         return gpus
@@ -629,9 +591,7 @@ class GPUCollector:
             } | ConvertTo-Json
         """)
         try:
-            result = Utility.subprocess_run(
-                ["powershell", "-Command", ps_command]
-            )
+            result = Utility.subprocess_run(["powershell", "-Command", ps_command])
             output = result.stdout.strip()
             gpu_list = []
             if output:
@@ -663,9 +623,7 @@ class GPUCollector:
         """
         gpus: list[GPUInfo] = []
         try:
-            output = Utility.run_command(
-                ["system_profiler", "SPDisplaysDataType", "-json"]
-            )
+            output = Utility.run_command(["system_profiler", "SPDisplaysDataType", "-json"])
             if output:
                 data = json.loads(output)
                 displays = data.get("SPDisplaysDataType", [])
@@ -675,16 +633,10 @@ class GPUCollector:
                     identifier = display.get("spdisplays_bus", "Unknown")
                     extended_info_parts = []
                     if "spdisplays_vram" in display:
-                        extended_info_parts.append(
-                            f"VRAM: {display['spdisplays_vram']}"
-                        )
+                        extended_info_parts.append(f"VRAM: {display['spdisplays_vram']}")
                     if "spdisplays_resolution" in display:
-                        extended_info_parts.append(
-                            f"Resolution: {display['spdisplays_resolution']}"
-                        )
-                    extended_info = GPUCollector.build_extended_info(
-                        extended_info_parts
-                    )
+                        extended_info_parts.append(f"Resolution: {display['spdisplays_resolution']}")
+                    extended_info = GPUCollector.build_extended_info(extended_info_parts)
                     gpus.append(
                         GPUInfo(
                             Identifier=identifier,
@@ -708,8 +660,7 @@ class GPUCollector:
 
         # Check for NVIDIA keywords in either string
         if "nvidia" in lower_vendor or any(
-            x in lower_device
-            for x in {"geforce", "rtx", "gtx", "quadro", "tesla", "titan"}
+            x in lower_device for x in {"geforce", "rtx", "gtx", "quadro", "tesla", "titan"}
         ):
             return "NVIDIA"
         # Check for AMD keywords
@@ -730,11 +681,7 @@ class GPUCollector:
 
     @staticmethod
     def build_extended_info(info_items: list[str]) -> str:
-        return (
-            "\n".join("    " + item for item in info_items)
-            if info_items
-            else "No extended info available"
-        )
+        return "\n".join("    " + item for item in info_items) if info_items else "No extended info available"
 
     @staticmethod
     def get_all() -> list[GPUInfo]:
@@ -768,11 +715,7 @@ class GPUCollector:
                     return lspci_gpus
 
                 lshw_gpu = Utility.safe_call(GPUCollector.get_lshw, None)
-                if (
-                    lshw_gpu
-                    and lshw_gpu.Name
-                    and lshw_gpu.Name != "Unknown"
-                ):
+                if lshw_gpu and lshw_gpu.Name and lshw_gpu.Name != "Unknown":
                     return [lshw_gpu]
 
             return []
@@ -804,9 +747,7 @@ class SoftwareInfo:
         cmd = [sys.executable, "-m", "pip", "freeze"]
         pip_out = Utility.run_command(cmd)
         if pip_out:
-            info["PipFreeze"] = "\n".join(
-                f"    {line}" for line in pip_out.splitlines()
-            )
+            info["PipFreeze"] = "\n".join(f"    {line}" for line in pip_out.splitlines())
             for line in pip_out.splitlines():
                 if line.startswith("torch=="):
                     info["PyTorchInfo"] = line.strip()
@@ -820,9 +761,7 @@ class SoftwareInfo:
         Retrieve Git information including repository details (user and repo name),
         the current branch, commit hash, and any modified files compared to the upstream branch.
         """
-        remote_url = Utility.run_command(
-            ["git", "config", "--get", "remote.origin.url"]
-        )
+        remote_url = Utility.run_command(["git", "config", "--get", "remote.origin.url"])
         if remote_url:
             import re
 
@@ -830,35 +769,21 @@ class SoftwareInfo:
                 r"[:/](?P<user>[^/]+)/(?P<repo>[^/.]+)(\.git)?$",
                 remote_url,
             )
-            repo_info = (
-                f"Repo: {match.group('user')}/{match.group('repo')}"
-                if match
-                else f"Remote URL: {remote_url}"
-            )
+            repo_info = f"Repo: {match.group('user')}/{match.group('repo')}" if match else f"Remote URL: {remote_url}"
         else:
             repo_info = "No remote repository URL available."
 
-        branch = Utility.run_command(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"]
-        )
+        branch = Utility.run_command(["git", "rev-parse", "--abbrev-ref", "HEAD"])
         if branch is None:
             return "Not a Git repository or git not installed."
 
-        commit = (
-            Utility.run_command(["git", "rev-parse", "HEAD"])
-            or "Unavailable"
-        )
+        commit = Utility.run_command(["git", "rev-parse", "HEAD"]) or "Unavailable"
         git_info = f"{repo_info}\nBranch: {branch}\nCommit: {commit}"
 
         origin_ref = "origin/master"
-        origin_exists = Utility.run_command(
-            ["git", "rev-parse", "--verify", "--quiet", origin_ref]
-        )
+        origin_exists = Utility.run_command(["git", "rev-parse", "--verify", "--quiet", origin_ref])
         if origin_exists:
-
-            diff_output = Utility.run_command(
-                ["git", "diff", "--name-status", "--diff-filter=DMU", origin_ref]
-            ) or ""
+            diff_output = Utility.run_command(["git", "diff", "--name-status", "--diff-filter=DMU", origin_ref]) or ""
             if diff_output.strip():
                 files = []
                 for line in diff_output.splitlines():
@@ -887,11 +812,7 @@ class NetworkInfo:
         host = parsed.netloc
         count = "4"  # Number of ping packets
 
-        cmd = (
-            ["ping", "-n", count, host]
-            if platform.system() == "Windows"
-            else ["ping", "-c", count, host]
-        )
+        cmd = ["ping", "-n", count, host] if platform.system() == "Windows" else ["ping", "-c", count, host]
         try:
             result = Utility.subprocess_run(cmd)
             output = result.stdout
@@ -906,9 +827,7 @@ class NetworkInfo:
                     packet_loss = f"{m.group(1)}%"
             return f"Ping to {host} successful: Packet Loss: {packet_loss}"
         except subprocess.CalledProcessError as e:
-            logger.warning(
-                f"Ping to {host} failed. Using requests fallback. Error: {e}"
-            )
+            logger.warning(f"Ping to {host} failed. Using requests fallback. Error: {e}")
             try:
                 r = requests.get(url, timeout=5)
                 if r.status_code == 200:
@@ -930,10 +849,7 @@ class NetworkInfo:
             "HuggingFace": "https://huggingface.co",
             "Google": "https://www.google.com",
         }
-        return {
-            name: (url, NetworkInfo.test_url(url))
-            for name, url in urls.items()
-        }
+        return {name: (url, NetworkInfo.test_url(url)) for name, url in urls.items()}
 
 
 class ReportBuilder:
@@ -963,9 +879,7 @@ class ReportBuilder:
         ]
         if gpu_info:
             for gpu in gpu_info:
-                report.append(
-                    f"{gpu.Identifier}: {gpu.Name} [{gpu.Vendor}]"
-                )
+                report.append(f"{gpu.Identifier}: {gpu.Name} [{gpu.Vendor}]")
                 if gpu.ExtendedInfo:
                     report.append(gpu.ExtendedInfo)
         else:
@@ -984,10 +898,7 @@ class ReportBuilder:
                 git_info,
                 "",
                 "=== Network Connectivity ===",
-                *[
-                    f"{name} ({url}): {status}"
-                    for name, (url, status) in network_status.items()
-                ],
+                *[f"{name} ({url}): {status}" for name, (url, status) in network_status.items()],
                 "",
                 "=== Intel Microcode Information ===",
                 intel_microcode,
@@ -1002,9 +913,7 @@ class ReportBuilder:
         Write the report to the given output file with final anonymization.
         """
         try:
-            anonymized_report = "\n".join(
-                Utility.anonymize_path(line) for line in report
-            )
+            anonymized_report = "\n".join(Utility.anonymize_path(line) for line in report)
             output_file.write_text(anonymized_report, encoding="utf-8")
             logger.info(f"Report assembled and saved to {output_file}")
         except Exception:
@@ -1017,17 +926,13 @@ def main() -> None:
     current_dir = Path.cwd()
     logger.info(f"Current directory: {current_dir}")
     if current_dir.name != "OneTrainer":
-        logger.warning(
-            f"Expected to run from the OneTrainer folder. Current folder: {current_dir}"
-        )
+        logger.warning(f"Expected to run from the OneTrainer folder. Current folder: {current_dir}")
 
     try:
         report = ReportBuilder.build_report()
         output_file = Path("debug_report.log")
         ReportBuilder.write_report(report, output_file)
-        print(
-            f"Debug report created successfully: {output_file.absolute()}"
-        )
+        print(f"Debug report created successfully: {output_file.absolute()}")
     except Exception as e:
         logger.error(f"Failed to generate debug report: {e}")
         raise

@@ -29,8 +29,8 @@ class StableDiffusionXLModelLoader(
         super().__init__()
 
     def _default_sd_config_name(
-            self,
-            model_type: ModelType,
+        self,
+        model_type: ModelType,
     ) -> str | None:
         match model_type:
             case ModelType.STABLE_DIFFUSION_XL_10_BASE:
@@ -41,13 +41,13 @@ class StableDiffusionXLModelLoader(
                 return None
 
     def __load_internal(
-            self,
-            model: StableDiffusionXLModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: StableDiffusionXLModel,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name, quantization)
@@ -55,13 +55,13 @@ class StableDiffusionXLModelLoader(
             raise Exception("not an internal model")
 
     def __load_diffusers(
-            self,
-            model: StableDiffusionXLModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: StableDiffusionXLModel,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
         tokenizer_1 = CLIPTokenizer.from_pretrained(
             base_model_name,
@@ -133,13 +133,13 @@ class StableDiffusionXLModelLoader(
         model.unet = unet
 
     def __load_ckpt(
-            self,
-            model: StableDiffusionXLModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: StableDiffusionXLModel,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
         pipeline = StableDiffusionXLPipeline.from_single_file(
             pretrained_model_link_or_path=base_model_name,
@@ -175,13 +175,13 @@ class StableDiffusionXLModelLoader(
         model.unet = unet
 
     def __load_safetensors(
-            self,
-            model: StableDiffusionXLModel,
-            model_type: ModelType,
-            weight_dtypes: ModelWeightDtypes,
-            base_model_name: str,
-            vae_model_name: str,
-            quantization: QuantizationConfig,
+        self,
+        model: StableDiffusionXLModel,
+        model_type: ModelType,
+        weight_dtypes: ModelWeightDtypes,
+        base_model_name: str,
+        vae_model_name: str,
+        quantization: QuantizationConfig,
     ):
         if model_type.has_conditioning_image_input():
             pipeline = StableDiffusionXLInpaintPipeline.from_single_file(
@@ -222,7 +222,10 @@ class StableDiffusionXLModelLoader(
             pipeline.text_encoder_2, weight_dtypes.text_encoder_2, weight_dtypes.train_dtype
         )
         unet = self._convert_diffusers_sub_module_to_dtype(
-            pipeline.unet, weight_dtypes.unet, weight_dtypes.train_dtype, quantization,
+            pipeline.unet,
+            weight_dtypes.unet,
+            weight_dtypes.train_dtype,
+            quantization,
         )
 
         model.model_type = model_type
@@ -235,12 +238,12 @@ class StableDiffusionXLModelLoader(
         model.unet = unet
 
     def load(
-            self,
-            model: StableDiffusionXLModel,
-            model_type: ModelType,
-            model_names: ModelNames,
-            weight_dtypes: ModelWeightDtypes,
-            quantization: QuantizationConfig,
+        self,
+        model: StableDiffusionXLModel,
+        model_type: ModelType,
+        model_names: ModelNames,
+        weight_dtypes: ModelWeightDtypes,
+        quantization: QuantizationConfig,
     ):
         stacktraces = []
 
@@ -248,19 +251,25 @@ class StableDiffusionXLModelLoader(
         model.sd_config_filename = self._get_sd_config_name(model_type, model_names.base_model)
 
         try:
-            self.__load_internal(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)
+            self.__load_internal(
+                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization
+            )
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
-            self.__load_diffusers(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)
+            self.__load_diffusers(
+                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization
+            )
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
-            self.__load_safetensors(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)
+            self.__load_safetensors(
+                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization
+            )
             return
         except Exception:
             stacktraces.append(traceback.format_exc())

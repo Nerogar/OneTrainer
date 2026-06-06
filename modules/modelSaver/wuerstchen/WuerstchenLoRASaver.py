@@ -20,8 +20,8 @@ class WuerstchenLoRASaver(
         return None
 
     def _get_state_dict(
-            self,
-            model: WuerstchenModel,
+        self,
+        model: WuerstchenModel,
     ) -> dict[str, Tensor]:
         state_dict = {}
         if model.prior_text_encoder_lora is not None:
@@ -38,15 +38,17 @@ class WuerstchenLoRASaver(
                 if embedding.prior_text_encoder_embedding.vector is not None:
                     state_dict[f"bundle_emb.{placeholder}.clip_g"] = embedding.prior_text_encoder_embedding.vector
                 if embedding.prior_text_encoder_embedding.output_vector is not None:
-                    state_dict[f"bundle_emb.{placeholder}.clip_g_out"] = embedding.prior_text_encoder_embedding.output_vector
+                    state_dict[f"bundle_emb.{placeholder}.clip_g_out"] = (
+                        embedding.prior_text_encoder_embedding.output_vector
+                    )
 
         return state_dict
 
     def save(
-            self,
-            model: WuerstchenModel,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
+        self,
+        model: WuerstchenModel,
+        output_model_format: ModelFormat,
+        output_model_destination: str,
+        dtype: torch.dtype | None,
     ):
         self._save(model, output_model_format, output_model_destination, dtype)

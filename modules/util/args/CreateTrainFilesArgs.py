@@ -13,21 +13,41 @@ class CreateTrainFilesArgs(BaseArgs):
         super().__init__(data)
 
     @staticmethod
-    def parse_args() -> 'CreateTrainFilesArgs':
+    def parse_args() -> "CreateTrainFilesArgs":
         parser = argparse.ArgumentParser(description="One Trainer Create Train Files Script.")
 
         # @formatter:off
 
-        parser.add_argument("--config-output-destination", type=str, required=False, default=None, dest="config_output_destination", help="The destination filename to save a default config file")
-        parser.add_argument("--concepts-output-destination", type=str, required=False, default=None, dest="concepts_output_destination", help="The destination filename to save a default concepts file")
-        parser.add_argument("--samples-output-destination", type=str, required=False, default=None, dest="samples_output_destination", help="The destination filename to save a default samples file")
+        parser.add_argument(
+            "--config-output-destination",
+            type=str,
+            required=False,
+            default=None,
+            dest="config_output_destination",
+            help="The destination filename to save a default config file",
+        )
+        parser.add_argument(
+            "--concepts-output-destination",
+            type=str,
+            required=False,
+            default=None,
+            dest="concepts_output_destination",
+            help="The destination filename to save a default concepts file",
+        )
+        parser.add_argument(
+            "--samples-output-destination",
+            type=str,
+            required=False,
+            default=None,
+            dest="samples_output_destination",
+            help="The destination filename to save a default samples file",
+        )
 
         # @formatter:on
 
         args = CreateTrainFilesArgs.default_values()
         args.from_dict(vars(parser.parse_args()))
         return args
-
 
     @staticmethod
     def default_values():

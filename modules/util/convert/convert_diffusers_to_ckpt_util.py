@@ -64,7 +64,6 @@ def map_noise_scheduler(noise_scheduler: DDIMScheduler) -> dict:
     return out_states
 
 
-
 def __map_vae_resnet_block(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
     out_states = {}
 
@@ -112,10 +111,18 @@ def __map_vae_attention_block(in_states: dict, out_prefix: str, in_prefix: str) 
     else:
         out_states |= map_wb(in_states, combine(out_prefix, "proj_out"), combine(in_prefix, "to_out.0"))  # current
 
-    out_states[combine(out_prefix, "q.weight")] = __reshape_vae_attention_weight(out_states[combine(out_prefix, "q.weight")])
-    out_states[combine(out_prefix, "k.weight")] = __reshape_vae_attention_weight(out_states[combine(out_prefix, "k.weight")])
-    out_states[combine(out_prefix, "v.weight")] = __reshape_vae_attention_weight(out_states[combine(out_prefix, "v.weight")])
-    out_states[combine(out_prefix, "proj_out.weight")] = __reshape_vae_attention_weight(out_states[combine(out_prefix, "proj_out.weight")])
+    out_states[combine(out_prefix, "q.weight")] = __reshape_vae_attention_weight(
+        out_states[combine(out_prefix, "q.weight")]
+    )
+    out_states[combine(out_prefix, "k.weight")] = __reshape_vae_attention_weight(
+        out_states[combine(out_prefix, "k.weight")]
+    )
+    out_states[combine(out_prefix, "v.weight")] = __reshape_vae_attention_weight(
+        out_states[combine(out_prefix, "v.weight")]
+    )
+    out_states[combine(out_prefix, "proj_out.weight")] = __reshape_vae_attention_weight(
+        out_states[combine(out_prefix, "proj_out.weight")]
+    )
 
     return out_states
 
@@ -128,24 +135,58 @@ def __map_vae_encoder(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
     out_states[combine(out_prefix, "conv_in.bias")] = in_states[combine(in_prefix, "conv_in.bias")]
 
     # down blocks
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "down.0.block.0"), combine(in_prefix, "down_blocks.0.resnets.0"))
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "down.0.block.1"), combine(in_prefix, "down_blocks.0.resnets.1"))
-    out_states |= map_wb(in_states, combine(out_prefix, "down.0.downsample.conv"), combine(in_prefix, "down_blocks.0.downsamplers.0.conv"))
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "down.0.block.0"), combine(in_prefix, "down_blocks.0.resnets.0")
+    )
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "down.0.block.1"), combine(in_prefix, "down_blocks.0.resnets.1")
+    )
+    out_states |= map_wb(
+        in_states,
+        combine(out_prefix, "down.0.downsample.conv"),
+        combine(in_prefix, "down_blocks.0.downsamplers.0.conv"),
+    )
 
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "down.1.block.0"), combine(in_prefix, "down_blocks.1.resnets.0"))
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "down.1.block.1"), combine(in_prefix, "down_blocks.1.resnets.1"))
-    out_states |= map_wb(in_states, combine(out_prefix, "down.1.downsample.conv"), combine(in_prefix, "down_blocks.1.downsamplers.0.conv"))
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "down.1.block.0"), combine(in_prefix, "down_blocks.1.resnets.0")
+    )
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "down.1.block.1"), combine(in_prefix, "down_blocks.1.resnets.1")
+    )
+    out_states |= map_wb(
+        in_states,
+        combine(out_prefix, "down.1.downsample.conv"),
+        combine(in_prefix, "down_blocks.1.downsamplers.0.conv"),
+    )
 
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "down.2.block.0"), combine(in_prefix, "down_blocks.2.resnets.0"))
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "down.2.block.1"), combine(in_prefix, "down_blocks.2.resnets.1"))
-    out_states |= map_wb(in_states, combine(out_prefix, "down.2.downsample.conv"), combine(in_prefix, "down_blocks.2.downsamplers.0.conv"))
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "down.2.block.0"), combine(in_prefix, "down_blocks.2.resnets.0")
+    )
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "down.2.block.1"), combine(in_prefix, "down_blocks.2.resnets.1")
+    )
+    out_states |= map_wb(
+        in_states,
+        combine(out_prefix, "down.2.downsample.conv"),
+        combine(in_prefix, "down_blocks.2.downsamplers.0.conv"),
+    )
 
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "down.3.block.0"), combine(in_prefix, "down_blocks.3.resnets.0"))
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "down.3.block.1"), combine(in_prefix, "down_blocks.3.resnets.1"))
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "down.3.block.0"), combine(in_prefix, "down_blocks.3.resnets.0")
+    )
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "down.3.block.1"), combine(in_prefix, "down_blocks.3.resnets.1")
+    )
 
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "mid.block_1"), combine(in_prefix, "mid_block.resnets.0"))
-    out_states |= __map_vae_attention_block(in_states, combine(out_prefix, "mid.attn_1"), combine(in_prefix, "mid_block.attentions.0"))
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "mid.block_2"), combine(in_prefix, "mid_block.resnets.1"))
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "mid.block_1"), combine(in_prefix, "mid_block.resnets.0")
+    )
+    out_states |= __map_vae_attention_block(
+        in_states, combine(out_prefix, "mid.attn_1"), combine(in_prefix, "mid_block.attentions.0")
+    )
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "mid.block_2"), combine(in_prefix, "mid_block.resnets.1")
+    )
 
     # conv out
     out_states[combine(out_prefix, "norm_out.weight")] = in_states[combine(in_prefix, "conv_norm_out.weight")]
@@ -184,28 +225,64 @@ def __map_vae_decoder(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
     out_states[combine(out_prefix, "conv_in.bias")] = in_states[combine(in_prefix, "conv_in.bias")]
 
     # down blocks
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "mid.block_1"), combine(in_prefix, "mid_block.resnets.0"))
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "mid.block_2"), combine(in_prefix, "mid_block.resnets.1"))
-    out_states |= __map_vae_attention_block(in_states, combine(out_prefix, "mid.attn_1"), combine(in_prefix, "mid_block.attentions.0"))
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "mid.block_1"), combine(in_prefix, "mid_block.resnets.0")
+    )
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "mid.block_2"), combine(in_prefix, "mid_block.resnets.1")
+    )
+    out_states |= __map_vae_attention_block(
+        in_states, combine(out_prefix, "mid.attn_1"), combine(in_prefix, "mid_block.attentions.0")
+    )
 
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "up.3.block.0"), combine(in_prefix, "up_blocks.0.resnets.0"))
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "up.3.block.1"), combine(in_prefix, "up_blocks.0.resnets.1"))
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "up.3.block.2"), combine(in_prefix, "up_blocks.0.resnets.2"))
-    out_states |= map_wb(in_states, combine(out_prefix, "up.3.upsample.conv"), combine(in_prefix, "up_blocks.0.upsamplers.0.conv"))
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "up.3.block.0"), combine(in_prefix, "up_blocks.0.resnets.0")
+    )
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "up.3.block.1"), combine(in_prefix, "up_blocks.0.resnets.1")
+    )
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "up.3.block.2"), combine(in_prefix, "up_blocks.0.resnets.2")
+    )
+    out_states |= map_wb(
+        in_states, combine(out_prefix, "up.3.upsample.conv"), combine(in_prefix, "up_blocks.0.upsamplers.0.conv")
+    )
 
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "up.2.block.0"), combine(in_prefix, "up_blocks.1.resnets.0"))
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "up.2.block.1"), combine(in_prefix, "up_blocks.1.resnets.1"))
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "up.2.block.2"), combine(in_prefix, "up_blocks.1.resnets.2"))
-    out_states |= map_wb(in_states, combine(out_prefix, "up.2.upsample.conv"), combine(in_prefix, "up_blocks.1.upsamplers.0.conv"))
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "up.2.block.0"), combine(in_prefix, "up_blocks.1.resnets.0")
+    )
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "up.2.block.1"), combine(in_prefix, "up_blocks.1.resnets.1")
+    )
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "up.2.block.2"), combine(in_prefix, "up_blocks.1.resnets.2")
+    )
+    out_states |= map_wb(
+        in_states, combine(out_prefix, "up.2.upsample.conv"), combine(in_prefix, "up_blocks.1.upsamplers.0.conv")
+    )
 
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "up.1.block.0"), combine(in_prefix, "up_blocks.2.resnets.0"))
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "up.1.block.1"), combine(in_prefix, "up_blocks.2.resnets.1"))
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "up.1.block.2"), combine(in_prefix, "up_blocks.2.resnets.2"))
-    out_states |= map_wb(in_states, combine(out_prefix, "up.1.upsample.conv"), combine(in_prefix, "up_blocks.2.upsamplers.0.conv"))
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "up.1.block.0"), combine(in_prefix, "up_blocks.2.resnets.0")
+    )
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "up.1.block.1"), combine(in_prefix, "up_blocks.2.resnets.1")
+    )
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "up.1.block.2"), combine(in_prefix, "up_blocks.2.resnets.2")
+    )
+    out_states |= map_wb(
+        in_states, combine(out_prefix, "up.1.upsample.conv"), combine(in_prefix, "up_blocks.2.upsamplers.0.conv")
+    )
 
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "up.0.block.0"), combine(in_prefix, "up_blocks.3.resnets.0"))
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "up.0.block.1"), combine(in_prefix, "up_blocks.3.resnets.1"))
-    out_states |= __map_vae_resnet_block(in_states, combine(out_prefix, "up.0.block.2"), combine(in_prefix, "up_blocks.3.resnets.2"))
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "up.0.block.0"), combine(in_prefix, "up_blocks.3.resnets.0")
+    )
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "up.0.block.1"), combine(in_prefix, "up_blocks.3.resnets.1")
+    )
+    out_states |= __map_vae_resnet_block(
+        in_states, combine(out_prefix, "up.0.block.2"), combine(in_prefix, "up_blocks.3.resnets.2")
+    )
 
     # conv out
     out_states[combine(out_prefix, "norm_out.weight")] = in_states[combine(in_prefix, "conv_norm_out.weight")]
@@ -221,9 +298,13 @@ def map_vae(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
 
     out_states |= __map_vae_encoder(in_states, combine(out_prefix, "encoder"), combine(in_prefix, "encoder"))
     if combine(in_prefix, "quant_conv.weight") in in_states:
-        out_states |= __map_vae_quant_conv(in_states, combine(out_prefix, "quant_conv"), combine(in_prefix, "quant_conv"))
+        out_states |= __map_vae_quant_conv(
+            in_states, combine(out_prefix, "quant_conv"), combine(in_prefix, "quant_conv")
+        )
     if combine(in_prefix, "post_quant_conv.weight") in in_states:
-        out_states |= __map_vae_post_quant_conv(in_states, combine(out_prefix, "post_quant_conv"), combine(in_prefix, "post_quant_conv"))
+        out_states |= __map_vae_post_quant_conv(
+            in_states, combine(out_prefix, "post_quant_conv"), combine(in_prefix, "post_quant_conv")
+        )
     out_states |= __map_vae_decoder(in_states, combine(out_prefix, "decoder"), combine(in_prefix, "decoder"))
 
     return out_states
@@ -256,6 +337,7 @@ def __map_unet_transformer_attention_block(in_states: dict, out_prefix: str, in_
 
     return out_states
 
+
 def __map_unet_transformer_ff_block(in_states: dict, out_prefix: str, in_prefix: str):
     out_states = {}
 
@@ -264,12 +346,19 @@ def __map_unet_transformer_ff_block(in_states: dict, out_prefix: str, in_prefix:
 
     return out_states
 
+
 def __map_unet_transformer_block(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
     out_states = {}
 
-    out_states |= __map_unet_transformer_attention_block(in_states, combine(out_prefix, "attn1"), combine(in_prefix, "attn1"))
-    out_states |= __map_unet_transformer_ff_block(in_states, combine(out_prefix, "ff.net"), combine(in_prefix, "ff.net"))
-    out_states |= __map_unet_transformer_attention_block(in_states, combine(out_prefix, "attn2"), combine(in_prefix, "attn2"))
+    out_states |= __map_unet_transformer_attention_block(
+        in_states, combine(out_prefix, "attn1"), combine(in_prefix, "attn1")
+    )
+    out_states |= __map_unet_transformer_ff_block(
+        in_states, combine(out_prefix, "ff.net"), combine(in_prefix, "ff.net")
+    )
+    out_states |= __map_unet_transformer_attention_block(
+        in_states, combine(out_prefix, "attn2"), combine(in_prefix, "attn2")
+    )
     out_states |= map_wb(in_states, combine(out_prefix, "norm1"), combine(in_prefix, "norm1"))
     out_states |= map_wb(in_states, combine(out_prefix, "norm2"), combine(in_prefix, "norm2"))
     out_states |= map_wb(in_states, combine(out_prefix, "norm3"), combine(in_prefix, "norm3"))
@@ -284,7 +373,9 @@ def map_unet_transformer(in_states: dict, out_prefix: str, in_prefix: str, num_t
     out_states |= map_wb(in_states, combine(out_prefix, "proj_in"), combine(in_prefix, "proj_in"))
 
     for i in range(num_transformer_blocks):
-        out_states |= __map_unet_transformer_block(in_states, combine(out_prefix, f"transformer_blocks.{i}"), combine(in_prefix, f"transformer_blocks.{i}"))
+        out_states |= __map_unet_transformer_block(
+            in_states, combine(out_prefix, f"transformer_blocks.{i}"), combine(in_prefix, f"transformer_blocks.{i}")
+        )
 
     out_states |= map_wb(in_states, combine(out_prefix, "proj_out"), combine(in_prefix, "proj_out"))
 

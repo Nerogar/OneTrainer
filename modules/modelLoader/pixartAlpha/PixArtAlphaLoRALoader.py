@@ -6,9 +6,7 @@ from modules.util.convert.lora.convert_pixart_lora import convert_pixart_lora_ke
 from modules.util.ModelNames import ModelNames
 
 
-class PixArtAlphaLoRALoader(
-    LoRALoaderMixin
-):
+class PixArtAlphaLoRALoader(LoRALoaderMixin):
     def __init__(self):
         super().__init__()
 
@@ -16,8 +14,8 @@ class PixArtAlphaLoRALoader(
         return convert_pixart_lora_key_sets()
 
     def load(
-            self,
-            model: PixArtAlphaModel,
-            model_names: ModelNames,
+        self,
+        model: PixArtAlphaModel,
+        model_names: ModelNames,
     ):
         return self._load(model, model_names)

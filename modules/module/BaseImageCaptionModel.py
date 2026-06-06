@@ -24,7 +24,7 @@ class CaptionSample:
 
     def get_image(self) -> Image:
         if self.image is None:
-            self.image = load_image(self.image_filename, 'RGB')
+            self.image = load_image(self.image_filename, "RGB")
             self.height = self.image.height
             self.width = self.image.width
 
@@ -48,8 +48,8 @@ class CaptionSample:
 
     def save_caption(self):
         if self.captions is not None:
-            with contextlib.suppress(Exception), open(self.caption_filename, "w", encoding='utf-8') as f:
-                f.write('\n'.join(self.captions))
+            with contextlib.suppress(Exception), open(self.caption_filename, "w", encoding="utf-8") as f:
+                f.write("\n".join(self.captions))
 
 
 class BaseImageCaptionModel(metaclass=ABCMeta):
@@ -59,16 +59,16 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
 
         def __is_supported_image_extension(path: Path) -> bool:
             ext = path.suffix
-            return path_util.is_supported_image_extension(ext) and '-masklabel.png' not in path.name
+            return path_util.is_supported_image_extension(ext) and "-masklabel.png" not in path.name
 
         recursive_prefix = "" if not include_subdirectories else "**/"
-        return [str(p) for p in sample_dir.glob(f'{recursive_prefix}*') if __is_supported_image_extension(p)]
+        return [str(p) for p in sample_dir.glob(f"{recursive_prefix}*") if __is_supported_image_extension(p)]
 
     @abstractmethod
     def generate_caption(
-            self,
-            caption_sample: CaptionSample,
-            initial_caption: str = "",
+        self,
+        caption_sample: CaptionSample,
+        initial_caption: str = "",
     ) -> str:
         """
         Generates caption for a single CaptionSample
@@ -81,12 +81,12 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
         """
 
     def caption_image(
-            self,
-            filename: str,
-            initial_caption: str = "",
-            caption_prefix: str = "",
-            caption_postfix: str = "",
-            mode: str = 'fill',
+        self,
+        filename: str,
+        initial_caption: str = "",
+        caption_prefix: str = "",
+        caption_postfix: str = "",
+        mode: str = "fill",
     ):
         """
         Captions a sample
@@ -104,28 +104,28 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
         caption_sample = CaptionSample(filename)
 
         existing_caption = caption_sample.get_caption()
-        if mode == 'fill' and existing_caption is not None and existing_caption != "":
+        if mode == "fill" and existing_caption is not None and existing_caption != "":
             return
 
         predicted_caption = self.generate_caption(caption_sample, initial_caption, caption_prefix, caption_postfix)
 
-        if mode == 'replace' or mode == 'fill':
+        if mode == "replace" or mode == "fill":
             caption_sample.set_caption(predicted_caption)
 
-        if mode == 'add':
+        if mode == "add":
             caption_sample.add_caption(predicted_caption)
 
         caption_sample.save_caption()
 
     def caption_images(
-            self,
-            filenames: list[str],
-            initial_caption: str = "",
-            caption_prefix: str = "",
-            caption_postfix: str = "",
-            mode: str = 'fill',
-            progress_callback: Callable[[int, int], None] = None,
-            error_callback: Callable[[str], None] = None,
+        self,
+        filenames: list[str],
+        initial_caption: str = "",
+        caption_prefix: str = "",
+        caption_postfix: str = "",
+        mode: str = "fill",
+        progress_callback: Callable[[int, int], None] = None,
+        error_callback: Callable[[str], None] = None,
     ):
         """
         Captions all samples in a list
@@ -155,15 +155,15 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
                 progress_callback(i + 1, len(filenames))
 
     def caption_folder(
-            self,
-            sample_dir: str,
-            initial_caption: str = "",
-            caption_prefix: str = "",
-            caption_postfix: str = "",
-            mode: str = 'fill',
-            progress_callback: Callable[[int, int], None] = None,
-            error_callback: Callable[[str], None] = None,
-            include_subdirectories: bool = False,
+        self,
+        sample_dir: str,
+        initial_caption: str = "",
+        caption_prefix: str = "",
+        caption_postfix: str = "",
+        mode: str = "fill",
+        progress_callback: Callable[[int, int], None] = None,
+        error_callback: Callable[[str], None] = None,
+        include_subdirectories: bool = False,
     ):
         """
         Captions all samples in a folder

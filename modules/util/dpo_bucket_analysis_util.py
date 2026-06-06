@@ -185,7 +185,7 @@ def analyze_concept(
     for target in target_resolutions:
         buckets, aspects = build_buckets(int(target), int(quantization))
         counts: dict[tuple[int, int], int] = {tuple(b): 0 for b in buckets}
-        for (h, w) in dims:
+        for h, w in dims:
             idx = int(np.argmin(np.abs(aspects - (h / w))))
             b = buckets[idx]
             counts[b] = counts.get(b, 0) + 1
@@ -202,15 +202,17 @@ def analyze_concept(
             drops = count % batch_size
             add = (batch_size - count % batch_size) % batch_size
             remove = drops
-            bucket_rows.append({
-                "h": bh,
-                "w": bw,
-                "count": count,
-                "drops": drops,
-                "add": add,
-                "remove": remove,
-                "aspect_label": label_aspect(bh, bw),
-            })
+            bucket_rows.append(
+                {
+                    "h": bh,
+                    "w": bw,
+                    "count": count,
+                    "drops": drops,
+                    "add": add,
+                    "remove": remove,
+                    "aspect_label": label_aspect(bh, bw),
+                }
+            )
             total_pairs += count
             total_drops += drops
             total_add += add
@@ -218,14 +220,16 @@ def analyze_concept(
 
         bucket_rows.sort(key=lambda row: row["count"], reverse=True)
 
-        targets_out.append({
-            "target": int(target),
-            "total_pairs": total_pairs,
-            "total_drops": total_drops,
-            "total_add": total_add,
-            "total_remove": total_remove,
-            "buckets": bucket_rows,
-        })
+        targets_out.append(
+            {
+                "target": int(target),
+                "total_pairs": total_pairs,
+                "total_drops": total_drops,
+                "total_add": total_add,
+                "total_remove": total_remove,
+                "buckets": bucket_rows,
+            }
+        )
 
     return {
         "concept_path": concept_path,

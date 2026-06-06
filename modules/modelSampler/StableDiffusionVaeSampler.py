@@ -19,11 +19,11 @@ from PIL import Image
 
 class StableDiffusionVaeSampler(BaseModelSampler):
     def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            model: StableDiffusionModel,
-            model_type: ModelType,
+        self,
+        train_device: torch.device,
+        temp_device: torch.device,
+        model: StableDiffusionModel,
+        model_type: ModelType,
     ):
         super().__init__(train_device, temp_device)
 
@@ -31,14 +31,14 @@ class StableDiffusionVaeSampler(BaseModelSampler):
         self.model_type = model_type
 
     def sample(
-            self,
-            sample_config: SampleConfig,
-            destination: str,
-            image_format: ImageFormat | None = None,
-            video_format: VideoFormat | None = None,
-            audio_format: AudioFormat | None = None,
-            on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
-            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+        self,
+        sample_config: SampleConfig,
+        destination: str,
+        image_format: ImageFormat | None = None,
+        video_format: VideoFormat | None = None,
+        audio_format: AudioFormat | None = None,
+        on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
+        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         # TODO: this is reusing the prompt parameters as the image path, think of a better solution
         image = Image.open(sample_config.prompt)
@@ -47,11 +47,13 @@ class StableDiffusionVaeSampler(BaseModelSampler):
 
         scale = sample_config.width if sample_config.width > sample_config.height else sample_config.height
 
-        t_in = transforms.Compose([
-            transforms.Resize(scale),
-            transforms.CenterCrop([sample_config.height, sample_config.width]),
-            transforms.ToTensor()
-        ])
+        t_in = transforms.Compose(
+            [
+                transforms.Resize(scale),
+                transforms.CenterCrop([sample_config.height, sample_config.width]),
+                transforms.ToTensor(),
+            ]
+        )
         image_tensor = t_in(image).to(device=self.train_device, dtype=self.model.vae.dtype)
         image_tensor = image_tensor * 2 - 1
 
@@ -73,17 +75,37 @@ class StableDiffusionVaeSampler(BaseModelSampler):
         )
 
         self.save_sampler_output(
-            sampler_output, destination,
-            image_format, video_format, audio_format,
+            sampler_output,
+            destination,
+            image_format,
+            video_format,
+            audio_format,
         )
 
         on_sample(sampler_output)
 
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE_VAE)
+
+factory.register(
+    BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE_VAE
+)
+factory.register(
+    BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE_VAE
+)
+factory.register(
+    BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE_VAE
+)
+factory.register(
+    BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE_VAE
+)
+factory.register(
+    BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE_VAE
+)
+factory.register(
+    BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE_VAE
+)
+factory.register(
+    BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE_VAE
+)
+factory.register(
+    BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE_VAE
+)

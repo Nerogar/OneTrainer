@@ -33,59 +33,68 @@ class BaseZImageSetup(
     ModelSetupFlowMatchingMixin,
     ModelSetupEmbeddingMixin,
     ModelSetupText2ImageMixin,
-    metaclass=ABCMeta
+    metaclass=ABCMeta,
 ):
     LAYER_PRESETS = {
         "full": [],
         "blocks": ["layers"],
-        "attn-mlp": {'patterns': ["^(?=.*attention)(?!.*refiner).*", "^(?=.*feed_forward)(?!.*refiner).*"], 'regex': True},
-        "attn-only": {'patterns': ["^(?=.*attention)(?!.*refiner).*"], 'regex': True},
+        "attn-mlp": {
+            "patterns": ["^(?=.*attention)(?!.*refiner).*", "^(?=.*feed_forward)(?!.*refiner).*"],
+            "regex": True,
+        },
+        "attn-only": {"patterns": ["^(?=.*attention)(?!.*refiner).*"], "regex": True},
     }
 
     def setup_optimizations(
-            self,
-            model: ZImageModel,
-            config: TrainConfig,
+        self,
+        model: ZImageModel,
+        config: TrainConfig,
     ):
         if config.gradient_checkpointing.enabled():
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_z_image_transformer(model.transformer, config)
-            if model.text_encoder is not None:
-                model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_qwen3_encoder_layers(model.text_encoder, config)
-
-        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().transformer,
-            config.weight_dtypes().text_encoder,
-            config.weight_dtypes().vae,
-            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-        ], config.enable_autocast_cache)
-
-        #TODO necessary if we don't train it?
-        model.text_encoder_autocast_context, model.text_encoder_train_dtype = \
-            disable_fp16_autocast_context(
-                self.train_device,
-                config.train_dtype,
-                config.fallback_train_dtype,
-                [
-                    config.weight_dtypes().text_encoder,
-                    config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-                ],
-                config.enable_autocast_cache,
+            model.transformer_offload_conductor = enable_checkpointing_for_z_image_transformer(
+                model.transformer, config
             )
+            if model.text_encoder is not None:
+                model.text_encoder_offload_conductor = enable_checkpointing_for_qwen3_encoder_layers(
+                    model.text_encoder, config
+                )
+
+        model.autocast_context, model.train_dtype = create_autocast_context(
+            self.train_device,
+            config.train_dtype,
+            [
+                config.weight_dtypes().transformer,
+                config.weight_dtypes().text_encoder,
+                config.weight_dtypes().vae,
+                config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+            ],
+            config.enable_autocast_cache,
+        )
+
+        # TODO necessary if we don't train it?
+        model.text_encoder_autocast_context, model.text_encoder_train_dtype = disable_fp16_autocast_context(
+            self.train_device,
+            config.train_dtype,
+            config.fallback_train_dtype,
+            [
+                config.weight_dtypes().text_encoder,
+                config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+            ],
+            config.enable_autocast_cache,
+        )
 
         quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype, config)
         quantize_layers(model.vae, self.train_device, model.train_dtype, config)
         quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
 
     def predict(
-            self,
-            model: ZImageModel,
-            batch: dict,
-            config: TrainConfig,
-            train_progress: TrainProgress,
-            *,
-            deterministic: bool = False,
+        self,
+        model: ZImageModel,
+        batch: dict,
+        config: TrainConfig,
+        train_progress: TrainProgress,
+        *,
+        deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
             batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
@@ -95,25 +104,25 @@ class BaseZImageSetup(
 
             text_encoder_output = model.encode_text(
                 train_device=self.train_device,
-                batch_size=batch['latent_image'].shape[0],
+                batch_size=batch["latent_image"].shape[0],
                 rand=rand,
                 tokens=batch.get("tokens"),
                 tokens_mask=batch.get("tokens_mask"),
-                text_encoder_output=batch.get('text_encoder_hidden_state'),
+                text_encoder_output=batch.get("text_encoder_hidden_state"),
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
-            scaled_latent_image = model.scale_latents(batch['latent_image'])
+            scaled_latent_image = model.scale_latents(batch["latent_image"])
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
             shift = model.calculate_timestep_shift(scaled_latent_image.shape[-2], scaled_latent_image.shape[-1])
             timestep = self._get_timestep_discrete(
-                model.noise_scheduler.config['num_train_timesteps'],
+                model.noise_scheduler.config["num_train_timesteps"],
                 deterministic,
                 generator,
                 scaled_latent_image.shape[0],
                 config,
-                shift = shift if config.dynamic_timestep_shifting else config.timestep_shift,
+                shift=shift if config.dynamic_timestep_shifting else config.timestep_shift,
             )
 
             scaled_noisy_latent_image, sigma = self._add_noise_discrete(
@@ -126,27 +135,23 @@ class BaseZImageSetup(
             latent_input_list = list(latent_input.unbind(dim=0))
 
             output_list = model.transformer(
-                latent_input_list,
-                (1000 - timestep) / 1000,
-                text_encoder_output,
-                return_dict=True
+                latent_input_list, (1000 - timestep) / 1000, text_encoder_output, return_dict=True
             ).sample
 
-            predicted_flow = - torch.stack(output_list, dim=0).squeeze(dim=2)
-
+            predicted_flow = -torch.stack(output_list, dim=0).squeeze(dim=2)
 
             flow = latent_noise - scaled_latent_image
             model_output_data = {
-                'loss_type': 'target',
-                'timestep': timestep,
-                'predicted': predicted_flow,
-                'target': flow,
+                "loss_type": "target",
+                "timestep": timestep,
+                "predicted": predicted_flow,
+                "target": flow,
             }
 
             if config.debug_mode:
                 with torch.no_grad():
                     predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
-                    self._save_tokens("7-prompt", batch['tokens'], model.tokenizer, config, train_progress)
+                    self._save_tokens("7-prompt", batch["tokens"], model.tokenizer, config, train_progress)
                     self._save_latent("1-noise", latent_noise, config, train_progress)
                     self._save_latent("2-noisy_image", scaled_noisy_latent_image, config, train_progress)
                     self._save_latent("3-predicted_flow", predicted_flow, config, train_progress)
@@ -157,11 +162,11 @@ class BaseZImageSetup(
         return model_output_data
 
     def calculate_loss(
-            self,
-            model: ZImageModel,
-            batch: dict,
-            data: dict,
-            config: TrainConfig,
+        self,
+        model: ZImageModel,
+        batch: dict,
+        data: dict,
+        config: TrainConfig,
     ) -> Tensor:
         return self._flow_matching_losses(
             batch=batch,

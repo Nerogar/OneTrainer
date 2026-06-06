@@ -23,10 +23,10 @@ class BaseModelSetup(
     metaclass=ABCMeta,
 ):
     def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
+        self,
+        train_device: torch.device,
+        temp_device: torch.device,
+        debug_mode: bool,
     ):
         super().__init__()
 
@@ -39,91 +39,91 @@ class BaseModelSetup(
 
     @abstractmethod
     def create_parameters(
-            self,
-            model: BaseModel,
-            config: TrainConfig,
+        self,
+        model: BaseModel,
+        config: TrainConfig,
     ) -> NamedParameterGroupCollection:
         pass
 
     @abstractmethod
     def setup_optimizations(
-            self,
-            model: BaseModel,
-            config: TrainConfig,
+        self,
+        model: BaseModel,
+        config: TrainConfig,
     ):
         pass
 
     @abstractmethod
     def setup_model(
-            self,
-            model: BaseModel,
-            config: TrainConfig,
+        self,
+        model: BaseModel,
+        config: TrainConfig,
     ):
         pass
 
     @abstractmethod
     def setup_train_device(
-            self,
-            model: BaseModel,
-            config: TrainConfig,
+        self,
+        model: BaseModel,
+        config: TrainConfig,
     ):
         pass
 
     @abstractmethod
     def predict(
-            self,
-            model: BaseModel,
-            batch: dict,
-            config: TrainConfig,
-            train_progress: TrainProgress,
-            *,
-            deterministic: bool = False,
+        self,
+        model: BaseModel,
+        batch: dict,
+        config: TrainConfig,
+        train_progress: TrainProgress,
+        *,
+        deterministic: bool = False,
     ) -> dict:
         pass
 
     @abstractmethod
     def calculate_loss(
-            self,
-            model: BaseModel,
-            batch: dict,
-            data: dict,
-            config: TrainConfig,
+        self,
+        model: BaseModel,
+        batch: dict,
+        data: dict,
+        config: TrainConfig,
     ) -> Tensor:
         pass
 
     @abstractmethod
     def after_optimizer_step(
-            self,
-            model: BaseModel,
-            config: TrainConfig,
-            train_progress: TrainProgress,
+        self,
+        model: BaseModel,
+        config: TrainConfig,
+        train_progress: TrainProgress,
     ):
         pass
 
     def report_to_tensorboard(
-            self,
-            model: BaseModel,
-            config: TrainConfig,
-            scheduler: LRScheduler,
-            tensorboard: SummaryWriter,
+        self,
+        model: BaseModel,
+        config: TrainConfig,
+        scheduler: LRScheduler,
+        tensorboard: SummaryWriter,
     ):
         lrs = scheduler.get_last_lr()
         parameters = model.parameters.display_name_mapping
 
         reported_learning_rates = {}
 
-        if any('optim_type' in g for g in model.optimizer.param_groups):
+        if any("optim_type" in g for g in model.optimizer.param_groups):
             for group in model.optimizer.param_groups:
-                name = group.get('name')
-                if not name or not group['params']:
+                name = group.get("name")
+                if not name or not group["params"]:
                     continue
-                optim_type = group.get('optim_type', 'unknown')
+                optim_type = group.get("optim_type", "unknown")
                 unique_name = f"{name}_{optim_type}"
                 if unique_name not in reported_learning_rates:
-                    reported_learning_rates[unique_name] = group['lr']
+                    reported_learning_rates[unique_name] = group["lr"]
         else:
             for lr, parameter in zip(lrs, parameters, strict=True):
-                name = parameter.split('/')[0]
+                name = parameter.split("/")[0]
 
                 if name not in reported_learning_rates:
                     reported_learning_rates[name] = lr
@@ -131,14 +131,12 @@ class BaseModelSetup(
         reported_learning_rates = config.optimizer.optimizer.maybe_adjust_lrs(reported_learning_rates, model.optimizer)
 
         for name, lr in reported_learning_rates.items():
-            tensorboard.add_scalar(
-                f"lr/{name}", lr, model.train_progress.global_step
-            )
+            tensorboard.add_scalar(f"lr/{name}", lr, model.train_progress.global_step)
 
-        if hasattr(model.optimizer, 'kourkoutas_helper') and model.optimizer.kourkoutas_helper is not None:
+        if hasattr(model.optimizer, "kourkoutas_helper") and model.optimizer.kourkoutas_helper is not None:
             stats = model.optimizer.kourkoutas_helper.last_beta2_stats
             if stats:
-                tensorboard.add_scalar("kourkoutas/beta2_mean", stats['mean'], model.train_progress.global_step)
+                tensorboard.add_scalar("kourkoutas/beta2_mean", stats["mean"], model.train_progress.global_step)
 
     @staticmethod
     def _is_dpo_rejected_key(key: str) -> bool:
@@ -158,7 +156,7 @@ class BaseModelSetup(
         # as [chosen; rejected] on dim 0, shared per-sample tensors are duplicated
         # by self-concat, and non-batched values pass through. The chosen half is
         # always the first B entries of the result.
-        chosen_b = batch['latent_image'].shape[0]
+        chosen_b = batch["latent_image"].shape[0]
         batched: dict = {}
         for key, value in batch.items():
             if cls._is_dpo_rejected_key(key):
@@ -200,19 +198,22 @@ class BaseModelSetup(
         return self._last_dpo_metrics or {}
 
     def calculate_dpo_loss(
-            self,
-            model: BaseModel,
-            batch: dict,
-            config: TrainConfig,
-            train_progress: TrainProgress,
+        self,
+        model: BaseModel,
+        batch: dict,
+        config: TrainConfig,
+        train_progress: TrainProgress,
     ) -> Tensor:
-        if 'latent_image_rejected' not in batch:
-            raise RuntimeError("RLHF DPO requires paired chosen/rejected batches, but the dataloader did not provide rejected samples.")
+        if "latent_image_rejected" not in batch:
+            raise RuntimeError(
+                "RLHF DPO requires paired chosen/rejected batches, but the dataloader did not provide rejected samples."
+            )
 
         rejected_batch = self._create_dpo_rejected_batch(batch)
         chosen_progress = self._create_dpo_progress(train_progress)
-        rejected_progress = chosen_progress if config.rlhf_dpo_shared_noise \
-            else self._create_dpo_progress(train_progress, offset=1)  # Shared noise depends on predict() seeding from global_step.
+        rejected_progress = (
+            chosen_progress if config.rlhf_dpo_shared_noise else self._create_dpo_progress(train_progress, offset=1)
+        )  # Shared noise depends on predict() seeding from global_step.
 
         def mse_per_sample(pred, target):
             return ((pred - target) ** 2).mean(dim=list(range(1, pred.ndim)))
@@ -233,15 +234,15 @@ class BaseModelSetup(
 
             with torch.no_grad(), self.reference_model(model, config):
                 ref_output = self.predict(model, batched_input, config, chosen_progress)
-                ref_predicted = ref_output['predicted'].float()
-                ref_target = ref_output['target'].float()
+                ref_predicted = ref_output["predicted"].float()
+                ref_target = ref_output["target"].float()
                 ref_chosen_logp = -mse_per_sample(ref_predicted[:chosen_b], ref_target[:chosen_b])
                 ref_rejected_logp = -mse_per_sample(ref_predicted[chosen_b:], ref_target[chosen_b:])
                 del ref_output, ref_predicted, ref_target
 
             policy_output = self.predict(model, batched_input, config, chosen_progress)
-            policy_predicted = policy_output['predicted'].float()
-            policy_target = policy_output['target'].float()
+            policy_predicted = policy_output["predicted"].float()
+            policy_target = policy_output["target"].float()
             policy_chosen_logp = -mse_per_sample(policy_predicted[:chosen_b], policy_target[:chosen_b])
             policy_rejected_logp = -mse_per_sample(policy_predicted[chosen_b:], policy_target[chosen_b:])
             if config.rlhf_supervised_mix > 0:
@@ -255,19 +256,19 @@ class BaseModelSetup(
             with torch.no_grad(), self.reference_model(model, config):
                 ref_chosen_output = self.predict(model, batch, config, chosen_progress)
                 ref_chosen_logp = -mse_per_sample(
-                    ref_chosen_output['predicted'].float(), ref_chosen_output['target'].float()
+                    ref_chosen_output["predicted"].float(), ref_chosen_output["target"].float()
                 )
                 del ref_chosen_output
                 ref_rejected_output = self.predict(model, rejected_batch, config, rejected_progress)
                 ref_rejected_logp = -mse_per_sample(
-                    ref_rejected_output['predicted'].float(), ref_rejected_output['target'].float()
+                    ref_rejected_output["predicted"].float(), ref_rejected_output["target"].float()
                 )
                 del ref_rejected_output
 
             batched_input, chosen_b = self._create_dpo_batched_batch(batch)
             policy_output = self.predict(model, batched_input, config, chosen_progress)
-            policy_predicted = policy_output['predicted'].float()
-            policy_target = policy_output['target'].float()
+            policy_predicted = policy_output["predicted"].float()
+            policy_target = policy_output["target"].float()
             policy_chosen_logp = -mse_per_sample(policy_predicted[:chosen_b], policy_target[:chosen_b])
             policy_rejected_logp = -mse_per_sample(policy_predicted[chosen_b:], policy_target[chosen_b:])
             if config.rlhf_supervised_mix > 0:
@@ -286,18 +287,18 @@ class BaseModelSetup(
             policy_rejected_output = self.predict(model, rejected_batch, config, rejected_progress)
 
             ref_chosen_logp = -mse_per_sample(
-                ref_chosen_output['predicted'].float(), ref_chosen_output['target'].float()
+                ref_chosen_output["predicted"].float(), ref_chosen_output["target"].float()
             )
             ref_rejected_logp = -mse_per_sample(
-                ref_rejected_output['predicted'].float(), ref_rejected_output['target'].float()
+                ref_rejected_output["predicted"].float(), ref_rejected_output["target"].float()
             )
             policy_chosen_logp = -mse_per_sample(
-                policy_chosen_output['predicted'].float(), policy_chosen_output['target'].float()
+                policy_chosen_output["predicted"].float(), policy_chosen_output["target"].float()
             )
             if config.rlhf_supervised_mix > 0:
                 supervised_loss = self.calculate_loss(model, batch, policy_chosen_output, config)
             policy_rejected_logp = -mse_per_sample(
-                policy_rejected_output['predicted'].float(), policy_rejected_output['target'].float()
+                policy_rejected_output["predicted"].float(), policy_rejected_output["target"].float()
             )
             del ref_chosen_output
             del ref_rejected_output
@@ -308,18 +309,18 @@ class BaseModelSetup(
             with torch.no_grad(), self.reference_model(model, config):
                 ref_chosen_output = self.predict(model, batch, config, chosen_progress)
                 ref_chosen_logp = -mse_per_sample(
-                    ref_chosen_output['predicted'].float(), ref_chosen_output['target'].float()
+                    ref_chosen_output["predicted"].float(), ref_chosen_output["target"].float()
                 )
                 del ref_chosen_output
                 ref_rejected_output = self.predict(model, rejected_batch, config, rejected_progress)
                 ref_rejected_logp = -mse_per_sample(
-                    ref_rejected_output['predicted'].float(), ref_rejected_output['target'].float()
+                    ref_rejected_output["predicted"].float(), ref_rejected_output["target"].float()
                 )
                 del ref_rejected_output
 
             policy_chosen_output = self.predict(model, batch, config, chosen_progress)
             policy_chosen_logp = -mse_per_sample(
-                policy_chosen_output['predicted'].float(), policy_chosen_output['target'].float()
+                policy_chosen_output["predicted"].float(), policy_chosen_output["target"].float()
             )
             if config.rlhf_supervised_mix > 0:
                 supervised_loss = self.calculate_loss(model, batch, policy_chosen_output, config)
@@ -328,7 +329,7 @@ class BaseModelSetup(
 
             policy_rejected_output = self.predict(model, rejected_batch, config, rejected_progress)
             policy_rejected_logp = -mse_per_sample(
-                policy_rejected_output['predicted'].float(), policy_rejected_output['target'].float()
+                policy_rejected_output["predicted"].float(), policy_rejected_output["target"].float()
             )
             if execution_mode != DPOExecutionMode.SEQUENTIAL:
                 del policy_chosen_output
@@ -349,19 +350,19 @@ class BaseModelSetup(
             del supervised_loss
 
         self._last_dpo_metrics = {
-            'loss': loss.detach().item(),
-            'dpo_loss': dpo_loss.detach().item(),
-            'chosen_reward': chosen_ratio.detach().mean().item(),
-            'rejected_reward': rejected_ratio.detach().mean().item(),
-            'accuracy': (chosen_ratio > rejected_ratio).float().mean().item(),
+            "loss": loss.detach().item(),
+            "dpo_loss": dpo_loss.detach().item(),
+            "chosen_reward": chosen_ratio.detach().mean().item(),
+            "rejected_reward": rejected_ratio.detach().mean().item(),
+            "accuracy": (chosen_ratio > rejected_ratio).float().mean().item(),
         }
 
         return loss
 
     def stop_embedding_training_elapsed(
-            self,
-            config: TrainEmbeddingConfig,
-            train_progress: TrainProgress,
+        self,
+        config: TrainEmbeddingConfig,
+        train_progress: TrainProgress,
     ):
         return self.single_action_elapsed(
             "stop_embedding_training_" + str(config.uuid),
@@ -371,10 +372,10 @@ class BaseModelSetup(
         )
 
     def __stop_model_part_training_elapsed(
-            self,
-            unique_name: str,
-            config: TrainModelPartConfig,
-            train_progress: TrainProgress,
+        self,
+        unique_name: str,
+        config: TrainModelPartConfig,
+        train_progress: TrainProgress,
     ):
         return self.single_action_elapsed(
             "stop_" + unique_name + "_training",
@@ -401,9 +402,13 @@ class BaseModelSetup(
         adapters = model.adapters()
 
         if config.training_method is not TrainingMethod.LORA:
-            raise NotImplementedError("RLHF DPO reference modes are currently only implemented for adapter training in the LoRA tab.")
+            raise NotImplementedError(
+                "RLHF DPO reference modes are currently only implemented for adapter training in the LoRA tab."
+            )
         if len(adapters) == 0:
-            raise RuntimeError("RLHF DPO requires active adapters, but no trainable adapters are attached to the current model.")
+            raise RuntimeError(
+                "RLHF DPO requires active adapters, but no trainable adapters are attached to the current model."
+            )
 
         ref_mode = config.effective_dpo_ref_mode()
 
@@ -420,15 +425,9 @@ class BaseModelSetup(
             # entire training run. This is intentional: DPO requires a fixed
             # reference policy from the start of training.
             if self._dpo_ref_params is None:
-                self._dpo_ref_params = [
-                    [p.data.clone() for p in adapter.parameters()]
-                    for adapter in adapters
-                ]
+                self._dpo_ref_params = [[p.data.clone() for p in adapter.parameters()] for adapter in adapters]
 
-            policy_data = [
-                [p.data for p in adapter.parameters()]
-                for adapter in adapters
-            ]
+            policy_data = [[p.data for p in adapter.parameters()] for adapter in adapters]
             try:
                 for adapter, ref_params in zip(adapters, self._dpo_ref_params, strict=True):
                     for param, ref_data in zip(adapter.parameters(), ref_params, strict=True):
@@ -476,11 +475,13 @@ class BaseModelSetup(
         else:
             parameters = model.parameters()
 
-        parameter_group_collection.add_group(NamedParameterGroup(
-            unique_name=unique_name,
-            parameters=parameters,
-            learning_rate=config.learning_rate,
-        ))
+        parameter_group_collection.add_group(
+            NamedParameterGroup(
+                unique_name=unique_name,
+                parameters=parameters,
+                learning_rate=config.learning_rate,
+            )
+        )
 
     def _setup_model_part_requires_grad(
         self,
@@ -490,8 +491,9 @@ class BaseModelSetup(
         train_progress: TrainProgress,
     ):
         if model is not None:
-            train_model_part = config.train and \
-                               not self.__stop_model_part_training_elapsed(unique_name, config, train_progress)
+            train_model_part = config.train and not self.__stop_model_part_training_elapsed(
+                unique_name, config, train_progress
+            )
             model.requires_grad_(train_model_part)
 
             if unique_name in self.frozen_parameters:
