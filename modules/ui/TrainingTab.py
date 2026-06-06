@@ -73,6 +73,8 @@ class TrainingTab:
             self.__setup_flux_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_flux_2():
             self.__setup_flux_2_ui(column_0, column_1, column_2)
+        elif self.train_config.model_type.is_lens():
+            self.__setup_lens_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_chroma():
             self.__setup_chroma_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_qwen():
@@ -179,6 +181,19 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True, supports_force_attention_mask=False)
+        self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
+
+        self.__create_masked_frame(column_2, 1)
+        self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
+
+    def __setup_lens_ui(self, column_0, column_1, column_2):
+        self.__create_base_frame(column_0, 0)
+        # the GPT-OSS encoder is always on-demand (MXFP4); layer offloading is incompatible with that, so hide it
+        self.__create_text_encoder_frame(column_0, 1, supports_clip_skip=False, supports_training=False, supports_sequence_length=False, supports_offloading=False)
+
+        self.__create_base2_frame(column_1, 0)
+        self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False, supports_force_attention_mask=False)
         self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1)
@@ -422,17 +437,19 @@ class TrainingTab:
                              tooltip="Enables circular padding for all conv layers to better train seamless images")
             components.switch(frame, row, 1, self.ui_state, "force_circular_padding")
 
-    def __create_offloading_widgets(self, frame, row, part, supports_checkpointing=True, supports_activation_offloading=False):
+    def __create_offloading_widgets(self, frame, row, part, supports_checkpointing=True, supports_activation_offloading=False, supports_layer_offloading=True):
+        # per-component offloading / checkpointing controls (bound to the model part config)
         if supports_checkpointing:
             components.label(frame, row, 0, "Gradient Checkpointing",
                              tooltip="Enables gradient checkpointing for this component. Reduces VRAM usage at the cost of training speed")
             components.switch(frame, row, 1, self.ui_state, f"{part}.gradient_checkpointing")
             row += 1
 
-        components.label(frame, row, 0, "Layer Offload Fraction",
-                         tooltip="Fraction of this component's layers to offload to CPU to reduce VRAM usage. Increases training time and RAM usage. 0=disabled, 1=all layers")
-        components.entry(frame, row, 1, self.ui_state, f"{part}.offload_fraction")
-        row += 1
+        if supports_layer_offloading:
+            components.label(frame, row, 0, "Layer Offload Fraction",
+                             tooltip="Fraction of this component's layers to offload to CPU to reduce VRAM usage. Increases training time and RAM usage. 0=disabled, 1=all layers")
+            components.entry(frame, row, 1, self.ui_state, f"{part}.offload_fraction")
+            row += 1
 
         if supports_activation_offloading:
             components.label(frame, row, 0, "Offload Activations",
@@ -442,7 +459,7 @@ class TrainingTab:
 
         return row
 
-    def __create_text_encoder_frame(self, master, row, supports_clip_skip=True, supports_training=True, supports_sequence_length=False):
+    def __create_text_encoder_frame(self, master, row, supports_clip_skip=True, supports_training=True, supports_sequence_length=False, supports_offloading=True):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
@@ -458,7 +475,7 @@ class TrainingTab:
             components.label(frame, row, 0, "Text Encoder")
             row += 1
 
-        row = self.__create_offloading_widgets(frame, row, "text_encoder", supports_checkpointing=supports_training)
+        row = self.__create_offloading_widgets(frame, row, "text_encoder", supports_checkpointing=supports_training, supports_layer_offloading=supports_offloading)
 
         # dropout
         components.label(frame, row, 0, "Caption Dropout Probability",

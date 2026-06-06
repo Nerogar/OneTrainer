@@ -61,6 +61,7 @@ class ModelTab:
             or model_type.is_chroma()
             or model_type.is_qwen()
             or model_type.is_hunyuan_video()
+            or model_type.is_lens()
         )
 
         row = 0
@@ -73,7 +74,8 @@ class ModelTab:
             allow_override_prior=model_type.is_stable_cascade(),
             has_transformer="transformer" in parts,
             allow_override_transformer=allow_override_transformer,
-            has_text_encoder=not model_type.has_multiple_text_encoders(),
+            # Lens: GPT-OSS dtype is fixed by MXFP4 + checkpoint; not user-configurable.
+            has_text_encoder=not model_type.has_multiple_text_encoders() and not model_type.is_lens(),
             has_text_encoder_1=model_type.has_multiple_text_encoders(),
             has_text_encoder_2="text_encoder_2" in parts,
             has_text_encoder_3="text_encoder_3" in parts,

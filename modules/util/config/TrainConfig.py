@@ -936,6 +936,8 @@ class TrainConfig(BaseConfig):
     #an encoder is loaded on demand only when it is requested, frozen (not trained, no embedding
     #training) and its conditioning is cached -- otherwise it is needed resident every step.
     def text_encoder_on_demand(self) -> bool:
+        if self.model_type.is_lens():
+            return True
         return self.text_encoder.load_on_demand \
             and not self.train_text_encoder_or_embedding() \
             and self.latent_caching
