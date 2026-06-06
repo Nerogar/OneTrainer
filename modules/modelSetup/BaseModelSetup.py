@@ -354,6 +354,7 @@ class BaseModelSetup(
             "dpo_loss": dpo_loss.detach().item(),
             "chosen_reward": chosen_ratio.detach().mean().item(),
             "rejected_reward": rejected_ratio.detach().mean().item(),
+            "reward_margin": (chosen_ratio - rejected_ratio).detach().mean().item(),
             "accuracy": (chosen_ratio > rejected_ratio).float().mean().item(),
         }
 

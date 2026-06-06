@@ -382,6 +382,7 @@ class GenericTrainer(BaseTrainer):
                 dpo_val_accuracy = []
                 dpo_val_chosen_reward = []
                 dpo_val_rejected_reward = []
+                dpo_val_reward_margin = []
 
                 for validation_batch in step_tqdm_validation:
                     if self.__needs_gc(train_progress):
@@ -394,12 +395,14 @@ class GenericTrainer(BaseTrainer):
                     dpo_val_accuracy.append(dpo_metrics["accuracy"])
                     dpo_val_chosen_reward.append(dpo_metrics["chosen_reward"])
                     dpo_val_rejected_reward.append(dpo_metrics["rejected_reward"])
+                    dpo_val_reward_margin.append(dpo_metrics["reward_margin"])
 
                 if dpo_val_loss:
                     val_loss = sum(dpo_val_loss) / len(dpo_val_loss)
                     val_accuracy = sum(dpo_val_accuracy) / len(dpo_val_accuracy)
                     val_chosen_reward = sum(dpo_val_chosen_reward) / len(dpo_val_chosen_reward)
                     val_rejected_reward = sum(dpo_val_rejected_reward) / len(dpo_val_rejected_reward)
+                    val_reward_margin = sum(dpo_val_reward_margin) / len(dpo_val_reward_margin)
 
                     self.tensorboard.add_scalar("dpo/val_loss", val_loss, train_progress.global_step)
                     self.tensorboard.add_scalar("dpo/val_accuracy", val_accuracy, train_progress.global_step)
@@ -407,6 +410,7 @@ class GenericTrainer(BaseTrainer):
                     self.tensorboard.add_scalar(
                         "dpo/val_rejected_reward", val_rejected_reward, train_progress.global_step
                     )
+                    self.tensorboard.add_scalar("dpo/val_reward_margin", val_reward_margin, train_progress.global_step)
                     self.__check_dpo_patience(val_accuracy, val_loss, train_progress)
 
                 # DPO validation uses a different data pipeline (paired samples) than
@@ -957,6 +961,9 @@ class GenericTrainer(BaseTrainer):
                                 )
                                 self.tensorboard.add_scalar(
                                     "dpo/rejected_reward", dpo_metrics["rejected_reward"], train_progress.global_step
+                                )
+                                self.tensorboard.add_scalar(
+                                    "dpo/reward_margin", dpo_metrics["reward_margin"], train_progress.global_step
                                 )
                                 self.tensorboard.add_scalar(
                                     "dpo/accuracy", dpo_metrics["accuracy"], train_progress.global_step
