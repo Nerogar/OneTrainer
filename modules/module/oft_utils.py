@@ -73,7 +73,9 @@ class OFTRotationModule(nn.Module):
         self.register_buffer("rows", rows, persistent=False)
         self.register_buffer("cols", cols, persistent=False)
         self.dropout = MultiplicativeDropoutLayer(p=dropout_probability)
-
+        if not self.use_cayley_neumann:
+            id_mat = (torch.eye(block_size).unsqueeze(0).expand(r, block_size, block_size))
+            self.register_buffer("id_mat", id_mat, persistent=False)
 
     def _pytorch_skew_symmetric(self, vec, block_size):
         batch_size = vec.shape[0]
@@ -113,8 +115,7 @@ class OFTRotationModule(nn.Module):
         # is guaranteed to be >= 1 / ||G||_F.
         # We clamp it to prevent numerical edge cases (e.g. extremely large norms).
         lower_bound = (1.0 / g_norm.detach()).clamp(min=1e-5, max=0.9)
-        one = torch.ones_like(lower_bound)
-        upper_bound = one
+        upper_bound = 1
 
         for _ in range(steps):
             lb, ub = lower_bound, upper_bound
@@ -132,8 +133,14 @@ class OFTRotationModule(nn.Module):
 
             # Dynamically update bounds for the next step
             eps_val = (K - L) / denom
-            lower_bound = one - eps_val
-            upper_bound = one + eps_val
+
+            # bmm acts as an opaque boundary, forcing Inductor to 
+            # materialize eps_val and severing the exponential AST tree.
+            # Shape is (B, 1, 1), so ones_like acts as an identity.
+            eps_val = torch.bmm(eps_val, torch.ones_like(eps_val))
+
+            lower_bound = 1 - eps_val
+            upper_bound = 1 + eps_val
 
         return X.to(original_dtype)
 
@@ -162,17 +169,11 @@ class OFTRotationModule(nn.Module):
                         R.add_(Q_power, alpha=2.0)
                     Q_power = torch.bmm(Q_power, Q_skew)
                     R.add_(Q_power)
+        elif oft_cans:
+            G = self.id_mat + Q_skew
+            R = self._cans_newton_schulz_iteration(G=G, steps=5)
         else:
-            id_mat = (
-                torch.eye(Q_skew.shape[-1], device=Q_skew.device)
-                .unsqueeze(0)
-                .expand(b, Q_skew.shape[-1], Q_skew.shape[-1])
-            )
-            if oft_cans:
-                G = id_mat + Q_skew
-                R = self._cans_newton_schulz_iteration(G=G, steps=5)
-            else:
-                R = torch.linalg.solve(id_mat + Q_skew, id_mat - Q_skew, left=False)
+            R = torch.linalg.solve(self.id_mat + Q_skew, self.id_mat - Q_skew, left=False)
 
         return R.to(previous_dtype)
 
