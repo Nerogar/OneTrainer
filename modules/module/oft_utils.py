@@ -106,7 +106,7 @@ class OFTRotationModule(nn.Module):
         X = G.bfloat16()
 
         # Max row sum is guaranteed to be >= the maximum singular value of X.
-        g_norm = torch.linalg.matrix_norm(X, ord=float('inf'), keepdim=True).clamp_min(eps)
+        g_norm = X.abs().sum(dim=-1, keepdim=True).amax(dim=-2, keepdim=True).clamp_min(eps)
         X = X / g_norm
 
         # Since min_singular_value(I + Q) >= 1, the min_singular_value of normalized X
