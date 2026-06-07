@@ -109,7 +109,7 @@ function Get-Platform {
 function Get-OrUpdatePixi {
     if (Test-CommandExists "pixi") {
         Write-OTDebug "'pixi' found, updating."
-        Invoke-Run pixi self-update
+        try { Invoke-Run pixi self-update } catch { Write-OTWarning "'pixi' couldn't be updated, assuming compatibility." }
     } else {
         Write-OTDebug "'pixi' not found, attempting installation."
         Write-OT "Installing pixi package manager..."

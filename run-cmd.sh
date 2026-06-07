@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -e pipefail
 
 if [ "$OT_PIP_INSTALL" = "true" ]; then
     echo "[OneTrainer] Running via pip..."

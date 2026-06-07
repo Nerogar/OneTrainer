@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -e pipefail
 
 # Detect absolute path to the directory where "lib.include.sh" resides.
 export SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
@@ -160,6 +160,7 @@ function get_platform {
 }
 
 function install_env {
+    print_debug "Installing OneTrainer environment, this may take a while..."
     run_cmd pixi install --locked -e "${OT_PLATFORM}"
 }
 
@@ -171,7 +172,7 @@ function get_or_update_pixi {
     if can_exec pixi; then
         if [[ "$1" == "upgrade" ]]; then
             print_debug '`pixi` found, updating.'
-            run_cmd pixi self-update --no-release-notes
+            run_cmd pixi self-update --no-release-notes || print_warning "`pixi` couldn't be updated, assuming compatibility."
         fi
         print_debug "`pixi` already available at $(which pixi)."
     else
