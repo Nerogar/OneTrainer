@@ -70,6 +70,7 @@ class ConvertModelUI(ctk.CTkToplevel):
             ("Hunyuan Video", ModelType.HUNYUAN_VIDEO),
             ("Chroma1", ModelType.CHROMA_1), #TODO does this just work? HiDream is not here
             ("QwenImage", ModelType.QWEN), #TODO does this just work? HiDream is not here
+            ("Anima", ModelType.ANIMA),
             ("ZImage", ModelType.Z_IMAGE),
         ], self.ui_state, "model_type")
 
