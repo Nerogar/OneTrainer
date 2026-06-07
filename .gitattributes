@@ -1,2 +1,4 @@
 * text=auto eol=lf
 *.bat text eol=crlf
+# Prevent unexecutable entrypoint error when using CRLF line ending.
+resources/docker/entrypoint.sh eol=lf
