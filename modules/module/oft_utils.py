@@ -47,6 +47,7 @@ class OFTRotationModule(nn.Module):
         oft_scaled=False,
         use_cayley_neumann=True,
         num_cayley_neumann_terms=5,
+        oft_cans=False,
         dropout_probability=0.0,
     ):
         super().__init__()
@@ -62,8 +63,11 @@ class OFTRotationModule(nn.Module):
             # allowing inference tools to automatically detect scaled oft.
             self.register_buffer("scaled_oft", torch.tensor(True))
         self.oft_scaled = oft_scaled
-        self.use_cayley_neumann = use_cayley_neumann
+        self.use_cayley_neumann = use_cayley_neumann and not oft_cans
         self.num_cayley_neumann_terms = num_cayley_neumann_terms
+        self.oft_cans = oft_cans
+        if oft_cans:
+            self.register_buffer("oft_cans", torch.tensor(True))
         # Create indices for upper triangle (excluding diagonal)
         rows, cols = torch.triu_indices(block_size, block_size, 1)
         self.register_buffer("rows", rows, persistent=False)
@@ -88,8 +92,53 @@ class OFTRotationModule(nn.Module):
         vec = matrix[:, self.rows, self.cols]
         return vec
 
+    def _cans_newton_schulz_iteration(
+        self,
+        G: torch.Tensor,
+        steps: int = 7,
+        eps: float = 1e-7,
+    ) -> torch.Tensor:
+        """
+        Chebyshev-Optimized Newton-Schulz iteration with a dynamically computed Chebyshev lower bound.
+        Optimized for G = I + Q (where Q is skew-symmetric).
+        """
+        assert G.ndim in (2, 3), f"Input must be 2D or 3D, got {G.ndim}D"
+        X = G
+        transposed = X.size(-2) > X.size(-1)
+        if transposed:
+            X = X.mT
+        # Compute Frobenius norm of the unnormalized matrix G
+        # We use this to establish a tight, safe lower bound dynamically per batch element.
+        g_norm = X.norm(dim=(-2, -1), keepdim=True).clamp_min(eps)
+        # Normalize X
+        X = X / g_norm
+        # Since min_singular_value(I + Q) >= 1, the min_singular_value of normalized X
+        # is guaranteed to be >= 1 / ||G||_F.
+        # We clamp it to prevent numerical edge cases (e.g. extremely large norms).
+        lower_bound = (1.0 / g_norm).clamp(min=1e-5, max=0.9)
+        upper_bound = 1
+        for _ in range(steps):
+            lb, ub = lower_bound, upper_bound
+            lb_ub = lb * ub
+            e_sq = (lb**2 + lb_ub + ub**2) / 3.0
+            K = 2.0 * e_sq**1.5
+            L = lb_ub * (lb + ub)
+            denom = K + L
+            alpha = 6.0 / denom
+            c1 = alpha * e_sq
+            c3 = -alpha / 3.0
+            A = X @ X.mT
+            X = c1 * X + c3 * (A @ X)
+            # Dynamically update bounds for the next step
+            eps_val = (K - L) / denom
+            lower_bound = 1.0 - eps_val
+            upper_bound = 1.0 + eps_val
+        if transposed:
+            X = X.mT
+        return X
+
     def _cayley_batch(
-        self, Q: torch.Tensor, block_size: int, use_cayley_neumann: bool = True, num_neumann_terms: int = 5
+        self, Q: torch.Tensor, block_size: int, use_cayley_neumann: bool = True, num_neumann_terms: int = 5, oft_cans: bool = False,
     ) -> torch.Tensor:
         """
         Perform the Cayley parametrization on a batch of skew-symmetric matrices.
@@ -119,7 +168,11 @@ class OFTRotationModule(nn.Module):
                 .unsqueeze(0)
                 .expand(b, Q_skew.shape[-1], Q_skew.shape[-1])
             )
-            R = torch.linalg.solve(id_mat + Q_skew, id_mat - Q_skew, left=False)
+            if oft_cans:
+                G = id_mat + Q_skew
+                R = self._cans_newton_schulz_iteration(G=G, steps=7)
+            else:
+                R = torch.linalg.solve(id_mat + Q_skew, id_mat - Q_skew, left=False)
 
         return R.to(previous_dtype)
 
@@ -134,7 +187,7 @@ class OFTRotationModule(nn.Module):
         effective_weight = self.weight / scaling_factor
 
         orth_rotate = self._cayley_batch(
-            effective_weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms
+            effective_weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms, self.oft_cans
         )
         orth_rotate = self.dropout(orth_rotate)
 
