@@ -67,7 +67,7 @@ class OFTRotationModule(nn.Module):
         self.num_cayley_neumann_terms = num_cayley_neumann_terms
         self.oft_cans = oft_cans
         if oft_cans:
-            self.register_buffer("oft_cans", torch.tensor(True))
+            self.register_buffer("cans_oft", torch.tensor(True))
         # Create indices for upper triangle (excluding diagonal)
         rows, cols = torch.triu_indices(block_size, block_size, 1)
         self.register_buffer("rows", rows, persistent=False)
