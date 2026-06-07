@@ -1,6 +1,7 @@
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
+from modules.modelLoader.mixin.LoRALoaderMixin import LoRALoaderMixin
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
@@ -69,7 +70,7 @@ class StableDiffusionLoRASetup(
         if config.train_any_embedding():
             model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te")
+        create_te = config.text_encoder.train
         model.text_encoder_lora = LoRAModuleWrapper(
             model.text_encoder, "lora_te", config
         ) if create_te else None
@@ -79,6 +80,13 @@ class StableDiffusionLoRASetup(
         )
 
         if model.lora_state_dict:
+            # Apply scaling factors to LoRA weights before loading
+            model.lora_state_dict = LoRALoaderMixin.scale_lora_state_dict(
+                model.lora_state_dict,
+                te_scale=config.lora_te_scale,
+                unet_scale=config.lora_unet_scale,
+            )
+            
             if create_te:
                 model.text_encoder_lora.load_state_dict(model.lora_state_dict)
             model.unet_lora.load_state_dict(model.lora_state_dict)
