@@ -144,7 +144,7 @@ class SampleWindow(ctk.CTkToplevel):
         model_setup.setup_optimizations(model, self.initial_train_config)
         model_setup.setup_train_device(model, self.initial_train_config)
         model_setup.setup_model(model, self.initial_train_config)
-        model.to(torch.device(self.initial_train_config.temp_device))
+        model.release()
 
         return model
 
