@@ -184,8 +184,13 @@ class OFTRotationModule(nn.Module):
 
         orig_shape = x.shape
 
-        scaling_factor = 2 * math.sqrt(self.block_size - 1) if self.oft_scaled else 1
-        effective_weight = self.weight / scaling_factor
+        if self.oft_scaled:
+            scaling_factor = math.sqrt(self.block_size - 1)
+            if not self.oft_cans:
+                scaling_factor = scaling_factor * 2
+            effective_weight = self.weight / scaling_factor
+        else:
+            effective_weight = self.weight
 
         orth_rotate = self._cayley_batch(
             effective_weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms, self.oft_cans
