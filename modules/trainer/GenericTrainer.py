@@ -746,6 +746,8 @@ class GenericTrainer(BaseTrainer):
         accumulated_dpo_metrics: dict[str, float] | None = None
         ema_loss = None
         ema_loss_steps = 0
+        ema_reward_margin = None
+        ema_reward_margin_steps = 0
         epochs = range(train_progress.epoch, self.config.epochs, 1)
 
         for _epoch in tqdm(epochs, desc="epoch") if multi.is_master() else epochs:
@@ -964,6 +966,15 @@ class GenericTrainer(BaseTrainer):
                                 )
                                 self.tensorboard.add_scalar(
                                     "dpo/reward_margin", dpo_metrics["reward_margin"], train_progress.global_step
+                                )
+                                ema_reward_margin = ema_reward_margin or dpo_metrics["reward_margin"]
+                                ema_reward_margin_steps += 1
+                                ema_reward_margin_decay = min(0.99, 1 - (1 / ema_reward_margin_steps))
+                                ema_reward_margin = (ema_reward_margin * ema_reward_margin_decay) + (
+                                    dpo_metrics["reward_margin"] * (1 - ema_reward_margin_decay)
+                                )
+                                self.tensorboard.add_scalar(
+                                    "dpo/smooth_reward_margin", ema_reward_margin, train_progress.global_step
                                 )
                                 self.tensorboard.add_scalar(
                                     "dpo/accuracy", dpo_metrics["accuracy"], train_progress.global_step
