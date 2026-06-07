@@ -224,7 +224,9 @@ def torch_gc():
 
         if torch_version > Version("2.6.0"):
             # TODO: replace with a torch.cuda binding once that's available
-            torch._C._host_emptyCache()
+                if hasattr(torch._C, '_host_emptyCache'):
+                    print ("true")
+                    torch._C._host_emptyCache()
 
     if torch.backends.mps.is_available():
         torch.mps.empty_cache()

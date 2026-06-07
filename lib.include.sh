@@ -340,6 +340,9 @@ function get_platform_requirements_path {
         elif [[ -e "/dev/kfd" ]]; then
             # AMD graphics.
             platform_reqs="requirements-rocm.txt"
+        elif [[ -e "/dev/dri/card0" ]] && (glxinfo | grep -qi "Intel"); then
+            #intel gpu:
+            platform_reqs="requirements-xpu.txt"
         else
             # No GPU acceleration.
             platform_reqs="requirements-default.txt"
