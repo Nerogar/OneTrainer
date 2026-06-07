@@ -102,21 +102,19 @@ class OFTRotationModule(nn.Module):
         Chebyshev-Optimized Newton-Schulz iteration with a dynamically computed Chebyshev lower bound.
         Optimized for G = I + Q (where Q is skew-symmetric).
         """
-        assert G.ndim in (2, 3), f"Input must be 2D or 3D, got {G.ndim}D"
-        X = G
-        transposed = X.size(-2) > X.size(-1)
-        if transposed:
-            X = X.mT
-        # Compute Frobenius norm of the unnormalized matrix G
-        # We use this to establish a tight, safe lower bound dynamically per batch element.
-        g_norm = X.norm(dim=(-2, -1), keepdim=True).clamp_min(eps)
-        # Normalize X
+        original_dtype = G.dtype
+        X = G.bfloat16()
+
+        # Max row sum is guaranteed to be >= the maximum singular value of X.
+        g_norm = torch.linalg.matrix_norm(X, ord=float('inf'), keepdim=True).clamp_min(eps)
         X = X / g_norm
+
         # Since min_singular_value(I + Q) >= 1, the min_singular_value of normalized X
         # is guaranteed to be >= 1 / ||G||_F.
         # We clamp it to prevent numerical edge cases (e.g. extremely large norms).
         lower_bound = (1.0 / g_norm).clamp(min=1e-5, max=0.9)
         upper_bound = 1
+
         for _ in range(steps):
             lb, ub = lower_bound, upper_bound
             lb_ub = lb * ub
@@ -133,9 +131,7 @@ class OFTRotationModule(nn.Module):
             eps_val = (K - L) / denom
             lower_bound = 1.0 - eps_val
             upper_bound = 1.0 + eps_val
-        if transposed:
-            X = X.mT
-        return X
+        return X.to(original_dtype)
 
     def _cayley_batch(
         self, Q: torch.Tensor, block_size: int, use_cayley_neumann: bool = True, num_neumann_terms: int = 5, oft_cans: bool = False,
@@ -170,7 +166,7 @@ class OFTRotationModule(nn.Module):
             )
             if oft_cans:
                 G = id_mat + Q_skew
-                R = self._cans_newton_schulz_iteration(G=G, steps=7)
+                R = self._cans_newton_schulz_iteration(G=G, steps=5)
             else:
                 R = torch.linalg.solve(id_mat + Q_skew, id_mat - Q_skew, left=False)
 
