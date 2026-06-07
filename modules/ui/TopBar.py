@@ -95,6 +95,7 @@ class TopBar:
                 ("Flux Dev.1", ModelType.FLUX_DEV_1),
                 ("Flux Fill Dev", ModelType.FLUX_FILL_DEV_1),
                 ("Flux 2 [Dev, Klein]", ModelType.FLUX_2),
+                ("Lens", ModelType.LENS),
                 ("Sana", ModelType.SANA),
                 ("Hunyuan Video", ModelType.HUNYUAN_VIDEO),
                 ("HiDream Full", ModelType.HI_DREAM_FULL),
@@ -112,37 +113,13 @@ class TopBar:
         if self.training_method:
             self.training_method.destroy()
 
-        values = []
-        #TODO simplify
-        if self.train_config.model_type.is_stable_diffusion():
-            values = [
-                ("Fine Tune", TrainingMethod.FINE_TUNE),
-                ("LoRA", TrainingMethod.LORA),
-                ("Embedding", TrainingMethod.EMBEDDING),
-                ("Fine Tune VAE", TrainingMethod.FINE_TUNE_VAE),
-            ]
-        elif self.train_config.model_type.is_stable_diffusion_3() \
-                or self.train_config.model_type.is_stable_diffusion_xl() \
-                or self.train_config.model_type.is_wuerstchen() \
-                or self.train_config.model_type.is_pixart() \
-                or self.train_config.model_type.is_flux_1() \
-                or self.train_config.model_type.is_sana() \
-                or self.train_config.model_type.is_hunyuan_video() \
-                or self.train_config.model_type.is_hi_dream() \
-                or self.train_config.model_type.is_chroma():
-            values = [
-                ("Fine Tune", TrainingMethod.FINE_TUNE),
-                ("LoRA", TrainingMethod.LORA),
-                ("Embedding", TrainingMethod.EMBEDDING),
-            ]
-        elif self.train_config.model_type.is_qwen() \
-             or self.train_config.model_type.is_z_image() \
-             or self.train_config.model_type.is_flux_2() \
-             or self.train_config.model_type.is_ernie():
-            values = [
-                ("Fine Tune", TrainingMethod.FINE_TUNE),
-                ("LoRA", TrainingMethod.LORA),
-            ]
+        labels = {
+            TrainingMethod.FINE_TUNE: "Fine Tune",
+            TrainingMethod.LORA: "LoRA",
+            TrainingMethod.EMBEDDING: "Embedding",
+            TrainingMethod.FINE_TUNE_VAE: "Fine Tune VAE",
+        }
+        values = [(labels[m], m) for m in self.train_config.model_type.supported_training_methods()]
 
         # training method
         self.training_method = components.options_kv(

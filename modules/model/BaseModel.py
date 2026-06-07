@@ -94,8 +94,11 @@ class BaseModel(metaclass=ABCMeta):
         self.autocast_context = nullcontext()
         self.train_dtype = DataType.FLOAT_32
 
+    #park the whole model on the temp device to free VRAM. Models with on-demand components
+    #(which cannot be parked, only discarded and rebuilt) override this to free those components
+    #instead of moving them.
     @abstractmethod
-    def to(self, device: torch.device):
+    def release(self):
         pass
 
     @abstractmethod

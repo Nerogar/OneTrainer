@@ -42,9 +42,8 @@ class BaseErnieSetup(
             model: ErnieModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_ernie_transformer(model.transformer, config)
+        if config.transformer.checkpointing_or_offloading_enabled():
+            model.transformer_offload_conductor = enable_checkpointing_for_ernie_transformer(model.transformer, config, config.transformer)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
@@ -165,7 +164,7 @@ class BaseErnieSetup(
         ).mean()
 
     def prepare_text_caching(self, model: ErnieModel, config: TrainConfig):
-        model.to(self.temp_device)
+        model.release()
         model.text_encoder_to(self.train_device)
         model.eval()
         torch_gc()

@@ -110,7 +110,11 @@ def create_data_loader(
         train_progress: TrainProgress | None = None,
         is_validation: bool = False
 ) -> BaseDataLoader | None:
-    if config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0 and config.dataloader_threads > 1:
+    # Layer offloading uses a non-thread-safe conductor. This check is too broad: it trips whenever any model
+    # part does layer offloading, even though only a component that is actually cached really runs in the
+    # dataloader worker threads.
+    # TODO: narrow this to the cached components only.
+    if config.dataloader_threads > 1 and any(part.offload_fraction > 0 for part in config.model_part_configs()):
         raise RuntimeError('layer offloading can not be activated if "dataloader_threads" > 1')
 
     if train_progress is None:
@@ -133,7 +137,8 @@ def create_optimizer(
     if optimizer_config.optimizer is None:
         return None
 
-    if config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0:
+    # a trained, layer-offloaded part has its params evicted during the back pass, so it needs fused_back_pass
+    if any(part.offload_fraction > 0 and part.train for part in config.model_part_configs()):
         if (not optimizer_config.optimizer.supports_fused_back_pass() or not optimizer_config.fused_back_pass) \
                 and config.training_method == TrainingMethod.FINE_TUNE:
             raise RuntimeError('layer offloading can only be used for fine tuning when using an optimizer that supports "fused_back_pass"')

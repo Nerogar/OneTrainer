@@ -49,12 +49,10 @@ class BaseChromaSetup(
             model: ChromaModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_chroma_transformer(model.transformer, config)
-            if model.text_encoder is not None:
-                model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_t5_encoder_layers(model.text_encoder, config)
+        if config.transformer.checkpointing_or_offloading_enabled():
+            model.transformer_offload_conductor = enable_checkpointing_for_chroma_transformer(model.transformer, config, config.transformer)
+        if model.text_encoder is not None and config.text_encoder.checkpointing_or_offloading_enabled():
+            model.text_encoder_offload_conductor = enable_checkpointing_for_t5_encoder_layers(model.text_encoder, config, config.text_encoder)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
@@ -279,7 +277,7 @@ class BaseChromaSetup(
 
 
     def prepare_text_caching(self, model: ChromaModel, config: TrainConfig):
-        model.to(self.temp_device)
+        model.release()
 
         if not config.train_text_encoder_or_embedding():
             model.text_encoder_to(self.train_device)

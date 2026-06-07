@@ -67,6 +67,7 @@ class ConvertModelUI(ctk.CTkToplevel):
             ("Flux Dev", ModelType.FLUX_DEV_1),
             ("Flux Fill Dev", ModelType.FLUX_FILL_DEV_1),
             ("Flux 2", ModelType.FLUX_2),
+            ("Lens", ModelType.LENS),
             ("Hunyuan Video", ModelType.HUNYUAN_VIDEO),
             ("Chroma1", ModelType.CHROMA_1), #TODO does this just work? HiDream is not here
             ("QwenImage", ModelType.QWEN), #TODO does this just work? HiDream is not here

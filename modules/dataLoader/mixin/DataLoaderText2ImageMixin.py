@@ -274,7 +274,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
     ):
         if before_cache_image_fun is None:
             def prepare_vae():
-                model.to(self.temp_device)
+                model.release()
                 model.vae_to(self.train_device)
                 model.eval()
                 torch_gc()
@@ -340,7 +340,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
 
         if before_cache_image_fun is None:
             def prepare_vae():
-                model.to(self.temp_device)
+                model.release()
                 model.vae_to(self.train_device)
                 model.eval()
                 torch_gc()

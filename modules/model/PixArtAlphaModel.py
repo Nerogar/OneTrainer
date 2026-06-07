@@ -42,6 +42,7 @@ class PixArtAlphaModelEmbedding:
 class PixArtAlphaModel(BaseModel):
     # base model data
     tokenizer: T5Tokenizer | None
+    orig_tokenizer: T5Tokenizer | None
     noise_scheduler: DDIMScheduler | None
     text_encoder: T5EncoderModel | None
     vae: AutoencoderKL | None
@@ -74,6 +75,7 @@ class PixArtAlphaModel(BaseModel):
         )
 
         self.tokenizer = None
+        self.orig_tokenizer = None
         self.noise_scheduler = None
         self.text_encoder = None
         self.vae = None
@@ -112,8 +114,7 @@ class PixArtAlphaModel(BaseModel):
         self.vae.to(device=device)
 
     def text_encoder_to(self, device: torch.device):
-        if self.text_encoder_offload_conductor is not None and \
-                self.text_encoder_offload_conductor.layer_offload_activated():
+        if self.text_encoder_offload_conductor is not None:
             self.text_encoder_offload_conductor.to(device)
         else:
             self.text_encoder.to(device=device)
@@ -122,8 +123,7 @@ class PixArtAlphaModel(BaseModel):
             self.text_encoder_lora.to(device)
 
     def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None and \
-                self.transformer_offload_conductor.layer_offload_activated():
+        if self.transformer_offload_conductor is not None:
             self.transformer_offload_conductor.to(device)
         else:
             self.transformer.to(device=device)
@@ -131,21 +131,22 @@ class PixArtAlphaModel(BaseModel):
         if self.transformer_lora is not None:
             self.transformer_lora.to(device)
 
-    def to(self, device: torch.device):
-        self.vae_to(device)
-        self.text_encoder_to(device)
-        self.transformer_to(device)
+    def release(self):
+        self.vae_to(self.train_config.temp_device)
+        self.text_encoder_to(self.train_config.temp_device)
+        self.transformer_to(self.train_config.temp_device)
 
     def eval(self):
         self.vae.eval()
         self.text_encoder.eval()
         self.transformer.eval()
 
-    def create_pipeline(self) -> DiffusionPipeline:
+    def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
+        tokenizer = self.orig_tokenizer if use_original_tokenizers else self.tokenizer
         match self.model_type:
             case ModelType.PIXART_ALPHA:
                 return PixArtAlphaPipeline(
-                    tokenizer=self.tokenizer,
+                    tokenizer=tokenizer,
                     text_encoder=self.text_encoder,
                     vae=self.vae,
                     transformer=self.transformer,
@@ -153,7 +154,7 @@ class PixArtAlphaModel(BaseModel):
                 )
             case ModelType.PIXART_SIGMA:
                 return PixArtSigmaPipeline(
-                    tokenizer=self.tokenizer,
+                    tokenizer=tokenizer,
                     text_encoder=self.text_encoder,
                     vae=self.vae,
                     transformer=self.transformer,

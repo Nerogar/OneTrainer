@@ -220,8 +220,7 @@ class HiDreamModel(BaseModel):
 
     def text_encoder_3_to(self, device: torch.device):
         if self.text_encoder_3 is not None:
-            if self.text_encoder_3_offload_conductor is not None and \
-                    self.text_encoder_3_offload_conductor.layer_offload_activated():
+            if self.text_encoder_3_offload_conductor is not None:
                 self.text_encoder_3_offload_conductor.to(device)
             else:
                 self.text_encoder_3.to(device=device)
@@ -231,8 +230,7 @@ class HiDreamModel(BaseModel):
 
     def text_encoder_4_to(self, device: torch.device):
         if self.text_encoder_4 is not None:
-            if self.text_encoder_4_offload_conductor is not None and \
-                    self.text_encoder_4_offload_conductor.layer_offload_activated():
+            if self.text_encoder_4_offload_conductor is not None:
                 self.text_encoder_4_offload_conductor.to(device)
             else:
                 self.text_encoder_4.to(device=device)
@@ -241,8 +239,7 @@ class HiDreamModel(BaseModel):
             self.text_encoder_4_lora.to(device)
 
     def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None and \
-                self.transformer_offload_conductor.layer_offload_activated():
+        if self.transformer_offload_conductor is not None:
             self.transformer_offload_conductor.to(device)
         else:
             self.transformer.to(device=device)
@@ -250,10 +247,10 @@ class HiDreamModel(BaseModel):
         if self.transformer_lora is not None:
             self.transformer_lora.to(device)
 
-    def to(self, device: torch.device):
-        self.vae_to(device)
-        self.text_encoder_to(device)
-        self.transformer_to(device)
+    def release(self):
+        self.vae_to(self.train_config.temp_device)
+        self.text_encoder_to(self.train_config.temp_device)
+        self.transformer_to(self.train_config.temp_device)
 
     def eval(self):
         self.vae.eval()
@@ -267,19 +264,19 @@ class HiDreamModel(BaseModel):
             self.text_encoder_4.eval()
         self.transformer.eval()
 
-    def create_pipeline(self, use_original_modules: bool) -> DiffusionPipeline:
+    def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
         return HiDreamImagePipeline(
             transformer=self.transformer,
             scheduler=self.noise_scheduler,
             vae=self.vae,
             text_encoder=self.text_encoder_1,
-            tokenizer=self.orig_tokenizer_1 if use_original_modules else self.tokenizer_1,
+            tokenizer=self.orig_tokenizer_1 if use_original_tokenizers else self.tokenizer_1,
             text_encoder_2=self.text_encoder_2,
-            tokenizer_2=self.orig_tokenizer_2 if use_original_modules else self.tokenizer_2,
+            tokenizer_2=self.orig_tokenizer_2 if use_original_tokenizers else self.tokenizer_2,
             text_encoder_3=self.text_encoder_3,
-            tokenizer_3=self.orig_tokenizer_3 if use_original_modules else self.tokenizer_3,
+            tokenizer_3=self.orig_tokenizer_3 if use_original_tokenizers else self.tokenizer_3,
             text_encoder_4=self.text_encoder_4,
-            tokenizer_4=self.orig_tokenizer_4 if use_original_modules else self.tokenizer_4,
+            tokenizer_4=self.orig_tokenizer_4 if use_original_tokenizers else self.tokenizer_4,
         )
 
     def add_text_encoder_1_embeddings_to_prompt(self, prompt: str) -> str:
