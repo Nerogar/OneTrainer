@@ -112,8 +112,9 @@ class OFTRotationModule(nn.Module):
         # Since min_singular_value(I + Q) >= 1, the min_singular_value of normalized X
         # is guaranteed to be >= 1 / ||G||_F.
         # We clamp it to prevent numerical edge cases (e.g. extremely large norms).
-        lower_bound = (1.0 / g_norm).clamp(min=1e-5, max=0.9)
-        upper_bound = 1
+        lower_bound = (1.0 / g_norm.detach()).clamp(min=1e-5, max=0.9)
+        one = torch.ones_like(lower_bound)
+        upper_bound = one
 
         for _ in range(steps):
             lb, ub = lower_bound, upper_bound
@@ -125,12 +126,15 @@ class OFTRotationModule(nn.Module):
             alpha = 6.0 / denom
             c1 = alpha * e_sq
             c3 = -alpha / 3.0
-            A = X @ X.mT
-            X = c1 * X + c3 * (A @ X)
+
+            A = torch.bmm(X, X.mT)
+            X = c1 * X + c3 * torch.bmm(A, X)
+
             # Dynamically update bounds for the next step
             eps_val = (K - L) / denom
-            lower_bound = 1.0 - eps_val
-            upper_bound = 1.0 + eps_val
+            lower_bound = one - eps_val
+            upper_bound = one + eps_val
+
         return X.to(original_dtype)
 
     def _cayley_batch(
