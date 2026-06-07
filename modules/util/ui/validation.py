@@ -130,8 +130,12 @@ def validate_path(
             return "Input path does not exist"
 
     if io_type == PathIOType.OUTPUT:
-        if not os.path.isdir(os.path.dirname(os.path.abspath(trimmed))):
-            return "Parent folder does not exist"
+        abs_path = os.path.abspath(trimmed)
+        output_dir = abs_path if output_is_dir else os.path.dirname(abs_path)
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+        except OSError as e:
+            return f"Could not create output folder: {e}"
         if not output_is_dir:
             return _check_overwrite(trimmed, is_dir=False, prevent=prevent_overwrites)
 
