@@ -12,6 +12,14 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE_VAE)
 class StableDiffusionFineTuneVaeSetup(
     BaseStableDiffusionSetup,
 ):
@@ -111,12 +119,3 @@ class StableDiffusionFineTuneVaeSetup(
             train_progress: TrainProgress
     ):
         pass
-
-factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneVaeSetup, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE_VAE)

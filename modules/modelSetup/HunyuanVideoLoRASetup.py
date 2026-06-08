@@ -16,6 +16,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.HUNYUAN_VIDEO, TrainingMethod.LORA)
 class HunyuanVideoLoRASetup(
     BaseHunyuanVideoSetup,
 ):
@@ -186,5 +187,3 @@ class HunyuanVideoLoRASetup(
                 model.embedding_wrapper_2.normalize_embeddings()
 
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, HunyuanVideoLoRASetup, ModelType.HUNYUAN_VIDEO, TrainingMethod.LORA)

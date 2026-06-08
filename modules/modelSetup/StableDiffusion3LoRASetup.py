@@ -14,6 +14,8 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_3, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_35, TrainingMethod.LORA)
 class StableDiffusion3LoRASetup(
     BaseStableDiffusion3Setup,
 ):
@@ -224,6 +226,3 @@ class StableDiffusion3LoRASetup(
             if model.embedding_wrapper_3 is not None:
                 model.embedding_wrapper_3.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, StableDiffusion3LoRASetup, ModelType.STABLE_DIFFUSION_3, TrainingMethod.LORA)
-factory.register(BaseModelSetup, StableDiffusion3LoRASetup, ModelType.STABLE_DIFFUSION_35, TrainingMethod.LORA)

@@ -19,6 +19,7 @@ import torch
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.HI_DREAM_FULL)
 class HiDreamSampler(BaseModelSampler):
     def __init__(
             self,
@@ -192,5 +193,3 @@ class HiDreamSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, HiDreamSampler, ModelType.HI_DREAM_FULL)
