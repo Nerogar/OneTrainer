@@ -105,7 +105,7 @@ class OFTRotationModule(nn.Module):
         Optimized for G = I + Q (where Q is skew-symmetric).
         """
         original_dtype = G.dtype
-        X = G.bfloat16()
+        X = G
 
         # Max row sum is guaranteed to be >= the maximum singular value of X.
         g_norm = X.abs().sum(dim=-1, keepdim=True).amax(dim=-2, keepdim=True).clamp_min(eps)
@@ -171,7 +171,10 @@ class OFTRotationModule(nn.Module):
                     R.add_(Q_power)
         elif oft_cans:
             G = self.id_mat + Q_skew
-            R = self._cans_newton_schulz_iteration(G=G, steps=5)
+            # Empirically, BF16 requires 5 steps to converge to ortho error ~1e-2 (its limit)
+            # While FP32 takes 7 steps to converge to ortho error ~1e-6
+            steps = 5 if G.dtype == torch.bfloat16 else 7
+            R = self._cans_newton_schulz_iteration(G=G, steps=steps)
         else:
             R = torch.linalg.solve(self.id_mat + Q_skew, self.id_mat - Q_skew, left=False)
 
