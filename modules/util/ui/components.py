@@ -8,7 +8,7 @@ from typing import Any, Literal
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions
-from modules.util.ui.ToolTip import ToolTip
+from modules.util.ui.ToolTip import InfoTooltip
 from modules.util.ui.UIState import UIState
 from modules.util.ui.validation import DEFAULT_MAX_UNDO, FieldValidator, PathValidator
 
@@ -38,7 +38,7 @@ def label(master, row, column, text, pad=PAD, tooltip=None, wide_tooltip=False, 
     component = ctk.CTkLabel(master, text=text, wraplength=wraplength)
     component.grid(row=row, column=column, padx=pad, pady=pad, sticky="nw")
     if tooltip:
-        ToolTip(component, tooltip, wide=wide_tooltip)
+        InfoTooltip(component, tooltip, wide_wrap=wide_tooltip)
     return component
 
 
@@ -57,6 +57,7 @@ def entry(
         validator_factory: Callable[..., FieldValidator] | None = None,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
+        allow_negative: bool = False,
 ):
     var = ui_state.get_var(var_name)
     trace_id = None
@@ -79,9 +80,31 @@ def entry(
             max_undo=max_undo or DEFAULT_MAX_UNDO,
             extra_validate=extra_validate,
             required=required,
+            allow_negative=allow_negative,
         )
     validator.attach()
     component._validator = validator  # type: ignore[attr-defined]
+
+    _disabled_fg = ("gray85", "gray17")
+    _disabled_text = ("gray30", "gray70")
+    _saved_colors: dict = {
+        "fg_color": component.cget("fg_color"),
+        "text_color": component.cget("text_color"),
+    }
+
+    def _set_disabled():
+        if str(component.cget("state")) != "disabled":
+            _saved_colors["fg_color"] = component.cget("fg_color")
+            _saved_colors["text_color"] = component.cget("text_color")
+        component.configure(state="disabled", fg_color=_disabled_fg, text_color=_disabled_text)
+
+    def _set_enabled():
+        fg = _saved_colors["fg_color"]
+        tc = _saved_colors["text_color"]
+        component.configure(state="normal", fg_color=fg, text_color=tc)
+
+    component.set_disabled = _set_disabled  # type: ignore[attr-defined]
+    component.set_enabled = _set_enabled  # type: ignore[attr-defined]
 
     original_destroy = component.destroy
 
@@ -103,7 +126,7 @@ def entry(
     component.destroy = new_destroy  # type: ignore[assignment]
 
     if tooltip:
-        ToolTip(component, tooltip, wide=wide_tooltip)
+        InfoTooltip(component, tooltip, wide_wrap=wide_tooltip)
 
     return component
 
@@ -131,7 +154,15 @@ def path_entry(
     frame.grid_columnconfigure(0, weight=1)
 
     def _path_validator_factory(comp, var, state, name, **kw):
-        return PathValidator(comp, var, state, name, io_type=io_type, **kw)
+        return PathValidator(
+            comp,
+            var,
+            state,
+            name,
+            io_type=io_type,
+            output_is_dir=(io_type == PathIOType.OUTPUT and mode == "dir"),
+            **kw,
+        )
 
     entry_component = entry(
         frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
@@ -141,7 +172,7 @@ def path_entry(
     )
 
     trace_ids = []
-    if io_type in (PathIOType.OUTPUT, PathIOType.MODEL):
+    if io_type == PathIOType.OUTPUT:
         validator = getattr(entry_component, '_validator', None)
         if validator is not None:
             for dep_var_name in ("prevent_overwrites", "output_model_format"):
@@ -150,7 +181,7 @@ def path_entry(
                     tid = dep_var.trace_add("write", lambda *_a: validator.revalidate())
                     trace_ids.append((dep_var, tid))
 
-    use_save_dialog = io_type in (PathIOType.OUTPUT, PathIOType.MODEL)
+    use_save_dialog = io_type == PathIOType.OUTPUT
 
     def __open_dialog():
         # Determine currently selected filename and/or directory
@@ -361,7 +392,7 @@ def button(master, row, column, text, command, tooltip=None, **kwargs):
     component = ctk.CTkButton(master, text=text, command=command, **kwargs)
     component.grid(row=row, column=column, padx=padx, pady=pady, sticky="new")
     if tooltip:
-        ToolTip(component, tooltip, x_position=25)
+        InfoTooltip(component, tooltip, y_offset=25)
     return component
 
 

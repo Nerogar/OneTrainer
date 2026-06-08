@@ -232,7 +232,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
                 self.toggle_muon_adam_button()
             elif type != 'bool':
                 components.entry(master, row, col + 1, self.optimizer_ui_state, key,
-                                 command=self.update_user_pref)
+                                 command=self.update_user_pref, allow_negative=True)
             else:
                 components.switch(master, row, col + 1, self.optimizer_ui_state, key,
                                   command=self.update_user_pref)

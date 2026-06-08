@@ -11,7 +11,7 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.TrainConfig import TrainConfig, prepare_run_name
 from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
 
@@ -32,6 +32,11 @@ class BaseTrainer(
         self.commands = commands
         self.train_device = torch.device(self.config.train_device)
         self.temp_device = torch.device(self.config.temp_device)
+        self.config.run_name = prepare_run_name(
+            self.config.training_method,
+            self.config.run_name_mode,
+            self.config.run_name,
+        )
 
     @abstractmethod
     def start(self):

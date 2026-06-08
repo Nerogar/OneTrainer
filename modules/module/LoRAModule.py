@@ -963,6 +963,15 @@ class LoRAModuleWrapper:
         if self.peft_type == PeftType.OFT_2:
             return
 
+        rank_key = next((k for k in state_dict if k.endswith(".lora_down.weight")), None)
+        if rank_key is not None:
+            checkpoint_rank = state_dict[rank_key].shape[0]
+        else:
+            rank_key = next((k for k in state_dict if k.endswith((".hada_w1_a", ".hada_w2_a"))), None)
+            checkpoint_rank = state_dict[rank_key].shape[1] if rank_key is not None else None
+
+        if checkpoint_rank is not None and checkpoint_rank != self.rank:
+            raise ValueError(f"Rank mismatch: checkpoint={checkpoint_rank}, config={self.rank}, please correct in the UI.")
         rank_keys = {
             PeftType.LORA: ".lora_down.weight",
             PeftType.LOHA: ".hada_w1_a",

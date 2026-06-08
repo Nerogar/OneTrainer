@@ -161,7 +161,7 @@ class LoraTab:
 
             components.label(master, 2, 0, "Decomposition Factor",
                              tooltip="Factor for Kronecker product decomposition. -1 for auto, which is recommended. Changing this drastically affects parameter count.")
-            components.entry(master, 2, 1, self.ui_state, "lokr_decompose_factor")
+            components.entry(master, 2, 1, self.ui_state, "lokr_decompose_factor", allow_negative=True)
 
             # alpha
             components.label(master, 3, 0, f"{name} alpha",

@@ -49,7 +49,7 @@
         }
     },
     "output_dtype": "BFLOAT_16",
-    "output_model_destination": "models/model",
+    "run_name": "model",
     "output_model_format": "SAFETENSORS",
     "resolution": "1024",
     "training_method": "FINE_TUNE",
