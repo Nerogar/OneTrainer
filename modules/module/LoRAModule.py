@@ -740,21 +740,22 @@ class DoRAOFTModule(OFTModule):
         # result = W_orig @ R^T @ x + bias
         result = super().forward(x, *args, **kwargs)
 
-        # Remove the original bias temporarily
+        # Apply Exponential DoRA Scale (exp(0) = Multiplies by 1.0 at step 0)
+        multiplier = torch.exp(self.dora_log_multiplier).to(result.dtype)
+        if isinstance(self.orig_module, nn.Conv2d):
+            multiplier = multiplier.view(1, -1, 1, 1)
+
         bias = self.orig_module.bias
         if bias is not None:
             bias_view = bias.view(1, -1, 1, 1) if isinstance(self.orig_module, nn.Conv2d) else bias
-            result = result - bias_view
 
-        # Apply Exponential DoRA Scale (exp(0) = Multiplies by 1.0 at step 0)
-        multiplier = torch.exp(self.dora_log_multiplier)
-        if isinstance(self.orig_module, nn.Conv2d):
-            multiplier = multiplier.view(1, -1, 1, 1)
-        result = result * multiplier.to(result.dtype)
-
-        # Re-add bias
-        if bias is not None:
-             result = result + bias_view
+            # This equivalent to (result - bias) * m + bias, but
+            # eliminates VRAM overhead by calculating the bias shift on the tiny bias tensor.
+            # y_{dora} = y * m + b * (1 - m)
+            bias_term = bias_view * (1.0 - multiplier)
+            result = result * multiplier + bias_term
+        else:
+            result = result * multiplier
 
         return result
 
