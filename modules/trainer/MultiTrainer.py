@@ -20,8 +20,8 @@ class MultiTrainer(BaseTrainer):
         super().__init__(config, callbacks, commands)
         if config.samples_to_tensorboard:
             print("Warning: If 'Samples To Tensorboard' is enabled, only one GPU is used for sampling!")
-        if not config.latent_caching:
-            print("Warning: Latent caching is disabled, but recommended for multi-GPU training!")
+        if not config.image_caching:
+            print("Warning: Image Caching is disabled, but it is recommended for multi-GPU training!")
 
     def start(self):
         os.environ.setdefault('MASTER_ADDR', 'localhost')

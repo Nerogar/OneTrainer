@@ -75,7 +75,7 @@ class WuerstchenEmbeddingSetup(
             model: WuerstchenModel,
             config: TrainConfig,
     ):
-        effnet_on_train_device = not config.latent_caching
+        effnet_on_train_device = not config.image_caching
 
         if model.model_type.is_wuerstchen_v2():
             model.decoder_text_encoder_to(self.temp_device)
