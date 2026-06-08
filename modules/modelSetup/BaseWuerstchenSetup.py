@@ -236,6 +236,11 @@ class BaseWuerstchenSetup(
                 self.__alpha_cumprod,
             )
 
+            if not deterministic:
+                scaled_noisy_latent_image, latent_noise = self._apply_ciop(
+                    scaled_noisy_latent_image, latent_noise, config, generator, rand
+                )
+
             text_embedding, pooled_text_text_embedding = model.encode_text(
                 train_device=self.train_device,
                 batch_size=batch['latent_image'].shape[0],

@@ -357,6 +357,15 @@ class BaseHiDreamSetup(
                 model.noise_scheduler.timesteps,
             )
 
+            if not deterministic:
+                scaled_noisy_latent_image, latent_noise = self._apply_ciop(
+                    scaled_noisy_latent_image,
+                    latent_noise,
+                    config,
+                    generator,
+                    rand
+                )
+
             if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
                 latent_input = torch.concat(
                     [scaled_noisy_latent_image, scaled_latent_conditioning_image, batch['latent_mask']], 1
