@@ -76,6 +76,9 @@ class StableDiffusionFineTuneSetup(
         elif config.force_epsilon_prediction:
             model.force_epsilon_prediction()
 
+        if config.diff2flow:
+            model.enable_diff2flow()
+
         self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
