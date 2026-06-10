@@ -108,7 +108,7 @@ class ConceptWindow(ctk.CTkToplevel):
         self.text_augmentation_tab = self.__text_augmentation_tab(tabview.add("text augmentation"))
         self.concept_stats_tab = self.__concept_stats_tab(tabview.add("statistics"))
 
-        #automatic concept scan
+        # automatic concept scan
         self.scan_thread = threading.Thread(target=self.__auto_update_concept_stats, daemon=True)
         self.scan_thread.start()
 
@@ -136,14 +136,18 @@ class ConceptWindow(ctk.CTkToplevel):
         components.switch(frame, 1, 1, self.ui_state, "enabled")
 
         # concept type
-        components.label(frame, 2, 0, "Concept Type",
-                         tooltip="STANDARD: Standard finetuning with the sample as training target\n"
-                                 "VALIDATION: Use concept for validation instead of training\n"
-                                 "PRIOR_PREDICTION: Use the sample to make a prediction using the model as it was before training. This prediction is then used as the training target "
-                                 "for the model in training. This can be used as regularisation and to preserve prior model knowledge while finetuning the model on other concepts. "
-                                 "Only implemented for LoRA.",
-                         wide_tooltip=True)
-        components.options(frame, 2, 1, [str(x) for x in list(ConceptType)], self.ui_state, "type")
+        components.label(
+            frame,
+            2,
+            0,
+            "Concept Type",
+            tooltip="STANDARD: Standard finetuning with the sample as the training target\n"
+            "VALIDATION: Use the concept for validation instead of training\n"
+            "PRIOR_PREDICTION: Use the model before training to make a target for regularization. Only implemented for LoRA.\n"
+            "For DPO preference pairs, set the chosen/rejected patterns below instead.",
+            wide_tooltip=True,
+        )
+        components.options_kv(frame, 2, 1, self._concept_type_options(), self.ui_state, "type")
 
         # path
         components.label(frame, 3, 0, "Path",
@@ -178,13 +182,23 @@ class ConceptWindow(ctk.CTkToplevel):
         components.switch(frame, 5, 1, self.ui_state, "include_subdirectories")
 
         # image variations
-        components.label(frame, 6, 0, "Image Variations",
-                         tooltip="The number of different image versions to cache if latent caching is enabled.")
+        components.label(
+            frame,
+            6,
+            0,
+            "Image Variations",
+            tooltip="The number of different image versions to cache if latent caching is enabled.",
+        )
         components.entry(frame, 6, 1, self.ui_state, "image_variations")
 
         # text variations
-        components.label(frame, 7, 0, "Text Variations",
-                         tooltip="The number of different text versions to cache if latent caching is enabled.")
+        components.label(
+            frame,
+            7,
+            0,
+            "Text Variations",
+            tooltip="The number of different text versions to cache if latent caching is enabled.",
+        )
         components.entry(frame, 7, 1, self.ui_state, "text_variations")
 
         # balancing
@@ -197,6 +211,21 @@ class ConceptWindow(ctk.CTkToplevel):
         components.label(frame, 9, 0, "Loss Weight",
                          tooltip="The loss multiplyer for this concept.")
         components.entry(frame, 9, 1, self.ui_state, "loss_weight")
+
+        # dpo patterns
+        components.label(frame, 10, 0, "DPO Chosen Pattern",
+                         tooltip="Turns this concept into a DPO pair concept. Filename pattern (relative to Path) "
+                                 "that selects the chosen images, e.g. 'chosen/{}'. The '{}' placeholder is the "
+                                 "shared file stem. Leave empty for a normal concept; both patterns must be set "
+                                 "together. Enable 'Include Subdirectories' when the pattern contains '/'.")
+        components.entry(frame, 10, 1, self.ui_state, "dpo_chosen_pattern")
+
+        components.label(frame, 11, 0, "DPO Rejected Pattern",
+                         tooltip="Pattern locating the rejected image for each chosen image, e.g. 'rejected/{}'. "
+                                 "'{}' is the stem matched by the chosen pattern; the file extension may differ. "
+                                 "The rejected image is loaded into the same sample as its chosen image, so both "
+                                 "share augmentations, bucketing and crops.")
+        components.entry(frame, 11, 1, self.ui_state, "dpo_rejected_pattern")
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -215,64 +244,74 @@ class ConceptWindow(ctk.CTkToplevel):
                          tooltip="Enable this augmentation with fixed values")
 
         # crop jitter
-        components.label(frame, 1, 0, "Crop Jitter",
-                         tooltip="Enables random cropping of samples")
+        components.label(frame, 1, 0, "Crop Jitter", tooltip="Enables random cropping of samples")
         components.switch(frame, 1, 1, self.image_ui_state, "enable_crop_jitter")
 
         # random flip
-        components.label(frame, 2, 0, "Random Flip",
-                         tooltip="Randomly flip the sample during training")
+        components.label(frame, 2, 0, "Random Flip", tooltip="Randomly flip the sample during training")
         components.switch(frame, 2, 1, self.image_ui_state, "enable_random_flip")
         components.switch(frame, 2, 2, self.image_ui_state, "enable_fixed_flip")
 
         # random rotation
-        components.label(frame, 3, 0, "Random Rotation",
-                         tooltip="Randomly rotates the sample during training")
+        components.label(frame, 3, 0, "Random Rotation", tooltip="Randomly rotates the sample during training")
         components.switch(frame, 3, 1, self.image_ui_state, "enable_random_rotate")
         components.switch(frame, 3, 2, self.image_ui_state, "enable_fixed_rotate")
         components.entry(frame, 3, 3, self.image_ui_state, "random_rotate_max_angle")
 
         # random brightness
-        components.label(frame, 4, 0, "Random Brightness",
-                         tooltip="Randomly adjusts the brightness of the sample during training")
+        components.label(
+            frame, 4, 0, "Random Brightness", tooltip="Randomly adjusts the brightness of the sample during training"
+        )
         components.switch(frame, 4, 1, self.image_ui_state, "enable_random_brightness")
         components.switch(frame, 4, 2, self.image_ui_state, "enable_fixed_brightness")
         components.entry(frame, 4, 3, self.image_ui_state, "random_brightness_max_strength")
 
         # random contrast
-        components.label(frame, 5, 0, "Random Contrast",
-                         tooltip="Randomly adjusts the contrast of the sample during training")
+        components.label(
+            frame, 5, 0, "Random Contrast", tooltip="Randomly adjusts the contrast of the sample during training"
+        )
         components.switch(frame, 5, 1, self.image_ui_state, "enable_random_contrast")
         components.switch(frame, 5, 2, self.image_ui_state, "enable_fixed_contrast")
         components.entry(frame, 5, 3, self.image_ui_state, "random_contrast_max_strength")
 
         # random saturation
-        components.label(frame, 6, 0, "Random Saturation",
-                         tooltip="Randomly adjusts the saturation of the sample during training")
+        components.label(
+            frame, 6, 0, "Random Saturation", tooltip="Randomly adjusts the saturation of the sample during training"
+        )
         components.switch(frame, 6, 1, self.image_ui_state, "enable_random_saturation")
         components.switch(frame, 6, 2, self.image_ui_state, "enable_fixed_saturation")
         components.entry(frame, 6, 3, self.image_ui_state, "random_saturation_max_strength")
 
         # random hue
-        components.label(frame, 7, 0, "Random Hue",
-                         tooltip="Randomly adjusts the hue of the sample during training")
+        components.label(frame, 7, 0, "Random Hue", tooltip="Randomly adjusts the hue of the sample during training")
         components.switch(frame, 7, 1, self.image_ui_state, "enable_random_hue")
         components.switch(frame, 7, 2, self.image_ui_state, "enable_fixed_hue")
         components.entry(frame, 7, 3, self.image_ui_state, "random_hue_max_strength")
 
         # random circular mask shrink
-        components.label(frame, 8, 0, "Circular Mask Generation",
-                         tooltip="Automatically create circular masks for masked training")
+        components.label(
+            frame, 8, 0, "Circular Mask Generation", tooltip="Automatically create circular masks for masked training"
+        )
         components.switch(frame, 8, 1, self.image_ui_state, "enable_random_circular_mask_shrink")
 
         # random rotate and crop
-        components.label(frame, 9, 0, "Random Rotate and Crop",
-                         tooltip="Randomly rotate the training samples and crop to the masked region")
+        components.label(
+            frame,
+            9,
+            0,
+            "Random Rotate and Crop",
+            tooltip="Randomly rotate the training samples and crop to the masked region",
+        )
         components.switch(frame, 9, 1, self.image_ui_state, "enable_random_mask_rotate_crop")
 
         # circular mask generation
-        components.label(frame, 10, 0, "Resolution Override",
-                         tooltip="Override the resolution for this concept. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format <width>x<height>")
+        components.label(
+            frame,
+            10,
+            0,
+            "Resolution Override",
+            tooltip="Override the resolution for this concept. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format <width>x<height>",
+        )
         components.switch(frame, 10, 2, self.image_ui_state, "enable_resolution_override")
         components.entry(frame, 10, 3, self.image_ui_state, "resolution_override")
 
@@ -318,64 +357,119 @@ class ConceptWindow(ctk.CTkToplevel):
         frame.grid_columnconfigure(3, weight=1)
 
         # tag shuffling
-        components.label(frame, 0, 0, "Tag Shuffling",
-                         tooltip="Enables tag shuffling")
+        components.label(frame, 0, 0, "Tag Shuffling", tooltip="Enables tag shuffling")
         components.switch(frame, 0, 1, self.text_ui_state, "enable_tag_shuffling")
 
         # keep tag count
-        components.label(frame, 1, 0, "Tag Delimiter",
-                         tooltip="The delimiter between tags")
+        components.label(frame, 1, 0, "Tag Delimiter", tooltip="The delimiter between tags")
         components.entry(frame, 1, 1, self.text_ui_state, "tag_delimiter")
 
         # keep tag count
-        components.label(frame, 2, 0, "Keep Tag Count",
-                         tooltip="The number of tags at the start of the caption that are not shuffled or dropped")
+        components.label(
+            frame,
+            2,
+            0,
+            "Keep Tag Count",
+            tooltip="The number of tags at the start of the caption that are not shuffled or dropped",
+        )
         components.entry(frame, 2, 1, self.text_ui_state, "keep_tags_count")
 
         # tag dropout
-        components.label(frame, 3, 0, "Tag Dropout",
-                         tooltip="Enables random dropout for tags in the captions.")
+        components.label(frame, 3, 0, "Tag Dropout", tooltip="Enables random dropout for tags in the captions.")
         components.switch(frame, 3, 1, self.text_ui_state, "tag_dropout_enable")
-        components.label(frame, 4, 0, "Dropout Mode",
-                         tooltip="Method used to drop captions. 'Full' will drop the entire caption past the 'kept' tags with a certain probability, 'Random' will drop individual tags with the set probability, and 'Random Weighted' will linearly increase the probability of dropping tags, more likely to preseve tags near the front with full probability to drop at the end.")
-        components.options_kv(frame, 4, 1, [
-            ("Full", 'FULL'),
-            ("Random", 'RANDOM'),
-            ("Random Weighted", 'RANDOM WEIGHTED'),
-        ], self.text_ui_state, "tag_dropout_mode", None)
-        components.label(frame, 4, 2, "Probability",
-                         tooltip="Probability to drop tags, from 0 to 1.")
+        components.label(
+            frame,
+            4,
+            0,
+            "Dropout Mode",
+            tooltip="Method used to drop captions. 'Full' will drop the entire caption past the 'kept' tags with a certain probability, 'Random' will drop individual tags with the set probability, and 'Random Weighted' will linearly increase the probability of dropping tags, more likely to preseve tags near the front with full probability to drop at the end.",
+        )
+        components.options_kv(
+            frame,
+            4,
+            1,
+            [
+                ("Full", "FULL"),
+                ("Random", "RANDOM"),
+                ("Random Weighted", "RANDOM WEIGHTED"),
+            ],
+            self.text_ui_state,
+            "tag_dropout_mode",
+            None,
+        )
+        components.label(frame, 4, 2, "Probability", tooltip="Probability to drop tags, from 0 to 1.")
         components.entry(frame, 4, 3, self.text_ui_state, "tag_dropout_probability")
 
-        components.label(frame, 5, 0, "Special Dropout Tags",
-                         tooltip="List of tags which will be whitelisted/blacklisted by dropout. 'Whitelist' tags will never be dropped but all others may be, 'Blacklist' tags may be dropped but all others will never be, 'None' may drop any tags. Can specify either a delimiter-separated list in the field, or a file path to a .txt or .csv file with entries separated by newlines.")
-        components.options_kv(frame, 5, 1, [
-            ("None", 'NONE'),
-            ("Blacklist", 'BLACKLIST'),
-            ("Whitelist", 'WHITELIST'),
-        ], self.text_ui_state, "tag_dropout_special_tags_mode", None)
+        components.label(
+            frame,
+            5,
+            0,
+            "Special Dropout Tags",
+            tooltip="List of tags which will be whitelisted/blacklisted by dropout. 'Whitelist' tags will never be dropped but all others may be, 'Blacklist' tags may be dropped but all others will never be, 'None' may drop any tags. Can specify either a delimiter-separated list in the field, or a file path to a .txt or .csv file with entries separated by newlines.",
+        )
+        components.options_kv(
+            frame,
+            5,
+            1,
+            [
+                ("None", "NONE"),
+                ("Blacklist", "BLACKLIST"),
+                ("Whitelist", "WHITELIST"),
+            ],
+            self.text_ui_state,
+            "tag_dropout_special_tags_mode",
+            None,
+        )
         components.entry(frame, 5, 2, self.text_ui_state, "tag_dropout_special_tags")
-        components.label(frame, 6, 0, "Special Tags Regex",
-                         tooltip="Interpret special tags with regex, such as 'photo.*' to match 'photo, photograph, photon' but not 'telephoto'. Includes exception for '/(' and '/)' syntax found in many booru/e6 tags.")
+        components.label(
+            frame,
+            6,
+            0,
+            "Special Tags Regex",
+            tooltip="Interpret special tags with regex, such as 'photo.*' to match 'photo, photograph, photon' but not 'telephoto'. Includes exception for '/(' and '/)' syntax found in many booru/e6 tags.",
+        )
         components.switch(frame, 6, 1, self.text_ui_state, "tag_dropout_special_tags_regex")
 
-        #capitalization randomization
-        components.label(frame, 7, 0, "Randomize Capitalization",
-                         tooltip="Enables randomization of capitalization for tags in the caption.")
+        # capitalization randomization
+        components.label(
+            frame,
+            7,
+            0,
+            "Randomize Capitalization",
+            tooltip="Enables randomization of capitalization for tags in the caption.",
+        )
         components.switch(frame, 7, 1, self.text_ui_state, "caps_randomize_enable")
-        components.label(frame, 7, 2, "Force Lowercase",
-                         tooltip="If enabled, converts the caption to lowercase before any further processing.")
+        components.label(
+            frame,
+            7,
+            2,
+            "Force Lowercase",
+            tooltip="If enabled, converts the caption to lowercase before any further processing.",
+        )
         components.switch(frame, 7, 3, self.text_ui_state, "caps_randomize_lowercase")
 
-        components.label(frame, 8, 0, "Captialization Mode",
-                         tooltip="Comma-separated list of types of capitalization randomization to perform. 'capslock' for ALL CAPS, 'title' for First Letter Of Every Word, 'first' for First word only, 'random' for rAndOMiZeD lEtTERs.")
+        components.label(
+            frame,
+            8,
+            0,
+            "Captialization Mode",
+            tooltip="Comma-separated list of types of capitalization randomization to perform. 'capslock' for ALL CAPS, 'title' for First Letter Of Every Word, 'first' for First word only, 'random' for rAndOMiZeD lEtTERs.",
+        )
         components.entry(frame, 8, 1, self.text_ui_state, "caps_randomize_mode")
-        components.label(frame, 8, 2, "Probability",
-                         tooltip="Probability to randomize capitialization of each tag, from 0 to 1.")
+        components.label(
+            frame, 8, 2, "Probability", tooltip="Probability to randomize capitialization of each tag, from 0 to 1."
+        )
         components.entry(frame, 8, 3, self.text_ui_state, "caps_randomize_probability")
 
         frame.pack(fill="both", expand=1)
         return frame
+
+    def _concept_type_options(self):
+        return [
+            ("Standard", ConceptType.STANDARD),
+            ("Validation", ConceptType.VALIDATION),
+            ("Prior Prediction", ConceptType.PRIOR_PREDICTION),
+        ]
 
     def __concept_stats_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")

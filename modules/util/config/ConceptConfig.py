@@ -137,6 +137,8 @@ class ConceptConfig(BaseConfig):
     repeats: float
     loss_weight: float
     concept_stats: dict
+    dpo_chosen_pattern: str
+    dpo_rejected_pattern: str
 
     image: ConceptImageConfig
     text: ConceptTextConfig
@@ -144,10 +146,11 @@ class ConceptConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=2,
+            config_version=3,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
+                2: self.__migration_2,
             }
         )
 
@@ -171,11 +174,51 @@ class ConceptConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_2(self, data: dict) -> dict:
+        # The DPO_* concept types were replaced by chosen/rejected patterns on a
+        # single concept. Chosen concepts using the Pair Tool's folder layout
+        # (<root>/chosen[/train|/val]) migrate to a pattern concept on <root>;
+        # everything else is disabled with a marker so it fails loudly instead
+        # of silently training rejected images as positives.
+        migrated_data = dict(data)
+        concept_type = str(data.get('type', ''))
+        if not concept_type.startswith('DPO_'):
+            return migrated_data
+
+        is_val = concept_type.endswith('_VAL')
+        migrated_data['type'] = ConceptType.VALIDATION.value if is_val else ConceptType.STANDARD.value
+
+        if concept_type.startswith('DPO_REJECTED'):
+            # The chosen-side concept of the pair covers this data now.
+            migrated_data['enabled'] = False
+            migrated_data['name'] = '[migrated DPO rejected - safe to delete] ' + str(data.get('name', ''))
+            return migrated_data
+
+        path = str(data.get('path', '')).replace('\\', '/').rstrip('/')
+        segments = path.split('/')
+        tail = []
+        if segments and segments[-1] in ('train', 'val'):
+            tail.insert(0, segments.pop())
+        if segments and segments[-1] == 'chosen':
+            tail.insert(0, segments.pop())
+            migrated_data['path'] = '/'.join(segments)
+            migrated_data['include_subdirectories'] = True
+            migrated_data['dpo_chosen_pattern'] = '/'.join([*tail, '{}'])
+            migrated_data['dpo_rejected_pattern'] = '/'.join(['rejected', *tail[1:], '{}'])
+        else:
+            migrated_data['enabled'] = False
+            migrated_data['name'] = '[needs DPO patterns] ' + str(data.get('name', ''))
+
+        return migrated_data
+
     def to_dict(self):
         as_dict = super().to_dict()
         as_dict['image'] = self.image.to_dict()
         as_dict['text'] = self.text.to_dict()
         return as_dict
+
+    def is_dpo(self) -> bool:
+        return bool(self.dpo_chosen_pattern) and bool(self.dpo_rejected_pattern)
 
     @staticmethod
     def default_values():
@@ -196,5 +239,7 @@ class ConceptConfig(BaseConfig):
         data.append(("balancing_strategy", BalancingStrategy.REPEATS, BalancingStrategy, False))
         data.append(("loss_weight", 1.0, float, False))
         data.append(("concept_stats", {}, dict, False))
+        data.append(("dpo_chosen_pattern", "", str, False))
+        data.append(("dpo_rejected_pattern", "", str, False))
 
         return ConceptConfig(data)

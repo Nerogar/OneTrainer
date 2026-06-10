@@ -36,6 +36,7 @@ class BaseDataLoader(
             config = copy.copy(config)
             config.batch_size = 1
             config.multi_gpu = False
+            config.rlhf_enabled = config.rlhf_dpo_validation and config.rlhf_enabled
 
         self.__ds = self._create_dataset(
             config=config,

@@ -100,7 +100,13 @@ class HunyuanVideoBaseDataLoader(
             text_caching=not config.train_text_encoder_or_embedding() or not config.train_text_encoder_2_or_embedding(),
         )
 
-    def _output_modules(self, config: TrainConfig, model: HunyuanVideoModel, model_setup: BaseHunyuanVideoSetup):
+    def _output_modules(
+        self,
+        config: TrainConfig,
+        model: HunyuanVideoModel,
+        model_setup: BaseHunyuanVideoSetup,
+        is_validation: bool = False,
+    ):
         output_names = [
             'image_path', 'latent_image',
             'prompt_1', 'prompt_2',
@@ -129,6 +135,7 @@ class HunyuanVideoBaseDataLoader(
             vae=model.vae,
             autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
+            is_validation=is_validation,
         )
 
     def _debug_modules(self, config: TrainConfig, model: HunyuanVideoModel):

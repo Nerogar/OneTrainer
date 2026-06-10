@@ -12,6 +12,8 @@ from modules.util.config.SecretsConfig import SecretsConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
+from modules.util.enum.DPOObjective import DPOObjective
+from modules.util.enum.DPORefMode import DPORefMode
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
 from modules.util.enum.GradientReducePrecision import GradientReducePrecision
@@ -23,6 +25,7 @@ from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType, PeftType
 from modules.util.enum.Optimizer import Optimizer
+from modules.util.enum.RLHFMode import RLHFMode
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -518,6 +521,12 @@ class TrainConfig(BaseConfig):
     lora_weight_dtype: DataType
     bundle_additional_embeddings: bool
 
+    # transfer learning
+    transfer_step1: bool
+    transfer_step2: bool
+    transfer_guidance: float
+    transfer_train_lora: bool
+
     # oft
     oft_block_size: int
     oft_block_share: bool
@@ -532,6 +541,23 @@ class TrainConfig(BaseConfig):
     lokr_dora_on_output: bool
     lokr_full_matrix: bool
     lokr_vec_trick: bool
+
+    # dpo
+    rlhf_mode: RLHFMode
+    rlhf_enabled: bool
+    rlhf_dpo_beta: float
+    rlhf_dpo_label_smoothing: float
+    rlhf_dpo_objective: DPOObjective
+    rlhf_dpo_ipo_tau: float
+    rlhf_dpo_adaptive_beta: bool
+    rlhf_dpo_timestep_margin_logging: bool
+    rlhf_dpo_ref_mode: DPORefMode
+    rlhf_supervised_mix: float
+    rlhf_dpo_validation: bool
+    rlhf_dpo_validation_percentage: float
+    rlhf_dpo_patience_enabled: bool
+    rlhf_dpo_patience_value: int
+    rlhf_dpo_save_best: bool
 
     # optimizer
     optimizer: TrainOptimizerConfig
@@ -569,7 +595,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=10,
+            config_version=15,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -581,6 +607,13 @@ class TrainConfig(BaseConfig):
                 7: self.__migration_7,
                 8: self.__migration_8,
                 9: self.__migration_9,
+                10: self.__migration_10,
+                11: self.__migration_11,
+                12: self.__migration_12,
+                13: self.__migration_13,
+                14: self.__migration_14,
+                15: self.__migration_15,
+                16: self.__migration_16,
             }
         )
 
@@ -799,6 +832,59 @@ class TrainConfig(BaseConfig):
         migrated_data.pop("weight_dtype")
 
         return migrated_data
+
+    def __migration_10(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        migrated_data.setdefault("rlhf_enabled", False)
+        migrated_data.setdefault("rlhf_dpo_beta", 300.0)
+        migrated_data.setdefault("rlhf_dpo_label_smoothing", 0.0)
+        migrated_data.setdefault("rlhf_dpo_ref_mode", "NEW_ADAPTER")
+        migrated_data.setdefault("rlhf_supervised_mix", 0.0)
+        return migrated_data
+
+    def __migration_11(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        migrated_data.setdefault("rlhf_dpo_shared_noise", True)
+        return migrated_data
+
+    def __migration_12(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        migrated_data.setdefault("rlhf_mode", "DPO")
+        migrated_data.setdefault("rlhf_dpo_validation", False)
+        migrated_data.setdefault("rlhf_dpo_validation_percentage", 10.0)
+        migrated_data.setdefault("rlhf_dpo_patience_enabled", False)
+        migrated_data.setdefault("rlhf_dpo_patience_value", 5)
+        migrated_data.setdefault("rlhf_dpo_patience_mode", "EITHER")
+        return migrated_data
+
+    def __migration_13(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        migrated_data.setdefault("rlhf_dpo_execution_mode", "SEQUENTIAL")
+        return migrated_data
+
+    def __migration_14(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        migrated_data.setdefault("transfer_step1", False)
+        migrated_data.setdefault("transfer_step2", False)
+        migrated_data.setdefault("transfer_guidance", 3.0)
+        migrated_data.setdefault("transfer_train_lora", False)
+        return migrated_data
+
+    def __migration_15(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        migrated_data.setdefault("rlhf_dpo_save_best", True)
+        return migrated_data
+
+    def __migration_16(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        migrated_data.setdefault("rlhf_dpo_objective", "SIGMOID")
+        migrated_data.setdefault("rlhf_dpo_ipo_tau", 1000.0)
+        migrated_data.setdefault("rlhf_dpo_adaptive_beta", False)
+        migrated_data.setdefault("rlhf_dpo_timestep_margin_logging", False)
+        return migrated_data
+
+    def effective_dpo_ref_mode(self) -> DPORefMode:
+        return DPORefMode.EXISTING_ADAPTER if self.lora_model_name else DPORefMode.NEW_ADAPTER
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
@@ -1157,6 +1243,12 @@ class TrainConfig(BaseConfig):
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("bundle_additional_embeddings", True, bool, False))
 
+        # transfer learning
+        data.append(("transfer_step1", False, bool, False))
+        data.append(("transfer_step2", False, bool, False))
+        data.append(("transfer_guidance", 3.0, float, False))
+        data.append(("transfer_train_lora", False, bool, False))
+
         # oft
         data.append(("oft_block_size", 32, int, False))
         data.append(("oft_block_share", False, bool, False))
@@ -1171,6 +1263,23 @@ class TrainConfig(BaseConfig):
         data.append(("lokr_dora_on_output", True, bool, False))
         data.append(("lokr_full_matrix", False, bool, False))
         data.append(("lokr_vec_trick", True, bool, False))
+
+        # dpo
+        data.append(("rlhf_mode", RLHFMode.DPO, RLHFMode, False))
+        data.append(("rlhf_enabled", False, bool, False))
+        data.append(("rlhf_dpo_beta", 300.0, float, False))
+        data.append(("rlhf_dpo_label_smoothing", 0.0, float, False))
+        data.append(("rlhf_dpo_objective", DPOObjective.SIGMOID, DPOObjective, False))
+        data.append(("rlhf_dpo_ipo_tau", 1000.0, float, False))
+        data.append(("rlhf_dpo_adaptive_beta", False, bool, False))
+        data.append(("rlhf_dpo_timestep_margin_logging", False, bool, False))
+        data.append(("rlhf_dpo_ref_mode", DPORefMode.NEW_ADAPTER, DPORefMode, False))
+        data.append(("rlhf_supervised_mix", 0.0, float, False))
+        data.append(("rlhf_dpo_validation", False, bool, False))
+        data.append(("rlhf_dpo_validation_percentage", 10.0, float, False))
+        data.append(("rlhf_dpo_patience_enabled", False, bool, False))
+        data.append(("rlhf_dpo_patience_value", 5, int, False))
+        data.append(("rlhf_dpo_save_best", True, bool, False))
 
         # optimizer
         data.append(("optimizer", TrainOptimizerConfig.default_values(), TrainOptimizerConfig, False))
