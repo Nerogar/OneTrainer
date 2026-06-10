@@ -22,7 +22,6 @@ from transformers import Qwen2Tokenizer, Qwen3ForCausalLM
 
 PROMPT_MAX_LENGTH = 512
 
-
 def format_input(text: str):
     return [
         {"role": "user", "content": text},
@@ -51,8 +50,8 @@ class ZImageModel(BaseModel):
     lora_state_dict: dict | None
 
     def __init__(
-        self,
-        model_type: ModelType,
+            self,
+            model_type: ModelType,
     ):
         super().__init__(
             model_type=model_type,
@@ -66,7 +65,7 @@ class ZImageModel(BaseModel):
 
         self.text_encoder_autocast_context = nullcontext()
 
-        self.text_encoder_train_dtype = DataType.FLOAT_32  # TODO
+        self.text_encoder_train_dtype = DataType.FLOAT_32 #TODO
 
         self.text_encoder_offload_conductor = None
         self.transformer_offload_conductor = None
@@ -75,32 +74,24 @@ class ZImageModel(BaseModel):
         self.lora_state_dict = None
 
     def adapters(self) -> list[LoRAModuleWrapper]:
-        return [
-            a
-            for a in [
-                self.transformer_lora,
-            ]
-            if a is not None
-        ]
+        return [a for a in [
+            self.transformer_lora,
+        ] if a is not None]
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
 
-    def text_encoder_to(self, device: torch.device):  # TODO share more code between models
+    def text_encoder_to(self, device: torch.device): #TODO share more code between models
         if self.text_encoder is not None:
-            if (
-                self.text_encoder_offload_conductor is not None
-                and self.text_encoder_offload_conductor.layer_offload_activated()
-            ):
+            if self.text_encoder_offload_conductor is not None and \
+                    self.text_encoder_offload_conductor.layer_offload_activated():
                 self.text_encoder_offload_conductor.to(device)
             else:
                 self.text_encoder.to(device=device)
 
     def transformer_to(self, device: torch.device):
-        if (
-            self.transformer_offload_conductor is not None
-            and self.transformer_offload_conductor.layer_offload_activated()
-        ):
+        if self.transformer_offload_conductor is not None and \
+                self.transformer_offload_conductor.layer_offload_activated():
             self.transformer_offload_conductor.to(device)
         else:
             self.transformer.to(device=device)
@@ -129,15 +120,15 @@ class ZImageModel(BaseModel):
         )
 
     def encode_text(
-        self,
-        train_device: torch.device,
-        batch_size: int = 1,
-        rand: Random | None = None,
-        text: str | list[str] = None,
-        tokens: Tensor = None,
-        tokens_mask: Tensor = None,
-        text_encoder_dropout_probability: float | None = None,
-        text_encoder_output: Tensor = None,
+            self,
+            train_device: torch.device,
+            batch_size: int = 1,
+            rand: Random | None = None,
+            text: str | list[str] = None,
+            tokens: Tensor = None,
+            tokens_mask: Tensor = None,
+            text_encoder_dropout_probability: float | None = None,
+            text_encoder_output: Tensor = None,
     ) -> tuple[Tensor, Tensor]:
         if tokens is None and text is not None:
             if isinstance(text, str):
@@ -154,7 +145,11 @@ class ZImageModel(BaseModel):
                 text[i] = prompt_item
 
             tokenizer_output = self.tokenizer(
-                text, max_length=PROMPT_MAX_LENGTH, padding="max_length", truncation=True, return_tensors="pt"
+                text,
+                max_length=PROMPT_MAX_LENGTH,
+                padding='max_length',
+                truncation=True,
+                return_tensors="pt"
             )
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
             tokens_mask = tokenizer_output.attention_mask.to(self.text_encoder.device)
@@ -170,7 +165,7 @@ class ZImageModel(BaseModel):
                 text_encoder_output = text_encoder_output.hidden_states[-2]
 
         if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
-            raise NotImplementedError  # https://github.com/Nerogar/OneTrainer/issues/957
+            raise NotImplementedError #https://github.com/Nerogar/OneTrainer/issues/957
 
         embeddings_list = []
         bool_attention_mask = tokens_mask.bool()
@@ -184,7 +179,7 @@ class ZImageModel(BaseModel):
         return latents / self.vae.config.scaling_factor + self.vae.config.shift_factor
 
     def calculate_timestep_shift(self, latent_width: int, latent_height: int):
-        # these values are not defined in the scheduler config of Z-Image. They are therefore taken from the default of FlowMatchEulerDiscreteScheduler - which are Flux settings
+        #these values are not defined in the scheduler config of Z-Image. They are therefore taken from the default of FlowMatchEulerDiscreteScheduler - which are Flux settings
         base_seq_len = self.noise_scheduler.config.base_image_seq_len
         max_seq_len = self.noise_scheduler.config.max_image_seq_len
         base_shift = self.noise_scheduler.config.base_shift

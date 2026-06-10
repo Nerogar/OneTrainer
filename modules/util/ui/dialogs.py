@@ -5,15 +5,14 @@ import customtkinter as ctk
 
 class StringInputDialog(ctk.CTkToplevel):
     def __init__(
-        self,
-        parent,
-        title: str,
-        question: str,
-        callback: Callable[[str], None],
-        default_value: str = None,
-        validate_callback: Callable[[str], bool] = None,
-        *args,
-        **kwargs,
+            self,
+            parent,
+            title: str,
+            question: str,
+            callback: Callable[[str], None],
+            default_value: str = None,
+            validate_callback: Callable[[str], bool] = None,
+            *args, **kwargs
     ):
         super().__init__(parent, *args, **kwargs)
         self.parent = parent

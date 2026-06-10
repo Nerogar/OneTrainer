@@ -21,11 +21,11 @@ from tqdm import tqdm
 
 class ZImageSampler(BaseModelSampler):
     def __init__(
-        self,
-        train_device: torch.device,
-        temp_device: torch.device,
-        model: ZImageModel,
-        model_type: ModelType,
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            model: ZImageModel,
+            model_type: ModelType,
     ):
         super().__init__(train_device, temp_device)
 
@@ -35,17 +35,17 @@ class ZImageSampler(BaseModelSampler):
 
     @torch.no_grad()
     def __sample_base(
-        self,
-        prompt: str,
-        negative_prompt: str,
-        height: int,
-        width: int,
-        seed: int,
-        random_seed: bool,
-        diffusion_steps: int,
-        cfg_scale: float,
-        noise_scheduler: NoiseScheduler,
-        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+            self,
+            prompt: str,
+            negative_prompt: str,
+            height: int,
+            width: int,
+            seed: int,
+            random_seed: bool,
+            diffusion_steps: int,
+            cfg_scale: float,
+            noise_scheduler: NoiseScheduler,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
@@ -61,7 +61,7 @@ class ZImageSampler(BaseModelSampler):
 
             vae_scale_factor = 8
             num_latent_channels = transformer.in_channels
-            # patch_size = 2
+            #patch_size = 2
 
             # prepare prompt
             self.model.text_encoder_to(self.train_device)
@@ -89,7 +89,7 @@ class ZImageSampler(BaseModelSampler):
             timesteps = noise_scheduler.timesteps
 
             # denoising loop
-            extra_step_kwargs = {}  # TODO remove
+            extra_step_kwargs = {} #TODO remove
             if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
                 extra_step_kwargs["generator"] = generator
 
@@ -99,20 +99,21 @@ class ZImageSampler(BaseModelSampler):
                 latent_model_input = torch.cat([latent_model_input] * batch_size)
                 latent_model_input_list = list(latent_model_input.unbind(dim=0))
                 timestep_model_input = timestep.unsqueeze(0)
-                assert timestep_model_input.ndim == 1
+                assert timestep_model_input.ndim ==  1
                 output_list = transformer(
-                    latent_model_input_list, (1000 - timestep_model_input) / 1000, prompt_embedding, return_dict=True
+                    latent_model_input_list,
+                    (1000 - timestep_model_input) / 1000,
+                    prompt_embedding,
+                    return_dict=True
                 ).sample
 
-                noise_pred = -torch.stack(output_list, dim=0).squeeze(dim=2)
+                noise_pred = - torch.stack(output_list, dim=0).squeeze(dim=2)
 
                 if cfg_scale > 1.0:
                     noise_pred_positive, noise_pred_negative = noise_pred.chunk(2)
                     noise_pred = noise_pred_negative + cfg_scale * (noise_pred_positive - noise_pred_negative)
 
-                latent_image = noise_scheduler.step(
-                    noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs
-                )[0]
+                latent_image = noise_scheduler.step(noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs)[0]
 
                 on_update_progress(i + 1, len(timesteps))
 
@@ -123,7 +124,7 @@ class ZImageSampler(BaseModelSampler):
             latents = self.model.unscale_latents(latent_image)
             image = vae.decode(latents, return_dict=False)[0]
 
-            image = image_processor.postprocess(image, output_type="pil")
+            image = image_processor.postprocess(image, output_type='pil')
 
             self.model.vae_to(self.temp_device)
             torch_gc()
@@ -134,14 +135,14 @@ class ZImageSampler(BaseModelSampler):
             )
 
     def sample(
-        self,
-        sample_config: SampleConfig,
-        destination: str,
-        image_format: ImageFormat | None = None,
-        video_format: VideoFormat | None = None,
-        audio_format: AudioFormat | None = None,
-        on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
-        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+            self,
+            sample_config: SampleConfig,
+            destination: str,
+            image_format: ImageFormat | None = None,
+            video_format: VideoFormat | None = None,
+            audio_format: AudioFormat | None = None,
+            on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         sampler_output = self.__sample_base(
             prompt=sample_config.prompt,
@@ -157,14 +158,10 @@ class ZImageSampler(BaseModelSampler):
         )
 
         self.save_sampler_output(
-            sampler_output,
-            destination,
-            image_format,
-            video_format,
-            audio_format,
+            sampler_output, destination,
+            image_format, video_format, audio_format,
         )
 
         on_sample(sampler_output)
-
 
 factory.register(BaseModelSampler, ZImageSampler, ModelType.Z_IMAGE)

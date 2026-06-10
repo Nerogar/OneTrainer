@@ -139,7 +139,6 @@ def validate_path(
 
     return None
 
-
 DEFAULT_MAX_UNDO = 20
 
 
@@ -238,8 +237,12 @@ class FieldValidator:
         self._shadow_var.set(self.var.get())
         self._swap_textvariable(self._shadow_var)
 
-        self._debounce = DebounceTimer(self.component, DEBOUNCE_TYPING_MS, self._on_debounce_fire)
-        self._undo_debounce = DebounceTimer(self.component, UNDO_DEBOUNCE_MS, self._push_undo_snapshot)
+        self._debounce = DebounceTimer(
+            self.component, DEBOUNCE_TYPING_MS, self._on_debounce_fire
+        )
+        self._undo_debounce = DebounceTimer(
+            self.component, UNDO_DEBOUNCE_MS, self._push_undo_snapshot
+        )
 
         self._shadow_trace_name = self._shadow_var.trace_add("write", self._on_shadow_write)
         self._real_var_trace_name = self.var.trace_add("write", self._on_real_var_write)
@@ -295,7 +298,9 @@ class FieldValidator:
         comp.configure(textvariable=new_var)
 
         if new_var is not None:
-            comp._textvariable_callback_name = new_var.trace_add("write", comp._textvariable_callback)
+            comp._textvariable_callback_name = new_var.trace_add(
+                "write", comp._textvariable_callback
+            )
 
     def _commit(self) -> None:
         shadow_val = self._shadow_var.get()
@@ -444,9 +449,7 @@ class PathValidator(FieldValidator):
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
     ):
-        super().__init__(
-            component, var, ui_state, var_name, max_undo=max_undo, extra_validate=extra_validate, required=required
-        )
+        super().__init__(component, var, ui_state, var_name, max_undo=max_undo, extra_validate=extra_validate, required=required)
         self.io_type = io_type
 
     def _get_var_safe(self, name: str) -> tk.Variable | None:

@@ -10,6 +10,7 @@ from torch import Generator, Tensor
 
 
 class ModelSetupNoiseMixin(metaclass=ABCMeta):
+
     def __init__(self):
         super().__init__()
 
@@ -31,9 +32,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
         alphas_cumprod = torch.cumprod(alphas, dim=0)
 
         # From paper footnote 4: "we introduce α_0 = 1 for convenience".
-        alphas_cumprod_prev = torch.cat(
-            [torch.tensor([1.0], device=betas.device, dtype=betas.dtype), alphas_cumprod[:-1]]
-        )
+        alphas_cumprod_prev = torch.cat([torch.tensor([1.0], device=betas.device, dtype=betas.dtype), alphas_cumprod[:-1]])
 
         # --- Start of Algorithm 1 ---
         gammas = torch.zeros(T, device=betas.device, dtype=betas.dtype)
@@ -75,16 +74,20 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
         self._offset_noise_psi_schedule = psi_schedule.to(betas.device)
         return self._offset_noise_psi_schedule
 
+
     def _create_noise(
-        self,
-        source_tensor: Tensor,
-        config: TrainConfig,
-        generator: Generator,
-        timestep: Tensor | None = None,
-        betas: Tensor | None = None,
+            self,
+            source_tensor: Tensor,
+            config: TrainConfig,
+            generator: Generator,
+            timestep: Tensor | None = None,
+            betas: Tensor | None = None,
     ) -> Tensor:
         noise = torch.randn(
-            source_tensor.shape, generator=generator, device=config.train_device, dtype=source_tensor.dtype
+            source_tensor.shape,
+            generator=generator,
+            device=config.train_device,
+            dtype=source_tensor.dtype
         )
 
         if config.offset_noise_weight > 0:
@@ -92,7 +95,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                 (source_tensor.shape[0], source_tensor.shape[1], *[1 for _ in range(source_tensor.ndim - 2)]),
                 generator=generator,
                 device=config.train_device,
-                dtype=source_tensor.dtype,
+                dtype=source_tensor.dtype
             )
             # Use the time-dependent generalized method if enabled.
             # This will only be true for Diffusion models (which uses betas)
@@ -102,25 +105,28 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                 psi_t = psi_t.view(psi_t.shape[0], *[1 for _ in range(source_tensor.ndim - 1)])
                 # Scale by the time-dependent psi_t factor
                 noise = noise + (psi_t * config.offset_noise_weight * offset_noise)
-            else:  # Otherwise, use the normal offset noise.
+            else: # Otherwise, use the normal offset noise.
                 noise = noise + (config.offset_noise_weight * offset_noise)
 
         if config.perturbation_noise_weight > 0:
             perturbation_noise = torch.randn(
-                source_tensor.shape, generator=generator, device=config.train_device, dtype=source_tensor.dtype
+                source_tensor.shape,
+                generator=generator,
+                device=config.train_device,
+                dtype=source_tensor.dtype
             )
             noise = noise + (config.perturbation_noise_weight * perturbation_noise)
 
         return noise
 
     def _get_timestep_discrete(
-        self,
-        num_train_timesteps: int,
-        deterministic: bool,
-        generator: Generator,
-        batch_size: int,
-        config: TrainConfig,
-        shift: float = None,
+            self,
+            num_train_timesteps: int,
+            deterministic: bool,
+            generator: Generator,
+            batch_size: int,
+            config: TrainConfig,
+            shift: float = None,
     ) -> Tensor:
         if shift is None:
             shift = config.timestep_shift
@@ -141,13 +147,12 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                 TimestepDistribution.UNIFORM,
                 TimestepDistribution.LOGIT_NORMAL,
                 TimestepDistribution.HEAVY_TAIL,
-                TimestepDistribution.BETA,
+                TimestepDistribution.BETA
             ]:
                 # continuous implementations
                 if config.timestep_distribution == TimestepDistribution.UNIFORM:
-                    timestep = min_timestep + (max_timestep - min_timestep) * torch.rand(
-                        batch_size, generator=generator, device=generator.device
-                    )
+                    timestep = min_timestep + (max_timestep - min_timestep) \
+                               * torch.rand(batch_size, generator=generator, device=generator.device)
                 elif config.timestep_distribution == TimestepDistribution.LOGIT_NORMAL:
                     bias = config.noising_bias
                     scale = config.noising_weight + 1.0
@@ -185,7 +190,10 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                     # Inverse case: Alpha=1, Beta != 1
                     # x = 1 - u^(1/beta)
                     elif abs(alpha - 1.0) < 1e-5:
-                        u = torch.rand(batch_size, generator=generator, device=generator.device)
+                        u = torch.rand(
+                            batch_size,
+                            generator=generator,
+                            device=generator.device)
                         u = 1.0 - u.pow(1.0 / beta)
                         timestep = u * num_timestep + min_timestep
 
@@ -196,7 +204,8 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                         # technically bypasses the generator seed (uses global device seed).
                         # Since B-TTDM requires Beta=1, this path is rarely taken for this specific paper.
                         m = torch.distributions.Beta(
-                            torch.tensor(alpha, device=generator.device), torch.tensor(beta, device=generator.device)
+                            torch.tensor(alpha, device=generator.device),
+                            torch.tensor(beta, device=generator.device)
                         )
                         u = m.sample((batch_size,))
                         timestep = u * num_timestep + min_timestep
@@ -218,7 +227,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                 # continuous implementations
                 if config.timestep_distribution == TimestepDistribution.COS_MAP:
                     if self.__weights is None:
-                        weights = 2.0 / (math.pi - 2.0 * math.pi * linspace + 2.0 * math.pi * linspace**2.0)
+                        weights = 2.0 / (math.pi - 2.0 * math.pi * linspace + 2.0 * math.pi * linspace ** 2.0)
                         weights *= linspace_derivative
                         self.__weights = weights.to(device=generator.device)
                 elif config.timestep_distribution == TimestepDistribution.SIGMOID:
@@ -238,20 +247,17 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                         weights = torch.clamp(-weight * ((linspace - bias) ** 2) + 2, min=0.0)
                         weights *= linspace_derivative
                         self.__weights = weights.to(device=generator.device)
-                samples = (
-                    torch.multinomial(self.__weights, num_samples=batch_size, replacement=True, generator=generator)
-                    + min_timestep
-                )
+                samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True, generator=generator) + min_timestep
                 timestep = samples.to(dtype=torch.long, device=generator.device)
 
             return timestep.int()
 
     def _get_timestep_continuous(
-        self,
-        deterministic: bool,
-        generator: Generator,
-        batch_size: int,
-        config: TrainConfig,
+            self,
+            deterministic: bool,
+            generator: Generator,
+            batch_size: int,
+            config: TrainConfig,
     ) -> Tensor:
         if deterministic:
             return torch.full(
@@ -261,16 +267,13 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             )
         else:
             discrete_timesteps = 10000  # Discretize to 10000 timesteps
-            discrete = (
-                self._get_timestep_discrete(
-                    num_train_timesteps=discrete_timesteps,
-                    deterministic=False,
-                    generator=generator,
-                    batch_size=batch_size,
-                    config=config,
-                )
-                + 1
-            )
+            discrete = self._get_timestep_discrete(
+                num_train_timesteps=discrete_timesteps,
+                deterministic=False,
+                generator=generator,
+                batch_size=batch_size,
+                config=config,
+            ) + 1
 
-            continuous = discrete.float() / discrete_timesteps
+            continuous = (discrete.float() / discrete_timesteps)
             return continuous

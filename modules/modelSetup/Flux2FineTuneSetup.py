@@ -17,10 +17,10 @@ class Flux2FineTuneSetup(
     BaseFlux2Setup,
 ):
     def __init__(
-        self,
-        train_device: torch.device,
-        temp_device: torch.device,
-        debug_mode: bool,
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            debug_mode: bool,
     ):
         super().__init__(
             train_device=train_device,
@@ -29,44 +29,39 @@ class Flux2FineTuneSetup(
         )
 
     def create_parameters(
-        self,
-        model: Flux2Model,
-        config: TrainConfig,
+            self,
+            model: Flux2Model,
+            config: TrainConfig,
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        self._create_model_part_parameters(
-            parameter_group_collection,
-            "transformer",
-            model.transformer,
-            config.transformer,
-            freeze=ModuleFilter.create(config),
-            debug=config.debug_mode,
-        )
+        self._create_model_part_parameters(parameter_group_collection, "transformer", model.transformer, config.transformer,
+                                           freeze=ModuleFilter.create(config), debug=config.debug_mode)
         return parameter_group_collection
 
     def __setup_requires_grad(
-        self,
-        model: Flux2Model,
-        config: TrainConfig,
+            self,
+            model: Flux2Model,
+            config: TrainConfig,
     ):
         self._setup_model_part_requires_grad("transformer", model.transformer, config.transformer, model.train_progress)
         model.vae.requires_grad_(False)
         model.text_encoder.requires_grad_(False)
 
+
     def setup_model(
-        self,
-        model: Flux2Model,
-        config: TrainConfig,
+            self,
+            model: Flux2Model,
+            config: TrainConfig,
     ):
         params = self.create_parameters(model, config)
         self.__setup_requires_grad(model, config)
         init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
-        self,
-        model: Flux2Model,
-        config: TrainConfig,
+            self,
+            model: Flux2Model,
+            config: TrainConfig,
     ):
         vae_on_train_device = not config.latent_caching
         text_encoder_on_train_device = not config.latent_caching
@@ -83,8 +78,12 @@ class Flux2FineTuneSetup(
         else:
             model.transformer.eval()
 
-    def after_optimizer_step(self, model: Flux2Model, config: TrainConfig, train_progress: TrainProgress):
+    def after_optimizer_step(
+            self,
+            model: Flux2Model,
+            config: TrainConfig,
+            train_progress: TrainProgress
+    ):
         self.__setup_requires_grad(model, config)
-
 
 factory.register(BaseModelSetup, Flux2FineTuneSetup, ModelType.FLUX_2, TrainingMethod.FINE_TUNE)

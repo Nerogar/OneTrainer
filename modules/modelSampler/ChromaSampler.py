@@ -21,11 +21,11 @@ from tqdm import tqdm
 
 class ChromaSampler(BaseModelSampler):
     def __init__(
-        self,
-        train_device: torch.device,
-        temp_device: torch.device,
-        model: ChromaModel,
-        model_type: ModelType,
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            model: ChromaModel,
+            model_type: ModelType,
     ):
         super().__init__(train_device, temp_device)
 
@@ -35,18 +35,18 @@ class ChromaSampler(BaseModelSampler):
 
     @torch.no_grad()
     def __sample_base(
-        self,
-        prompt: str,
-        negative_prompt: str,
-        height: int,
-        width: int,
-        seed: int,
-        random_seed: bool,
-        diffusion_steps: int,
-        cfg_scale: float,
-        noise_scheduler: NoiseScheduler,
-        text_encoder_layer_skip: int = 0,
-        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+            self,
+            prompt: str,
+            negative_prompt: str,
+            height: int,
+            width: int,
+            seed: int,
+            random_seed: bool,
+            diffusion_steps: int,
+            cfg_scale: float,
+            noise_scheduler: NoiseScheduler,
+            text_encoder_layer_skip: int = 0,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
@@ -67,7 +67,7 @@ class ChromaSampler(BaseModelSampler):
 
             combined_prompt_embedding, text_attention_mask = self.model.encode_text(
                 text=[prompt, negative_prompt],
-                batch_size=2,
+                batch_size = 2,
                 train_device=self.train_device,
                 text_encoder_layer_skip=text_encoder_layer_skip,
             )
@@ -87,7 +87,7 @@ class ChromaSampler(BaseModelSampler):
                 height // vae_scale_factor,
                 width // vae_scale_factor,
                 self.train_device,
-                self.model.train_dtype.torch_dtype(),
+                self.model.train_dtype.torch_dtype()
             )
 
             latent_image = self.model.pack_latents(latent_image)
@@ -97,17 +97,15 @@ class ChromaSampler(BaseModelSampler):
 
             # denoising loop
             extra_step_kwargs = {}
-            # TODO always True for FlowMatchEulerDiscreteScheduler - remove and pass directly?
-            # If so, also remove for other models
+            #TODO always True for FlowMatchEulerDiscreteScheduler - remove and pass directly?
+            #If so, also remove for other models
             if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
-                extra_step_kwargs["generator"] = generator  # TODO purpose?
+                extra_step_kwargs["generator"] = generator #TODO purpose?
 
             text_ids = torch.zeros(combined_prompt_embedding.shape[1], 3, device=self.train_device)
 
             image_seq_len = latent_image.shape[1]
-            image_attention_mask = torch.full(
-                (2, image_seq_len), True, dtype=torch.bool, device=text_attention_mask.device
-            )
+            image_attention_mask = torch.full((2, image_seq_len), True, dtype=torch.bool, device=text_attention_mask.device)
             attention_mask = torch.cat([text_attention_mask, image_attention_mask], dim=1)
 
             self.model.transformer_to(self.train_device)
@@ -122,7 +120,7 @@ class ChromaSampler(BaseModelSampler):
                     img_ids=image_ids.to(dtype=self.model.train_dtype.torch_dtype()),
                     attention_mask=attention_mask,
                     joint_attention_kwargs=None,
-                    return_dict=True,
+                    return_dict=True
                 ).sample
 
                 noise_pred_positive, noise_pred_negative = noise_pred.chunk(2)
@@ -151,7 +149,7 @@ class ChromaSampler(BaseModelSampler):
             image = vae.decode(latents, return_dict=False)[0]
 
             do_denormalize = [True] * image.shape[0]
-            image = image_processor.postprocess(image, output_type="pil", do_denormalize=do_denormalize)
+            image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
             self.model.vae_to(self.temp_device)
             torch_gc()
@@ -162,14 +160,14 @@ class ChromaSampler(BaseModelSampler):
             )
 
     def sample(
-        self,
-        sample_config: SampleConfig,
-        destination: str,
-        image_format: ImageFormat | None = None,
-        video_format: VideoFormat | None = None,
-        audio_format: AudioFormat | None = None,
-        on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
-        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+            self,
+            sample_config: SampleConfig,
+            destination: str,
+            image_format: ImageFormat | None = None,
+            video_format: VideoFormat | None = None,
+            audio_format: AudioFormat | None = None,
+            on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         sampler_output = self.__sample_base(
             prompt=sample_config.prompt,
@@ -186,14 +184,10 @@ class ChromaSampler(BaseModelSampler):
         )
 
         self.save_sampler_output(
-            sampler_output,
-            destination,
-            image_format,
-            video_format,
-            audio_format,
+            sampler_output, destination,
+            image_format, video_format, audio_format,
         )
 
         on_sample(sampler_output)
-
 
 factory.register(BaseModelSampler, ChromaSampler, ModelType.CHROMA_1)

@@ -36,7 +36,6 @@ def __map_single_transformer_block(key_prefix: LoraConversionKeySet) -> list[Lor
 
     return keys
 
-
 def __map_distilled_guidance_layer_layers(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 

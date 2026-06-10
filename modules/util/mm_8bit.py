@@ -3,7 +3,6 @@ try:
 except ImportError as e:
     print(str(e) + ", continuing without triton")
     import torch
-
     def mm_8bit(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
         assert a.shape[1] == b.shape[0], "Incompatible dimensions"
         assert a.is_contiguous(), "Matrix A must be contiguous"

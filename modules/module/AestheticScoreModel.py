@@ -29,20 +29,20 @@ class MLPModel(nn.Module):
 
 class AestheticScoreModel(nn.Module):
     def __init__(
-        self,
+            self,
     ):
         super().__init__()
 
         self.clip = CLIPModel.from_pretrained("openai/clip-vit-large-patch14")
         self.mlp_model = self.__load_mlp_model()
 
-        self.normalize = transforms.Normalize(
-            mean=[0.48145466, 0.4578275, 0.40821073], std=[0.26862954, 0.26130258, 0.27577711]
-        )
+        self.normalize = transforms.Normalize(mean=[0.48145466, 0.4578275, 0.40821073],
+                                              std=[0.26862954, 0.26130258, 0.27577711])
         self.resize = transforms.Resize(224)
         self.crop = transforms.CenterCrop(224)
 
         self.score_target = 10.0
+
 
     def __load_mlp_model(self):
         filename = "sac+logos+ava1-l14-linearMSE.pth"

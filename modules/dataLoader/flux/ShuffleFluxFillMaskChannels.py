@@ -42,4 +42,6 @@ class ShuffleFluxFillMaskChannels(
             width // vae_scale_factor,
         )
 
-        return {self.out_name: mask}
+        return {
+            self.out_name: mask
+        }

@@ -18,8 +18,8 @@ class PixArtAlphaLoRASaver(
         return convert_pixart_lora_key_sets()
 
     def _get_state_dict(
-        self,
-        model: PixArtAlphaModel,
+            self,
+            model: PixArtAlphaModel,
     ) -> dict[str, Tensor]:
         state_dict = {}
         if model.text_encoder_lora is not None:
@@ -41,10 +41,10 @@ class PixArtAlphaLoRASaver(
         return state_dict
 
     def save(
-        self,
-        model: PixArtAlphaModel,
-        output_model_format: ModelFormat,
-        output_model_destination: str,
-        dtype: torch.dtype | None,
+            self,
+            model: PixArtAlphaModel,
+            output_model_format: ModelFormat,
+            output_model_destination: str,
+            dtype: torch.dtype | None,
     ):
         self._save(model, output_model_format, output_model_destination, dtype)

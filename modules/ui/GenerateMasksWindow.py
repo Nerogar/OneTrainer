@@ -24,13 +24,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
             path = ""
 
         self.mode_var = ctk.StringVar(self, "Create if absent")
-        self.modes = [
-            "Replace all masks",
-            "Create if absent",
-            "Add to existing",
-            "Subtract from existing",
-            "Blend with existing",
-        ]
+        self.modes = ["Replace all masks", "Create if absent", "Add to existing", "Subtract from existing", "Blend with existing"]
         self.model_var = ctk.StringVar(self, "ClipSeg")
         self.models = ["ClipSeg", "Rembg", "Rembg-Human", "Hex Color"]
 
@@ -43,31 +37,25 @@ class GenerateMasksWindow(ctk.CTkToplevel):
 
         self.model_label = ctk.CTkLabel(self.frame, text="Model", width=100)
         self.model_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.model_dropdown = ctk.CTkOptionMenu(
-            self.frame, variable=self.model_var, values=self.models, dynamic_resizing=False, width=200
-        )
+        self.model_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.model_var, values=self.models, dynamic_resizing=False, width=200)
         self.model_dropdown.grid(row=0, column=1, sticky="w", padx=5, pady=5)
 
         self.path_label = ctk.CTkLabel(self.frame, text="Folder", width=100)
-        self.path_label.grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        self.path_label.grid(row=1, column=0, sticky="w",padx=5, pady=5)
         self.path_entry = ctk.CTkEntry(self.frame, width=150)
         self.path_entry.insert(0, path)
         self.path_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
-        self.path_button = ctk.CTkButton(
-            self.frame, width=30, text="...", command=lambda: self.browse_for_path(self.path_entry)
-        )
+        self.path_button = ctk.CTkButton(self.frame, width=30, text="...", command=lambda: self.browse_for_path(self.path_entry))
         self.path_button.grid(row=1, column=1, sticky="e", padx=5, pady=5)
 
         self.prompt_label = ctk.CTkLabel(self.frame, text="Prompt", width=100)
-        self.prompt_label.grid(row=2, column=0, sticky="w", padx=5, pady=5)
+        self.prompt_label.grid(row=2, column=0, sticky="w",padx=5, pady=5)
         self.prompt_entry = ctk.CTkEntry(self.frame, width=200)
         self.prompt_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
 
         self.mode_label = ctk.CTkLabel(self.frame, text="Mode", width=100)
         self.mode_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
-        self.mode_dropdown = ctk.CTkOptionMenu(
-            self.frame, variable=self.mode_var, values=self.modes, dynamic_resizing=False, width=200
-        )
+        self.mode_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.mode_var, values=self.modes, dynamic_resizing=False, width=200)
         self.mode_dropdown.grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
         self.threshold_label = ctk.CTkLabel(self.frame, text="Threshold", width=100)
@@ -97,9 +85,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.include_subdirectories_label = ctk.CTkLabel(self.frame, text="Include subfolders", width=100)
         self.include_subdirectories_label.grid(row=8, column=0, sticky="w", padx=5, pady=5)
         self.include_subdirectories_var = ctk.BooleanVar(self, parent_include_subdirectories)
-        self.include_subdirectories_switch = ctk.CTkSwitch(
-            self.frame, text="", variable=self.include_subdirectories_var
-        )
+        self.include_subdirectories_switch = ctk.CTkSwitch(self.frame, text="", variable=self.include_subdirectories_var)
         self.include_subdirectories_switch.grid(row=8, column=1, sticky="w", padx=5, pady=5)
 
         self.progress_label = ctk.CTkLabel(self.frame, text="Progress: 0/0", width=100)
@@ -116,6 +102,7 @@ class GenerateMasksWindow(ctk.CTkToplevel):
         self.grab_set()
         self.focus_set()
         self.after(200, lambda: set_window_icon(self))
+
 
     def browse_for_path(self, entry_box):
         # get the path from the user

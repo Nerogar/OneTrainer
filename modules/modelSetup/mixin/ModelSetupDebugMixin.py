@@ -54,13 +54,16 @@ class ModelSetupDebugMixin(metaclass=ABCMeta):
     # https://huggingface.co/blog/TimothyAlexisVass/explaining-the-sdxl-latent-space
     # Uses linear approximation based on first three channels of latent image (luminance, cyan/red, lime/purple)
     def _project_latent_to_image_sdxl(self, latent_tensor: Tensor):
-        weights = ((60, -60, 25, -70), (60, -5, 15, -50), (60, 10, -5, -35))
+        weights = (
+            (60, -60, 25, -70),
+            (60, -5, 15, -50),
+            (60, 10, -5, -35)
+        )
 
         weights_tensor = torch.t(torch.tensor(weights, dtype=latent_tensor.dtype).to(latent_tensor.device))
         biases_tensor = torch.tensor((150, 140, 130), dtype=latent_tensor.dtype).to(latent_tensor.device)
-        rgb_tensor = torch.einsum("...lxy,lr -> ...rxy", latent_tensor, weights_tensor) + biases_tensor.unsqueeze(
-            -1
-        ).unsqueeze(-1)
+        rgb_tensor = torch.einsum("...lxy,lr -> ...rxy", latent_tensor, weights_tensor) \
+                     + biases_tensor.unsqueeze(-1).unsqueeze(-1)
         image_array = rgb_tensor.clamp(0, 255)[0].byte().cpu().numpy()
         image_array = image_array.transpose(1, 2, 0)
 
@@ -78,7 +81,7 @@ class ModelSetupDebugMixin(metaclass=ABCMeta):
         )
 
         with torch.no_grad():
-            if latent_tensor.ndim == 5:  # remove frames dimension
+            if latent_tensor.ndim == 5: #remove frames dimension
                 latent_tensor = latent_tensor[:, :, 0, :, :]
 
             result = torch.nn.functional.conv2d(latent_tensor, weight)

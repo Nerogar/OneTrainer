@@ -26,24 +26,22 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         super().__init__()
 
     def __load_sub_module(
-        self,
-        sub_module: nn.Module,
-        dtype: DataType,
-        train_dtype: DataType,
-        keep_in_fp32_modules: list[str] | None,
-        quantization: QuantizationConfig | None,
-        pretrained_model_name_or_path: str,
-        subfolder: str | None,
-        model_filename: str,
-        pytorch_model_filename: str | None,
-        shard_index_filename: str,
+            self,
+            sub_module: nn.Module,
+            dtype: DataType,
+            train_dtype: DataType,
+            keep_in_fp32_modules: list[str] | None,
+            quantization: QuantizationConfig | None,
+            pretrained_model_name_or_path: str,
+            subfolder: str | None,
+            model_filename: str,
+            pytorch_model_filename: str | None,
+            shard_index_filename: str,
     ):
         if keep_in_fp32_modules is None:
             keep_in_fp32_modules = []
 
-        replace_linear_with_quantized_layers(
-            sub_module, dtype, keep_in_fp32_modules, quantization, copy_parameters=False
-        )
+        replace_linear_with_quantized_layers(sub_module, dtype, keep_in_fp32_modules, quantization, copy_parameters=False)
 
         is_local = os.path.isdir(pretrained_model_name_or_path)
 
@@ -78,9 +76,8 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
 
         if is_local:
             if subfolder:
-                full_filenames = [
-                    os.path.join(pretrained_model_name_or_path, subfolder, f) for f in safetensors_filenames
-                ]
+                full_filenames = [os.path.join(pretrained_model_name_or_path, subfolder, f) for f in
+                                  safetensors_filenames]
             else:
                 full_filenames = [os.path.join(pretrained_model_name_or_path, f) for f in safetensors_filenames]
 
@@ -90,39 +87,34 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 is_torch_pickle = True
         else:
             try:
-                full_filenames = [
-                    huggingface_hub.hf_hub_download(
-                        repo_id=pretrained_model_name_or_path,
-                        subfolder=subfolder,
-                        filename=f,
-                    )
-                    for f in safetensors_filenames
-                ]
+                full_filenames = [huggingface_hub.hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    subfolder=subfolder,
+                    filename=f,
+                ) for f in safetensors_filenames]
             except EntryNotFoundError as _:
                 # fall back to the pytorch_model_filename
-                full_filenames = [
-                    huggingface_hub.hf_hub_download(
-                        repo_id=pretrained_model_name_or_path,
-                        subfolder=subfolder,
-                        filename=pytorch_model_filename,
-                    )
-                ]
+                full_filenames = [huggingface_hub.hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    subfolder=subfolder,
+                    filename=pytorch_model_filename,
+                )]
                 is_torch_pickle = True
 
         if is_torch_pickle:
             for f in full_filenames:
                 file_state_dict = torch.load(f, weights_only=True)
-                while "state_dict" in file_state_dict:
-                    file_state_dict = file_state_dict["state_dict"]
+                while 'state_dict' in file_state_dict:
+                    file_state_dict = file_state_dict['state_dict']
                 state_dict |= file_state_dict
         else:
             for f in full_filenames:
                 state_dict |= load_file(f)
 
-        if hasattr(sub_module, "_fix_state_dict_keys_on_load"):
+        if hasattr(sub_module, '_fix_state_dict_keys_on_load'):
             sub_module._fix_state_dict_keys_on_load(state_dict)
 
-        if hasattr(sub_module, "_checkpoint_conversion_mapping"):  # required for loading the text encoder of Qwen
+        if hasattr(sub_module, "_checkpoint_conversion_mapping"): #required for loading the text encoder of Qwen
             new_state_dict = {}
             for k, v in state_dict.items():
                 new_k = k
@@ -131,9 +123,9 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 new_state_dict[new_k] = v
             state_dict = new_state_dict
 
-        # tensors that will be quantized are loaded at their original dtype. non-quantized tensors are converted
-        # to their intended dtype here
-        # TODO the following code requires quite a few workarounds by now. Is there a better way?
+        #tensors that will be quantized are loaded at their original dtype. non-quantized tensors are converted
+        #to their intended dtype here
+        #TODO the following code requires quite a few workarounds by now. Is there a better way?
         for key, value in state_dict.items():
             module = sub_module
             tensor_name = key
@@ -169,12 +161,12 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         return sub_module
 
     def _load_transformers_sub_module(
-        self,
-        module_type,
-        dtype: DataType,
-        train_dtype: DataType,
-        pretrained_model_name_or_path: str,
-        subfolder: str = "",
+            self,
+            module_type,
+            dtype: DataType,
+            train_dtype: DataType,
+            pretrained_model_name_or_path: str,
+            subfolder: str = "",
     ):
         user_agent = {
             "file_type": "model",
@@ -205,13 +197,13 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         )
 
     def _load_diffusers_sub_module(
-        self,
-        module_type,
-        dtype: DataType,
-        train_dtype: DataType,
-        pretrained_model_name_or_path: str,
-        subfolder: str | None = None,
-        quantization: QuantizationConfig | None = None,
+            self,
+            module_type,
+            dtype: DataType,
+            train_dtype: DataType,
+            pretrained_model_name_or_path: str,
+            subfolder: str | None = None,
+            quantization: QuantizationConfig | None = None,
     ):
         user_agent = {
             "file_type": "model",
@@ -242,19 +234,17 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         )
 
     def __convert_sub_module_to_dtype(
-        self,
-        sub_module: nn.Module,
-        dtype: DataType,
-        train_dtype: DataType,
-        keep_in_fp32_modules: list[str] | None,
-        quantization: QuantizationConfig | None,
+            self,
+            sub_module: nn.Module,
+            dtype: DataType,
+            train_dtype: DataType,
+            keep_in_fp32_modules: list[str] | None,
+            quantization: QuantizationConfig | None,
     ):
         if keep_in_fp32_modules is None:
             keep_in_fp32_modules = []
 
-        replace_linear_with_quantized_layers(
-            sub_module, dtype, keep_in_fp32_modules, quantization, copy_parameters=True
-        )
+        replace_linear_with_quantized_layers(sub_module, dtype, keep_in_fp32_modules, quantization, copy_parameters=True)
 
         for module_name, module in sub_module.named_modules():
             param_iter = [(x, y[0], y[1]) for x, y in zip(repeat(False), module._parameters.items(), strict=False)]
@@ -278,11 +268,11 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         return sub_module
 
     def _convert_transformers_sub_module_to_dtype(
-        self,
-        sub_module: nn.Module,
-        dtype: DataType,
-        train_dtype: DataType,
-        quantization: QuantizationConfig | None = None,
+            self,
+            sub_module: nn.Module,
+            dtype: DataType,
+            train_dtype: DataType,
+            quantization: QuantizationConfig | None = None,
     ):
         module_type = type(sub_module)
 
@@ -295,11 +285,11 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         )
 
     def _convert_diffusers_sub_module_to_dtype(
-        self,
-        sub_module: nn.Module,
-        dtype: DataType,
-        train_dtype: DataType,
-        quantization: QuantizationConfig | None = None,
+            self,
+            sub_module: nn.Module,
+            dtype: DataType,
+            train_dtype: DataType,
+            quantization: QuantizationConfig | None = None,
     ):
         return self.__convert_sub_module_to_dtype(
             sub_module,
@@ -309,20 +299,14 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             quantization,
         )
 
-    def _prepare_sub_modules(
-        self, pretrained_model_name_or_path: str, diffusers_modules: list[str], transformers_modules: list[str]
-    ):
+    def _prepare_sub_modules(self, pretrained_model_name_or_path: str, diffusers_modules: list[str], transformers_modules: list[str]):
         is_local = os.path.isdir(pretrained_model_name_or_path)
         if is_local:
             return
 
-        diffusers_paths = [
-            ((folder + "/") if folder else "") + "diffusion_pytorch_model*" for folder in diffusers_modules
-        ]
+        diffusers_paths = [((folder + "/") if folder else "") + "diffusion_pytorch_model*" for folder in diffusers_modules]
         transformers_paths = [((folder + "/") if folder else "") + "model*" for folder in transformers_modules]
-        transformers_paths.extend(
-            [((folder + "/") if folder else "") + "pytorch_model*" for folder in transformers_modules]
-        )
+        transformers_paths.extend([((folder + "/") if folder else "") + "pytorch_model*" for folder in transformers_modules])
         try:
             huggingface_hub.snapshot_download(
                 pretrained_model_name_or_path,

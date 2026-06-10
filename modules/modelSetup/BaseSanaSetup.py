@@ -47,28 +47,25 @@ class BaseSanaSetup(
         super().__init__(train_device, temp_device, debug_mode)
 
     def setup_optimizations(
-        self,
-        model: SanaModel,
-        config: TrainConfig,
+            self,
+            model: SanaModel,
+            config: TrainConfig,
     ):
 
         if config.gradient_checkpointing.enabled():
             # model.vae.enable_gradient_checkpointing()
-            model.transformer_offload_conductor = enable_checkpointing_for_sana_transformer(model.transformer, config)
-            model.text_encoder_offload_conductor = enable_checkpointing_for_gemma_layers(model.text_encoder, config)
+            model.transformer_offload_conductor = \
+                enable_checkpointing_for_sana_transformer(model.transformer, config)
+            model.text_encoder_offload_conductor = \
+                enable_checkpointing_for_gemma_layers(model.text_encoder, config)
 
-        model.autocast_context, model.train_dtype = create_autocast_context(
-            self.train_device,
-            config.train_dtype,
-            [
-                config.weight_dtypes().transformer,
-                config.weight_dtypes().text_encoder,
-                config.weight_dtypes().vae,
-                config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-                config.weight_dtypes().embedding if config.train_any_embedding() else None,
-            ],
-            config.enable_autocast_cache,
-        )
+        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
+            config.weight_dtypes().transformer,
+            config.weight_dtypes().text_encoder,
+            config.weight_dtypes().vae,
+            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+            config.weight_dtypes().embedding if config.train_any_embedding() else None,
+        ], config.enable_autocast_cache)
 
         model.text_encoder_autocast_context, model.text_encoder_train_dtype = disable_fp16_autocast_context(
             self.train_device,
@@ -97,9 +94,9 @@ class BaseSanaSetup(
         quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
 
     def _setup_embeddings(
-        self,
-        model: SanaModel,
-        config: TrainConfig,
+            self,
+            model: SanaModel,
+            config: TrainConfig,
     ):
         additional_embeddings = []
         for embedding_config in config.all_embedding_configs():
@@ -139,9 +136,9 @@ class BaseSanaSetup(
         self._add_embeddings_to_tokenizer(model.tokenizer, model.all_text_encoder_embeddings())
 
     def _setup_embedding_wrapper(
-        self,
-        model: SanaModel,
-        config: TrainConfig,
+            self,
+            model: SanaModel,
+            config: TrainConfig,
     ):
         model.embedding_wrapper = AdditionalEmbeddingWrapper(
             tokenizer=model.tokenizer,
@@ -151,26 +148,25 @@ class BaseSanaSetup(
         model.embedding_wrapper.hook_to_module()
 
     def _setup_embeddings_requires_grad(
-        self,
-        model: SanaModel,
-        config: TrainConfig,
+            self,
+            model: SanaModel,
+            config: TrainConfig,
     ):
-        for embedding, embedding_config in zip(
-            model.all_text_encoder_embeddings(), config.all_embedding_configs(), strict=True
-        ):
-            train_embedding = embedding_config.train and not self.stop_embedding_training_elapsed(
-                embedding_config, model.train_progress
-            )
+        for embedding, embedding_config in zip(model.all_text_encoder_embeddings(),
+                                               config.all_embedding_configs(), strict=True):
+            train_embedding = \
+                embedding_config.train \
+                and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
             embedding.requires_grad_(train_embedding)
 
     def predict(
-        self,
-        model: SanaModel,
-        batch: dict,
-        config: TrainConfig,
-        train_progress: TrainProgress,
-        *,
-        deterministic: bool = False,
+            self,
+            model: SanaModel,
+            batch: dict,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+            *,
+            deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
             batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
@@ -178,32 +174,31 @@ class BaseSanaSetup(
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
 
-            vae_scaling_factor = model.vae.config["scaling_factor"]
+            vae_scaling_factor = model.vae.config['scaling_factor']
 
             text_encoder_output, text_encoder_attention_mask = model.encode_text(
                 train_device=self.train_device,
-                batch_size=batch["latent_image"].shape[0],
+                batch_size=batch['latent_image'].shape[0],
                 rand=rand,
-                tokens=batch["tokens"],
+                tokens=batch['tokens'],
                 text_encoder_layer_skip=config.text_encoder_layer_skip,
-                text_encoder_output=batch["text_encoder_hidden_state"]
-                if not config.train_text_encoder_or_embedding()
-                else None,
-                attention_mask=batch["tokens_mask"],
+                text_encoder_output=batch[
+                    'text_encoder_hidden_state'] if not config.train_text_encoder_or_embedding() else None,
+                attention_mask=batch['tokens_mask'],
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
 
-            latent_image = batch["latent_image"]
+            latent_image = batch['latent_image']
             scaled_latent_image = latent_image * vae_scaling_factor
 
             scaled_latent_conditioning_image = None
             if config.model_type.has_conditioning_image_input():
-                scaled_latent_conditioning_image = batch["latent_conditioning_image"] * vae_scaling_factor
+                scaled_latent_conditioning_image = batch['latent_conditioning_image'] * vae_scaling_factor
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
             timestep = self._get_timestep_discrete(
-                model.noise_scheduler.config["num_train_timesteps"],
+                model.noise_scheduler.config['num_train_timesteps'],
                 deterministic,
                 generator,
                 scaled_latent_image.shape[0],
@@ -219,7 +214,7 @@ class BaseSanaSetup(
 
             if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
                 latent_input = torch.concat(
-                    [scaled_noisy_latent_image, batch["latent_mask"], scaled_latent_conditioning_image], 1
+                    [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
                 )
             else:
                 latent_input = scaled_noisy_latent_image
@@ -233,16 +228,16 @@ class BaseSanaSetup(
 
             flow = latent_noise - scaled_latent_image
             model_output_data = {
-                "loss_type": "target",
-                "timestep": timestep,
-                "predicted": predicted_flow,
-                "target": flow,
+                'loss_type': 'target',
+                'timestep': timestep,
+                'predicted': predicted_flow,
+                'target': flow,
             }
 
             if self.debug_mode:
                 with torch.no_grad():
                     predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
-                    self._save_tokens("7-prompt", batch["tokens"], model.tokenizer, config, train_progress)
+                    self._save_tokens("7-prompt", batch['tokens'], model.tokenizer, config, train_progress)
                     self._save_latent("1-noise", latent_noise, config, train_progress)
                     self._save_latent("2-noisy_image", scaled_noisy_latent_image, config, train_progress)
                     self._save_latent("3-predicted_flow", predicted_flow, config, train_progress)
@@ -253,11 +248,11 @@ class BaseSanaSetup(
         return model_output_data
 
     def calculate_loss(
-        self,
-        model: SanaModel,
-        batch: dict,
-        data: dict,
-        config: TrainConfig,
+            self,
+            model: SanaModel,
+            batch: dict,
+            data: dict,
+            config: TrainConfig,
     ) -> Tensor:
         return self._diffusion_losses(
             batch=batch,

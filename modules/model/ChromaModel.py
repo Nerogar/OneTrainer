@@ -24,11 +24,11 @@ from transformers import T5EncoderModel, T5Tokenizer
 
 class ChromaModelEmbedding:
     def __init__(
-        self,
-        uuid: str,
-        text_encoder_vector: Tensor | None,
-        placeholder: str,
-        is_output_embedding: bool,
+            self,
+            uuid: str,
+            text_encoder_vector: Tensor | None,
+            placeholder: str,
+            is_output_embedding: bool,
     ):
         self.text_encoder_embedding = BaseModelEmbedding(
             uuid=uuid,
@@ -36,7 +36,6 @@ class ChromaModelEmbedding:
             vector=text_encoder_vector,
             is_output_embedding=is_output_embedding,
         )
-
 
 class ChromaModel(BaseModel):
     # base model data
@@ -65,8 +64,8 @@ class ChromaModel(BaseModel):
     lora_state_dict: dict | None
 
     def __init__(
-        self,
-        model_type: ModelType,
+            self,
+            model_type: ModelType,
     ):
         super().__init__(
             model_type=model_type,
@@ -94,32 +93,26 @@ class ChromaModel(BaseModel):
         self.lora_state_dict = None
 
     def adapters(self) -> list[LoRAModuleWrapper]:
-        return [
-            a
-            for a in [
-                self.text_encoder_lora,
-                self.transformer_lora,
-            ]
-            if a is not None
-        ]
+        return [a for a in [
+            self.text_encoder_lora,
+            self.transformer_lora,
+        ] if a is not None]
 
     def all_embeddings(self) -> list[ChromaModelEmbedding]:
-        return self.additional_embeddings + ([self.embedding] if self.embedding is not None else [])
+        return self.additional_embeddings \
+               + ([self.embedding] if self.embedding is not None else [])
 
     def all_text_encoder_embeddings(self) -> list[BaseModelEmbedding]:
-        return [embedding.text_encoder_embedding for embedding in self.additional_embeddings] + (
-            [self.embedding.text_encoder_embedding] if self.embedding is not None else []
-        )
+        return [embedding.text_encoder_embedding for embedding in self.additional_embeddings] \
+               + ([self.embedding.text_encoder_embedding] if self.embedding is not None else [])
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
 
     def text_encoder_to(self, device: torch.device):
         if self.text_encoder is not None:
-            if (
-                self.text_encoder_offload_conductor is not None
-                and self.text_encoder_offload_conductor.layer_offload_activated()
-            ):
+            if self.text_encoder_offload_conductor is not None and \
+                    self.text_encoder_offload_conductor.layer_offload_activated():
                 self.text_encoder_offload_conductor.to(device)
             else:
                 self.text_encoder.to(device=device)
@@ -128,10 +121,8 @@ class ChromaModel(BaseModel):
             self.text_encoder_lora.to(device)
 
     def transformer_to(self, device: torch.device):
-        if (
-            self.transformer_offload_conductor is not None
-            and self.transformer_offload_conductor.layer_offload_activated()
-        ):
+        if self.transformer_offload_conductor is not None and \
+                self.transformer_offload_conductor.layer_offload_activated():
             self.transformer_offload_conductor.to(device)
         else:
             self.transformer.to(device=device)
@@ -163,16 +154,16 @@ class ChromaModel(BaseModel):
         return self._add_embeddings_to_prompt(self.all_text_encoder_embeddings(), prompt)
 
     def encode_text(
-        self,
-        train_device: torch.device,
-        batch_size: int = 1,
-        rand: Random | None = None,
-        text: str | list[str] = None,
-        tokens: Tensor = None,
-        tokens_mask: Tensor = None,
-        text_encoder_layer_skip: int = 0,
-        text_encoder_dropout_probability: float | None = None,
-        text_encoder_output: Tensor = None,
+            self,
+            train_device: torch.device,
+            batch_size: int = 1,
+            rand: Random | None = None,
+            text: str | list[str] = None,
+            tokens: Tensor = None,
+            tokens_mask: Tensor = None,
+            text_encoder_layer_skip: int = 0,
+            text_encoder_dropout_probability: float | None = None,
+            text_encoder_output: Tensor = None,
     ) -> tuple[Tensor, Tensor]:
         # tokenize prompt
         if tokens is None and text is not None:
@@ -182,22 +173,21 @@ class ChromaModel(BaseModel):
                 text = self.add_text_encoder_embeddings_to_prompt(text)
             tokenizer_output = self.tokenizer(
                 text,
-                padding="max_length",
+                padding='max_length',
                 truncation=True,
                 return_tensors="pt",
             )
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
             tokens_mask = tokenizer_output.attention_mask.to(self.text_encoder.device)
 
-            # unmask 1 token:
+            #unmask 1 token:
             seq_lengths = tokens_mask.sum(dim=1)
-            mask_indices = (
-                torch.arange(tokens_mask.size(1), device=tokens_mask.device).unsqueeze(0).expand(batch_size, -1)
-            )
-            bool_attention_mask = mask_indices <= seq_lengths.unsqueeze(1)
+            mask_indices = torch.arange(tokens_mask.size(1), device=tokens_mask.device).unsqueeze(0).expand(batch_size, -1)
+            bool_attention_mask = (mask_indices <= seq_lengths.unsqueeze(1))
         else:
             assert tokens_mask is not None
             bool_attention_mask = tokens_mask.bool()
+
 
         with self.text_encoder_autocast_context:
             text_encoder_output = encode_t5(
@@ -219,34 +209,32 @@ class ChromaModel(BaseModel):
 
         # apply dropout FIXME not a real dropout
         if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
-            dropout_text_encoder_mask = (
-                torch.tensor(
-                    [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)], device=train_device
-                )
-            ).float()
+            dropout_text_encoder_mask = (torch.tensor(
+                [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)],
+                device=train_device)).float()
             text_encoder_output = text_encoder_output * dropout_text_encoder_mask[:, None, None]
 
-        # prune tokens that are masked in all batch samples:
+        #prune tokens that are masked in all batch samples:
         seq_lengths = bool_attention_mask.sum(dim=1)
         max_seq_length = seq_lengths.max().item()
 
-        # pad to 16 because attention processors and/or torch.compile can have issues with uneven sequence lengths, but only pad if an attention mask has to be used anyway:
-        # TODO the second condition could trigger https://github.com/pytorch/pytorch/issues/165506 again, but try like this because no attention mask
-        # is preferable: https://github.com/Nerogar/OneTrainer/pull/1109
+        #pad to 16 because attention processors and/or torch.compile can have issues with uneven sequence lengths, but only pad if an attention mask has to be used anyway:
+        #TODO the second condition could trigger https://github.com/pytorch/pytorch/issues/165506 again, but try like this because no attention mask
+        #is preferable: https://github.com/Nerogar/OneTrainer/pull/1109
         if max_seq_length % 16 > 0 and (seq_lengths != max_seq_length).any():
-            max_seq_length += 16 - max_seq_length % 16
+            max_seq_length += (16 - max_seq_length % 16)
 
         text_encoder_output = text_encoder_output[:, :max_seq_length, :]
         bool_attention_mask = bool_attention_mask[:, :max_seq_length]
 
         return (text_encoder_output, bool_attention_mask)
 
-    def prepare_latent_image_ids(  # TODO share code with Flux
-        self,
-        height: int,
-        width: int,
-        device: torch.device,
-        dtype: torch.dtype,
+    def prepare_latent_image_ids( #TODO share code with Flux
+            self,
+            height: int,
+            width: int,
+            device: torch.device,
+            dtype: torch.dtype,
     ) -> Tensor:
         latent_image_ids = torch.zeros(height // 2, width // 2, 3)
         latent_image_ids[..., 1] = latent_image_ids[..., 1] + torch.arange(height // 2)[:, None]

@@ -25,12 +25,12 @@ def make_embedding_model_saver(
             super().__init__()
 
         def save(
-            self,
-            model: model_class,
-            model_type: ModelType,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
+                self,
+                model: model_class,
+                model_type: ModelType,
+                output_model_format: ModelFormat,
+                output_model_destination: str,
+                dtype: torch.dtype | None,
         ):
             embedding_model_saver = embedding_saver_class()
 

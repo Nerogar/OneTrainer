@@ -10,10 +10,10 @@ class BaseArgs(BaseConfig):
         super().__init__(data)
 
     def __to_arg_name(self, var_name: str) -> str:
-        return "--" + var_name.replace("_", "-")
+        return "--" + var_name.replace('_', '-')
 
     def __to_var_name(self, arg_name: str) -> str:
-        return arg_name.lstrip("-").replace("-", "_")
+        return arg_name.lstrip('-').replace('-', '_')
 
     def to_args(self) -> str:
         data = []
@@ -21,25 +21,25 @@ class BaseArgs(BaseConfig):
             value = getattr(self, name)
             if value is not None:
                 if self.types[name] is str:
-                    data.append(f'{self.__to_arg_name(name)}="{value}"')
+                    data.append(f"{self.__to_arg_name(name)}=\"{value}\"")
                 elif issubclass_safe(self.types[name], Enum):
-                    data.append(f'{self.__to_arg_name(name)}="{str(value)}"')
+                    data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
                 elif self.types[name] is bool:
                     if self.nullables[name]:
-                        data.append(f'{self.__to_arg_name(name)}="{str(value)}"')
+                        data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
                     else:
                         if value:
                             data.append(self.__to_arg_name(name))
                 elif self.types[name] is int:
-                    data.append(f'{self.__to_arg_name(name)}="{str(value)}"')
+                    data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
                 elif self.types[name] is float:
-                    if value in [float("inf"), float("-inf")]:
-                        data.append(f'{self.__to_arg_name(name)}="{str(value)}"')
+                    if value in [float('inf'), float('-inf')]:
+                        data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
                     else:
-                        data.append(f'{self.__to_arg_name(name)}="{str(value)}"')
+                        data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
                 elif self.types[name] == list[str]:
-                    data.extend(f'{self.__to_arg_name(name)}="{val}"' for val in value)
+                    data.extend(f"{self.__to_arg_name(name)}=\"{val}\"" for val in value)
                 else:
-                    data.append(f'{self.__to_arg_name(name)}="{str(value)}"')
+                    data.append(f"{self.__to_arg_name(name)}=\"{str(value)}\"")
 
-        return " ".join(data)
+        return ' '.join(data)

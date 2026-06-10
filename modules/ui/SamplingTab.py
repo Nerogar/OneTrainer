@@ -9,6 +9,7 @@ import customtkinter as ctk
 
 
 class SamplingTab(ConfigList):
+
     def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
         super().__init__(
             master,
@@ -21,7 +22,7 @@ class SamplingTab(ConfigList):
             add_button_text="Add Sample",
             add_button_tooltip="Add a new sample configuration.",
             is_full_width=True,
-            show_toggle_button=True,
+            show_toggle_button=True
         )
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
@@ -31,14 +32,14 @@ class SamplingTab(ConfigList):
         return SampleConfig.default_values(self.train_config.model_type)
 
     def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
-        return SampleParamsWindow(
-            self.master, self.current_config[i], ui_state, model_type=self.train_config.model_type
-        )
+        return SampleParamsWindow(self.master, self.current_config[i], ui_state, model_type=self.train_config.model_type)
 
 
 class SampleWidget(ctk.CTkFrame):
     def __init__(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        super().__init__(master=master, corner_radius=10, bg_color="transparent")
+        super().__init__(
+            master=master, corner_radius=10, bg_color="transparent"
+        )
 
         self.element = element
         self.ui_state = UIState(self, element)
@@ -78,25 +79,25 @@ class SampleWidget(ctk.CTkFrame):
         # width
         components.label(self, 0, 3, "width:")
         self.width_entry = components.entry(self, 0, 4, self.ui_state, "width")
-        self.width_entry.bind("<FocusOut>", lambda _: save_command())
+        self.width_entry.bind('<FocusOut>', lambda _: save_command())
         self.width_entry.configure(width=50)
 
         # height
         components.label(self, 0, 5, "height:")
         self.height_entry = components.entry(self, 0, 6, self.ui_state, "height")
-        self.height_entry.bind("<FocusOut>", lambda _: save_command())
+        self.height_entry.bind('<FocusOut>', lambda _: save_command())
         self.height_entry.configure(width=50)
 
         # seed
         components.label(self, 0, 7, "seed:")
         self.seed_entry = components.entry(self, 0, 8, self.ui_state, "seed")
-        self.seed_entry.bind("<FocusOut>", lambda _: save_command())
+        self.seed_entry.bind('<FocusOut>', lambda _: save_command())
         self.seed_entry.configure(width=80)
 
         # prompt
         components.label(self, 0, 9, "prompt:")
         self.prompt_entry = components.entry(self, 0, 10, self.ui_state, "prompt")
-        self.prompt_entry.bind("<FocusOut>", lambda _: save_command())
+        self.prompt_entry.bind('<FocusOut>', lambda _: save_command())
 
         # button
         self.button = components.icon_button(self, 0, 11, "...", lambda: open_command(self.i, self.ui_state))

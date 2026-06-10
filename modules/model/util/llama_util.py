@@ -4,14 +4,14 @@ from transformers import LlamaModel
 
 
 def encode_llama(
-    text_encoder: LlamaModel,
-    tokens: Tensor | None = None,
-    default_layer: int = -1,
-    layer_skip: int = 0,
-    text_encoder_output: Tensor | None = None,
-    use_attention_mask: bool = True,
-    attention_mask: Tensor | None = None,
-    crop_start: int | None = None,
+        text_encoder: LlamaModel,
+        tokens: Tensor | None = None,
+        default_layer: int = -1,
+        layer_skip: int = 0,
+        text_encoder_output: Tensor | None = None,
+        use_attention_mask: bool = True,
+        attention_mask: Tensor | None = None,
+        crop_start: int | None = None,
 ) -> tuple[Tensor, Tensor, Tensor]:
     if text_encoder_output is None and text_encoder is not None:
         text_encoder_output = text_encoder(

@@ -18,8 +18,8 @@ class StableDiffusionLoRASaver(
         return convert_sd_lora_key_sets()
 
     def _get_state_dict(
-        self,
-        model: StableDiffusionModel,
+            self,
+            model: StableDiffusionModel,
     ) -> dict[str, Tensor]:
         state_dict = {}
         if model.text_encoder_lora is not None:
@@ -41,10 +41,10 @@ class StableDiffusionLoRASaver(
         return state_dict
 
     def save(
-        self,
-        model: StableDiffusionModel,
-        output_model_format: ModelFormat,
-        output_model_destination: str,
-        dtype: torch.dtype | None,
+            self,
+            model: StableDiffusionModel,
+            output_model_format: ModelFormat,
+            output_model_destination: str,
+            dtype: torch.dtype | None,
     ):
         self._save(model, output_model_format, output_model_destination, dtype)

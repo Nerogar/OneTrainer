@@ -35,7 +35,7 @@ class BaseStableDiffusion3Setup(
     ModelSetupFlowMatchingMixin,
     ModelSetupEmbeddingMixin,
     ModelSetupText2ImageMixin,
-    metaclass=ABCMeta,
+    metaclass=ABCMeta
 ):
     LAYER_PRESETS = {
         "attn-only": ["attn"],
@@ -44,49 +44,43 @@ class BaseStableDiffusion3Setup(
     }
 
     def setup_optimizations(
-        self,
-        model: StableDiffusion3Model,
-        config: TrainConfig,
+            self,
+            model: StableDiffusion3Model,
+            config: TrainConfig,
     ):
         if config.gradient_checkpointing.enabled():
-            model.transformer_offload_conductor = enable_checkpointing_for_stable_diffusion_3_transformer(
-                model.transformer, config
-            )
+            model.transformer_offload_conductor = \
+                enable_checkpointing_for_stable_diffusion_3_transformer(model.transformer, config)
             if model.text_encoder_1 is not None:
                 enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config)
             if model.text_encoder_2 is not None:
                 enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config)
             if model.text_encoder_3 is not None:
-                model.text_encoder_3_offload_conductor = enable_checkpointing_for_t5_encoder_layers(
-                    model.text_encoder_3, config
-                )
+                model.text_encoder_3_offload_conductor = \
+                    enable_checkpointing_for_t5_encoder_layers(model.text_encoder_3, config)
 
-        model.autocast_context, model.train_dtype = create_autocast_context(
-            self.train_device,
-            config.train_dtype,
-            [
-                config.weight_dtypes().transformer,
-                config.weight_dtypes().text_encoder,
-                config.weight_dtypes().text_encoder_2,
-                config.weight_dtypes().text_encoder_3,
-                config.weight_dtypes().vae,
-                config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-                config.weight_dtypes().embedding if config.train_any_embedding() else None,
-            ],
-            config.enable_autocast_cache,
-        )
+        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
+            config.weight_dtypes().transformer,
+            config.weight_dtypes().text_encoder,
+            config.weight_dtypes().text_encoder_2,
+            config.weight_dtypes().text_encoder_3,
+            config.weight_dtypes().vae,
+            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+            config.weight_dtypes().embedding if config.train_any_embedding() else None,
+        ], config.enable_autocast_cache)
 
-        model.text_encoder_3_autocast_context, model.text_encoder_3_train_dtype = disable_fp16_autocast_context(
-            self.train_device,
-            config.train_dtype,
-            config.fallback_train_dtype,
-            [
-                config.weight_dtypes().text_encoder_3,
-                config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-                config.weight_dtypes().embedding if config.train_any_embedding() else None,
-            ],
-            config.enable_autocast_cache,
-        )
+        model.text_encoder_3_autocast_context, model.text_encoder_3_train_dtype = \
+            disable_fp16_autocast_context(
+                self.train_device,
+                config.train_dtype,
+                config.fallback_train_dtype,
+                [
+                    config.weight_dtypes().text_encoder_3,
+                    config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+                    config.weight_dtypes().embedding if config.train_any_embedding() else None,
+                ],
+                config.enable_autocast_cache,
+            )
 
         quantize_layers(model.text_encoder_1, self.train_device, model.train_dtype, config)
         quantize_layers(model.text_encoder_2, self.train_device, model.train_dtype, config)
@@ -95,9 +89,9 @@ class BaseStableDiffusion3Setup(
         quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
 
     def _setup_embeddings(
-        self,
-        model: StableDiffusion3Model,
-        config: TrainConfig,
+            self,
+            model: StableDiffusion3Model,
+            config: TrainConfig,
     ):
         additional_embeddings = []
         for embedding_config in config.all_embedding_configs():
@@ -181,9 +175,9 @@ class BaseStableDiffusion3Setup(
             self._add_embeddings_to_tokenizer(model.tokenizer_3, model.all_text_encoder_3_embeddings())
 
     def _setup_embedding_wrapper(
-        self,
-        model: StableDiffusion3Model,
-        config: TrainConfig,
+            self,
+            model: StableDiffusion3Model,
+            config: TrainConfig,
     ):
         if model.tokenizer_1 is not None and model.text_encoder_1 is not None:
             model.embedding_wrapper_1 = AdditionalEmbeddingWrapper(
@@ -212,51 +206,45 @@ class BaseStableDiffusion3Setup(
             model.embedding_wrapper_3.hook_to_module()
 
     def _setup_embeddings_requires_grad(
-        self,
-        model: StableDiffusion3Model,
-        config: TrainConfig,
+            self,
+            model: StableDiffusion3Model,
+            config: TrainConfig,
     ):
         if model.text_encoder_1 is not None:
-            for embedding, embedding_config in zip(
-                model.all_text_encoder_1_embeddings(), config.all_embedding_configs(), strict=True
-            ):
-                train_embedding_1 = (
-                    embedding_config.train
-                    and config.text_encoder.train_embedding
+            for embedding, embedding_config in zip(model.all_text_encoder_1_embeddings(),
+                                                   config.all_embedding_configs(), strict=True):
+                train_embedding_1 = \
+                    embedding_config.train \
+                    and config.text_encoder.train_embedding \
                     and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
-                )
                 embedding.requires_grad_(train_embedding_1)
 
         if model.text_encoder_2 is not None:
-            for embedding, embedding_config in zip(
-                model.all_text_encoder_2_embeddings(), config.all_embedding_configs(), strict=True
-            ):
-                train_embedding_2 = (
-                    embedding_config.train
-                    and config.text_encoder_2.train_embedding
+            for embedding, embedding_config in zip(model.all_text_encoder_2_embeddings(),
+                                                   config.all_embedding_configs(), strict=True):
+                train_embedding_2 = \
+                    embedding_config.train \
+                    and config.text_encoder_2.train_embedding \
                     and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
-                )
                 embedding.requires_grad_(train_embedding_2)
 
         if model.text_encoder_3 is not None:
-            for embedding, embedding_config in zip(
-                model.all_text_encoder_3_embeddings(), config.all_embedding_configs(), strict=True
-            ):
-                train_embedding_3 = (
-                    embedding_config.train
-                    and config.text_encoder_3.train_embedding
+            for embedding, embedding_config in zip(model.all_text_encoder_3_embeddings(),
+                                                   config.all_embedding_configs(), strict=True):
+                train_embedding_3 = \
+                    embedding_config.train \
+                    and config.text_encoder_3.train_embedding \
                     and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
-                )
                 embedding.requires_grad_(train_embedding_3)
 
     def predict(
-        self,
-        model: StableDiffusion3Model,
-        batch: dict,
-        config: TrainConfig,
-        train_progress: TrainProgress,
-        *,
-        deterministic: bool = False,
+            self,
+            model: StableDiffusion3Model,
+            batch: dict,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+            *,
+            deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
             batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
@@ -264,64 +252,50 @@ class BaseStableDiffusion3Setup(
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
 
-            vae_scaling_factor = model.vae.config["scaling_factor"]
-            vae_shift_factor = model.vae.config["shift_factor"]
+            vae_scaling_factor = model.vae.config['scaling_factor']
+            vae_shift_factor = model.vae.config['shift_factor']
 
-            text_encoder_output, pooled_text_encoder_output = model.combine_text_encoder_output(
-                *model.encode_text(
-                    train_device=self.train_device,
-                    batch_size=batch["latent_image"].shape[0],
-                    rand=rand,
-                    tokens_1=batch.get("tokens_1"),
-                    tokens_2=batch.get("tokens_2"),
-                    tokens_3=batch.get("tokens_3"),
-                    tokens_mask_1=batch.get("tokens_mask_1"),
-                    tokens_mask_2=batch.get("tokens_mask_2"),
-                    tokens_mask_3=batch.get("tokens_mask_3"),
-                    text_encoder_1_layer_skip=config.text_encoder_layer_skip,
-                    text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
-                    text_encoder_3_layer_skip=config.text_encoder_3_layer_skip,
-                    text_encoder_1_output=batch["text_encoder_1_hidden_state"]
-                    if "text_encoder_1_hidden_state" in batch and not config.train_text_encoder_or_embedding()
-                    else None,
-                    pooled_text_encoder_1_output=batch["text_encoder_1_pooled_state"]
-                    if "text_encoder_1_pooled_state" in batch and not config.train_text_encoder_or_embedding()
-                    else None,
-                    text_encoder_2_output=batch["text_encoder_2_hidden_state"]
-                    if "text_encoder_2_hidden_state" in batch and not config.train_text_encoder_2_or_embedding()
-                    else None,
-                    pooled_text_encoder_2_output=batch["text_encoder_2_pooled_state"]
-                    if "text_encoder_2_pooled_state" in batch and not config.train_text_encoder_2_or_embedding()
-                    else None,
-                    text_encoder_3_output=batch["text_encoder_3_hidden_state"]
-                    if "text_encoder_3_hidden_state" in batch and not config.train_text_encoder_3_or_embedding()
-                    else None,
-                    text_encoder_1_dropout_probability=config.text_encoder.dropout_probability
-                    if not deterministic
-                    else None,
-                    text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability
-                    if not deterministic
-                    else None,
-                    text_encoder_3_dropout_probability=config.text_encoder_3.dropout_probability
-                    if not deterministic
-                    else None,
-                    apply_attention_mask=config.transformer.attention_mask,
-                )
-            )
+            text_encoder_output, pooled_text_encoder_output = model.combine_text_encoder_output(*model.encode_text(
+                train_device=self.train_device,
+                batch_size=batch['latent_image'].shape[0],
+                rand=rand,
+                tokens_1=batch.get("tokens_1"),
+                tokens_2=batch.get("tokens_2"),
+                tokens_3=batch.get("tokens_3"),
+                tokens_mask_1=batch.get("tokens_mask_1"),
+                tokens_mask_2=batch.get("tokens_mask_2"),
+                tokens_mask_3=batch.get("tokens_mask_3"),
+                text_encoder_1_layer_skip=config.text_encoder_layer_skip,
+                text_encoder_2_layer_skip=config.text_encoder_2_layer_skip,
+                text_encoder_3_layer_skip=config.text_encoder_3_layer_skip,
+                text_encoder_1_output=batch['text_encoder_1_hidden_state'] \
+                    if 'text_encoder_1_hidden_state' in batch and not config.train_text_encoder_or_embedding() else None,
+                pooled_text_encoder_1_output=batch['text_encoder_1_pooled_state'] \
+                    if 'text_encoder_1_pooled_state' in batch and not config.train_text_encoder_or_embedding() else None,
+                text_encoder_2_output=batch['text_encoder_2_hidden_state'] \
+                    if 'text_encoder_2_hidden_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
+                pooled_text_encoder_2_output=batch['text_encoder_2_pooled_state'] \
+                    if 'text_encoder_2_pooled_state' in batch and not config.train_text_encoder_2_or_embedding() else None,
+                text_encoder_3_output=batch['text_encoder_3_hidden_state'] \
+                    if 'text_encoder_3_hidden_state' in batch and not config.train_text_encoder_3_or_embedding() else None,
+                text_encoder_1_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
+                text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability if not deterministic else None,
+                text_encoder_3_dropout_probability=config.text_encoder_3.dropout_probability if not deterministic else None,
+                apply_attention_mask=config.transformer.attention_mask,
+            ))
 
-            latent_image = batch["latent_image"]
+            latent_image = batch['latent_image']
             scaled_latent_image = (latent_image - vae_shift_factor) * vae_scaling_factor
 
             scaled_latent_conditioning_image = None
             if config.model_type.has_conditioning_image_input():
-                scaled_latent_conditioning_image = (
-                    batch["latent_conditioning_image"] - vae_shift_factor
-                ) * vae_scaling_factor
+                scaled_latent_conditioning_image = \
+                    (batch['latent_conditioning_image'] - vae_shift_factor) * vae_scaling_factor
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
             timestep = self._get_timestep_discrete(
-                model.noise_scheduler.config["num_train_timesteps"],
+                model.noise_scheduler.config['num_train_timesteps'],
                 deterministic,
                 generator,
                 scaled_latent_image.shape[0],
@@ -337,7 +311,7 @@ class BaseStableDiffusion3Setup(
 
             if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
                 latent_input = torch.concat(
-                    [scaled_noisy_latent_image, batch["latent_mask"], scaled_latent_conditioning_image], 1
+                    [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
                 )
             else:
                 latent_input = scaled_noisy_latent_image
@@ -347,21 +321,21 @@ class BaseStableDiffusion3Setup(
                 timestep=timestep,
                 encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                 pooled_projections=pooled_text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
-                return_dict=True,
+                return_dict=True
             ).sample
 
             flow = latent_noise - scaled_latent_image
             model_output_data = {
-                "loss_type": "target",
-                "timestep": timestep,
-                "predicted": predicted_flow,
-                "target": flow,
+                'loss_type': 'target',
+                'timestep': timestep,
+                'predicted': predicted_flow,
+                'target': flow,
             }
 
             if config.debug_mode:
                 with torch.no_grad():
                     predicted_scaled_latent_image = scaled_noisy_latent_image - predicted_flow * sigma
-                    self._save_tokens("7-prompt", batch["tokens_1"], model.tokenizer_1, config, train_progress)
+                    self._save_tokens("7-prompt", batch['tokens_1'], model.tokenizer_1, config, train_progress)
                     self._save_latent("1-noise", latent_noise, config, train_progress)
                     self._save_latent("2-noisy_image", scaled_noisy_latent_image, config, train_progress)
                     self._save_latent("3-predicted_flow", predicted_flow, config, train_progress)
@@ -372,11 +346,11 @@ class BaseStableDiffusion3Setup(
         return model_output_data
 
     def calculate_loss(
-        self,
-        model: StableDiffusion3Model,
-        batch: dict,
-        data: dict,
-        config: TrainConfig,
+            self,
+            model: StableDiffusion3Model,
+            batch: dict,
+            data: dict,
+            config: TrainConfig,
     ) -> Tensor:
         return self._flow_matching_losses(
             batch=batch,

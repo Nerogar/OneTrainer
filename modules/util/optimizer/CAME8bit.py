@@ -49,8 +49,8 @@ class CAME8bit(torch.optim.Optimizer):
         min_8bit_size=16384,
         quant_block_size=2048,
     ):
-        assert lr > 0.0
-        assert all(0.0 <= beta <= 1.0 for beta in betas)
+        assert lr > 0.
+        assert all(0. <= beta <= 1. for beta in betas)
 
         defaults = {
             "lr": lr,
@@ -80,7 +80,8 @@ class CAME8bit(torch.optim.Optimizer):
     @staticmethod
     def _should_use_matrix_factorization(grad_shape: torch.Size):
         grad_shape_dimensions = len(grad_shape)
-        return grad_shape_dimensions == 2 or (grad_shape_dimensions == 4 and grad_shape[2] == 1 and grad_shape[3] == 1)
+        return grad_shape_dimensions == 2 or \
+                (grad_shape_dimensions == 4 and grad_shape[2] == 1 and grad_shape[3] == 1)
 
     @staticmethod
     def _should_quantize_param(grad_shape: torch.Size, min_8bit_size: int):
@@ -128,9 +129,8 @@ class CAME8bit(torch.optim.Optimizer):
 
         dequantized_values: list = [None] * len(quantized_value_list)
         for index, quantized_chunk in enumerate(quantized_value_list, start=0):
-            dequantized_values[index] = (quantized_chunk["value"].float() * quantized_chunk["scale"]) + quantized_chunk[
-                "min"
-            ]
+            dequantized_values[index] = \
+                (quantized_chunk["value"].float() * quantized_chunk["scale"]) + quantized_chunk["min"]
 
         return torch.cat(dequantized_values)
 
@@ -138,7 +138,11 @@ class CAME8bit(torch.optim.Optimizer):
         return tensor.norm(2) / (tensor.numel() ** 0.5)
 
     def _approx_sq_grad(self, exp_avg_sq_row, exp_avg_sq_col):
-        r_factor = (exp_avg_sq_row / exp_avg_sq_row.mean(dim=-1, keepdim=True)).rsqrt_().unsqueeze(-1)
+        r_factor = (
+            (exp_avg_sq_row / exp_avg_sq_row.mean(dim=-1, keepdim=True))
+            .rsqrt_()
+            .unsqueeze(-1)
+        )
         c_factor = exp_avg_sq_col.unsqueeze(-2).rsqrt()
         return torch.mul(r_factor, c_factor)
 
@@ -166,11 +170,8 @@ class CAME8bit(torch.optim.Optimizer):
             state["step"] = 0
             state["RMS"] = 0
 
-            state["exp_avg"] = (
-                torch.zeros_like(grad)
-                if not should_quantize_param
-                else CAME8bit._quantize_param(torch.zeros_like(grad), group["quant_block_size"])
-            )
+            state["exp_avg"] = torch.zeros_like(grad) if not should_quantize_param else \
+                               CAME8bit._quantize_param(torch.zeros_like(grad), group["quant_block_size"])
 
             if use_factor:
                 state["exp_avg_sq_row"] = torch.zeros(grad_shape[0]).type_as(grad)
@@ -179,11 +180,8 @@ class CAME8bit(torch.optim.Optimizer):
                 state["exp_avg_res_row"] = torch.zeros(grad_shape[0]).type_as(grad)
                 state["exp_avg_res_col"] = torch.zeros(grad_shape[1]).type_as(grad)
             else:
-                state["exp_avg_sq"] = (
-                    torch.zeros_like(grad)
-                    if not should_quantize_param
-                    else CAME8bit._quantize_param(torch.zeros_like(grad), group["quant_block_size"])
-                )
+                state["exp_avg_sq"] = torch.zeros_like(grad) if not should_quantize_param else \
+                                      CAME8bit._quantize_param(torch.zeros_like(grad), group["quant_block_size"])
 
         state["step"] += 1
         state["RMS"] = self._rms(p.data)
@@ -197,8 +195,12 @@ class CAME8bit(torch.optim.Optimizer):
             sq_update = update if len(grad_shape) == 2 else update.squeeze()
 
             # Do update
-            exp_avg_sq_row.mul_(group["betas"][1]).add_(sq_update.mean(dim=-1), alpha=1.0 - group["betas"][1])
-            exp_avg_sq_col.mul_(group["betas"][1]).add_(sq_update.mean(dim=-2), alpha=1.0 - group["betas"][1])
+            exp_avg_sq_row.mul_(group["betas"][1]).add_(
+                sq_update.mean(dim=-1), alpha=1.0 - group["betas"][1]
+            )
+            exp_avg_sq_col.mul_(group["betas"][1]).add_(
+                sq_update.mean(dim=-2), alpha=1.0 - group["betas"][1]
+            )
 
             # Approximation of exponential moving average of square of gradient
             update = self._approx_sq_grad(exp_avg_sq_row, exp_avg_sq_col)
@@ -208,40 +210,36 @@ class CAME8bit(torch.optim.Optimizer):
                 update = update.view(grad_shape)
         else:
             # Dequantize if needed
-            exp_avg_sq: torch.Tensor = (
-                state["exp_avg_sq"] if not should_quantize_param else CAME8bit._dequantize_param(state["exp_avg_sq"])
-            )
+            exp_avg_sq: torch.Tensor = state["exp_avg_sq"] if not should_quantize_param else \
+                                       CAME8bit._dequantize_param(state["exp_avg_sq"])
 
             # Do update
             exp_avg_sq.mul_(group["betas"][1]).add_(update, alpha=1.0 - group["betas"][1])
             update = exp_avg_sq.rsqrt()
 
             # Requantize if needed
-            state["exp_avg_sq"] = (
-                exp_avg_sq
-                if not should_quantize_param
-                else CAME8bit._quantize_param(exp_avg_sq, group["quant_block_size"])
-            )
+            state["exp_avg_sq"] = exp_avg_sq if not should_quantize_param else \
+                                  CAME8bit._quantize_param(exp_avg_sq, group["quant_block_size"])
 
         update.mul_(grad)
 
         update.div_((self._rms(update) / group["clip_threshold"]).clamp_(min=1.0))
 
         # Dequantize if needed
-        exp_avg = state["exp_avg"] if not should_quantize_param else CAME8bit._dequantize_param(state["exp_avg"])
+        exp_avg = state["exp_avg"] if not should_quantize_param else \
+                  CAME8bit._dequantize_param(state["exp_avg"])
 
         # Do update
         exp_avg.mul_(group["betas"][0]).add_(update, alpha=1 - group["betas"][0])
 
         # Requantize if needed
-        state["exp_avg"] = (
-            exp_avg if not should_quantize_param else CAME8bit._quantize_param(exp_avg, group["quant_block_size"])
-        )
+        state["exp_avg"] = exp_avg if not should_quantize_param else \
+                           CAME8bit._quantize_param(exp_avg, group["quant_block_size"])
 
         # Confidence-guided strategy
         # Calculation of instability
         if use_factor:
-            res = (update - exp_avg) ** 2 + group["eps"][1]
+            res = (update - exp_avg)**2 + group["eps"][1]
 
             exp_avg_res_row = state["exp_avg_res_row"]
             exp_avg_res_col = state["exp_avg_res_col"]
@@ -250,8 +248,12 @@ class CAME8bit(torch.optim.Optimizer):
             re_update = res if len(grad_shape) == 2 else res.squeeze()
 
             # Do update
-            exp_avg_res_row.mul_(group["betas"][2]).add_(re_update.mean(dim=-1), alpha=1.0 - group["betas"][2])
-            exp_avg_res_col.mul_(group["betas"][2]).add_(re_update.mean(dim=-2), alpha=1.0 - group["betas"][2])
+            exp_avg_res_row.mul_(group["betas"][2]).add_(
+                re_update.mean(dim=-1), alpha=1.0 - group["betas"][2]
+            )
+            exp_avg_res_col.mul_(group["betas"][2]).add_(
+                re_update.mean(dim=-2), alpha=1.0 - group["betas"][2]
+            )
 
             # Approximation of exponential moving average of instability
             res_approx = self._approx_sq_grad(exp_avg_res_row, exp_avg_res_col)
@@ -273,9 +275,12 @@ class CAME8bit(torch.optim.Optimizer):
         # Decay weights if needed
         if group["weight_decay"] > 0:
             if p.dtype == torch.bfloat16 and group["stochastic_rounding"]:
-                add_stochastic_(p.data, p.data, alpha=-group["weight_decay"] * group["lr"])
+                add_stochastic_(p.data, p.data,
+                                alpha=-group["weight_decay"] * group["lr"])
             else:
-                p.data.add_(p.data, alpha=-group["weight_decay"] * group["lr"])
+                p.data.add_(
+                    p.data, alpha=-group["weight_decay"] * group["lr"]
+                )
 
         # Write update
         update.mul_(group["lr"])
@@ -310,10 +315,8 @@ class CAME8bit(torch.optim.Optimizer):
         quantizable_value_keys = [
             "exp_avg",
             "exp_avg_sq",
-            "exp_avg_sq_col",
-            "exp_avg_sq_row",
-            "exp_avg_res_col",
-            "exp_avg_res_row",
+            "exp_avg_sq_col", "exp_avg_sq_row",
+            "exp_avg_res_col", "exp_avg_res_row",
         ]
         for state in self.state.values():
             for quant_state_key in quantizable_value_keys:

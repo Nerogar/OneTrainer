@@ -25,17 +25,17 @@ def make_embedding_model_loader(
             super().__init__()
 
         def _default_model_spec_name(
-            self,
-            model_type: ModelType,
+                self,
+                model_type: ModelType,
         ) -> str | None:
             return model_spec_map.get(model_type)
 
         def load(
-            self,
-            model_type: ModelType,
-            model_names: ModelNames,
-            weight_dtypes: ModelWeightDtypes,
-            quantization: QuantizationConfig,
+                self,
+                model_type: ModelType,
+                model_names: ModelNames,
+                weight_dtypes: ModelWeightDtypes,
+                quantization: QuantizationConfig,
         ) -> model_class | None:
             base_model_loader = model_loader_class()
             embedding_loader = embedding_loader_class()

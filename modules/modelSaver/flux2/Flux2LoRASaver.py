@@ -1,3 +1,4 @@
+
 from modules.model.Flux2Model import Flux2Model
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
 from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
@@ -17,8 +18,8 @@ class Flux2LoRASaver(
         return None
 
     def _get_state_dict(
-        self,
-        model: Flux2Model,
+            self,
+            model: Flux2Model,
     ) -> dict[str, Tensor]:
         state_dict = {}
         if model.transformer_lora is not None:
@@ -29,10 +30,10 @@ class Flux2LoRASaver(
         return state_dict
 
     def save(
-        self,
-        model: Flux2Model,
-        output_model_format: ModelFormat,
-        output_model_destination: str,
-        dtype: torch.dtype | None,
+            self,
+            model: Flux2Model,
+            output_model_format: ModelFormat,
+            output_model_destination: str,
+            dtype: torch.dtype | None,
     ):
         self._save(model, output_model_format, output_model_destination, dtype)

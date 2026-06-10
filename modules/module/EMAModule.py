@@ -5,11 +5,11 @@ import torch
 
 class EMAModuleWrapper:
     def __init__(
-        self,
-        parameters: Iterable[torch.nn.Parameter],
-        decay: float = 0.9999,
-        update_step_interval: int = 1,
-        device: torch.device | None = None,
+            self,
+            parameters: Iterable[torch.nn.Parameter],
+            decay: float = 0.9999,
+            update_step_interval: int = 1,
+            device: torch.device | None = None,
     ):
         parameters = list(parameters)
         self.ema_parameters = [p.clone().detach().to(device) for p in parameters]
@@ -29,7 +29,10 @@ class EMAModuleWrapper:
         #     decay = (1-impact)^(1/n)
 
     def get_current_decay(self, optimization_step) -> float:
-        return min((1 + optimization_step) / (10 + optimization_step), self.decay)
+        return min(
+            (1 + optimization_step) / (10 + optimization_step),
+            self.decay
+        )
 
     @torch.no_grad()
     def step(self, parameters: Iterable[torch.nn.Parameter], optimization_step):

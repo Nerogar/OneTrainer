@@ -6,7 +6,9 @@ from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.ModelNames import ModelNames
 
 
-class HiDreamLoRALoader(LoRALoaderMixin):
+class HiDreamLoRALoader(
+    LoRALoaderMixin
+):
     def __init__(self):
         super().__init__()
 
@@ -14,8 +16,8 @@ class HiDreamLoRALoader(LoRALoaderMixin):
         return convert_hidream_lora_key_sets()
 
     def load(
-        self,
-        model: HiDreamModel,
-        model_names: ModelNames,
+            self,
+            model: HiDreamModel,
+            model_names: ModelNames,
     ):
         return self._load(model, model_names)

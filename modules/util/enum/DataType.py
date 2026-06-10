@@ -4,26 +4,26 @@ import torch
 
 
 class DataType(Enum):
-    NONE = "NONE"
-    FLOAT_8 = "FLOAT_8"
-    FLOAT_16 = "FLOAT_16"
-    FLOAT_32 = "FLOAT_32"
-    BFLOAT_16 = "BFLOAT_16"
-    TFLOAT_32 = "TFLOAT_32"
-    INT_8 = "INT_8"
-    NFLOAT_4 = "NFLOAT_4"
-    FLOAT_W8A8 = "FLOAT_W8A8"
-    INT_W8A8 = "INT_W8A8"
-    GGUF = "GGUF"
-    GGUF_A8_FLOAT = "GGUF_A8_FLOAT"
-    GGUF_A8_INT = "GGUF_A8_INT"
+    NONE = 'NONE'
+    FLOAT_8 = 'FLOAT_8'
+    FLOAT_16 = 'FLOAT_16'
+    FLOAT_32 = 'FLOAT_32'
+    BFLOAT_16 = 'BFLOAT_16'
+    TFLOAT_32 = 'TFLOAT_32'
+    INT_8 = 'INT_8'
+    NFLOAT_4 = 'NFLOAT_4'
+    FLOAT_W8A8 = 'FLOAT_W8A8'
+    INT_W8A8 = 'INT_W8A8'
+    GGUF = 'GGUF'
+    GGUF_A8_FLOAT = 'GGUF_A8_FLOAT'
+    GGUF_A8_INT = 'GGUF_A8_INT'
 
     def __str__(self):
         return self.value
 
     def torch_dtype(
-        self,
-        supports_quantization: bool = True,
+            self,
+            supports_quantization: bool = True,
     ):
         if self.is_quantized() and not supports_quantization:
             return torch.float16
@@ -44,10 +44,16 @@ class DataType(Enum):
         return self == DataType.TFLOAT_32
 
     def is_quantized(self):
-        return self in [DataType.FLOAT_8, DataType.INT_8, DataType.FLOAT_W8A8, DataType.INT_W8A8, DataType.NFLOAT_4]
+        return self in [DataType.FLOAT_8,
+                        DataType.INT_8,
+                        DataType.FLOAT_W8A8,
+                        DataType.INT_W8A8,
+                        DataType.NFLOAT_4]
 
     def is_gguf(self):
-        return self in [DataType.GGUF, DataType.GGUF_A8_FLOAT, DataType.GGUF_A8_INT]
+        return self in [DataType.GGUF,
+                        DataType.GGUF_A8_FLOAT,
+                        DataType.GGUF_A8_INT]
 
     def quantize_fp8(self):
         return self == DataType.FLOAT_8

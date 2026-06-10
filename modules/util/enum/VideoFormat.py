@@ -2,9 +2,9 @@ from enum import Enum
 
 
 class VideoFormat(Enum):
-    PNG_IMAGE_SEQUENCE = "PNG_IMAGE_SEQUENCE"
-    JPG_IMAGE_SEQUENCE = "JPG_IMAGE_SEQUENCE"
-    MP4 = "MP4"
+    PNG_IMAGE_SEQUENCE = 'PNG_IMAGE_SEQUENCE'
+    JPG_IMAGE_SEQUENCE = 'JPG_IMAGE_SEQUENCE'
+    MP4 = 'MP4'
 
     def __str__(self):
         return self.value

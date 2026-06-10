@@ -4,13 +4,13 @@ import torch.utils._sympy.functions
 from sympy import S
 
 
-# code from https://github.com/pytorch/pytorch/blob/ed82d5fcfd80110565f69130f286c7bfec6db2dc/torch/utils/_sympy/functions.py#L481
-# but accepts negative numbers, to avoid https://github.com/Nerogar/OneTrainer/issues/1126
-# torch 2.12 merged the fix PR https://github.com/pytorch/pytorch/pull/169726, but according to Claude's analysis this bug
-# still exists. TODO confirm manually by testing https://github.com/Nerogar/OneTrainer/issues/1126:
-# Claude: "Mod.eval itself still raises on negative numbers, and inductor's tiling_utils still calls sympy is_constant() (which
-# substitutes negative test values) on expressions that can contain Mod. can be removed once Mod.eval itself
-# accepts negative numbers in a torch version we use"
+#code from https://github.com/pytorch/pytorch/blob/ed82d5fcfd80110565f69130f286c7bfec6db2dc/torch/utils/_sympy/functions.py#L481
+#but accepts negative numbers, to avoid https://github.com/Nerogar/OneTrainer/issues/1126
+#torch 2.12 merged the fix PR https://github.com/pytorch/pytorch/pull/169726, but according to Claude's analysis this bug
+#still exists. TODO confirm manually by testing https://github.com/Nerogar/OneTrainer/issues/1126:
+#Claude: "Mod.eval itself still raises on negative numbers, and inductor's tiling_utils still calls sympy is_constant() (which
+#substitutes negative test values) on expressions that can contain Mod. can be removed once Mod.eval itself
+#accepts negative numbers in a torch version we use"
 @classmethod
 def Mod_patched_eval(cls, p, q):
     # This was adapted from: sympy/core/mod.py
@@ -33,7 +33,7 @@ def Mod_patched_eval(cls, p, q):
     # Evaluate if they are both literals.
     if q.is_Number and p.is_Number:
         if p < 0:
-            # raise AssertionError(p)
+            #raise AssertionError(p)
             pass
         if q < 1:
             raise AssertionError(q)

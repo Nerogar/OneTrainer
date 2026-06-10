@@ -6,7 +6,9 @@ from modules.util.convert.lora.convert_sdxl_lora import convert_sdxl_lora_key_se
 from modules.util.ModelNames import ModelNames
 
 
-class StableDiffusionXLLoRALoader(LoRALoaderMixin):
+class StableDiffusionXLLoRALoader(
+    LoRALoaderMixin
+):
     def __init__(self):
         super().__init__()
 
@@ -14,8 +16,8 @@ class StableDiffusionXLLoRALoader(LoRALoaderMixin):
         return convert_sdxl_lora_key_sets()
 
     def load(
-        self,
-        model: StableDiffusionXLModel,
-        model_names: ModelNames,
+            self,
+            model: StableDiffusionXLModel,
+            model_names: ModelNames,
     ):
         return self._load(model, model_names)

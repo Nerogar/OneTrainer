@@ -3,10 +3,10 @@ from torch import Tensor
 
 
 def masked_losses(
-    losses: Tensor,
-    mask: Tensor,
-    unmasked_weight: float,
-    normalize_masked_area_loss: bool,
+        losses: Tensor,
+        mask: Tensor,
+        unmasked_weight: float,
+        normalize_masked_area_loss: bool,
 ) -> Tensor:
     clamped_mask = torch.clamp(mask, unmasked_weight, 1)
 
@@ -19,12 +19,12 @@ def masked_losses(
 
 
 def masked_losses_with_prior(
-    losses: Tensor,
-    prior_losses: Tensor | None,
-    mask: Tensor,
-    unmasked_weight: float,
-    normalize_masked_area_loss: bool,
-    masked_prior_preservation_weight: float,
+        losses: Tensor,
+        prior_losses: Tensor | None,
+        mask: Tensor,
+        unmasked_weight: float,
+        normalize_masked_area_loss: bool,
+        masked_prior_preservation_weight: float,
 ) -> Tensor:
     clamped_mask = torch.clamp(mask, unmasked_weight, 1)
 
@@ -36,7 +36,7 @@ def masked_losses_with_prior(
     if masked_prior_preservation_weight == 0 or prior_losses is None:
         return losses
 
-    clamped_mask = 1 - clamped_mask
+    clamped_mask = (1 - clamped_mask)
     prior_losses *= clamped_mask * masked_prior_preservation_weight
 
     if normalize_masked_area_loss:

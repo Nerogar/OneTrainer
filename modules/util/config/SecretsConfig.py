@@ -12,7 +12,7 @@ class SecretsConfig(BaseConfig):
         super().__init__(data)
 
     @staticmethod
-    def default_values() -> "SecretsConfig":
+    def default_values() -> 'SecretsConfig':
         data = []
 
         # name, default value, data type, nullable

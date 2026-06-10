@@ -61,34 +61,12 @@ def __map_single_transformer_block(key_prefix: LoraConversionKeySet) -> list[Lor
 def __map_transformer(key_prefix: LoraConversionKeySet) -> list[LoraConversionKeySet]:
     keys = []
 
-    keys += [
-        LoraConversionKeySet(
-            "txt_in.c_embedder.linear_1", "context_embedder.time_text_embed.text_embedder.linear_1", parent=key_prefix
-        )
-    ]
-    keys += [
-        LoraConversionKeySet(
-            "txt_in.c_embedder.linear_2", "context_embedder.time_text_embed.text_embedder.linear_2", parent=key_prefix
-        )
-    ]
-    keys += [
-        LoraConversionKeySet(
-            "txt_in.t_embedder.linear_1",
-            "context_embedder.time_text_embed.timestep_embedder.linear_1",
-            parent=key_prefix,
-        )
-    ]
-    keys += [
-        LoraConversionKeySet(
-            "txt_in.t_embedder.linear_2",
-            "context_embedder.time_text_embed.timestep_embedder.linear_2",
-            parent=key_prefix,
-        )
-    ]
+    keys += [LoraConversionKeySet("txt_in.c_embedder.linear_1", "context_embedder.time_text_embed.text_embedder.linear_1", parent=key_prefix)]
+    keys += [LoraConversionKeySet("txt_in.c_embedder.linear_2", "context_embedder.time_text_embed.text_embedder.linear_2", parent=key_prefix)]
+    keys += [LoraConversionKeySet("txt_in.t_embedder.linear_1", "context_embedder.time_text_embed.timestep_embedder.linear_1", parent=key_prefix)]
+    keys += [LoraConversionKeySet("txt_in.t_embedder.linear_2", "context_embedder.time_text_embed.timestep_embedder.linear_2", parent=key_prefix)]
     keys += [LoraConversionKeySet("txt_in.input_embedder", "context_embedder.proj_in", parent=key_prefix)]
-    keys += [
-        LoraConversionKeySet("final_layer.adaLN_modulation.1", "norm_out.linear", parent=key_prefix, swap_chunks=True)
-    ]
+    keys += [LoraConversionKeySet("final_layer.adaLN_modulation.1", "norm_out.linear", parent=key_prefix, swap_chunks=True)]
     keys += [LoraConversionKeySet("final_layer.linear", "proj_out", parent=key_prefix)]
     keys += [LoraConversionKeySet("guidance_in.mlp.0", "time_text_embed.guidance_embedder.linear_1", parent=key_prefix)]
     keys += [LoraConversionKeySet("guidance_in.mlp.2", "time_text_embed.guidance_embedder.linear_2", parent=key_prefix)]
@@ -98,9 +76,7 @@ def __map_transformer(key_prefix: LoraConversionKeySet) -> list[LoraConversionKe
     keys += [LoraConversionKeySet("time_in.mlp.2", "time_text_embed.timestep_embedder.linear_2", parent=key_prefix)]
     keys += [LoraConversionKeySet("img_in.proj", "x_embedder.proj", parent=key_prefix)]
 
-    for k in map_prefix_range(
-        "txt_in.individual_token_refiner.blocks", "context_embedder.token_refiner.refiner_blocks", parent=key_prefix
-    ):
+    for k in map_prefix_range("txt_in.individual_token_refiner.blocks", "context_embedder.token_refiner.refiner_blocks", parent=key_prefix):
         keys += __map_token_refiner_block(k)
 
     for k in map_prefix_range("double_blocks", "transformer_blocks", parent=key_prefix):

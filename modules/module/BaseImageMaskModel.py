@@ -26,21 +26,17 @@ class MaskSample:
         self.height = 0
         self.width = 0
 
-        self.image2Tensor = transforms.Compose(
-            [
-                transforms.ToTensor(),
-            ]
-        )
+        self.image2Tensor = transforms.Compose([
+            transforms.ToTensor(),
+        ])
 
-        self.tensor2Image = transforms.Compose(
-            [
-                transforms.ToPILImage(),
-            ]
-        )
+        self.tensor2Image = transforms.Compose([
+            transforms.ToPILImage(),
+        ])
 
     def get_image(self) -> Image:
         if self.image is None:
-            self.image = load_image(self.image_filename, "RGB")
+            self.image = load_image(self.image_filename, 'RGB')
             self.height = self.image.height
             self.width = self.image.width
 
@@ -48,7 +44,7 @@ class MaskSample:
 
     def get_mask_tensor(self) -> Tensor:
         if self.mask_tensor is None and os.path.exists(self.mask_filename):
-            mask = load_image(self.mask_filename, "L")
+            mask = load_image(self.mask_filename, 'L')
             mask = self.image2Tensor(mask)
             mask = mask.to(self.device)
             self.mask_tensor = mask.unsqueeze(0)
@@ -101,13 +97,13 @@ class MaskSample:
         self.mask_tensor = mask
 
     def apply_mask(self, mode: str, mask_tensor: Tensor, alpha: float, inverted: bool):
-        if mode in {"replace", "fill"}:
+        if mode in {'replace', 'fill'}:
             self.set_mask_tensor(mask_tensor, alpha)
-        elif mode == "add":
+        elif mode == 'add':
             self.add_mask_tensor(mask_tensor, alpha, inverted)
-        elif mode == "subtract":
+        elif mode == 'subtract':
             self.subtract_mask_tensor(mask_tensor, alpha, inverted)
-        elif mode == "blend":
+        elif mode == 'blend':
             self.blend_mask_tensor(mask_tensor, alpha)
         else:
             raise ValueError("invalid mode")
@@ -115,7 +111,7 @@ class MaskSample:
     def save_mask(self):
         if self.mask_tensor is not None:
             mask = self.mask_tensor.cpu().squeeze()
-            mask = self.tensor2Image(mask).convert("RGB")
+            mask = self.tensor2Image(mask).convert('RGB')
             mask.save(self.mask_filename)
 
 
@@ -126,21 +122,21 @@ class BaseImageMaskModel(metaclass=ABCMeta):
 
         def __is_supported_image_extension(path: Path) -> bool:
             ext = path.suffix
-            return path_util.is_supported_image_extension(ext) and "-masklabel.png" not in path.name
+            return path_util.is_supported_image_extension(ext) and '-masklabel.png' not in path.name
 
         recursive_prefix = "" if not include_subdirectories else "**/"
-        return [str(p) for p in sample_dir.glob(f"{recursive_prefix}*") if __is_supported_image_extension(p)]
+        return [str(p) for p in sample_dir.glob(f'{recursive_prefix}*') if __is_supported_image_extension(p)]
 
     @abstractmethod
     def mask_image(
-        self,
-        filename: str,
-        prompts: list[str],
-        mode: str = "fill",
-        alpha: float = 1.0,
-        threshold: float = 0.3,
-        smooth_pixels: int = 5,
-        expand_pixels: int = 10,
+            self,
+            filename: str,
+            prompts: list[str],
+            mode: str = 'fill',
+            alpha: float = 1.0,
+            threshold: float = 0.3,
+            smooth_pixels: int = 5,
+            expand_pixels: int = 10
     ):
         """
         Masks a sample
@@ -161,16 +157,16 @@ class BaseImageMaskModel(metaclass=ABCMeta):
         """
 
     def mask_images(
-        self,
-        filenames: list[str],
-        prompts: list[str],
-        mode: str = "fill",
-        alpha: float = 1.0,
-        threshold: float = 0.3,
-        smooth_pixels: int = 5,
-        expand_pixels: int = 10,
-        progress_callback: Callable[[int, int], None] = None,
-        error_callback: Callable[[str], None] = None,
+            self,
+            filenames: list[str],
+            prompts: list[str],
+            mode: str = 'fill',
+            alpha: float = 1.0,
+            threshold: float = 0.3,
+            smooth_pixels: int = 5,
+            expand_pixels: int = 10,
+            progress_callback: Callable[[int, int], None] = None,
+            error_callback: Callable[[str], None] = None,
     ):
         """
         Masks all samples in a list
@@ -204,17 +200,17 @@ class BaseImageMaskModel(metaclass=ABCMeta):
                 progress_callback(i + 1, len(filenames))
 
     def mask_folder(
-        self,
-        sample_dir: str,
-        prompts: list[str],
-        mode: str = "fill",
-        threshold: float = 0.3,
-        smooth_pixels: int = 5,
-        expand_pixels: int = 10,
-        alpha: float = 1.0,
-        progress_callback: Callable[[int, int], None] = None,
-        error_callback: Callable[[str], None] = None,
-        include_subdirectories: bool = False,
+            self,
+            sample_dir: str,
+            prompts: list[str],
+            mode: str = 'fill',
+            threshold: float = 0.3,
+            smooth_pixels: int = 5,
+            expand_pixels: int = 10,
+            alpha: float = 1.0,
+            progress_callback: Callable[[int, int], None] = None,
+            error_callback: Callable[[str], None] = None,
+            include_subdirectories: bool = False,
     ):
         """
         Masks all samples in a folder

@@ -16,10 +16,10 @@ class PixArtAlphaEmbeddingSetup(
     BasePixArtAlphaSetup,
 ):
     def __init__(
-        self,
-        train_device: torch.device,
-        temp_device: torch.device,
-        debug_mode: bool,
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            debug_mode: bool,
     ):
         super().__init__(
             train_device=train_device,
@@ -28,25 +28,23 @@ class PixArtAlphaEmbeddingSetup(
         )
 
     def create_parameters(
-        self,
-        model: PixArtAlphaModel,
-        config: TrainConfig,
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
         self._add_embedding_param_groups(
-            model.all_text_encoder_embeddings(),
-            parameter_group_collection,
-            config.embedding_learning_rate,
-            "embeddings",
+            model.all_text_encoder_embeddings(), parameter_group_collection, config.embedding_learning_rate,
+            "embeddings"
         )
 
         return parameter_group_collection
 
     def __setup_requires_grad(
-        self,
-        model: PixArtAlphaModel,
-        config: TrainConfig,
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
     ):
         self._setup_embeddings_requires_grad(model, config)
         model.text_encoder.requires_grad_(False)
@@ -54,9 +52,9 @@ class PixArtAlphaEmbeddingSetup(
         model.vae.requires_grad_(False)
 
     def setup_model(
-        self,
-        model: PixArtAlphaModel,
-        config: TrainConfig,
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
     ):
         model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
@@ -69,9 +67,9 @@ class PixArtAlphaEmbeddingSetup(
         init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
-        self,
-        model: PixArtAlphaModel,
-        config: TrainConfig,
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
     ):
         vae_on_train_device = self.debug_mode
 
@@ -83,12 +81,16 @@ class PixArtAlphaEmbeddingSetup(
         model.vae.eval()
         model.transformer.eval()
 
-    def after_optimizer_step(self, model: PixArtAlphaModel, config: TrainConfig, train_progress: TrainProgress):
+    def after_optimizer_step(
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
+            train_progress: TrainProgress
+    ):
         if config.preserve_embedding_norm:
             self._normalize_output_embeddings(model.all_text_encoder_embeddings())
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
 
 factory.register(BaseModelSetup, PixArtAlphaEmbeddingSetup, ModelType.PIXART_ALPHA, TrainingMethod.EMBEDDING)
 factory.register(BaseModelSetup, PixArtAlphaEmbeddingSetup, ModelType.PIXART_SIGMA, TrainingMethod.EMBEDDING)

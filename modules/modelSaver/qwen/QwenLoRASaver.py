@@ -17,8 +17,8 @@ class QwenLoRASaver(
         return None
 
     def _get_state_dict(
-        self,
-        model: QwenModel,
+            self,
+            model: QwenModel,
     ) -> dict[str, Tensor]:
         state_dict = {}
         if model.text_encoder_lora is not None:
@@ -30,10 +30,10 @@ class QwenLoRASaver(
         return state_dict
 
     def save(
-        self,
-        model: QwenModel,
-        output_model_format: ModelFormat,
-        output_model_destination: str,
-        dtype: torch.dtype | None,
+            self,
+            model: QwenModel,
+            output_model_format: ModelFormat,
+            output_model_destination: str,
+            dtype: torch.dtype | None,
     ):
         self._save(model, output_model_format, output_model_destination, dtype)

@@ -16,7 +16,7 @@ def rescale_noise_scheduler_to_zero_terminal_snr(noise_scheduler: DDIMScheduler)
 
     """
     alphas_cumprod = noise_scheduler.alphas_cumprod
-    sqrt_alphas_cumprod = alphas_cumprod**0.5
+    sqrt_alphas_cumprod = alphas_cumprod ** 0.5
 
     # Store old values.
     alphas_cumprod_sqrt_0 = sqrt_alphas_cumprod[0].clone()
@@ -29,7 +29,7 @@ def rescale_noise_scheduler_to_zero_terminal_snr(noise_scheduler: DDIMScheduler)
     sqrt_alphas_cumprod *= alphas_cumprod_sqrt_0 / (alphas_cumprod_sqrt_0 - alphas_cumprod_sqrt_T)
 
     # Convert alphas_cumprod_sqrt to betas
-    alphas_cumprod = sqrt_alphas_cumprod**2
+    alphas_cumprod = sqrt_alphas_cumprod ** 2
     alphas = alphas_cumprod[1:] / alphas_cumprod[:-1]
     alphas = torch.cat([alphas_cumprod[0:1], alphas])
     betas = 1 - alphas

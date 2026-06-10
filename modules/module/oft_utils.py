@@ -70,12 +70,13 @@ class OFTRotationModule(nn.Module):
         self.register_buffer("cols", cols, persistent=False)
         self.dropout = MultiplicativeDropoutLayer(p=dropout_probability)
 
+
     def _pytorch_skew_symmetric(self, vec, block_size):
         batch_size = vec.shape[0]
         matrix = torch.zeros(batch_size, block_size, block_size, device=vec.device, dtype=vec.dtype)
 
-        # the following two lines are equivalent to "matrix[:, self.rows, self.cols] = vec",
-        # but they work around a pytorch issue: https://github.com/pytorch/pytorch/issues/169179
+        #the following two lines are equivalent to "matrix[:, self.rows, self.cols] = vec",
+        #but they work around a pytorch issue: https://github.com/pytorch/pytorch/issues/169179
         batch_idx = torch.arange(batch_size, device=vec.device)[:, None]
         matrix = matrix.index_put((batch_idx, self.rows, self.cols), vec)
 

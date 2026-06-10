@@ -52,15 +52,15 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
         return sanitized
 
     def _create_mgds(
-        self,
-        config: TrainConfig,
-        definition: list,
-        train_progress: TrainProgress,
-        is_validation: bool = False,
+            self,
+            config: TrainConfig,
+            definition: list,
+            train_progress: TrainProgress,
+            is_validation: bool = False,
     ):
         concepts = config.concepts
         if concepts is None:
-            with open(config.concept_file_name, "r") as f:
+            with open(config.concept_file_name, 'r') as f:
                 concepts = [ConceptConfig.default_values().from_dict(c) for c in json.load(f)]
 
         if is_validation:
@@ -89,7 +89,7 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
             concepts,
             settings,
             definition,
-            batch_size=config.batch_size,
+            batch_size=config.batch_size, #local batch size
             state=PipelineState(config.dataloader_threads),
             initial_epoch=train_progress.epoch,
             initial_epoch_sample=train_progress.epoch_sample,

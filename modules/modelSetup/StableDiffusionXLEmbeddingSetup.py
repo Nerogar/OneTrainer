@@ -16,10 +16,10 @@ class StableDiffusionXLEmbeddingSetup(
     BaseStableDiffusionXLSetup,
 ):
     def __init__(
-        self,
-        train_device: torch.device,
-        temp_device: torch.device,
-        debug_mode: bool,
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            debug_mode: bool,
     ):
         super().__init__(
             train_device=train_device,
@@ -28,34 +28,30 @@ class StableDiffusionXLEmbeddingSetup(
         )
 
     def create_parameters(
-        self,
-        model: StableDiffusionXLModel,
-        config: TrainConfig,
+            self,
+            model: StableDiffusionXLModel,
+            config: TrainConfig,
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
         if config.text_encoder.train_embedding:
             self._add_embedding_param_groups(
-                model.all_text_encoder_1_embeddings(),
-                parameter_group_collection,
-                config.embedding_learning_rate,
-                "embeddings_1",
+                model.all_text_encoder_1_embeddings(), parameter_group_collection, config.embedding_learning_rate,
+                "embeddings_1"
             )
 
         if config.text_encoder_2.train_embedding:
             self._add_embedding_param_groups(
-                model.all_text_encoder_2_embeddings(),
-                parameter_group_collection,
-                config.embedding_learning_rate,
-                "embeddings_2",
+                model.all_text_encoder_2_embeddings(), parameter_group_collection, config.embedding_learning_rate,
+                "embeddings_2"
             )
 
         return parameter_group_collection
 
     def __setup_requires_grad(
-        self,
-        model: StableDiffusionXLModel,
-        config: TrainConfig,
+            self,
+            model: StableDiffusionXLModel,
+            config: TrainConfig,
     ):
         self._setup_embeddings_requires_grad(model, config)
         model.text_encoder_1.requires_grad_(False)
@@ -64,9 +60,9 @@ class StableDiffusionXLEmbeddingSetup(
         model.unet.requires_grad_(False)
 
     def setup_model(
-        self,
-        model: StableDiffusionXLModel,
-        config: TrainConfig,
+            self,
+            model: StableDiffusionXLModel,
+            config: TrainConfig,
     ):
         model.text_encoder_1.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
         model.text_encoder_2.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
@@ -85,9 +81,9 @@ class StableDiffusionXLEmbeddingSetup(
         init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
-        self,
-        model: StableDiffusionXLModel,
-        config: TrainConfig,
+            self,
+            model: StableDiffusionXLModel,
+            config: TrainConfig,
     ):
         vae_on_train_device = not config.latent_caching
 
@@ -101,7 +97,12 @@ class StableDiffusionXLEmbeddingSetup(
         model.vae.eval()
         model.unet.eval()
 
-    def after_optimizer_step(self, model: StableDiffusionXLModel, config: TrainConfig, train_progress: TrainProgress):
+    def after_optimizer_step(
+            self,
+            model: StableDiffusionXLModel,
+            config: TrainConfig,
+            train_progress: TrainProgress
+    ):
         if config.preserve_embedding_norm:
             self._normalize_output_embeddings(model.all_text_encoder_1_embeddings())
             self._normalize_output_embeddings(model.all_text_encoder_2_embeddings())
@@ -109,13 +110,5 @@ class StableDiffusionXLEmbeddingSetup(
             model.embedding_wrapper_2.normalize_embeddings()
         self.__setup_requires_grad(model, config)
 
-
-factory.register(
-    BaseModelSetup, StableDiffusionXLEmbeddingSetup, ModelType.STABLE_DIFFUSION_XL_10_BASE, TrainingMethod.EMBEDDING
-)
-factory.register(
-    BaseModelSetup,
-    StableDiffusionXLEmbeddingSetup,
-    ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING,
-    TrainingMethod.EMBEDDING,
-)
+factory.register(BaseModelSetup, StableDiffusionXLEmbeddingSetup, ModelType.STABLE_DIFFUSION_XL_10_BASE, TrainingMethod.EMBEDDING)
+factory.register(BaseModelSetup, StableDiffusionXLEmbeddingSetup, ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING, TrainingMethod.EMBEDDING)

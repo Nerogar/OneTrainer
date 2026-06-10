@@ -1,3 +1,4 @@
+
 from modules.module.BaseImageMaskModel import BaseImageMaskModel, MaskSample
 
 import torch
@@ -31,12 +32,8 @@ class ClipSegModel(BaseImageMaskModel):
         kernel_size = kernel_radius * 2 + 1
         kernel_weights = torch.ones(1, 1, kernel_size, kernel_size) / (kernel_size * kernel_size)
         kernel = nn.Conv2d(
-            in_channels=1,
-            out_channels=1,
-            kernel_size=kernel_size,
-            bias=False,
-            padding_mode="replicate",
-            padding=kernel_radius,
+            in_channels=1, out_channels=1, kernel_size=kernel_size, bias=False, padding_mode='replicate',
+            padding=kernel_radius
         )
         kernel.weight.data = kernel_weights
         kernel.requires_grad_(False)
@@ -60,18 +57,18 @@ class ClipSegModel(BaseImageMaskModel):
         return mask
 
     def mask_image(
-        self,
-        filename: str,
-        prompts: list[str],
-        mode: str = "fill",
-        alpha: float = 1.0,
-        threshold: float = 0.3,
-        smooth_pixels: int = 5,
-        expand_pixels: int = 10,
+            self,
+            filename: str,
+            prompts: list[str],
+            mode: str = 'fill',
+            alpha: float = 1.0,
+            threshold: float = 0.3,
+            smooth_pixels: int = 5,
+            expand_pixels: int = 10
     ):
         mask_sample = MaskSample(filename, self.device)
 
-        if mode == "fill" and mask_sample.get_mask_tensor() is not None:
+        if mode == 'fill' and mask_sample.get_mask_tensor() is not None:
             return
 
         if self.smoothing_kernel_radius != smooth_pixels:
@@ -82,9 +79,8 @@ class ClipSegModel(BaseImageMaskModel):
             self.expand_kernel = self.__create_average_kernel(expand_pixels)
             self.expand_kernel_radius = expand_pixels
 
-        inputs = self.processor(
-            text=prompts, images=[mask_sample.get_image()] * len(prompts), padding="max_length", return_tensors="pt"
-        )
+        inputs = self.processor(text=prompts, images=[mask_sample.get_image()] * len(prompts), padding="max_length",
+                                return_tensors="pt")
         inputs = inputs.to(self.device)
         with torch.no_grad():
             outputs = self.model(**inputs)

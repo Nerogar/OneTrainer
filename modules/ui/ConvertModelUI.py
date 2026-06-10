@@ -28,6 +28,7 @@ class ConvertModelUI(ctk.CTkToplevel):
         self.ui_state = UIState(self, self.convert_model_args)
         self.button = None
 
+
         self.title("Convert models")
         self.geometry("550x350")
         self.resizable(True, True)
@@ -44,101 +45,73 @@ class ConvertModelUI(ctk.CTkToplevel):
         self.focus_set()
         self.after(200, lambda: set_window_icon(self))
 
+
     def main_frame(self, master):
         # model type
-        components.label(master, 0, 0, "Model Type", tooltip="Type of the model")
-        components.options_kv(
-            master,
-            0,
-            1,
-            [  # TODO simplify
-                ("Stable Diffusion 1.5", ModelType.STABLE_DIFFUSION_15),
-                ("Stable Diffusion 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
-                ("Stable Diffusion 2.0", ModelType.STABLE_DIFFUSION_20),
-                ("Stable Diffusion 2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
-                ("Stable Diffusion 2.1", ModelType.STABLE_DIFFUSION_21),
-                ("Stable Diffusion 3", ModelType.STABLE_DIFFUSION_3),
-                ("Stable Diffusion 3.5", ModelType.STABLE_DIFFUSION_35),
-                ("Stable Diffusion XL 1.0 Base", ModelType.STABLE_DIFFUSION_XL_10_BASE),
-                ("Stable Diffusion XL 1.0 Base Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
-                ("Wuerstchen v2", ModelType.WUERSTCHEN_2),
-                ("Stable Cascade", ModelType.STABLE_CASCADE_1),
-                ("PixArt Alpha", ModelType.PIXART_ALPHA),
-                ("PixArt Sigma", ModelType.PIXART_SIGMA),
-                ("Flux Dev", ModelType.FLUX_DEV_1),
-                ("Flux Fill Dev", ModelType.FLUX_FILL_DEV_1),
-                ("Flux 2", ModelType.FLUX_2),
-                ("Hunyuan Video", ModelType.HUNYUAN_VIDEO),
-                ("Chroma1", ModelType.CHROMA_1),  # TODO does this just work? HiDream is not here
-                ("QwenImage", ModelType.QWEN),  # TODO does this just work? HiDream is not here
-                ("ZImage", ModelType.Z_IMAGE),
-            ],
-            self.ui_state,
-            "model_type",
-        )
+        components.label(master, 0, 0, "Model Type",
+                         tooltip="Type of the model")
+        components.options_kv(master, 0, 1, [ #TODO simplify
+            ("Stable Diffusion 1.5", ModelType.STABLE_DIFFUSION_15),
+            ("Stable Diffusion 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
+            ("Stable Diffusion 2.0", ModelType.STABLE_DIFFUSION_20),
+            ("Stable Diffusion 2.0 Inpainting", ModelType.STABLE_DIFFUSION_20_INPAINTING),
+            ("Stable Diffusion 2.1", ModelType.STABLE_DIFFUSION_21),
+            ("Stable Diffusion 3", ModelType.STABLE_DIFFUSION_3),
+            ("Stable Diffusion 3.5", ModelType.STABLE_DIFFUSION_35),
+            ("Stable Diffusion XL 1.0 Base", ModelType.STABLE_DIFFUSION_XL_10_BASE),
+            ("Stable Diffusion XL 1.0 Base Inpainting", ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING),
+            ("Wuerstchen v2", ModelType.WUERSTCHEN_2),
+            ("Stable Cascade", ModelType.STABLE_CASCADE_1),
+            ("PixArt Alpha", ModelType.PIXART_ALPHA),
+            ("PixArt Sigma", ModelType.PIXART_SIGMA),
+            ("Flux Dev", ModelType.FLUX_DEV_1),
+            ("Flux Fill Dev", ModelType.FLUX_FILL_DEV_1),
+            ("Flux 2", ModelType.FLUX_2),
+            ("Hunyuan Video", ModelType.HUNYUAN_VIDEO),
+            ("Chroma1", ModelType.CHROMA_1), #TODO does this just work? HiDream is not here
+            ("QwenImage", ModelType.QWEN), #TODO does this just work? HiDream is not here
+            ("ZImage", ModelType.Z_IMAGE),
+        ], self.ui_state, "model_type")
 
         # training method
-        components.label(master, 1, 0, "Model Type", tooltip="The type of model to convert")
-        components.options_kv(
-            master,
-            1,
-            1,
-            [
-                ("Base Model", TrainingMethod.FINE_TUNE),
-                ("LoRA", TrainingMethod.LORA),
-                ("Embedding", TrainingMethod.EMBEDDING),
-            ],
-            self.ui_state,
-            "training_method",
-        )
+        components.label(master, 1, 0, "Model Type",
+                         tooltip="The type of model to convert")
+        components.options_kv(master, 1, 1, [
+            ("Base Model", TrainingMethod.FINE_TUNE),
+            ("LoRA", TrainingMethod.LORA),
+            ("Embedding", TrainingMethod.EMBEDDING),
+        ], self.ui_state, "training_method")
 
         # input name
-        components.label(
-            master, 2, 0, "Input name", tooltip="Filename, directory or hugging face repository of the base model"
-        )
+        components.label(master, 2, 0, "Input name",
+                         tooltip="Filename, directory or hugging face repository of the base model")
         components.path_entry(
-            master, 2, 1, self.ui_state, "input_name", mode="file", path_modifier=components.json_path_modifier
+            master, 2, 1, self.ui_state, "input_name",
+            mode="file", path_modifier=components.json_path_modifier
         )
 
         # output data type
-        components.label(master, 3, 0, "Output Data Type", tooltip="Precision to use when saving the output model")
-        components.options_kv(
-            master,
-            3,
-            1,
-            [
-                ("float32", DataType.FLOAT_32),
-                ("float16", DataType.FLOAT_16),
-                ("bfloat16", DataType.BFLOAT_16),
-            ],
-            self.ui_state,
-            "output_dtype",
-        )
+        components.label(master, 3, 0, "Output Data Type",
+                         tooltip="Precision to use when saving the output model")
+        components.options_kv(master, 3, 1, [
+            ("float32", DataType.FLOAT_32),
+            ("float16", DataType.FLOAT_16),
+            ("bfloat16", DataType.BFLOAT_16),
+        ], self.ui_state, "output_dtype")
 
         # output format
-        components.label(master, 4, 0, "Output Format", tooltip="Format to use when saving the output model")
-        components.options_kv(
-            master,
-            4,
-            1,
-            [
-                ("Safetensors", ModelFormat.SAFETENSORS),
-                ("Diffusers", ModelFormat.DIFFUSERS),
-            ],
-            self.ui_state,
-            "output_model_format",
-        )
+        components.label(master, 4, 0, "Output Format",
+                         tooltip="Format to use when saving the output model")
+        components.options_kv(master, 4, 1, [
+            ("Safetensors", ModelFormat.SAFETENSORS),
+            ("Diffusers", ModelFormat.DIFFUSERS),
+        ], self.ui_state, "output_model_format")
 
         # output model destination
-        components.label(
-            master, 5, 0, "Model Output Destination", tooltip="Filename or directory where the output model is saved"
-        )
+        components.label(master, 5, 0, "Model Output Destination",
+                         tooltip="Filename or directory where the output model is saved")
         components.path_entry(
-            master,
-            5,
-            1,
-            self.ui_state,
-            "output_model_destination",
+            master, 5, 1, self.ui_state, "output_model_destination",
             mode="file",
             io_type=PathIOType.MODEL,
         )
@@ -149,10 +122,12 @@ class ConvertModelUI(ctk.CTkToplevel):
         try:
             self.button.configure(state="disabled")
             model_loader = create.create_model_loader(
-                model_type=self.convert_model_args.model_type, training_method=self.convert_model_args.training_method
+                model_type=self.convert_model_args.model_type,
+                training_method=self.convert_model_args.training_method
             )
             model_saver = create.create_model_saver(
-                model_type=self.convert_model_args.model_type, training_method=self.convert_model_args.training_method
+                model_type=self.convert_model_args.model_type,
+                training_method=self.convert_model_args.training_method
             )
 
             print("Loading model " + self.convert_model_args.input_name)

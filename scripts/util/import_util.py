@@ -6,9 +6,9 @@ def script_imports(allow_zluda: bool = True):
 
     # Filter out the Triton warning on startup.
     # xformers is not installed anymore, but might still exist for some installations.
-    logging.getLogger("xformers").addFilter(
-        lambda record: "A matching Triton is not available" not in record.getMessage()
-    )
+    logging \
+        .getLogger("xformers") \
+        .addFilter(lambda record: 'A matching Triton is not available' not in record.getMessage())
 
     # Insert ourselves as the highest-priority library path, so our modules are
     # always found without any risk of being shadowed by another import path.
@@ -16,7 +16,7 @@ def script_imports(allow_zluda: bool = True):
     onetrainer_lib_path = Path(__file__).absolute().parent.parent.parent
     sys.path.insert(0, str(onetrainer_lib_path))
 
-    if allow_zluda and sys.platform.startswith("win"):
+    if allow_zluda and sys.platform.startswith('win'):
         from modules.zluda import ZLUDAInstaller
 
         zluda_path = ZLUDAInstaller.get_path()
@@ -24,9 +24,9 @@ def script_imports(allow_zluda: bool = True):
         if os.path.exists(zluda_path):
             try:
                 ZLUDAInstaller.load(zluda_path)
-                print(f"Using ZLUDA in {zluda_path}")
+                print(f'Using ZLUDA in {zluda_path}')
             except Exception as e:
-                print(f"Failed to load ZLUDA: {e}")
+                print(f'Failed to load ZLUDA: {e}')
 
             from modules.zluda import ZLUDA
 

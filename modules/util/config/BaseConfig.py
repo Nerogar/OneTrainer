@@ -10,10 +10,10 @@ class BaseConfig:
     config_migrations: dict[int, Callable[[dict], dict]]
 
     def __init__(
-        self,
-        data: list[tuple[str, Any, type, bool]],
-        config_version: int | None = None,
-        config_migrations: dict[int, Callable[[dict], dict]] | None = None,
+            self,
+            data: list[tuple[str, Any, type, bool]],
+            config_version: int | None = None,
+            config_migrations: dict[int, Callable[[dict], dict]] | None = None
     ):
         self.config_version = config_version if config_version is not None else 0
         self.config_migrations = config_migrations if config_migrations is not None else {}
@@ -21,7 +21,7 @@ class BaseConfig:
         self.types = {}
         self.nullables = {}
         self.default_values = {}
-        for name, value, var_type, nullable in data:
+        for (name, value, var_type, nullable) in data:
             setattr(self, name, value)
             self.types[name] = var_type
             self.nullables[name] = nullable
@@ -29,7 +29,7 @@ class BaseConfig:
 
     def to_dict(self) -> dict:
         data = {
-            "__version": self.config_version,
+            '__version': self.config_version,
         }
 
         for name in self.types:
@@ -56,17 +56,17 @@ class BaseConfig:
             elif self.types[name] is bool or self.types[name] is int:
                 data[name] = value
             elif self.types[name] is float:
-                if value in [float("inf"), float("-inf")]:
+                if value in [float('inf'), float('-inf')]:
                     data[name] = str(value)
                 else:
                     data[name] = value
 
         return data
 
-    def from_dict(self, data: dict) -> "BaseConfig":
+    def from_dict(self, data: dict) -> 'BaseConfig':
         version = 0
-        if "__version" in data:
-            version = data["__version"]
+        if '__version' in data:
+            version = data['__version']
 
         while version in self.config_migrations:
             data = self.config_migrations[version](data)
@@ -77,14 +77,11 @@ class BaseConfig:
                 if issubclass_safe(self.types[name], BaseConfig):
                     getattr(self, name).from_dict(data[name])
                 elif self.types[name] is list or get_origin(self.types[name]) is list:
-                    if len(get_args(self.types[name])) > 0 and issubclass_safe(
-                        get_args(self.types[name])[0], BaseConfig
-                    ):
+                    if len(get_args(self.types[name])) > 0 and issubclass_safe(get_args(self.types[name])[0], BaseConfig):
                         list_type = get_args(self.types[name])[0]
                         if data[name] is not None:
-                            old_value = (
+                            old_value = \
                                 getattr(self, name) if hasattr(self, name) and getattr(self, name) is not None else []
-                            )
                             value = []
                             for i in range(len(data[name])):
                                 if i < len(old_value) and i < len(data[name]):
@@ -97,9 +94,7 @@ class BaseConfig:
                     else:
                         setattr(self, name, data[name])
                 elif self.types[name] is dict or get_origin(self.types[name]) is dict:
-                    if len(get_args(self.types[name])) > 0 and issubclass_safe(
-                        get_args(self.types[name])[1], BaseConfig
-                    ):
+                    if len(get_args(self.types[name])) > 0 and issubclass_safe(get_args(self.types[name])[1], BaseConfig):
                         dict_type = get_args(self.types[name])[1]
                         value = {}
                         for dict_key, dict_value in data[name].items():
@@ -129,7 +124,7 @@ class BaseConfig:
                         setattr(self, name, int(data[name]))
                 elif self.types[name] is float:
                     # check for strings to support dicts loaded from json
-                    if data[name] in [float("inf"), float("-inf"), "inf", "-inf"]:
+                    if data[name] in [float('inf'), float('-inf'), 'inf', '-inf']:
                         setattr(self, name, float(data[name]))
                     if self.nullables[name]:
                         setattr(self, name, None if data[name] is None else float(data[name]))

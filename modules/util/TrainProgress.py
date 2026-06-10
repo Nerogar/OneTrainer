@@ -1,10 +1,10 @@
 class TrainProgress:
     def __init__(
-        self,
-        epoch: int = 0,
-        epoch_step: int = 0,
-        epoch_sample: int = 0,
-        global_step: int = 0,
+            self,
+            epoch: int = 0,
+            epoch_step: int = 0,
+            epoch_sample: int = 0,
+            global_step: int = 0,
     ):
         self.epoch = epoch
         self.epoch_step = epoch_step

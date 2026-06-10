@@ -25,11 +25,11 @@ from tqdm import tqdm
 
 class FluxSampler(BaseModelSampler):
     def __init__(
-        self,
-        train_device: torch.device,
-        temp_device: torch.device,
-        model: FluxModel,
-        model_type: ModelType,
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            model: FluxModel,
+            model_type: ModelType,
     ):
         super().__init__(train_device, temp_device)
 
@@ -39,21 +39,21 @@ class FluxSampler(BaseModelSampler):
 
     @torch.no_grad()
     def __sample_base(
-        self,
-        prompt: str,
-        negative_prompt: str,
-        height: int,
-        width: int,
-        seed: int,
-        random_seed: bool,
-        diffusion_steps: int,
-        cfg_scale: float,
-        noise_scheduler: NoiseScheduler,
-        text_encoder_1_layer_skip: int = 0,
-        text_encoder_2_layer_skip: int = 0,
-        text_encoder_2_sequence_length: int | None = None,
-        transformer_attention_mask: bool = False,
-        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+            self,
+            prompt: str,
+            negative_prompt: str,
+            height: int,
+            width: int,
+            seed: int,
+            random_seed: bool,
+            diffusion_steps: int,
+            cfg_scale: float,
+            noise_scheduler: NoiseScheduler,
+            text_encoder_1_layer_skip: int = 0,
+            text_encoder_2_layer_skip: int = 0,
+            text_encoder_2_sequence_length: int | None = None,
+            transformer_attention_mask: bool = False,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
@@ -96,7 +96,7 @@ class FluxSampler(BaseModelSampler):
                 height // vae_scale_factor,
                 width // vae_scale_factor,
                 self.train_device,
-                self.model.train_dtype.torch_dtype(),
+                self.model.train_dtype.torch_dtype()
             )
 
             shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
@@ -135,7 +135,7 @@ class FluxSampler(BaseModelSampler):
                     txt_ids=text_ids,
                     img_ids=image_ids,
                     joint_attention_kwargs=None,
-                    return_dict=True,
+                    return_dict=True
                 ).sample
 
                 # compute the previous noisy sample x_t -> x_t-1
@@ -159,10 +159,8 @@ class FluxSampler(BaseModelSampler):
             latents = (latent_image / vae.config.scaling_factor) + vae.config.shift_factor
             image = vae.decode(latents, return_dict=False)[0]
 
-            do_denormalize = [True] * image.shape[
-                0
-            ]  # TODO remove and test, from Flux and other models. True is the default
-            image = image_processor.postprocess(image, output_type="pil", do_denormalize=do_denormalize)
+            do_denormalize = [True] * image.shape[0] #TODO remove and test, from Flux and other models. True is the default
+            image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
             self.model.vae_to(self.temp_device)
             torch_gc()
@@ -178,12 +176,8 @@ class FluxSampler(BaseModelSampler):
         kernel_size = kernel_radius * 2 + 1
         kernel_weights = torch.ones(1, 1, kernel_size, kernel_size, dtype=dtype) / (kernel_size * kernel_size)
         kernel = nn.Conv2d(
-            in_channels=1,
-            out_channels=1,
-            kernel_size=kernel_size,
-            bias=False,
-            padding_mode="replicate",
-            padding=kernel_radius,
+            in_channels=1, out_channels=1, kernel_size=kernel_size, bias=False, padding_mode='replicate',
+            padding=kernel_radius
         ).to(dtype)
         kernel.weight.data = kernel_weights
         kernel.requires_grad_(False)
@@ -192,24 +186,24 @@ class FluxSampler(BaseModelSampler):
 
     @torch.no_grad()
     def __sample_inpainting(
-        self,
-        prompt: str,
-        negative_prompt: str,
-        height: int,
-        width: int,
-        seed: int,
-        random_seed: bool,
-        diffusion_steps: int,
-        cfg_scale: float,
-        noise_scheduler: NoiseScheduler,
-        sample_inpainting: bool = False,
-        base_image_path: str = "",
-        mask_image_path: str = "",
-        text_encoder_1_layer_skip: int = 0,
-        text_encoder_2_layer_skip: int = 0,
-        text_encoder_2_sequence_length: int | None = None,
-        transformer_attention_mask: bool = False,
-        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+            self,
+            prompt: str,
+            negative_prompt: str,
+            height: int,
+            width: int,
+            seed: int,
+            random_seed: bool,
+            diffusion_steps: int,
+            cfg_scale: float,
+            noise_scheduler: NoiseScheduler,
+            sample_inpainting: bool = False,
+            base_image_path: str = "",
+            mask_image_path: str = "",
+            text_encoder_1_layer_skip: int = 0,
+            text_encoder_2_layer_skip: int = 0,
+            text_encoder_2_sequence_length: int | None = None,
+            transformer_attention_mask: bool = False,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
@@ -229,14 +223,12 @@ class FluxSampler(BaseModelSampler):
             self.model.vae_to(self.train_device)
 
             if sample_inpainting:
-                t = transforms.Compose(
-                    [
-                        transforms.ToTensor(),
-                        transforms.Resize(
-                            (height, width), interpolation=transforms.InterpolationMode.BILINEAR, antialias=True
-                        ),
-                    ]
-                )
+                t = transforms.Compose([
+                    transforms.ToTensor(),
+                    transforms.Resize(
+                        (height, width), interpolation=transforms.InterpolationMode.BILINEAR, antialias=True
+                    ),
+                ])
 
                 image = load_image(base_image_path, convert_mode="RGB")
                 image = t(image).to(
@@ -244,7 +236,7 @@ class FluxSampler(BaseModelSampler):
                     device=self.train_device,
                 )
 
-                mask = load_image(mask_image_path, convert_mode="L")
+                mask = load_image(mask_image_path, convert_mode='L')
                 mask = t(mask).to(
                     dtype=self.model.train_dtype.torch_dtype(),
                     device=self.train_device,
@@ -255,13 +247,12 @@ class FluxSampler(BaseModelSampler):
                 eroded_mask = (eroded_mask > 0.5).to(dtype=self.model.train_dtype.torch_dtype())
 
                 image = (image * 2.0) - 1.0
-                conditioning_image = image * (1 - eroded_mask)
+                conditioning_image = (image * (1 - eroded_mask))
                 conditioning_image = conditioning_image.unsqueeze(0)
 
                 latent_conditioning_image = vae.encode(conditioning_image).latent_dist.mode()
-                latent_conditioning_image = (
-                    latent_conditioning_image - vae.config.shift_factor
-                ) * vae.config.scaling_factor
+                latent_conditioning_image = (latent_conditioning_image - vae.config.shift_factor) \
+                                            * vae.config.scaling_factor
 
                 latent_conditioning_image = self.model.pack_latents(latent_conditioning_image)
 
@@ -291,16 +282,15 @@ class FluxSampler(BaseModelSampler):
                     device=self.train_device,
                 )
                 latent_conditioning_image = vae.encode(conditioning_image).latent_dist.mode()
-                latent_conditioning_image = (
-                    latent_conditioning_image - vae.config.shift_factor
-                ) * vae.config.scaling_factor
+                latent_conditioning_image = (latent_conditioning_image - vae.config.shift_factor) \
+                                            * vae.config.scaling_factor
 
                 latent_conditioning_image = self.model.pack_latents(latent_conditioning_image)
 
                 latent_mask = torch.ones(
                     size=(1, (height // vae_scale_factor // 2) * (width // vae_scale_factor // 2), 256),
                     dtype=self.model.train_dtype.torch_dtype(),
-                    device=self.train_device,
+                    device=self.train_device
                 )
 
             # prepare prompt
@@ -330,7 +320,7 @@ class FluxSampler(BaseModelSampler):
                 height // vae_scale_factor,
                 width // vae_scale_factor,
                 self.train_device,
-                self.model.train_dtype.torch_dtype(),
+                self.model.train_dtype.torch_dtype()
             )
 
             shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
@@ -348,7 +338,9 @@ class FluxSampler(BaseModelSampler):
             self.model.transformer_to(self.train_device)
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 latent_model_input = torch.cat([latent_image])
-                latent_model_input = torch.concat([latent_model_input, latent_conditioning_image, latent_mask], -1)
+                latent_model_input = torch.concat(
+                    [latent_model_input, latent_conditioning_image, latent_mask], -1
+                )
                 expanded_timestep = timestep.expand(latent_model_input.shape[0])
 
                 # handle guidance
@@ -368,7 +360,7 @@ class FluxSampler(BaseModelSampler):
                     txt_ids=text_ids.to(dtype=self.model.train_dtype.torch_dtype()),
                     img_ids=image_ids.to(dtype=self.model.train_dtype.torch_dtype()),
                     joint_attention_kwargs=None,
-                    return_dict=True,
+                    return_dict=True
                 ).sample
 
                 # compute the previous noisy sample x_t -> x_t-1
@@ -394,7 +386,7 @@ class FluxSampler(BaseModelSampler):
             image = vae.decode(latents, return_dict=False)[0]
 
             do_denormalize = [True] * image.shape[0]
-            image = image_processor.postprocess(image, output_type="pil", do_denormalize=do_denormalize)
+            image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
             self.model.vae_to(self.temp_device)
             torch_gc()
@@ -405,14 +397,14 @@ class FluxSampler(BaseModelSampler):
             )
 
     def sample(
-        self,
-        sample_config: SampleConfig,
-        destination: str,
-        image_format: ImageFormat | None = None,
-        video_format: VideoFormat | None = None,
-        audio_format: AudioFormat | None = None,
-        on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
-        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+            self,
+            sample_config: SampleConfig,
+            destination: str,
+            image_format: ImageFormat | None = None,
+            video_format: VideoFormat | None = None,
+            audio_format: AudioFormat | None = None,
+            on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         if self.model_type.has_conditioning_image_input():
             sampler_output = self.__sample_inpainting(
@@ -453,15 +445,11 @@ class FluxSampler(BaseModelSampler):
             )
 
         self.save_sampler_output(
-            sampler_output,
-            destination,
-            image_format,
-            video_format,
-            audio_format,
+            sampler_output, destination,
+            image_format, video_format, audio_format,
         )
 
         on_sample(sampler_output)
-
 
 factory.register(BaseModelSampler, FluxSampler, ModelType.FLUX_DEV_1)
 factory.register(BaseModelSampler, FluxSampler, ModelType.FLUX_FILL_DEV_1)

@@ -30,16 +30,16 @@ class LoRASaverMixin(
 
     @abstractmethod
     def _get_state_dict(
-        self,
-        model: BaseModel,
+            self,
+            model: BaseModel,
     ) -> dict[str, Tensor]:
         pass
 
     def __save_safetensors(
-        self,
-        model: BaseModel,
-        destination: str,
-        dtype: torch.dtype | None,
+            self,
+            model: BaseModel,
+            destination: str,
+            dtype: torch.dtype | None,
     ):
         state_dict = self._get_state_dict(model)
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
@@ -52,10 +52,10 @@ class LoRASaverMixin(
         save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
 
     def __save_legacy_safetensors(
-        self,
-        model: BaseModel,
-        destination: str,
-        dtype: torch.dtype | None,
+            self,
+            model: BaseModel,
+            destination: str,
+            dtype: torch.dtype | None,
     ):
         state_dict = self._get_state_dict(model)
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
@@ -68,21 +68,21 @@ class LoRASaverMixin(
         save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
 
     def __save_internal(
-        self,
-        model: BaseModel,
-        destination: str,
+            self,
+            model: BaseModel,
+            destination: str,
     ):
         os.makedirs(destination, exist_ok=True)
 
         self.__save_safetensors(model, os.path.join(destination, "lora", "lora.safetensors"), None)
 
     def _save(
-        self,
-        model: BaseModel,
-        output_model_format: ModelFormat,
-        output_model_destination: str,
-        dtype: torch.dtype | None,
-        enable_omi_format: bool = False,
+            self,
+            model: BaseModel,
+            output_model_format: ModelFormat,
+            output_model_destination: str,
+            dtype: torch.dtype | None,
+            enable_omi_format: bool = False,
     ):
         match output_model_format:
             case ModelFormat.DIFFUSERS:

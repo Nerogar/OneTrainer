@@ -4,18 +4,18 @@ from typing import Any
 
 
 def safe_filename(
-    text: str,
-    allow_spaces: bool = True,
-    max_length: int | None = 32,
+        text: str,
+        allow_spaces: bool = True,
+        max_length: int | None = 32,
 ):
-    legal_chars = [" ", ".", "_", "-", "#"]
+    legal_chars = [' ', '.', '_', '-', '#']
     if not allow_spaces:
-        text = text.replace(" ", "_")
+        text = text.replace(' ', '_')
 
-    text = "".join(filter(lambda x: str.isalnum(x) or x in legal_chars, text)).strip()
+    text = ''.join(filter(lambda x: str.isalnum(x) or x in legal_chars, text)).strip()
 
     if max_length is not None:
-        text = text[0:max_length]
+        text = text[0: max_length]
 
     return text.strip()
 
@@ -25,7 +25,7 @@ def canonical_join(base_path: str, *paths: str):
     # Also, Windows does understand / instead of \, so these paths can be used as usual.
 
     joined = os.path.join(base_path, *paths)
-    return joined.replace("\\", "/")
+    return joined.replace('\\', '/')
 
 
 def write_json_atomic(path: str, obj: Any):
@@ -34,9 +34,9 @@ def write_json_atomic(path: str, obj: Any):
     os.replace(path + ".write", path)
 
 
-SUPPORTED_IMAGE_EXTENSIONS = {".bmp", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".webp", ".avif"}
-SUPPORTED_VIDEO_EXTENSIONS = {".webm", ".mkv", ".flv", ".avi", ".mov", ".wmv", ".mp4", ".mpeg", ".m4v"}
-SUPPORTED_CAPTION_EXTENSIONS = {".txt"}
+SUPPORTED_IMAGE_EXTENSIONS = {'.bmp', '.jpg', '.jpeg', '.png', '.tif', '.tiff', '.webp', '.avif'}
+SUPPORTED_VIDEO_EXTENSIONS = {'.webm', '.mkv', '.flv', '.avi', '.mov', '.wmv', '.mp4', '.mpeg', '.m4v'}
+SUPPORTED_CAPTION_EXTENSIONS = {'.txt'}
 
 
 def supported_image_extensions() -> set[str]:

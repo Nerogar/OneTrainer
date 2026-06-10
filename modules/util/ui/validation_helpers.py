@@ -13,15 +13,15 @@ def validate_resolution() -> Callable[[str], str | None]:
 
         dims = []
 
-        if "x" in value:
-            parts = value.split("x")
+        if 'x' in value:
+            parts = value.split('x')
             if len(parts) == 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
                 dims = [int(parts[0].strip()), int(parts[1].strip())]
             else:
                 return "Invalid format. Use <width>x<height> (e.g., 1024x768)"
 
         else:
-            parts = value.split(",")
+            parts = value.split(',')
             if all(p.strip().isdigit() for p in parts):
                 dims = [int(p.strip()) for p in parts]
             else:

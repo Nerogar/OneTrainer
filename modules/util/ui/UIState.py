@@ -30,7 +30,7 @@ class UIState:
         self.__set_vars(obj)
 
     def get_var(self, name):
-        split_name = name.split(".")
+        split_name = name.split('.')
 
         if len(split_name) == 1:
             return self.__vars[split_name[0]]
@@ -57,7 +57,6 @@ class UIState:
 
     def __set_str_var(self, obj, is_dict, name, var, nullable):
         if is_dict:
-
             def update(_0, _1, _2):
                 string_var = var.get()
                 if (string_var == "" or string_var == "None") and nullable:
@@ -66,7 +65,6 @@ class UIState:
                     obj[name] = string_var
                 self.__call_var_traces(name)
         else:
-
             def update(_0, _1, _2):
                 string_var = var.get()
                 if (string_var == "" or string_var == "None") and nullable:
@@ -79,7 +77,6 @@ class UIState:
 
     def __set_enum_var(self, obj, is_dict, name, var, var_type, nullable):
         if is_dict:
-
             def update(_0, _1, _2):
                 string_var = var.get()
                 if (string_var == "" or string_var == "None") and nullable:
@@ -88,7 +85,6 @@ class UIState:
                     obj[name] = var_type[string_var]
                 self.__call_var_traces(name)
         else:
-
             def update(_0, _1, _2):
                 string_var = var.get()
                 if (string_var == "" or string_var == "None") and nullable:
@@ -101,12 +97,10 @@ class UIState:
 
     def __set_bool_var(self, obj, is_dict, name, var):
         if is_dict:
-
             def update(_0, _1, _2):
                 obj[name] = var.get()
                 self.__call_var_traces(name)
         else:
-
             def update(_0, _1, _2):
                 setattr(obj, name, var.get())
                 self.__call_var_traces(name)
@@ -115,7 +109,6 @@ class UIState:
 
     def __set_int_var(self, obj, is_dict, name, var, nullable):
         if is_dict:
-
             def update(_0, _1, _2):
                 string_var = var.get()
                 if (string_var == "" or string_var == "None") and nullable:
@@ -131,7 +124,6 @@ class UIState:
                         obj[name] = None
                 self.__call_var_traces(name)
         else:
-
             def update(_0, _1, _2):
                 string_var = var.get()
                 if (string_var == "" or string_var == "None") and nullable:
@@ -151,7 +143,6 @@ class UIState:
 
     def __set_float_var(self, obj, is_dict, name, var, nullable):
         if is_dict:
-
             def update(_0, _1, _2):
                 string_var = var.get()
                 if (string_var == "" or string_var == "None") and nullable:
@@ -167,7 +158,6 @@ class UIState:
                         obj[name] = None
                 self.__call_var_traces(name)
         else:
-
             def update(_0, _1, _2):
                 string_var = var.get()
                 if (string_var == "" or string_var == "None") and nullable:
@@ -231,6 +221,7 @@ class UIState:
             iterable = obj.items() if is_dict else vars(obj).items()
 
             for name, obj_var in iterable:
+
                 if isinstance(obj_var, str):
                     var = tk.StringVar(master=self.master)
                     var.set(obj_var)
@@ -299,7 +290,7 @@ class UIState:
 
     # metadata api
     def _resolve_state_and_leaf(self, name: str):
-        parts = name.split(".")
+        parts = name.split('.')
         state: UIState = self
         for part in parts[:-1]:
             state = state.get_var(part)

@@ -15,19 +15,19 @@ class EmbeddingSaverMixin(metaclass=ABCMeta):
 
     @abstractmethod
     def _to_state_dict(
-        self,
-        embedding: Any | None,
-        embedding_state_dict: dict[str, Tensor] | None,
-        dtype: torch.dtype | None,
+            self,
+            embedding: Any | None,
+            embedding_state_dict: dict[str, Tensor] | None,
+            dtype: torch.dtype | None,
     ):
         pass
 
     def _save_safetensors(
-        self,
-        embedding: Any | None,
-        embedding_state_dict: dict[str, Tensor] | None,
-        destination: str,
-        dtype: torch.dtype | None,
+            self,
+            embedding: Any | None,
+            embedding_state_dict: dict[str, Tensor] | None,
+            destination: str,
+            dtype: torch.dtype | None,
     ):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
 
@@ -40,11 +40,11 @@ class EmbeddingSaverMixin(metaclass=ABCMeta):
         save_file(state_dict, destination)
 
     def _save_internal(
-        self,
-        embedding: Any | None,
-        embedding_state: dict[str, Tensor] | None,
-        embedding_uuid: str,
-        destination: str,
+            self,
+            embedding: Any | None,
+            embedding_state: dict[str, Tensor] | None,
+            embedding_uuid: str,
+            destination: str,
     ):
         safetensors_embedding_name = os.path.join(
             destination,

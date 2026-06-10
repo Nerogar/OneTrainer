@@ -19,45 +19,38 @@ class StableDiffusion3ModelLoader(
         super().__init__()
 
     def __load_internal(
-        self,
-        model: StableDiffusion3Model,
-        model_type: ModelType,
-        weight_dtypes: ModelWeightDtypes,
-        base_model_name: str,
-        vae_model_name: str,
-        include_text_encoder_1: bool,
-        include_text_encoder_2: bool,
-        include_text_encoder_3: bool,
-        quantization: QuantizationConfig,
+            self,
+            model: StableDiffusion3Model,
+            model_type: ModelType,
+            weight_dtypes: ModelWeightDtypes,
+            base_model_name: str,
+            vae_model_name: str,
+            include_text_encoder_1: bool,
+            include_text_encoder_2: bool,
+            include_text_encoder_3: bool,
+            quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(
-                model,
-                model_type,
-                weight_dtypes,
-                base_model_name,
-                vae_model_name,
-                include_text_encoder_1,
-                include_text_encoder_2,
-                include_text_encoder_3,
-                quantization,
+                model, model_type, weight_dtypes, base_model_name, vae_model_name,
+                include_text_encoder_1, include_text_encoder_2, include_text_encoder_3, quantization,
             )
         else:
             raise Exception("not an internal model")
 
     def __load_diffusers(
-        self,
-        model: StableDiffusion3Model,
-        model_type: ModelType,
-        weight_dtypes: ModelWeightDtypes,
-        base_model_name: str,
-        vae_model_name: str,
-        include_text_encoder_1: bool,
-        include_text_encoder_2: bool,
-        include_text_encoder_3: bool,
-        quantization: QuantizationConfig,
+            self,
+            model: StableDiffusion3Model,
+            model_type: ModelType,
+            weight_dtypes: ModelWeightDtypes,
+            base_model_name: str,
+            vae_model_name: str,
+            include_text_encoder_1: bool,
+            include_text_encoder_2: bool,
+            include_text_encoder_3: bool,
+            quantization: QuantizationConfig,
     ):
-        # no call to self._prepare_sub_modules, because SAI polluted their sd3 / sd3.5 medium repo text encoders with fp16 files
+        #no call to self._prepare_sub_modules, because SAI polluted their sd3 / sd3.5 medium repo text encoders with fp16 files
 
         if include_text_encoder_1:
             tokenizer_1 = CLIPTokenizer.from_pretrained(
@@ -158,16 +151,16 @@ class StableDiffusion3ModelLoader(
         model.transformer = transformer
 
     def __load_safetensors(
-        self,
-        model: StableDiffusion3Model,
-        model_type: ModelType,
-        weight_dtypes: ModelWeightDtypes,
-        base_model_name: str,
-        vae_model_name: str,
-        include_text_encoder_1: bool,
-        include_text_encoder_2: bool,
-        include_text_encoder_3: bool,
-        quantization: QuantizationConfig,
+            self,
+            model: StableDiffusion3Model,
+            model_type: ModelType,
+            weight_dtypes: ModelWeightDtypes,
+            base_model_name: str,
+            vae_model_name: str,
+            include_text_encoder_1: bool,
+            include_text_encoder_2: bool,
+            include_text_encoder_3: bool,
+            quantization: QuantizationConfig,
     ):
         pipeline = StableDiffusion3Pipeline.from_single_file(
             pretrained_model_link_or_path=base_model_name,
@@ -232,10 +225,7 @@ class StableDiffusion3ModelLoader(
             print("text encoder 3 (t5) not loaded, continuing without it")
 
         transformer = self._convert_diffusers_sub_module_to_dtype(
-            pipeline.transformer,
-            weight_dtypes.transformer,
-            weight_dtypes.train_dtype,
-            quantization,
+            pipeline.transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization,
         )
 
         model.model_type = model_type
@@ -250,26 +240,20 @@ class StableDiffusion3ModelLoader(
         model.transformer = transformer
 
     def load(
-        self,
-        model: StableDiffusion3Model,
-        model_type: ModelType,
-        model_names: ModelNames,
-        weight_dtypes: ModelWeightDtypes,
-        quantization: QuantizationConfig,
+            self,
+            model: StableDiffusion3Model,
+            model_type: ModelType,
+            model_names: ModelNames,
+            weight_dtypes: ModelWeightDtypes,
+            quantization: QuantizationConfig,
     ):
         stacktraces = []
 
         try:
             self.__load_internal(
-                model,
-                model_type,
-                weight_dtypes,
-                model_names.base_model,
-                model_names.vae_model,
-                model_names.include_text_encoder,
-                model_names.include_text_encoder_2,
-                model_names.include_text_encoder_3,
-                quantization,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
+                model_names.include_text_encoder, model_names.include_text_encoder_2,
+                 model_names.include_text_encoder_3, quantization,
             )
             return
         except Exception:
@@ -277,15 +261,9 @@ class StableDiffusion3ModelLoader(
 
         try:
             self.__load_diffusers(
-                model,
-                model_type,
-                weight_dtypes,
-                model_names.base_model,
-                model_names.vae_model,
-                model_names.include_text_encoder,
-                model_names.include_text_encoder_2,
-                model_names.include_text_encoder_3,
-                quantization,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
+                model_names.include_text_encoder, model_names.include_text_encoder_2,
+                model_names.include_text_encoder_3, quantization,
             )
             return
         except Exception:
@@ -293,15 +271,9 @@ class StableDiffusion3ModelLoader(
 
         try:
             self.__load_safetensors(
-                model,
-                model_type,
-                weight_dtypes,
-                model_names.base_model,
-                model_names.vae_model,
-                model_names.include_text_encoder,
-                model_names.include_text_encoder_2,
-                model_names.include_text_encoder_3,
-                quantization,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
+                model_names.include_text_encoder, model_names.include_text_encoder_2,
+                model_names.include_text_encoder_3, quantization,
             )
             return
         except Exception:

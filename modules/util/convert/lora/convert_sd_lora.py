@@ -18,39 +18,15 @@ def __map_unet_attention_block(key_prefix: LoraConversionKeySet) -> list[LoraCon
 
     keys += [LoraConversionKeySet("proj_in", "proj_in", parent=key_prefix)]
     keys += [LoraConversionKeySet("proj_out", "proj_out", parent=key_prefix)]
-    keys += [
-        LoraConversionKeySet("transformer_blocks.0.attn1.to_q", "transformer_blocks.0.attn1.to_q", parent=key_prefix)
-    ]
-    keys += [
-        LoraConversionKeySet("transformer_blocks.0.attn1.to_k", "transformer_blocks.0.attn1.to_k", parent=key_prefix)
-    ]
-    keys += [
-        LoraConversionKeySet("transformer_blocks.0.attn1.to_v", "transformer_blocks.0.attn1.to_v", parent=key_prefix)
-    ]
-    keys += [
-        LoraConversionKeySet(
-            "transformer_blocks.0.attn1.to_out.0", "transformer_blocks.0.attn1.to_out.0", parent=key_prefix
-        )
-    ]
-    keys += [
-        LoraConversionKeySet("transformer_blocks.0.attn2.to_q", "transformer_blocks.0.attn2.to_q", parent=key_prefix)
-    ]
-    keys += [
-        LoraConversionKeySet("transformer_blocks.0.attn2.to_k", "transformer_blocks.0.attn2.to_k", parent=key_prefix)
-    ]
-    keys += [
-        LoraConversionKeySet("transformer_blocks.0.attn2.to_v", "transformer_blocks.0.attn2.to_v", parent=key_prefix)
-    ]
-    keys += [
-        LoraConversionKeySet(
-            "transformer_blocks.0.attn2.to_out.0", "transformer_blocks.0.attn2.to_out.0", parent=key_prefix
-        )
-    ]
-    keys += [
-        LoraConversionKeySet(
-            "transformer_blocks.0.ff.net.0.proj", "transformer_blocks.0.ff.net.0.proj", parent=key_prefix
-        )
-    ]
+    keys += [LoraConversionKeySet("transformer_blocks.0.attn1.to_q", "transformer_blocks.0.attn1.to_q", parent=key_prefix)]
+    keys += [LoraConversionKeySet("transformer_blocks.0.attn1.to_k", "transformer_blocks.0.attn1.to_k", parent=key_prefix)]
+    keys += [LoraConversionKeySet("transformer_blocks.0.attn1.to_v", "transformer_blocks.0.attn1.to_v", parent=key_prefix)]
+    keys += [LoraConversionKeySet("transformer_blocks.0.attn1.to_out.0", "transformer_blocks.0.attn1.to_out.0", parent=key_prefix)]
+    keys += [LoraConversionKeySet("transformer_blocks.0.attn2.to_q", "transformer_blocks.0.attn2.to_q", parent=key_prefix)]
+    keys += [LoraConversionKeySet("transformer_blocks.0.attn2.to_k", "transformer_blocks.0.attn2.to_k", parent=key_prefix)]
+    keys += [LoraConversionKeySet("transformer_blocks.0.attn2.to_v", "transformer_blocks.0.attn2.to_v", parent=key_prefix)]
+    keys += [LoraConversionKeySet("transformer_blocks.0.attn2.to_out.0", "transformer_blocks.0.attn2.to_out.0", parent=key_prefix)]
+    keys += [LoraConversionKeySet("transformer_blocks.0.ff.net.0.proj", "transformer_blocks.0.ff.net.0.proj", parent=key_prefix)]
     keys += [LoraConversionKeySet("transformer_blocks.0.ff.net.2", "transformer_blocks.0.ff.net.2", parent=key_prefix)]
 
     return keys
@@ -149,7 +125,7 @@ def convert_sd_lora_key_sets() -> list[LoraConversionKeySet]:
     keys = []
 
     keys += [LoraConversionKeySet("bundle_emb", "bundle_emb")]
-    keys += __map_unet(LoraConversionKeySet("unet", "lora_unet"))
+    keys += __map_unet(LoraConversionKeySet( "unet", "lora_unet"))
     keys += map_clip(LoraConversionKeySet("clip_l", "lora_te"))
 
     return keys

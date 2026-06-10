@@ -17,10 +17,10 @@ class Flux2LoRASetup(
     BaseFlux2Setup,
 ):
     def __init__(
-        self,
-        train_device: torch.device,
-        temp_device: torch.device,
-        debug_mode: bool,
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            debug_mode: bool,
     ):
         super().__init__(
             train_device=train_device,
@@ -29,34 +29,30 @@ class Flux2LoRASetup(
         )
 
     def create_parameters(
-        self,
-        model: Flux2Model,
-        config: TrainConfig,
+            self,
+            model: Flux2Model,
+            config: TrainConfig,
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        self._create_model_part_parameters(
-            parameter_group_collection, "transformer", model.transformer_lora, config.transformer
-        )
+        self._create_model_part_parameters(parameter_group_collection, "transformer", model.transformer_lora, config.transformer)
         return parameter_group_collection
 
     def __setup_requires_grad(
-        self,
-        model: Flux2Model,
-        config: TrainConfig,
+            self,
+            model: Flux2Model,
+            config: TrainConfig,
     ):
         model.text_encoder.requires_grad_(False)
         model.transformer.requires_grad_(False)
         model.vae.requires_grad_(False)
 
-        self._setup_model_part_requires_grad(
-            "transformer", model.transformer_lora, config.transformer, model.train_progress
-        )
+        self._setup_model_part_requires_grad("transformer", model.transformer_lora, config.transformer, model.train_progress)
 
     def setup_model(
-        self,
-        model: Flux2Model,
-        config: TrainConfig,
+            self,
+            model: Flux2Model,
+            config: TrainConfig,
     ):
         model.transformer_lora = LoRAModuleWrapper(
             model.transformer, "transformer", config, config.layer_filter.split(",")
@@ -75,9 +71,9 @@ class Flux2LoRASetup(
         init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
-        self,
-        model: Flux2Model,
-        config: TrainConfig,
+            self,
+            model: Flux2Model,
+            config: TrainConfig,
     ):
         vae_on_train_device = not config.latent_caching
         text_encoder_on_train_device = not config.latent_caching
@@ -94,8 +90,12 @@ class Flux2LoRASetup(
         else:
             model.transformer.eval()
 
-    def after_optimizer_step(self, model: Flux2Model, config: TrainConfig, train_progress: TrainProgress):
+    def after_optimizer_step(
+            self,
+            model: Flux2Model,
+            config: TrainConfig,
+            train_progress: TrainProgress
+    ):
         self.__setup_requires_grad(model, config)
-
 
 factory.register(BaseModelSetup, Flux2LoRASetup, ModelType.FLUX_2, TrainingMethod.LORA)

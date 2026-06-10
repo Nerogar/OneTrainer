@@ -7,13 +7,13 @@ from modules.util.TrainProgress import TrainProgress
 
 class TrainCallbacks:
     def __init__(
-        self,
-        on_update_train_progress: Callable[[TrainProgress, int, int], None] = lambda _, __, ___: None,
-        on_update_status: Callable[[str], None] = lambda _: None,
-        on_sample_default: Callable[[ModelSamplerOutput], None] = lambda _: None,
-        on_update_sample_default_progress: Callable[[int, int], None] = lambda _, __: None,
-        on_sample_custom: Callable[[ModelSamplerOutput], None] = lambda _: None,
-        on_update_sample_custom_progress: Callable[[int, int], None] = lambda _, __: None,
+            self,
+            on_update_train_progress: Callable[[TrainProgress, int, int], None] = lambda _, __, ___: None,
+            on_update_status: Callable[[str], None] = lambda _: None,
+            on_sample_default: Callable[[ModelSamplerOutput], None] = lambda _: None,
+            on_update_sample_default_progress: Callable[[int, int], None] = lambda _, __: None,
+            on_sample_custom: Callable[[ModelSamplerOutput], None] = lambda _: None,
+            on_update_sample_custom_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         self.__on_update_train_progress = on_update_train_progress
         self.__on_update_status = on_update_status
@@ -24,8 +24,8 @@ class TrainCallbacks:
 
     # on_update_train_progress
     def set_on_update_train_progress(
-        self,
-        on_update_train_progress: Callable[[TrainProgress, int, int], None] = lambda _, __, ___: None,
+            self,
+            on_update_train_progress: Callable[[TrainProgress, int, int], None] = lambda _, __, ___: None,
     ):
         self.__on_update_train_progress = on_update_train_progress
 
@@ -36,8 +36,8 @@ class TrainCallbacks:
 
     # on_update_status
     def set_on_update_status(
-        self,
-        on_update_status: Callable[[str], None] = lambda _: None,
+            self,
+            on_update_status: Callable[[str], None] = lambda _: None,
     ):
         self.__on_update_status = on_update_status
 
@@ -48,8 +48,8 @@ class TrainCallbacks:
 
     # on_sample_default
     def set_on_sample_default(
-        self,
-        on_sample_default: Callable[[ModelSamplerOutput], None] = lambda _: None,
+            self,
+            on_sample_default: Callable[[ModelSamplerOutput], None] = lambda _: None,
     ):
         self.__on_sample_default = on_sample_default
 
@@ -60,8 +60,8 @@ class TrainCallbacks:
 
     # on_update_sample_default_progress
     def set_on_update_sample_default_progress(
-        self,
-        on_update_sample_default_progress: Callable[[int, int], None] = lambda _, __: None,
+            self,
+            on_update_sample_default_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         self.__on_update_sample_default_progress = on_update_sample_default_progress
 
@@ -72,8 +72,8 @@ class TrainCallbacks:
 
     # on_sample_custom
     def set_on_sample_custom(
-        self,
-        on_sample_custom: Callable[[ModelSamplerOutput], None] = lambda _: None,
+            self,
+            on_sample_custom: Callable[[ModelSamplerOutput], None] = lambda _: None,
     ):
         self.__on_sample_custom = on_sample_custom
 
@@ -84,8 +84,8 @@ class TrainCallbacks:
 
     # on_update_sample_custom_progress
     def set_on_update_sample_custom_progress(
-        self,
-        on_update_sample_custom_progress: Callable[[int, int], None] = lambda _, __: None,
+            self,
+            on_update_sample_custom_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         self.__on_update_sample_custom_progress = on_update_sample_custom_progress
 

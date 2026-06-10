@@ -20,10 +20,9 @@ def state_dict_has_prefix(state_dict: dict | None, prefix: str):
         return False
     return any(k.startswith(prefix) for k in state_dict)
 
-
 def get_tensor_data(
-    data: torch.Tensor | list | tuple | dict,
-    include_parameter_indices: list[int] | None = None,
+        data: torch.Tensor | list | tuple | dict,
+        include_parameter_indices: list[int] | None = None,
 ) -> list[torch.Tensor]:
     tensors = []
 
@@ -41,8 +40,8 @@ def get_tensor_data(
 
 
 def has_grad_fn(
-    data: torch.Tensor | list | tuple | dict,
-    include_parameter_indices: list[int] | None = None,
+        data: torch.Tensor | list | tuple | dict,
+        include_parameter_indices: list[int] | None = None,
 ) -> bool:
     if isinstance(data, torch.Tensor) and include_parameter_indices is None:
         return data.grad_fn is not None
@@ -58,23 +57,22 @@ def has_grad_fn(
 
     return False
 
-
 def add_dummy_grad_fn_(
-    data: torch.Tensor | list | tuple | dict,
+        data: torch.Tensor | list | tuple | dict,
 ) -> Any:
     if isinstance(data, torch.Tensor):
         if data.grad_fn is not None:
             return data
-        grad_tensor = torch.zeros(size=(0, *data.shape[1:]), requires_grad=True, device=data.device, dtype=data.dtype)
+        grad_tensor = torch\
+            .zeros(size=(0, *data.shape[1:]), requires_grad=True, device=data.device, dtype=data.dtype)
         return torch.cat([data, grad_tensor], dim=0)
     if isinstance(data, list):
         for i, elem in enumerate(data):
             if isinstance(elem, torch.Tensor):
                 if elem.grad_fn is not None:
                     return data
-                grad_tensor = torch.zeros(
-                    size=(0, *elem.shape[1:]), requires_grad=True, device=elem.device, dtype=elem.dtype
-                )
+                grad_tensor = torch\
+                    .zeros(size=(0, *elem.shape[1:]), requires_grad=True, device=elem.device, dtype=elem.dtype)
                 data[i] = torch.cat([elem, grad_tensor], dim=0)
                 return data
             else:
@@ -84,9 +82,8 @@ def add_dummy_grad_fn_(
             if isinstance(elem, torch.Tensor):
                 if elem.grad_fn is not None:
                     return data
-                grad_tensor = torch.zeros(
-                    size=(0, *elem.shape[1:]), requires_grad=True, device=elem.device, dtype=elem.dtype
-                )
+                grad_tensor = torch\
+                    .zeros(size=(0, *elem.shape[1:]), requires_grad=True, device=elem.device, dtype=elem.dtype)
                 data = list(data)
                 data[i] = torch.cat([elem, grad_tensor], dim=0)
                 data = tuple(data)
@@ -100,9 +97,8 @@ def add_dummy_grad_fn_(
             if isinstance(elem, torch.Tensor):
                 if elem.grad_fn is not None:
                     return data
-                grad_tensor = torch.zeros(
-                    size=(0, *elem.shape[1:]), requires_grad=True, device=elem.device, dtype=elem.dtype
-                )
+                grad_tensor = torch \
+                    .zeros(size=(0, *elem.shape[1:]), requires_grad=True, device=elem.device, dtype=elem.dtype)
                 data[key] = torch.cat([elem, grad_tensor], dim=0)
                 return data
             else:
@@ -110,13 +106,12 @@ def add_dummy_grad_fn_(
 
     return data
 
-
 def tensors_to_device_(
-    data: torch.Tensor | list | tuple | dict,
-    device: torch.device,
-    include_parameter_indices: list[int] | None = None,
-    non_blocking: bool = False,
-    allocator: Callable[[torch.tensor], torch.tensor] | None = None,
+        data: torch.Tensor | list | tuple | dict,
+        device: torch.device,
+        include_parameter_indices: list[int] | None = None,
+        non_blocking: bool = False,
+        allocator: Callable[[torch.tensor], torch.tensor] | None = None,
 ) -> bool:
     tensor_transferred = False
 
@@ -140,14 +135,14 @@ def tensors_to_device_(
 
 
 def optimizer_to_device_(optimizer: torch.optim.Optimizer, device: torch.device):
-    for state in optimizer.state_dict()["state"].values():
+    for state in optimizer.state_dict()['state'].values():
         tensors_to_device_(state, device)
 
 
 def replace_tensors_(
-    target_data: torch.Tensor | list | tuple | dict,
-    source_data: torch.Tensor | list | tuple | dict,
-    include_parameter_indices: list[int] | None = None,
+        target_data: torch.Tensor | list | tuple | dict,
+        source_data: torch.Tensor | list | tuple | dict,
+        include_parameter_indices: list[int] | None = None,
 ):
     if isinstance(target_data, torch.Tensor) and include_parameter_indices is None:
         target_data.data = source_data.data
@@ -161,9 +156,9 @@ def replace_tensors_(
 
 
 def tensors_match_device(
-    data: torch.Tensor | list | tuple | dict,
-    device: torch.device,
-    include_parameter_indices: list[int] | None = None,
+        data: torch.Tensor | list | tuple | dict,
+        device: torch.device,
+        include_parameter_indices: list[int] | None = None,
 ) -> bool:
     if isinstance(data, torch.Tensor) and include_parameter_indices is None:
         if not device_equals(data.device, device):
@@ -182,9 +177,9 @@ def tensors_match_device(
 
 
 def tensors_record_stream(
-    stream: torch.Stream,
-    data: torch.Tensor | list | tuple | dict,
-    include_parameter_indices: list[int] | None = None,
+        stream: torch.Stream,
+        data: torch.Tensor | list | tuple | dict,
+        include_parameter_indices: list[int] | None = None,
 ):
     if isinstance(data, torch.Tensor):
         if data.device.type == "cuda":
@@ -200,7 +195,7 @@ def tensors_record_stream(
 
 
 def unpin_module(
-    module: torch.nn.Module,
+        module: torch.nn.Module,
 ):
     def convert(t):
         if t.is_pinned():
@@ -211,12 +206,9 @@ def unpin_module(
 
 
 def device_equals(device1: torch.device, device2: torch.device) -> bool:
-    return (
-        device1 is not None
-        and device2 is not None
-        and device1.type == device2.type
+    return device1 is not None and device2 is not None \
+        and device1.type == device2.type \
         and (0 if device1.index is None else device1.index) == (0 if device2.index is None else device2.index)
-    )
 
 
 def torch_gc():
@@ -263,9 +255,7 @@ def pin_tensor_(x):
         )
 
         if err.value != 0:
-            raise RuntimeError(
-                f"CUDA Error while trying to pin memory. error: {err.value}, ptr: {x.data_ptr()}, size: {x.numel() * x.element_size()}"
-            )
+            raise RuntimeError(f"CUDA Error while trying to pin memory. error: {err.value}, ptr: {x.data_ptr()}, size: {x.numel() * x.element_size()}")
 
 
 def unpin_tensor_(x):

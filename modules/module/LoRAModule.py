@@ -31,7 +31,7 @@ class PeftBase(nn.Module):
 
     def __init__(self, prefix: str, orig_module: nn.Module | None):
         super().__init__()
-        self.prefix = prefix + "."
+        self.prefix = prefix + '.'
         self._orig_module = [orig_module] if orig_module else None
         self.is_applied = False
         self.layer_kwargs = {}
@@ -110,7 +110,8 @@ class PeftBase(nn.Module):
         assert self._orig_module is not None
         return self._orig_module[0]
 
-    def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True, assign: bool = False):
+    def load_state_dict(self, state_dict: Mapping[str, Any],
+                        strict: bool = True, assign: bool = False):
         state_dict = {k.removeprefix(self.prefix): v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
         return super().load_state_dict(state_dict, strict, assign)
 
@@ -151,9 +152,7 @@ class PeftBase(nn.Module):
                 padding = self.orig_module.padding
                 dilation = self.orig_module.dilation
                 groups = self.orig_module.groups
-                lora_down = Conv2d(
-                    in_channels, self.rank, kernel_size, stride, padding, dilation=dilation, bias=False, device=device
-                )
+                lora_down = Conv2d(in_channels, self.rank, kernel_size, stride, padding, dilation=dilation, bias=False, device=device)
                 # Note: small departure here from part of the community.
                 # The original Mcrosoft repo does it this way. The cloneofsimo
                 # repo handles the groups in lora_down. We follow the Microsoft
@@ -173,7 +172,6 @@ class PeftBase(nn.Module):
         actually train or hook to the module at all. Generally used to hold
         extra keys that aren't specified in the training configuration.
         """
-
         class Dummy(cls):
             def __init__(self, *args, **kwargs):
                 super().__init__(*args, **kwargs)
@@ -183,7 +181,8 @@ class PeftBase(nn.Module):
                 assert self.orig_module is not None
                 return PeftBase.forward(self, *args, **kwargs)
 
-            def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True, assign: bool = False):
+            def load_state_dict(self, state_dict: Mapping[str, Any],
+                                strict: bool = True, assign: bool = False):
                 self._initialized = True
                 self._state_dict = copy.deepcopy(state_dict)
                 # noinspection PyProtectedMember
@@ -270,8 +269,10 @@ class LoHaModule(PeftBase):
 
         # Yeah, yeah, it's different from the A/B parameters in make_weight.
         # Lycoris defines them in the opposite order. Yeah, it's confusing.
-        W1 = self.make_weight(self.dropout(self.hada_w1_b), self.dropout(self.hada_w1_a))
-        W2 = self.make_weight(self.dropout(self.hada_w2_b), self.dropout(self.hada_w2_a))
+        W1 = self.make_weight(self.dropout(self.hada_w1_b),
+                              self.dropout(self.hada_w1_a))
+        W2 = self.make_weight(self.dropout(self.hada_w2_b),
+                              self.dropout(self.hada_w2_a))
         W = (W1 * W2) * (self.alpha / self.rank)
         return self.orig_forward(x) + self.op(x, W, bias=None, **self.layer_kwargs)
 
@@ -287,21 +288,7 @@ class LoHaModule(PeftBase):
 class LoKrModule(PeftBase):
     """Implementation of LoKr from Lycoris."""
 
-    def __init__(
-        self,
-        prefix: str,
-        orig_module: nn.Module | None,
-        dim: int,
-        alpha: float,
-        decompose_both: bool,
-        decompose_factor: int,
-        use_tucker: bool,
-        weight_decompose: bool,
-        dora_on_output: bool,
-        full_matrix: bool,
-        train_device: torch.device,
-        lokr_vec_trick: bool = False,
-    ):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, dim: int, alpha: float, decompose_both: bool, decompose_factor: int, use_tucker: bool, weight_decompose: bool, dora_on_output: bool, full_matrix: bool, train_device: torch.device, lokr_vec_trick: bool = False):
         super().__init__(prefix, orig_module)
         self.dim = dim  # LoKr uses 'dim' as its parameter
         self.dropout = Dropout(0)
@@ -367,9 +354,7 @@ class LoKrModule(PeftBase):
                     self.lokr_w2_b = Parameter(torch.empty(lokr_dim, shape[1][1], device=device))
                 else:
                     if not self.full_matrix:
-                        print(
-                            f"LoKr rank {lokr_dim} is too large for dims ({in_dim}, {out_dim}) and factor {self.decompose_factor}, using full matrix mode."
-                        )
+                        print(f"LoKr rank {lokr_dim} is too large for dims ({in_dim}, {out_dim}) and factor {self.decompose_factor}, using full matrix mode.")
                     self.use_w2 = True
                     self.lokr_w2 = Parameter(torch.empty(shape[0][1], shape[1][1], device=device))
 
@@ -398,9 +383,7 @@ class LoKrModule(PeftBase):
                 # Create w2, or decomposed/tucker variants
                 if self.full_matrix or lokr_dim >= max(shape[0][1], shape[1][1]) / 2:
                     if not self.full_matrix:
-                        print(
-                            f"LoKr rank {lokr_dim} is too large for dims ({in_dim}, {out_dim}) and factor {self.decompose_factor}, using full matrix mode."
-                        )
+                        print(f"LoKr rank {lokr_dim} is too large for dims ({in_dim}, {out_dim}) and factor {self.decompose_factor}, using full matrix mode.")
                     self.use_w2 = True
                     self.lokr_w2 = Parameter(torch.empty(shape[0][1], shape[1][1], *k_size, device=device))
                 elif self.tucker:
@@ -409,9 +392,7 @@ class LoKrModule(PeftBase):
                     self.lokr_w2_b = Parameter(torch.empty(lokr_dim, shape[1][1], device=device))
                 else:
                     self.lokr_w2_a = Parameter(torch.empty(shape[0][1], lokr_dim, device=device))
-                    self.lokr_w2_b = Parameter(
-                        torch.empty(lokr_dim, shape[1][1] * torch.tensor(shape[2:]).prod().item(), device=device)
-                    )
+                    self.lokr_w2_b = Parameter(torch.empty(lokr_dim, shape[1][1] * torch.tensor(shape[2:]).prod().item(), device=device))
             case _:
                 raise NotImplementedError("Only Linear and Conv2d are supported layers.")
 
@@ -438,15 +419,9 @@ class LoKrModule(PeftBase):
 
             dora_num_dims = orig_weight.dim() - 1
             if self.dora_on_output:
-                dora_scale_val = torch.norm(orig_weight.reshape(orig_weight.shape[0], -1), dim=1, keepdim=True).reshape(
-                    orig_weight.shape[0], *[1] * dora_num_dims
-                )
+                dora_scale_val = torch.norm(orig_weight.reshape(orig_weight.shape[0], -1), dim=1, keepdim=True).reshape(orig_weight.shape[0], *[1] * dora_num_dims)
             else:
-                dora_scale_val = (
-                    torch.norm(orig_weight.transpose(1, 0).reshape(orig_weight.shape[1], -1), dim=1, keepdim=True)
-                    .reshape(orig_weight.shape[1], *[1] * dora_num_dims)
-                    .transpose(0, 1)
-                )
+                dora_scale_val = torch.norm(orig_weight.transpose(1, 0).reshape(orig_weight.shape[1], -1), dim=1, keepdim=True).reshape(orig_weight.shape[1], *[1] * dora_num_dims).transpose(0, 1)
 
             self.dora_scale = Parameter(
                 dora_scale_val.to(device=self.orig_module.weight.device, dtype=self.orig_module.weight.dtype)
@@ -491,6 +466,7 @@ class LoKrModule(PeftBase):
 
         # DoRA for LoKr
         if self.weight_decompose:
+
             if isinstance(self.orig_module, nn.Linear):
                 orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
             else:
@@ -502,19 +478,9 @@ class LoKrModule(PeftBase):
 
             eps = torch.finfo(wp.dtype).eps
             if self.dora_on_output:
-                norm = (
-                    wp.detach().reshape(wp.shape[0], -1).norm(dim=1).reshape(wp.shape[0], *[1] * (wp.dim() - 1)) + eps
-                )
+                norm = wp.detach().reshape(wp.shape[0], -1).norm(dim=1).reshape(wp.shape[0], *[1] * (wp.dim() - 1)) + eps
             else:
-                norm = (
-                    wp.detach()
-                    .transpose(0, 1)
-                    .reshape(wp.shape[1], -1)
-                    .norm(dim=1, keepdim=True)
-                    .reshape(wp.shape[1], *[1] * (wp.dim() - 1))
-                    .transpose(0, 1)
-                    + eps
-                )
+                norm = wp.detach().transpose(0, 1).reshape(wp.shape[1], -1).norm(dim=1, keepdim=True).reshape(wp.shape[1], *[1] * (wp.dim() - 1)).transpose(0, 1) + eps
 
             wp = self.dora_scale * (wp / norm)
 
@@ -530,7 +496,10 @@ class LoKrModule(PeftBase):
                 x_reshaped = x.reshape(-1, self.in_m, self.in_n)
 
                 # Calculate delta = x @ (W1 x W2).T
-                delta_output = torch.einsum("bmn, lm, kn -> blk", x_reshaped, w1.to(x.dtype), w2.to(x.dtype))
+                delta_output = torch.einsum(
+                    'bmn, lm, kn -> blk',
+                    x_reshaped, w1.to(x.dtype), w2.to(x.dtype)
+                )
 
                 # Reshape back to [Batch, ..., Out_Features]
                 delta_output = delta_output.reshape(*x_shape[:-1], -1) * scale
@@ -610,25 +579,18 @@ class OFTModule(PeftBase):
     block_share: bool
     oft_scaled: bool
     dropout_probability: float
-    adjustment_info: tuple[int, int] | None  # for reporting
+    adjustment_info: tuple[int, int] | None # for reporting
 
-    def __init__(
-        self,
-        prefix: str,
-        orig_module: nn.Module | None,
-        oft_block_size: int,
-        block_share: bool,
-        oft_scaled: bool,
-        **kwargs,
-    ):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, block_share: bool, oft_scaled: bool, **kwargs):
         super().__init__(prefix, orig_module)
         self.oft_block_size = oft_block_size
         self.rank = 0
         self.block_share = block_share
         self.oft_scaled = oft_scaled
-        self.dropout_probability = kwargs.pop("dropout_probability", 0.0)
+        self.dropout_probability = kwargs.pop('dropout_probability', 0.0)
         self.oft_R = None
         self.adjustment_info = None
+
 
         if orig_module is not None:
             self.initialize_weights()
@@ -661,9 +623,7 @@ class OFTModule(PeftBase):
         elif isinstance(self.orig_module, nn.Conv2d):
             if self.orig_module.dilation[0] > 1 or self.orig_module.dilation[1] > 1:
                 raise ValueError("Conv2d with dilation > 1 is not supported by OFT.")
-            in_features = (
-                self.orig_module.in_channels * self.orig_module.kernel_size[0] * self.orig_module.kernel_size[1]
-            )
+            in_features = self.orig_module.in_channels * self.orig_module.kernel_size[0] * self.orig_module.kernel_size[1]
         else:
             raise NotImplementedError("Unsupported layer type for OFT")
 
@@ -751,7 +711,6 @@ class DoRAModule(LoRAModule):
     Not unlike LoRA in theory but the forward pass is significantly more
     complicated, as it involves taking the norm of the directional result.
     """
-
     dora_num_dims: int
     dora_scale: Tensor | None
     norm_epsilon: bool
@@ -759,9 +718,9 @@ class DoRAModule(LoRAModule):
 
     def __init__(self, *args, **kwargs):
         self.dora_scale = None
-        self.norm_epsilon = kwargs.pop("norm_epsilon", False)
-        self.decompose_output_axis = kwargs.pop("decompose_output_axis", False)
-        self.train_device = kwargs.pop("train_device")
+        self.norm_epsilon = kwargs.pop('norm_epsilon', False)
+        self.decompose_output_axis = kwargs.pop('decompose_output_axis', False)
+        self.train_device = kwargs.pop('train_device')
         super().__init__(*args, **kwargs)
 
     def initialize_weights(self):
@@ -779,13 +738,17 @@ class DoRAModule(LoRAModule):
         self.dora_num_dims = orig_weight.dim() - 1
         if self.decompose_output_axis:
             self.dora_scale = nn.Parameter(
-                torch.norm(orig_weight.reshape(orig_weight.shape[0], -1), dim=1, keepdim=True)
+                torch.norm(
+                    orig_weight.reshape(orig_weight.shape[0], -1),
+                    dim=1, keepdim=True)
                 .reshape(orig_weight.shape[0], *[1] * self.dora_num_dims)
                 .to(device=self.orig_module.weight.device)
             )
         else:
             self.dora_scale = nn.Parameter(
-                torch.norm(orig_weight.transpose(1, 0).reshape(orig_weight.shape[1], -1), dim=1, keepdim=True)
+                torch.norm(
+                    orig_weight.transpose(1, 0).reshape(orig_weight.shape[1], -1),
+                    dim=1, keepdim=True)
                 .reshape(orig_weight.shape[1], *[1] * self.dora_num_dims)
                 .transpose(1, 0)
                 .to(device=self.orig_module.weight.device)
@@ -817,24 +780,26 @@ class DoRAModule(LoRAModule):
         # the gradient graph).
         eps = torch.finfo(WP.dtype).eps if self.norm_epsilon else 0.0
         if self.decompose_output_axis:
-            norm = (
-                WP.detach().reshape(WP.shape[0], -1).norm(dim=1).reshape(WP.shape[0], *[1] * self.dora_num_dims) + eps
-            )
+            norm = WP.detach() \
+                    .reshape(WP.shape[0], -1) \
+                    .norm(dim=1) \
+                    .reshape(WP.shape[0], *[1] * self.dora_num_dims) \
+                    + eps
         else:
-            norm = (
-                WP.detach()
-                .transpose(0, 1)
-                .reshape(WP.shape[1], -1)
-                .norm(dim=1, keepdim=True)
-                .reshape(WP.shape[1], *[1] * self.dora_num_dims)
-                .transpose(0, 1)
-                + eps
-            )
+            norm = WP.detach() \
+                    .transpose(0, 1) \
+                    .reshape(WP.shape[1], -1) \
+                    .norm(dim=1, keepdim=True) \
+                    .reshape(WP.shape[1], *[1] * self.dora_num_dims) \
+                    .transpose(0, 1) + eps
         WP = self.dora_scale * (WP / norm)
         # In the DoRA codebase (and thus the paper results), they perform
         # dropout on the *input*, rather than between layers, so we duplicate
         # that here.
-        return self.op(self.dropout(x), WP, self.orig_module.bias, **self.layer_kwargs)
+        return self.op(self.dropout(x),
+                       WP,
+                       self.orig_module.bias,
+                       **self.layer_kwargs)
 
 
 DummyLoRAModule = LoRAModule.make_dummy()
@@ -854,11 +819,11 @@ class LoRAModuleWrapper:
     lokr_dim: int
 
     def __init__(
-        self,
-        orig_module: nn.Module | None,
-        prefix: str,
-        config: TrainConfig,
-        module_filter: list[str] = None,
+            self,
+            orig_module: nn.Module | None,
+            prefix: str,
+            config: TrainConfig,
+            module_filter: list[str] = None,
     ):
         self.orig_module = orig_module
         self.prefix = prefix
@@ -868,7 +833,8 @@ class LoRAModuleWrapper:
         self.lokr_dim = config.lokr_dim
 
         self.module_filters = [
-            ModuleFilter(pattern, use_regex=config.layer_filter_regex) for pattern in (module_filter or [])
+            ModuleFilter(pattern, use_regex=config.layer_filter_regex)
+            for pattern in (module_filter or [])
         ]
 
         if self.peft_type == PeftType.LORA:
@@ -877,9 +843,9 @@ class LoRAModuleWrapper:
                 self.dummy_klass = DummyDoRAModule
                 self.additional_args = [self.rank, self.alpha]
                 self.additional_kwargs = {
-                    "norm_epsilon": config.lora_decompose_norm_epsilon,
-                    "decompose_output_axis": config.lora_decompose_output_axis,
-                    "train_device": torch.device(config.train_device),
+                    'norm_epsilon': config.lora_decompose_norm_epsilon,
+                    'decompose_output_axis': config.lora_decompose_output_axis,
+                    'train_device': torch.device(config.train_device),
                 }
             else:
                 self.klass = LoRAModule
@@ -900,21 +866,21 @@ class LoRAModuleWrapper:
                 config.oft_scaled,
             ]
             self.additional_kwargs = {
-                "dropout_probability": config.dropout_probability,
+                'dropout_probability': config.dropout_probability,
             }
         elif self.peft_type == PeftType.LOKR:
             self.klass = LoKrModule
             self.dummy_klass = DummyLoKrModule
             self.additional_args = [self.lokr_dim, self.alpha]
             self.additional_kwargs = {
-                "decompose_both": config.lokr_decompose_both,
-                "decompose_factor": config.lokr_decompose_factor,
-                "use_tucker": config.lokr_use_tucker,
-                "weight_decompose": config.lokr_weight_decompose,
-                "dora_on_output": config.lokr_dora_on_output,
-                "full_matrix": config.lokr_full_matrix,
-                "train_device": torch.device(config.train_device),
-                "lokr_vec_trick": config.lokr_vec_trick,
+                'decompose_both': config.lokr_decompose_both,
+                'decompose_factor': config.lokr_decompose_factor,
+                'use_tucker': config.lokr_use_tucker,
+                'weight_decompose': config.lokr_weight_decompose,
+                'dora_on_output': config.lokr_dora_on_output,
+                'full_matrix': config.lokr_full_matrix,
+                'train_device': torch.device(config.train_device),
+                'lokr_vec_trick': config.lokr_vec_trick,
             }
         self.lora_modules = self.__create_modules(orig_module, config)
 
@@ -939,7 +905,7 @@ class LoRAModuleWrapper:
                 lora_modules[name] = lora_module
                 if self.peft_type == PeftType.OFT_2 and lora_module.adjustment_info:
                     old, new = lora_module.adjustment_info
-                    oft_adjustments.append({"old": old, "new": new})
+                    oft_adjustments.append({'old': old, 'new': new})
                 selected.append(name)
             else:
                 deselected.append(name)
@@ -947,7 +913,7 @@ class LoRAModuleWrapper:
         if oft_adjustments:
             summary = defaultdict(int)
             for adj in oft_adjustments:
-                summary[(adj["old"], adj["new"])] += 1
+                summary[(adj['old'], adj['new'])] += 1
 
             sorted_summary = sorted(summary.items(), key=lambda item: (item[0][0], item[0][1]))
 
@@ -970,7 +936,7 @@ class LoRAModuleWrapper:
 
         unused_filters = [mf for mf in self.module_filters if not mf.was_used()]
         if len(unused_filters) > 0:
-            raise ValueError("Custom layer filters: no modules were matched by the custom filter(s)")
+            raise ValueError('Custom layer filters: no modules were matched by the custom filter(s)')
 
         return lora_modules
 
@@ -984,7 +950,7 @@ class LoRAModuleWrapper:
             parameters += module.parameters()
         return parameters
 
-    def to(self, device: torch.device = None, dtype: torch.dtype = None) -> "LoRAModuleWrapper":
+    def to(self, device: torch.device = None, dtype: torch.dtype = None) -> 'LoRAModuleWrapper':
         for module in self.lora_modules.values():
             module.to(device, dtype)
         return self
@@ -1007,15 +973,11 @@ class LoRAModuleWrapper:
             return
 
         if rank_key := next((k for k in state_dict if k.endswith(key_suffix)), None):
-            checkpoint_rank = (
-                state_dict[rank_key].shape[1] if self.peft_type == PeftType.LOKR else state_dict[rank_key].shape[0]
-            )
+            checkpoint_rank = state_dict[rank_key].shape[1] if self.peft_type == PeftType.LOKR else state_dict[rank_key].shape[0]
             config_rank = self.lokr_dim if self.peft_type == PeftType.LOKR else self.rank
 
             if checkpoint_rank != config_rank:
-                raise ValueError(
-                    f"Rank/Dim mismatch: checkpoint={checkpoint_rank}, config={config_rank}, please correct in the UI."
-                )
+                raise ValueError(f"Rank/Dim mismatch: checkpoint={checkpoint_rank}, config={config_rank}, please correct in the UI.")
 
     def load_state_dict(self, state_dict: dict[str, Tensor], strict: bool = True):
         """
@@ -1034,7 +996,7 @@ class LoRAModuleWrapper:
             for module in self.lora_modules.values():
                 module.load_state_dict(state_dict, strict=strict)
         except RuntimeError as e:
-            raise RuntimeError(f'Error during loading of module key "{module.prefix}"') from e
+            raise RuntimeError(f"Error during loading of module key \"{module.prefix}\"") from e
 
         # Temporarily re-create the state dict, so we can see what keys were left.
         remaining_names = set(state_dict) - set(self.state_dict())

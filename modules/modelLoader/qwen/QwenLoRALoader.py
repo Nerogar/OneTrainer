@@ -5,7 +5,9 @@ from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.ModelNames import ModelNames
 
 
-class QwenLoRALoader(LoRALoaderMixin):
+class QwenLoRALoader(
+    LoRALoaderMixin
+):
     def __init__(self):
         super().__init__()
 
@@ -13,8 +15,8 @@ class QwenLoRALoader(LoRALoaderMixin):
         return None
 
     def load(
-        self,
-        model: QwenModel,
-        model_names: ModelNames,
+            self,
+            model: QwenModel,
+            model_names: ModelNames,
     ):
         return self._load(model, model_names)

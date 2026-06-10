@@ -13,15 +13,15 @@ class ModelSpecModelLoaderMixin(metaclass=ABCMeta):
         super().__init__()
 
     def _default_model_spec_name(
-        self,
-        model_type: ModelType,
+            self,
+            model_type: ModelType,
     ) -> str | None:
         return None
 
     def _load_default_model_spec(
-        self,
-        model_type: ModelType,
-        safetensors_file_name: str | None = None,
+            self,
+            model_type: ModelType,
+            safetensors_file_name: str | None = None,
     ) -> ModelSpec:
         model_spec = None
 

@@ -18,8 +18,8 @@ class ChromaLoRASaver(
         return convert_chroma_lora_key_sets()
 
     def _get_state_dict(
-        self,
-        model: ChromaModel,
+            self,
+            model: ChromaModel,
     ) -> dict[str, Tensor]:
         state_dict = {}
         if model.text_encoder_lora is not None:
@@ -41,10 +41,10 @@ class ChromaLoRASaver(
         return state_dict
 
     def save(
-        self,
-        model: ChromaModel,
-        output_model_format: ModelFormat,
-        output_model_destination: str,
-        dtype: torch.dtype | None,
+            self,
+            model: ChromaModel,
+            output_model_format: ModelFormat,
+            output_model_destination: str,
+            dtype: torch.dtype | None,
     ):
         self._save(model, output_model_format, output_model_destination, dtype)

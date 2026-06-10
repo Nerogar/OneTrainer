@@ -17,8 +17,8 @@ class SanaLoRASaver(
         return None
 
     def _get_state_dict(
-        self,
-        model: SanaModel,
+            self,
+            model: SanaModel,
     ) -> dict[str, Tensor]:
         state_dict = {}
         if model.text_encoder_lora is not None:
@@ -40,10 +40,10 @@ class SanaLoRASaver(
         return state_dict
 
     def save(
-        self,
-        model: SanaModel,
-        output_model_format: ModelFormat,
-        output_model_destination: str,
-        dtype: torch.dtype | None,
+            self,
+            model: SanaModel,
+            output_model_format: ModelFormat,
+            output_model_destination: str,
+            dtype: torch.dtype | None,
     ):
         self._save(model, output_model_format, output_model_destination, dtype)

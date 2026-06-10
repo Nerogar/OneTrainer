@@ -16,8 +16,8 @@ class EmbeddingLoaderMixin(metaclass=ABCMeta):
         super().__init__()
 
     def __load_embedding(
-        self,
-        embedding_name: str,
+            self,
+            embedding_name: str,
     ) -> dict[str, Tensor] | None:
         if embedding_name == "":
             return None
@@ -31,9 +31,9 @@ class EmbeddingLoaderMixin(metaclass=ABCMeta):
         raise Exception(f"could not load embedding: {embedding_name}")
 
     def __load_internal(
-        self,
-        directory: str,
-        embedding_name: EmbeddingName,
+            self,
+            directory: str,
+            embedding_name: EmbeddingName,
     ) -> dict[str, Tensor] | None:
         if os.path.exists(os.path.join(directory, "meta.json")):
             safetensors_embedding_name = os.path.join(
@@ -50,17 +50,19 @@ class EmbeddingLoaderMixin(metaclass=ABCMeta):
             raise Exception("not an internal model")
 
     def _load(
-        self,
-        model: BaseModel,
-        directory: str,
-        model_names: ModelNames,
+            self,
+            model: BaseModel,
+            directory: str,
+            model_names: ModelNames,
     ):
         for embedding_name in model_names.all_embedding():
             try:
-                model.embedding_state_dicts[embedding_name.uuid] = self.__load_internal(directory, embedding_name)
+                model.embedding_state_dicts[embedding_name.uuid] = \
+                    self.__load_internal(directory, embedding_name)
             except Exception as e1:  # noqa: PERF203
                 try:
-                    model.embedding_state_dicts[embedding_name.uuid] = self.__load_embedding(embedding_name.model_name)
+                    model.embedding_state_dicts[embedding_name.uuid] = \
+                        self.__load_embedding(embedding_name.model_name)
                 except Exception as e2:
                     e2.__cause__ = e1
                     raise Exception(f"could not load embedding: {embedding_name}") from e2

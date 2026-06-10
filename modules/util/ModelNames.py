@@ -1,8 +1,8 @@
 class EmbeddingName:
     def __init__(
-        self,
-        uuid: str,
-        model_name: str,
+            self,
+            uuid: str,
+            model_name: str,
     ):
         self.uuid = uuid
         self.model_name = model_name
@@ -10,21 +10,21 @@ class EmbeddingName:
 
 class ModelNames:
     def __init__(
-        self,
-        base_model: str = "",
-        prior_model: str = "",
-        transformer_model: str = "",
-        effnet_encoder_model: str = "",
-        decoder_model: str = "",
-        text_encoder_4: str = "",
-        vae_model: str = "",
-        lora: str = "",
-        embedding: EmbeddingName | None = None,
-        additional_embeddings: list[EmbeddingName] | None = None,
-        include_text_encoder: bool = True,
-        include_text_encoder_2: bool = True,
-        include_text_encoder_3: bool = True,
-        include_text_encoder_4: bool = True,
+            self,
+            base_model: str = "",
+            prior_model: str = "",
+            transformer_model: str = "",
+            effnet_encoder_model: str = "",
+            decoder_model: str = "",
+            text_encoder_4: str = "",
+            vae_model: str = "",
+            lora: str = "",
+            embedding: EmbeddingName | None = None,
+            additional_embeddings: list[EmbeddingName] | None = None,
+            include_text_encoder: bool = True,
+            include_text_encoder_2: bool = True,
+            include_text_encoder_3: bool = True,
+            include_text_encoder_4: bool = True,
     ):
         self.base_model = base_model
         self.prior_model = prior_model

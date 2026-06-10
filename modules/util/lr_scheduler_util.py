@@ -20,8 +20,8 @@ def lr_lambda_constant():
 
 
 def lr_lambda_linear(
-    scheduler_steps: int,
-    min_factor: float = 1.0,
+        scheduler_steps: int,
+        min_factor: float = 1.0,
 ):
     def lr_lambda(current_step: int):
         lin_val = max(0.0, float(scheduler_steps - current_step) / float(scheduler_steps))
@@ -31,9 +31,10 @@ def lr_lambda_linear(
     return lr_lambda
 
 
+
 def lr_lambda_cosine(
-    scheduler_steps: int,
-    min_factor: float = 1.0,
+        scheduler_steps: int,
+        min_factor: float = 1.0,
 ):
     def lr_lambda(current_step: int):
         progress = float(current_step) / float(scheduler_steps)
@@ -46,9 +47,9 @@ def lr_lambda_cosine(
 
 
 def lr_lambda_cosine_with_restarts(
-    scheduler_steps: int,
-    num_cycles: float,
-    min_factor: float = 1.0,
+        scheduler_steps: int,
+        num_cycles: float,
+        min_factor: float = 1.0,
 ):
     def lr_lambda(current_step: int):
         progress = float(min(current_step, scheduler_steps - 1)) / float(scheduler_steps)
@@ -60,10 +61,11 @@ def lr_lambda_cosine_with_restarts(
     return lr_lambda
 
 
+
 def lr_lambda_cosine_with_hard_restarts(
-    scheduler_steps: int,
-    num_cycles: float,
-    min_factor: float = 1.0,
+        scheduler_steps: int,
+        num_cycles: float,
+        min_factor: float = 1.0,
 ):
     def lr_lambda(current_step: int):
         progress = float(min(current_step, scheduler_steps - 1)) / float(scheduler_steps)
@@ -75,9 +77,10 @@ def lr_lambda_cosine_with_hard_restarts(
     return lr_lambda
 
 
+
 def lr_lambda_rex(
-    scheduler_steps: int,
-    min_factor: float = 1.0,
+        scheduler_steps: int,
+        min_factor: float = 1.0,
 ):
     def lr_lambda(current_step: int):
         # https://arxiv.org/abs/2107.04197
@@ -85,7 +88,7 @@ def lr_lambda_rex(
         min_lr = 0
         d = 0.9
         if current_step < scheduler_steps:
-            progress = current_step / scheduler_steps
+            progress = (current_step / scheduler_steps)
             div = (1 - d) + (d * (1 - progress))
             val = min_lr + (max_lr - min_lr) * ((1 - progress) / div)
         else:

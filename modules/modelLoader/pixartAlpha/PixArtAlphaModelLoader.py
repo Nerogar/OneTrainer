@@ -19,13 +19,13 @@ class PixArtAlphaModelLoader(
         super().__init__()
 
     def __load_internal(
-        self,
-        model: PixArtAlphaModel,
-        model_type: ModelType,
-        weight_dtypes: ModelWeightDtypes,
-        base_model_name: str,
-        vae_model_name: str,
-        quantization: QuantizationConfig,
+            self,
+            model: PixArtAlphaModel,
+            model_type: ModelType,
+            weight_dtypes: ModelWeightDtypes,
+            base_model_name: str,
+            vae_model_name: str,
+            quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name, quantization)
@@ -33,13 +33,13 @@ class PixArtAlphaModelLoader(
             raise Exception("not an internal model")
 
     def __load_diffusers(
-        self,
-        model: PixArtAlphaModel,
-        model_type: ModelType,
-        weight_dtypes: ModelWeightDtypes,
-        base_model_name: str,
-        vae_model_name: str,
-        quantization: QuantizationConfig,
+            self,
+            model: PixArtAlphaModel,
+            model_type: ModelType,
+            weight_dtypes: ModelWeightDtypes,
+            base_model_name: str,
+            vae_model_name: str,
+            quantization: QuantizationConfig,
     ):
         tokenizer = T5Tokenizer.from_pretrained(
             base_model_name,
@@ -92,12 +92,12 @@ class PixArtAlphaModelLoader(
         model.transformer = transformer
 
     def load(
-        self,
-        model: PixArtAlphaModel,
-        model_type: ModelType,
-        model_names: ModelNames,
-        weight_dtypes: ModelWeightDtypes,
-        quantization: QuantizationConfig,
+            self,
+            model: PixArtAlphaModel,
+            model_type: ModelType,
+            model_names: ModelNames,
+            weight_dtypes: ModelWeightDtypes,
+            quantization: QuantizationConfig,
     ) -> PixArtAlphaModel | None:
         stacktraces = []
 
@@ -110,9 +110,7 @@ class PixArtAlphaModelLoader(
             stacktraces.append(traceback.format_exc())
 
         try:
-            self.__load_diffusers(
-                model, model_type, weight_dtypes, base_model_name, model_names.vae_model, quantization
-            )
+            self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, model_names.vae_model, quantization)
             return
         except Exception:
             stacktraces.append(traceback.format_exc())

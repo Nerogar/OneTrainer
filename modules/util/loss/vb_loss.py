@@ -12,10 +12,10 @@ import numpy as np
 
 
 def normal_kl(
-    mean1: Tensor,
-    logvar1: Tensor,
-    mean2: Tensor,
-    logvar2: Tensor,
+        mean1: Tensor,
+        logvar1: Tensor,
+        mean2: Tensor,
+        logvar2: Tensor,
 ) -> Tensor:
     """
     Compute the KL divergence between two gaussians.
@@ -23,7 +23,11 @@ def normal_kl(
     scalars, among other use cases.
     """
     return 0.5 * (
-        -1.0 + logvar2 - logvar1 + torch.exp(logvar1 - logvar2) + ((mean1 - mean2) ** 2) * torch.exp(-logvar2)
+            -1.0
+            + logvar2
+            - logvar1
+            + torch.exp(logvar1 - logvar2)
+            + ((mean1 - mean2) ** 2) * torch.exp(-logvar2)
     )
 
 
@@ -36,9 +40,9 @@ def approx_standard_normal_cdf(x: Tensor) -> Tensor:
 
 
 def discretized_gaussian_log_likelihood(
-    x: Tensor,
-    means: Tensor,
-    log_scales: Tensor,
+        x: Tensor,
+        means: Tensor,
+        log_scales: Tensor,
 ) -> Tensor:
     """
     Compute the log-likelihood of a Gaussian distribution discretizing to a
@@ -67,10 +71,10 @@ def discretized_gaussian_log_likelihood(
 
 
 def __q_posterior_mean_variance(
-    coefficients: DiffusionScheduleCoefficients,
-    x_0: Tensor,
-    x_t: Tensor,
-    t: Tensor,
+        coefficients: DiffusionScheduleCoefficients,
+        x_0: Tensor,
+        x_t: Tensor,
+        t: Tensor,
 ) -> (Tensor, Tensor):
     """
     Compute the mean and variance of the diffusion posterior:
@@ -78,20 +82,26 @@ def __q_posterior_mean_variance(
     """
     assert x_0.shape == x_t.shape
     posterior_mean = (
-        __extract_into_tensor(coefficients.posterior_mean_coef1, t, x_t.shape) * x_0
-        + __extract_into_tensor(coefficients.posterior_mean_coef2, t, x_t.shape) * x_t
+            __extract_into_tensor(coefficients.posterior_mean_coef1, t, x_t.shape) * x_0
+            + __extract_into_tensor(coefficients.posterior_mean_coef2, t, x_t.shape) * x_t
     )
-    posterior_log_variance_clipped = __extract_into_tensor(coefficients.posterior_log_variance_clipped, t, x_t.shape)
-    assert posterior_mean.shape[0] == posterior_log_variance_clipped.shape[0] == x_0.shape[0]
+    posterior_log_variance_clipped = __extract_into_tensor(
+        coefficients.posterior_log_variance_clipped, t, x_t.shape
+    )
+    assert (
+            posterior_mean.shape[0]
+            == posterior_log_variance_clipped.shape[0]
+            == x_0.shape[0]
+    )
     return posterior_mean, posterior_log_variance_clipped
 
 
 def __p_mean_variance(
-    coefficients: DiffusionScheduleCoefficients,
-    x_t: Tensor,
-    t: Tensor,
-    frozen_predicted_eps: Tensor,
-    predicted_var_values: Tensor,
+        coefficients: DiffusionScheduleCoefficients,
+        x_t: Tensor,
+        t: Tensor,
+        frozen_predicted_eps: Tensor,
+        predicted_var_values: Tensor,
 ):
     min_log = __extract_into_tensor(coefficients.posterior_log_variance_clipped, t, x_t.shape)
     max_log = __extract_into_tensor(torch.log(coefficients.betas), t, x_t.shape)
@@ -106,25 +116,25 @@ def __p_mean_variance(
 
 
 def __predict_x_0_from_eps(
-    coefficients: DiffusionScheduleCoefficients,
-    x_t,
-    t,
-    eps,
+        coefficients: DiffusionScheduleCoefficients,
+        x_t,
+        t,
+        eps,
 ) -> Tensor:
     assert x_t.shape == eps.shape
     return (
-        __extract_into_tensor(coefficients.sqrt_recip_alphas_cumprod, t, x_t.shape) * x_t
-        - __extract_into_tensor(coefficients.sqrt_recipm1_alphas_cumprod, t, x_t.shape) * eps
+            __extract_into_tensor(coefficients.sqrt_recip_alphas_cumprod, t, x_t.shape) * x_t
+            - __extract_into_tensor(coefficients.sqrt_recipm1_alphas_cumprod, t, x_t.shape) * eps
     )
 
 
 def __vb_terms_bpd(
-    coefficients: DiffusionScheduleCoefficients,
-    x_0: Tensor,
-    x_t: Tensor,
-    t: Tensor,
-    frozen_predicted_eps: Tensor,
-    predicted_var_values: Tensor,
+        coefficients: DiffusionScheduleCoefficients,
+        x_0: Tensor,
+        x_t: Tensor,
+        t: Tensor,
+        frozen_predicted_eps: Tensor,
+        predicted_var_values: Tensor,
 ) -> Tensor:
     """
     Get a term for the variational lower-bound.
@@ -147,7 +157,9 @@ def __vb_terms_bpd(
         frozen_predicted_eps=frozen_predicted_eps,
         predicted_var_values=predicted_var_values,
     )
-    kl = normal_kl(true_mean, true_log_variance_clipped, predicted_mean, predicted_log_variance)
+    kl = normal_kl(
+        true_mean, true_log_variance_clipped, predicted_mean, predicted_log_variance
+    )
     kl = kl / np.log(2.0)
 
     decoder_nll = -discretized_gaussian_log_likelihood(
@@ -165,9 +177,9 @@ def __vb_terms_bpd(
 
 
 def __extract_into_tensor(
-    tensor: Tensor,
-    timesteps: Tensor,
-    broadcast_shape,
+        tensor: Tensor,
+        timesteps: Tensor,
+        broadcast_shape,
 ) -> Tensor:
     res = tensor[timesteps]
     while len(res.shape) < len(broadcast_shape):
@@ -176,12 +188,12 @@ def __extract_into_tensor(
 
 
 def vb_losses(
-    coefficients: DiffusionScheduleCoefficients,
-    x_0: Tensor,
-    x_t: Tensor,
-    t: Tensor,
-    predicted_eps: Tensor,
-    predicted_var_values: Tensor,
+        coefficients: DiffusionScheduleCoefficients,
+        x_0: Tensor,
+        x_t: Tensor,
+        t: Tensor,
+        predicted_eps: Tensor,
+        predicted_var_values: Tensor,
 ) -> Tensor:
     # convert to float64 for increased precision and to prevent nan results
     # x_0 = x_0.to(dtype=torch.float64)

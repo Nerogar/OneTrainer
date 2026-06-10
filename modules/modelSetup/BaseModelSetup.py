@@ -23,10 +23,10 @@ class BaseModelSetup(
     metaclass=ABCMeta,
 ):
     def __init__(
-        self,
-        train_device: torch.device,
-        temp_device: torch.device,
-        debug_mode: bool,
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            debug_mode: bool,
     ):
         super().__init__()
 
@@ -39,91 +39,95 @@ class BaseModelSetup(
 
     @abstractmethod
     def create_parameters(
-        self,
-        model: BaseModel,
-        config: TrainConfig,
+            self,
+            model: BaseModel,
+            config: TrainConfig,
     ) -> NamedParameterGroupCollection:
         pass
 
     @abstractmethod
     def setup_optimizations(
-        self,
-        model: BaseModel,
-        config: TrainConfig,
+            self,
+            model: BaseModel,
+            config: TrainConfig,
     ):
         pass
 
     @abstractmethod
     def setup_model(
-        self,
-        model: BaseModel,
-        config: TrainConfig,
+            self,
+            model: BaseModel,
+            config: TrainConfig,
     ):
         pass
 
     @abstractmethod
     def setup_train_device(
-        self,
-        model: BaseModel,
-        config: TrainConfig,
+            self,
+            model: BaseModel,
+            config: TrainConfig,
     ):
         pass
 
     @abstractmethod
     def predict(
-        self,
-        model: BaseModel,
-        batch: dict,
-        config: TrainConfig,
-        train_progress: TrainProgress,
-        *,
-        deterministic: bool = False,
+            self,
+            model: BaseModel,
+            batch: dict,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+            *,
+            deterministic: bool = False,
     ) -> dict:
         pass
 
     @abstractmethod
     def calculate_loss(
-        self,
-        model: BaseModel,
-        batch: dict,
-        data: dict,
-        config: TrainConfig,
+            self,
+            model: BaseModel,
+            batch: dict,
+            data: dict,
+            config: TrainConfig,
     ) -> Tensor:
         pass
 
     @abstractmethod
     def after_optimizer_step(
-        self,
-        model: BaseModel,
-        config: TrainConfig,
-        train_progress: TrainProgress,
+            self,
+            model: BaseModel,
+            config: TrainConfig,
+            train_progress: TrainProgress,
     ):
         pass
 
     def report_to_tensorboard(
-        self,
-        model: BaseModel,
-        config: TrainConfig,
-        scheduler: LRScheduler,
-        tensorboard: SummaryWriter,
+            self,
+            model: BaseModel,
+            config: TrainConfig,
+            scheduler: LRScheduler,
+            tensorboard: SummaryWriter,
     ):
         lrs = scheduler.get_last_lr()
         parameters = model.parameters.display_name_mapping
 
         reported_learning_rates = {}
 
-        if any("optim_type" in g for g in model.optimizer.param_groups):
+        # Handle MuonWithAuxAdam's split parameter groups
+        if any('optim_type' in g for g in model.optimizer.param_groups):
             for group in model.optimizer.param_groups:
-                name = group.get("name")
-                if not name or not group["params"]:
+                name = group.get('name')
+                if not name or not group['params']:
                     continue
-                optim_type = group.get("optim_type", "unknown")
+                # For MuonWithAuxAdam, parameter groups are split for Muon and Adam,
+                # but might retain the same base name (e.g., 'unet').
+                optim_type = group.get('optim_type', 'unknown')
                 unique_name = f"{name}_{optim_type}"
                 if unique_name not in reported_learning_rates:
-                    reported_learning_rates[unique_name] = group["lr"]
+                    reported_learning_rates[unique_name] = group['lr']
         else:
             for lr, parameter in zip(lrs, parameters, strict=True):
-                name = parameter.split("/")[0]
+                # only use the prefix. this prevents multiple embedding reports. TODO: find a better solution
+                name = parameter.split('/')[0]
 
                 if name not in reported_learning_rates:
                     reported_learning_rates[name] = lr
@@ -131,12 +135,14 @@ class BaseModelSetup(
         reported_learning_rates = config.optimizer.optimizer.maybe_adjust_lrs(reported_learning_rates, model.optimizer)
 
         for name, lr in reported_learning_rates.items():
-            tensorboard.add_scalar(f"lr/{name}", lr, model.train_progress.global_step)
+            tensorboard.add_scalar(
+                f"lr/{name}", lr, model.train_progress.global_step
+            )
 
-        if hasattr(model.optimizer, "kourkoutas_helper") and model.optimizer.kourkoutas_helper is not None:
+        if hasattr(model.optimizer, 'kourkoutas_helper') and model.optimizer.kourkoutas_helper is not None:
             stats = model.optimizer.kourkoutas_helper.last_beta2_stats
             if stats:
-                tensorboard.add_scalar("kourkoutas/beta2_mean", stats["mean"], model.train_progress.global_step)
+                tensorboard.add_scalar("kourkoutas/beta2_mean", stats['mean'], model.train_progress.global_step)
 
     @staticmethod
     def _is_dpo_rejected_key(key: str) -> bool:
@@ -361,9 +367,9 @@ class BaseModelSetup(
         return loss
 
     def stop_embedding_training_elapsed(
-        self,
-        config: TrainEmbeddingConfig,
-        train_progress: TrainProgress,
+            self,
+            config: TrainEmbeddingConfig,
+            train_progress: TrainProgress,
     ):
         return self.single_action_elapsed(
             "stop_embedding_training_" + str(config.uuid),
@@ -373,10 +379,10 @@ class BaseModelSetup(
         )
 
     def __stop_model_part_training_elapsed(
-        self,
-        unique_name: str,
-        config: TrainModelPartConfig,
-        train_progress: TrainProgress,
+            self,
+            unique_name: str,
+            config: TrainModelPartConfig,
+            train_progress: TrainProgress,
     ):
         return self.single_action_elapsed(
             "stop_" + unique_name + "_training",
@@ -476,13 +482,11 @@ class BaseModelSetup(
         else:
             parameters = model.parameters()
 
-        parameter_group_collection.add_group(
-            NamedParameterGroup(
-                unique_name=unique_name,
-                parameters=parameters,
-                learning_rate=config.learning_rate,
-            )
-        )
+        parameter_group_collection.add_group(NamedParameterGroup(
+            unique_name=unique_name,
+            parameters=parameters,
+            learning_rate=config.learning_rate,
+        ))
 
     def _setup_model_part_requires_grad(
         self,
@@ -492,11 +496,12 @@ class BaseModelSetup(
         train_progress: TrainProgress,
     ):
         if model is not None:
-            train_model_part = config.train and not self.__stop_model_part_training_elapsed(
-                unique_name, config, train_progress
-            )
+            train_model_part = config.train and \
+                               not self.__stop_model_part_training_elapsed(unique_name, config, train_progress)
             model.requires_grad_(train_model_part)
 
+            #even if frozen parameters are not passed to the optimizer, required_grad has to be False.
+            #otherwise, gradients accumulate in param.grad and waste vram
             if unique_name in self.frozen_parameters:
                 for param in self.frozen_parameters[unique_name]:
                     param.requires_grad_(False)

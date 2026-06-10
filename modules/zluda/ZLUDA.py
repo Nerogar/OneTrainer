@@ -1,3 +1,4 @@
+
 from modules.util.config.TrainConfig import TrainConfig
 
 import torch
@@ -14,20 +15,8 @@ def is_zluda(device: DeviceLikeType):
 def test(device: DeviceLikeType) -> Exception | None:
     device = torch.device(device)
     try:
-        ten1 = torch.randn(
-            (
-                2,
-                4,
-            ),
-            device=device,
-        )
-        ten2 = torch.randn(
-            (
-                4,
-                8,
-            ),
-            device=device,
-        )
+        ten1 = torch.randn((2, 4,), device=device)
+        ten2 = torch.randn((4, 8,), device=device)
         out = torch.mm(ten1, ten2)
         assert out.sum().is_nonzero()
         return None
@@ -47,17 +36,12 @@ def initialize():
 def initialize_devices(config: TrainConfig):
     if not is_zluda(config.train_device) and not is_zluda(config.temp_device):
         return
-    devices = [
-        config.train_device,
-        config.temp_device,
-    ]
+    devices = [config.train_device, config.temp_device,]
     for i in range(2):
         device = torch.device(devices[i])
         result = test(device)
         if result is not None:
-            print(
-                f"ZLUDA device failed to pass basic operation test: index={device.index}, device_name={torch.cuda.get_device_name(device)}"
-            )
+            print(f'ZLUDA device failed to pass basic operation test: index={device.index}, device_name={torch.cuda.get_device_name(device)}')
             print(result)
-            devices[i] = "cpu"
+            devices[i] = 'cpu'
     config.train_device, config.temp_device = devices

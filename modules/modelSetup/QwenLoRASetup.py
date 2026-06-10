@@ -18,10 +18,10 @@ class QwenLoRASetup(
     BaseQwenSetup,
 ):
     def __init__(
-        self,
-        train_device: torch.device,
-        temp_device: torch.device,
-        debug_mode: bool,
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            debug_mode: bool,
     ):
         super().__init__(
             train_device=train_device,
@@ -30,18 +30,14 @@ class QwenLoRASetup(
         )
 
     def create_parameters(
-        self,
-        model: QwenModel,
-        config: TrainConfig,
+            self,
+            model: QwenModel,
+            config: TrainConfig,
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        self._create_model_part_parameters(
-            parameter_group_collection, "text_encoder", model.text_encoder_lora, config.text_encoder
-        )
-        self._create_model_part_parameters(
-            parameter_group_collection, "transformer", model.transformer_lora, config.transformer
-        )
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder", model.text_encoder_lora, config.text_encoder)
+        self._create_model_part_parameters(parameter_group_collection, "transformer",  model.transformer_lora,  config.transformer)
 
         if config.train_any_embedding() or config.train_any_output_embedding():
             raise NotImplementedError("Embeddings not implemented for Qwen")
@@ -49,33 +45,29 @@ class QwenLoRASetup(
         return parameter_group_collection
 
     def __setup_requires_grad(
-        self,
-        model: QwenModel,
-        config: TrainConfig,
+            self,
+            model: QwenModel,
+            config: TrainConfig,
     ):
         if model.text_encoder is not None:
             model.text_encoder.requires_grad_(False)
         model.transformer.requires_grad_(False)
         model.vae.requires_grad_(False)
 
-        self._setup_model_part_requires_grad(
-            "text_encoder", model.text_encoder_lora, config.text_encoder, model.train_progress
-        )
-        self._setup_model_part_requires_grad(
-            "transformer", model.transformer_lora, config.transformer, model.train_progress
-        )
+        self._setup_model_part_requires_grad("text_encoder", model.text_encoder_lora, config.text_encoder, model.train_progress)
+        self._setup_model_part_requires_grad("transformer", model.transformer_lora, config.transformer, model.train_progress)
 
     def setup_model(
-        self,
-        model: QwenModel,
-        config: TrainConfig,
+            self,
+            model: QwenModel,
+            config: TrainConfig,
     ):
         create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
 
         if model.text_encoder is not None:
-            model.text_encoder_lora = (
-                LoRAModuleWrapper(model.text_encoder, "text_encoder", config) if create_te else None
-            )
+            model.text_encoder_lora = LoRAModuleWrapper(
+                model.text_encoder, "text_encoder", config
+            ) if create_te else None
 
         model.transformer_lora = LoRAModuleWrapper(
             model.transformer, "transformer", config, config.layer_filter.split(",")
@@ -101,12 +93,14 @@ class QwenLoRASetup(
         init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
-        self,
-        model: QwenModel,
-        config: TrainConfig,
+            self,
+            model: QwenModel,
+            config: TrainConfig,
     ):
         vae_on_train_device = not config.latent_caching
-        text_encoder_on_train_device = config.train_text_encoder_or_embedding() or not config.latent_caching
+        text_encoder_on_train_device = \
+            config.train_text_encoder_or_embedding() \
+            or not config.latent_caching
 
         model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
@@ -125,8 +119,12 @@ class QwenLoRASetup(
         else:
             model.transformer.eval()
 
-    def after_optimizer_step(self, model: QwenModel, config: TrainConfig, train_progress: TrainProgress):
+    def after_optimizer_step(
+            self,
+            model: QwenModel,
+            config: TrainConfig,
+            train_progress: TrainProgress
+    ):
         self.__setup_requires_grad(model, config)
-
 
 factory.register(BaseModelSetup, QwenLoRASetup, ModelType.QWEN, TrainingMethod.LORA)

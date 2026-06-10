@@ -9,8 +9,8 @@ class ModelSetupText2ImageMixin(metaclass=ABCMeta):
     def prepare_text_caching(self, model: BaseModel, config: TrainConfig):
         pass
 
-    # for future use in samplers etc.
-    """@abstractmethod
+    #for future use in samplers etc.
+    '''@abstractmethod
     def prepare_training(self, model: BaseModel):
         pass
 
@@ -20,4 +20,4 @@ class ModelSetupText2ImageMixin(metaclass=ABCMeta):
 
     @abstractmethod
     def prepare_image_inference(self, model: BaseModel):
-        pass"""
+        pass'''

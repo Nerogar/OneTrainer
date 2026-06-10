@@ -28,43 +28,36 @@ class HunyuanVideoModelLoader(
         super().__init__()
 
     def __load_internal(
-        self,
-        model: HunyuanVideoModel,
-        model_type: ModelType,
-        weight_dtypes: ModelWeightDtypes,
-        base_model_name: str,
-        transformer_model_name: str,
-        vae_model_name: str,
-        include_text_encoder_1: bool,
-        include_text_encoder_2: bool,
-        quantization: QuantizationConfig,
+            self,
+            model: HunyuanVideoModel,
+            model_type: ModelType,
+            weight_dtypes: ModelWeightDtypes,
+            base_model_name: str,
+            transformer_model_name: str,
+            vae_model_name: str,
+            include_text_encoder_1: bool,
+            include_text_encoder_2: bool,
+            quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(
-                model,
-                model_type,
-                weight_dtypes,
-                base_model_name,
-                transformer_model_name,
-                vae_model_name,
-                include_text_encoder_1,
-                include_text_encoder_2,
-                quantization,
+                model, model_type, weight_dtypes, base_model_name, transformer_model_name, vae_model_name,
+                include_text_encoder_1, include_text_encoder_2, quantization,
             )
         else:
             raise Exception("not an internal model")
 
     def __load_diffusers(
-        self,
-        model: HunyuanVideoModel,
-        model_type: ModelType,
-        weight_dtypes: ModelWeightDtypes,
-        base_model_name: str,
-        transformer_model_name: str,
-        vae_model_name: str,
-        include_text_encoder_1: bool,
-        include_text_encoder_2: bool,
-        quantization: QuantizationConfig,
+            self,
+            model: HunyuanVideoModel,
+            model_type: ModelType,
+            weight_dtypes: ModelWeightDtypes,
+            base_model_name: str,
+            transformer_model_name: str,
+            vae_model_name: str,
+            include_text_encoder_1: bool,
+            include_text_encoder_2: bool,
+            quantization: QuantizationConfig,
     ):
         diffusers_sub = []
         transformers_sub = []
@@ -148,13 +141,9 @@ class HunyuanVideoModelLoader(
                 transformer_model_name,
                 config=base_model_name,
                 subfolder="transformer",
-                # avoid loading the transformer in float32:
-                torch_dtype=torch.bfloat16
-                if weight_dtypes.transformer.torch_dtype() is None
-                else weight_dtypes.transformer.torch_dtype(),
-                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16)
-                if weight_dtypes.transformer.is_gguf()
-                else None,
+                #avoid loading the transformer in float32:
+                torch_dtype = torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype(),
+                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16) if weight_dtypes.transformer.is_gguf() else None,
             )
             transformer = self._convert_diffusers_sub_module_to_dtype(
                 transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization
@@ -179,16 +168,16 @@ class HunyuanVideoModelLoader(
         model.transformer = transformer
 
     def __load_safetensors(
-        self,
-        model: HunyuanVideoModel,
-        model_type: ModelType,
-        weight_dtypes: ModelWeightDtypes,
-        base_model_name: str,
-        transformer_model_name: str,
-        vae_model_name: str,
-        include_text_encoder_1: bool,
-        include_text_encoder_2: bool,
-        quantization: QuantizationConfig,
+            self,
+            model: HunyuanVideoModel,
+            model_type: ModelType,
+            weight_dtypes: ModelWeightDtypes,
+            base_model_name: str,
+            transformer_model_name: str,
+            vae_model_name: str,
+            include_text_encoder_1: bool,
+            include_text_encoder_2: bool,
+            quantization: QuantizationConfig,
     ):
         pipeline = HunyuanVideoPipeline.from_single_file(
             pretrained_model_link_or_path=base_model_name,
@@ -230,23 +219,16 @@ class HunyuanVideoModelLoader(
         if transformer_model_name:
             transformer = HunyuanVideoTransformer3DModel.from_single_file(
                 transformer_model_name,
-                config=pipeline.config.transformer,  # Use config from the loaded pipeline
-                torch_dtype=torch.bfloat16
-                if weight_dtypes.transformer.torch_dtype() is None
-                else weight_dtypes.transformer.torch_dtype(),
-                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16)
-                if weight_dtypes.transformer.is_gguf()
-                else None,
+                config=pipeline.config.transformer, # Use config from the loaded pipeline
+                torch_dtype = torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype(),
+                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16) if weight_dtypes.transformer.is_gguf() else None,
             )
             transformer = self._convert_diffusers_sub_module_to_dtype(
                 transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization
             )
         else:
             transformer = self._convert_diffusers_sub_module_to_dtype(
-                pipeline.transformer,
-                weight_dtypes.transformer,
-                weight_dtypes.train_dtype,
-                quantization,
+                pipeline.transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization,
             )
 
         model.model_type = model_type
@@ -263,26 +245,19 @@ class HunyuanVideoModelLoader(
         model.orig_tokenizer_2 = copy.deepcopy(model.tokenizer_2)
 
     def load(
-        self,
-        model: HunyuanVideoModel,
-        model_type: ModelType,
-        model_names: ModelNames,
-        weight_dtypes: ModelWeightDtypes,
-        quantization: QuantizationConfig,
+            self,
+            model: HunyuanVideoModel,
+            model_type: ModelType,
+            model_names: ModelNames,
+            weight_dtypes: ModelWeightDtypes,
+            quantization: QuantizationConfig,
     ):
         stacktraces = []
 
         try:
             self.__load_internal(
-                model,
-                model_type,
-                weight_dtypes,
-                model_names.base_model,
-                model_names.transformer_model,
-                model_names.vae_model,
-                model_names.include_text_encoder,
-                model_names.include_text_encoder_2,
-                quantization,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model,
+                model_names.include_text_encoder, model_names.include_text_encoder_2, quantization,
             )
             self.__after_load(model)
             return
@@ -291,15 +266,8 @@ class HunyuanVideoModelLoader(
 
         try:
             self.__load_diffusers(
-                model,
-                model_type,
-                weight_dtypes,
-                model_names.base_model,
-                model_names.transformer_model,
-                model_names.vae_model,
-                model_names.include_text_encoder,
-                model_names.include_text_encoder_2,
-                quantization,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model,
+                model_names.include_text_encoder, model_names.include_text_encoder_2, quantization,
             )
             self.__after_load(model)
             return
@@ -308,15 +276,8 @@ class HunyuanVideoModelLoader(
 
         try:
             self.__load_safetensors(
-                model,
-                model_type,
-                weight_dtypes,
-                model_names.base_model,
-                model_names.transformer_model,
-                model_names.vae_model,
-                model_names.include_text_encoder,
-                model_names.include_text_encoder_2,
-                quantization,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model,
+                model_names.include_text_encoder, model_names.include_text_encoder_2, quantization,
             )
             self.__after_load(model)
             return

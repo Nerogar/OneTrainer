@@ -18,10 +18,10 @@ class PixArtAlphaLoRASetup(
     BasePixArtAlphaSetup,
 ):
     def __init__(
-        self,
-        train_device: torch.device,
-        temp_device: torch.device,
-        debug_mode: bool,
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            debug_mode: bool,
     ):
         super().__init__(
             train_device=train_device,
@@ -30,57 +30,49 @@ class PixArtAlphaLoRASetup(
         )
 
     def create_parameters(
-        self,
-        model: PixArtAlphaModel,
-        config: TrainConfig,
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        self._create_model_part_parameters(
-            parameter_group_collection, "text_encoder_lora", model.text_encoder_lora, config.text_encoder
-        )
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder_lora", model.text_encoder_lora, config.text_encoder)
 
         if config.train_any_embedding() or config.train_any_output_embedding():
             self._add_embedding_param_groups(
-                model.all_text_encoder_embeddings(),
-                parameter_group_collection,
-                config.embedding_learning_rate,
-                "embeddings",
+                model.all_text_encoder_embeddings(), parameter_group_collection, config.embedding_learning_rate,
+                "embeddings"
             )
 
-        self._create_model_part_parameters(
-            parameter_group_collection, "transformer_lora", model.transformer_lora, config.transformer
-        )
+        self._create_model_part_parameters(parameter_group_collection, "transformer_lora", model.transformer_lora, config.transformer)
 
         return parameter_group_collection
 
     def __setup_requires_grad(
-        self,
-        model: PixArtAlphaModel,
-        config: TrainConfig,
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
     ):
         self._setup_embeddings_requires_grad(model, config)
         model.text_encoder.requires_grad_(False)
         model.transformer.requires_grad_(False)
         model.vae.requires_grad_(False)
 
-        self._setup_model_part_requires_grad(
-            "text_encoder_lora", model.text_encoder_lora, config.text_encoder, model.train_progress
-        )
-        self._setup_model_part_requires_grad(
-            "transformer_lora", model.transformer_lora, config.transformer, model.train_progress
-        )
+        self._setup_model_part_requires_grad("text_encoder_lora", model.text_encoder_lora, config.text_encoder, model.train_progress)
+        self._setup_model_part_requires_grad("transformer_lora", model.transformer_lora, config.transformer, model.train_progress)
 
     def setup_model(
-        self,
-        model: PixArtAlphaModel,
-        config: TrainConfig,
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
     ):
         if config.train_any_embedding():
             model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
         create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te")
-        model.text_encoder_lora = LoRAModuleWrapper(model.text_encoder, "lora_te", config) if create_te else None
+        model.text_encoder_lora = LoRAModuleWrapper(
+            model.text_encoder, "lora_te", config
+        ) if create_te else None
 
         model.transformer_lora = LoRAModuleWrapper(
             model.transformer, "lora_transformer", config, config.layer_filter.split(",")
@@ -111,14 +103,15 @@ class PixArtAlphaLoRASetup(
         init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
-        self,
-        model: PixArtAlphaModel,
-        config: TrainConfig,
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
     ):
         vae_on_train_device = self.debug_mode or not config.latent_caching
-        text_encoder_on_train_device = (
-            config.text_encoder.train or config.train_any_embedding() or not config.latent_caching
-        )
+        text_encoder_on_train_device = \
+            config.text_encoder.train \
+            or config.train_any_embedding() \
+            or not config.latent_caching
 
         model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
@@ -136,12 +129,16 @@ class PixArtAlphaLoRASetup(
         else:
             model.transformer.eval()
 
-    def after_optimizer_step(self, model: PixArtAlphaModel, config: TrainConfig, train_progress: TrainProgress):
+    def after_optimizer_step(
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
+            train_progress: TrainProgress
+    ):
         if config.preserve_embedding_norm:
             self._normalize_output_embeddings(model.all_text_encoder_embeddings())
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
 
 factory.register(BaseModelSetup, PixArtAlphaLoRASetup, ModelType.PIXART_ALPHA, TrainingMethod.LORA)
 factory.register(BaseModelSetup, PixArtAlphaLoRASetup, ModelType.PIXART_SIGMA, TrainingMethod.LORA)

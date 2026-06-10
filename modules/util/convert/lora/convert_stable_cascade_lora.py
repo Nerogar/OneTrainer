@@ -20,29 +20,10 @@ def __map_unet_blocks(key_prefix: LoraConversionKeySet) -> list[LoraConversionKe
 
         # attention block
         keys += [LoraConversionKeySet("kv_mapper.1", "kv_mapper.1", parent=k)]
-        keys += [
-            LoraConversionKeySet(
-                "attention.attn.out_proj",
-                "attention.to_out.0",
-                legacy_diffusers_prefix="attention_attn_out_proj",
-                parent=k,
-            )
-        ]
-        keys += [
-            LoraConversionKeySet(
-                "attention.attn.in_proj.0", "attention.to_q", legacy_diffusers_prefix="attention_attn_to_q", parent=k
-            )
-        ]
-        keys += [
-            LoraConversionKeySet(
-                "attention.attn.in_proj.1", "attention.to_k", legacy_diffusers_prefix="attention_attn_to_k", parent=k
-            )
-        ]
-        keys += [
-            LoraConversionKeySet(
-                "attention.attn.in_proj.2", "attention.to_v", legacy_diffusers_prefix="attention_attn_to_v", parent=k
-            )
-        ]
+        keys += [LoraConversionKeySet("attention.attn.out_proj", "attention.to_out.0", legacy_diffusers_prefix="attention_attn_out_proj", parent=k)]
+        keys += [LoraConversionKeySet("attention.attn.in_proj.0", "attention.to_q", legacy_diffusers_prefix="attention_attn_to_q", parent=k)]
+        keys += [LoraConversionKeySet("attention.attn.in_proj.1", "attention.to_k", legacy_diffusers_prefix="attention_attn_to_k", parent=k)]
+        keys += [LoraConversionKeySet("attention.attn.in_proj.2", "attention.to_v", legacy_diffusers_prefix="attention_attn_to_v", parent=k)]
 
     return keys
 
@@ -70,7 +51,7 @@ def convert_stable_cascade_lora_key_sets() -> list[LoraConversionKeySet]:
     keys = []
 
     keys += [LoraConversionKeySet("bundle_emb", "bundle_emb")]
-    keys += __map_prior(LoraConversionKeySet("unet", "lora_prior_unet"))
+    keys += __map_prior(LoraConversionKeySet( "unet", "lora_prior_unet"))
     keys += map_clip(LoraConversionKeySet("clip_g", "lora_prior_te"))
 
     return keys

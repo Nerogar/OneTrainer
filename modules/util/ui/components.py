@@ -24,7 +24,8 @@ def app_title(master, row, column):
     frame.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
 
     image_component = ctk.CTkImage(
-        Image.open("resources/icons/icon.png").resize((40, 40), Image.Resampling.LANCZOS), size=(40, 40)
+        Image.open("resources/icons/icon.png").resize((40, 40), Image.Resampling.LANCZOS),
+        size=(40, 40)
     )
     image_label_component = ctk.CTkLabel(frame, image=image_component, text="")
     image_label_component.grid(row=0, column=0, padx=PAD, pady=PAD)
@@ -42,20 +43,20 @@ def label(master, row, column, text, pad=PAD, tooltip=None, wide_tooltip=False, 
 
 
 def entry(
-    master,
-    row,
-    column,
-    ui_state: UIState,
-    var_name: str,
-    command: Callable[[], None] | None = None,
-    tooltip: str = "",
-    wide_tooltip: bool = False,
-    width: int = 140,
-    sticky: str = "new",
-    max_undo: int | None = None,
-    validator_factory: Callable[..., FieldValidator] | None = None,
-    extra_validate: Callable[[str], str | None] | None = None,
-    required: bool = False,
+        master,
+        row,
+        column,
+        ui_state: UIState,
+        var_name: str,
+        command: Callable[[], None] | None = None,
+        tooltip: str = "",
+        wide_tooltip: bool = False,
+        width: int = 140,
+        sticky: str = "new",
+        max_undo: int | None = None,
+        validator_factory: Callable[..., FieldValidator] | None = None,
+        extra_validate: Callable[[str], str | None] | None = None,
+        required: bool = False,
 ):
     var = ui_state.get_var(var_name)
     trace_id = None
@@ -67,20 +68,14 @@ def entry(
 
     if validator_factory is not None:
         validator = validator_factory(
-            component,
-            var,
-            ui_state,
-            var_name,
+            component, var, ui_state, var_name,
             max_undo=max_undo or DEFAULT_MAX_UNDO,
             extra_validate=extra_validate,
             required=required,
         )
     else:
         validator = FieldValidator(
-            component,
-            var,
-            ui_state,
-            var_name,
+            component, var, ui_state, var_name,
             max_undo=max_undo or DEFAULT_MAX_UNDO,
             extra_validate=extra_validate,
             required=required,
@@ -119,20 +114,16 @@ def json_path_modifier(x: str | Path) -> Path:
 
 
 def path_entry(
-    master,
-    row,
-    column,
-    ui_state: UIState,
-    var_name: str,
-    *,
-    mode: Literal["file", "dir"] = "file",
-    io_type: PathIOType = PathIOType.INPUT,
-    path_modifier: Callable[[str], str | Path] | None = None,
-    allow_model_files: bool = True,
-    allow_image_files: bool = False,
-    command: Callable[[str], None] | None = None,
-    extra_validate: Callable[[str], str | None] | None = None,
-    required: bool = False,
+        master, row, column, ui_state: UIState, var_name: str,
+        *,
+        mode: Literal["file", "dir"] = "file",
+        io_type: PathIOType = PathIOType.INPUT,
+        path_modifier: Callable[[str], str | Path] | None = None,
+        allow_model_files: bool = True,
+        allow_image_files: bool = False,
+        command: Callable[[str], None] | None = None,
+        extra_validate: Callable[[str], str | None] | None = None,
+        required: bool = False,
 ):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
@@ -143,11 +134,7 @@ def path_entry(
         return PathValidator(comp, var, state, name, io_type=io_type, **kw)
 
     entry_component = entry(
-        frame,
-        row=0,
-        column=0,
-        ui_state=ui_state,
-        var_name=var_name,
+        frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
         validator_factory=_path_validator_factory,
         extra_validate=extra_validate,
         required=required,
@@ -155,7 +142,7 @@ def path_entry(
 
     trace_ids = []
     if io_type in (PathIOType.OUTPUT, PathIOType.MODEL):
-        validator = getattr(entry_component, "_validator", None)
+        validator = getattr(entry_component, '_validator', None)
         if validator is not None:
             for dep_var_name in ("prevent_overwrites", "output_model_format"):
                 with contextlib.suppress(KeyError, AttributeError):
@@ -187,28 +174,22 @@ def path_entry(
             ]
 
             if allow_model_files:
-                filetypes.extend(
-                    [
-                        ("Diffusers", "model_index.json"),
-                        ("Checkpoint", "*.ckpt *.pt *.bin"),
-                        ("Safetensors", "*.safetensors"),
-                    ]
-                )
+                filetypes.extend([
+                    ("Diffusers", "model_index.json"),
+                    ("Checkpoint", "*.ckpt *.pt *.bin"),
+                    ("Safetensors", "*.safetensors"),
+                ])
             if allow_image_files:
-                filetypes.extend(
-                    [
-                        ("Image", " ".join([f"*.{x}" for x in supported_image_extensions()])),
-                    ]
-                )
+                filetypes.extend([
+                    ("Image", ' '.join([f"*.{x}" for x in supported_image_extensions()])),
+                ])
 
             if use_save_dialog:
-                chosen = filedialog.asksaveasfilename(
-                    filetypes=filetypes, initialdir=current_dir, initialfile=current_filename
-                )
+                chosen = filedialog.asksaveasfilename(filetypes=filetypes, initialdir=current_dir,
+                                                      initialfile=current_filename)
             else:
-                chosen = filedialog.askopenfilename(
-                    filetypes=filetypes, initialdir=current_dir, initialfile=current_filename
-                )
+                chosen = filedialog.askopenfilename(filetypes=filetypes, initialdir=current_dir,
+                                                    initialfile=current_filename)
 
         if chosen:
             if path_modifier:
@@ -225,13 +206,11 @@ def path_entry(
 
     if trace_ids:
         original_frame_destroy = frame.destroy
-
         def _frame_destroy():
             for dep_var, tid in trace_ids:
                 with contextlib.suppress(tk.TclError, ValueError):
                     dep_var.trace_remove("write", tid)
             original_frame_destroy()
-
         frame.destroy = _frame_destroy  # type: ignore[assignment]
 
     return frame
@@ -260,49 +239,37 @@ def time_entry(master, row, column, ui_state: UIState, var_name: str, unit_var_n
 
     return frame
 
-
-def layer_filter_entry(
-    master,
-    row,
-    column,
-    ui_state: UIState,
-    preset_var_name: str,
-    preset_label: str,
-    preset_tooltip: str,
-    presets,
-    entry_var_name,
-    entry_tooltip: str,
-    regex_var_name,
-    regex_tooltip: str,
-    frame_color=None,
-):
+def layer_filter_entry(master, row, column, ui_state: UIState, preset_var_name: str, preset_label: str, preset_tooltip: str, presets, entry_var_name, entry_tooltip: str, regex_var_name, regex_tooltip: str, frame_color=None):
     frame = ctk.CTkFrame(master=master, corner_radius=5, fg_color=frame_color)
     frame.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
     frame.grid_columnconfigure(0, weight=1)
 
-    layer_entry = entry(frame, 1, 0, ui_state, entry_var_name, tooltip=entry_tooltip)
+    layer_entry = entry(
+        frame, 1, 0, ui_state, entry_var_name,
+        tooltip=entry_tooltip
+    )
     layer_entry_fg_color = layer_entry.cget("fg_color")
     layer_entry_text_color = layer_entry.cget("text_color")
 
     regex_label = label(
-        frame,
-        2,
-        0,
-        "Use Regex",
+        frame, 2, 0, "Use Regex",
         tooltip=regex_tooltip,
     )
-    regex_switch = switch(frame, 2, 1, ui_state, regex_var_name)
+    regex_switch = switch(
+        frame, 2, 1, ui_state, regex_var_name
+    )
 
     # Let the user set their own layer filter
     # TODO
-    # if self.train_config.layer_filter and self.train_config.layer_filter_preset == "custom":
+    #if self.train_config.layer_filter and self.train_config.layer_filter_preset == "custom":
     #    self.prior_custom = self.train_config.layer_filter
-    # else:
+    #else:
     #    self.prior_custom = ""
 
     layer_entry.grid_configure(columnspan=2, sticky="ew")
 
     presets_list = list(presets.keys()) + ["custom"]
+
 
     def hide_layer_entry():
         if layer_entry and layer_entry.winfo_manager():
@@ -312,6 +279,7 @@ def layer_filter_entry(
         if layer_entry and not layer_entry.winfo_manager():
             layer_entry.grid()
 
+
     def preset_set_layer_choice(selected: str):
         if not selected or selected not in presets_list:
             selected = presets_list[0]
@@ -320,12 +288,12 @@ def layer_filter_entry(
             # Allow editing + regex toggle
             show_layer_entry()
             layer_entry.configure(state="normal", fg_color=layer_entry_fg_color, text_color=layer_entry_text_color)
-            # layer_entry.cget('textvariable').set("")
+            #layer_entry.cget('textvariable').set("")
             regex_label.grid()
             regex_switch.grid()
         else:
             # Preserve custom text before overwriting
-            # if self.prior_selected == "custom":
+            #if self.prior_selected == "custom":
             #    self.prior_custom = self.layer_entry.get()
 
             # Resolve preset definition (list[str] OR {'patterns': [...], 'regex': bool})
@@ -340,7 +308,7 @@ def layer_filter_entry(
             disabled_color = ("gray85", "gray17")
             disabled_text_color = ("gray30", "gray70")
             layer_entry.configure(state="disabled", fg_color=disabled_color, text_color=disabled_text_color)
-            layer_entry.cget("textvariable").set(",".join(patterns))
+            layer_entry.cget('textvariable').set(",".join(patterns))
 
             ui_state.get_var(entry_var_name).set(",".join(patterns))
             ui_state.get_var(regex_var_name).set(preset_uses_regex)
@@ -353,13 +321,18 @@ def layer_filter_entry(
             else:
                 show_layer_entry()
 
-    #        self.prior_selected = selected
+#        self.prior_selected = selected
 
-    label(frame, 0, 0, preset_label, tooltip=preset_tooltip)
+    label(frame, 0, 0, preset_label,
+                     tooltip=preset_tooltip)
+
 
     ui_state.remove_all_var_traces(preset_var_name)
 
-    layer_selector = options(frame, 0, 1, presets_list, ui_state, preset_var_name, command=preset_set_layer_choice)
+    layer_selector = options(
+        frame, 0, 1, presets_list, ui_state, preset_var_name,
+        command=preset_set_layer_choice
+    )
 
     def on_layer_filter_preset_change():
         if not layer_selector:
@@ -374,7 +347,6 @@ def layer_filter_entry(
 
     preset_set_layer_choice(layer_selector.get())
 
-
 def icon_button(master, row, column, text, command):
     component = ctk.CTkButton(master, text=text, width=40, command=command)
     component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="new")
@@ -383,8 +355,8 @@ def icon_button(master, row, column, text, command):
 
 def button(master, row, column, text, command, tooltip=None, **kwargs):
     # Pop grid-specific parameters from kwargs, using PAD as the default if not provided.
-    padx = kwargs.pop("padx", PAD)
-    pady = kwargs.pop("pady", PAD)
+    padx = kwargs.pop('padx', PAD)
+    pady = kwargs.pop('pady', PAD)
 
     component = ctk.CTkButton(master, text=text, command=command, **kwargs)
     component.grid(row=row, column=column, padx=padx, pady=pady, sticky="new")
@@ -393,9 +365,7 @@ def button(master, row, column, text, command, tooltip=None, **kwargs):
     return component
 
 
-def options(
-    master, row, column, values, ui_state: UIState, var_name: str, command: Callable[[str], None] | None = None
-):
+def options(master, row, column, values, ui_state: UIState, var_name: str, command: Callable[[str], None] | None = None):
     component = ctk.CTkOptionMenu(master, values=values, variable=ui_state.get_var(var_name), command=command)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
 
@@ -415,16 +385,8 @@ def options(
     return component
 
 
-def options_adv(
-    master,
-    row,
-    column,
-    values,
-    ui_state: UIState,
-    var_name: str,
-    command: Callable[[str], None] | None = None,
-    adv_command: Callable[[], None] | None = None,
-):
+def options_adv(master, row, column, values, ui_state: UIState, var_name: str,
+                command: Callable[[str], None] | None = None, adv_command: Callable[[], None] | None = None):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
 
@@ -452,18 +414,11 @@ def options_adv(
     destroy = create_destroy(component._dropdown_menu)
     component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)  # type: ignore[assignment]
 
-    return frame, {"component": component, "button_component": button_component}
+    return frame, {'component': component, 'button_component': button_component}
 
 
-def options_kv(
-    master,
-    row,
-    column,
-    values: list[tuple[str, Any]],
-    ui_state: UIState,
-    var_name: str,
-    command: Callable[[Any], None] | None = None,
-):
+def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: UIState, var_name: str,
+               command: Callable[[Any], None] | None = None):
     var = ui_state.get_var(var_name)
     keys = [key for key, value in values]
 
@@ -517,13 +472,13 @@ def options_kv(
 
 
 def switch(
-    master,
-    row,
-    column,
-    ui_state: UIState,
-    var_name: str,
-    command: Callable[[], None] | None = None,
-    text: str = "",
+        master,
+        row,
+        column,
+        ui_state: UIState,
+        var_name: str,
+        command: Callable[[], None] | None = None,
+        text: str = "",
 ):
     var = ui_state.get_var(var_name)
     if command:

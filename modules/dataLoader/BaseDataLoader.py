@@ -16,15 +16,16 @@ class BaseDataLoader(
     DataLoaderMgdsMixin,
     metaclass=ABCMeta,
 ):
+
     def __init__(
-        self,
-        train_device: torch.device,
-        temp_device: torch.device,
-        config: TrainConfig,
-        model: BaseModel,
-        model_setup: BaseModelSetup,
-        train_progress: TrainProgress,
-        is_validation: bool = False,
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            config: TrainConfig,
+            model: BaseModel,
+            model_setup: BaseModelSetup,
+            train_progress: TrainProgress,
+            is_validation: bool = False,
     ):
         super().__init__()
 
@@ -54,11 +55,11 @@ class BaseDataLoader(
 
     @abstractmethod
     def _create_dataset(
-        self,
-        config: TrainConfig,
-        model: BaseModel,
-        model_setup: BaseModelSetup,
-        train_progress: TrainProgress,
-        is_validation,
+            self,
+            config: TrainConfig,
+            model: BaseModel,
+            model_setup: BaseModelSetup,
+            train_progress: TrainProgress,
+            is_validation,
     ):
         pass

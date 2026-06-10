@@ -21,8 +21,8 @@ class SampleArgs(BaseArgs):
     destination: str
     text_encoder_layer_skip: int
     sample_inpainting: bool
-    base_image_path: str
-    mask_image_path: str
+    base_image_path:str
+    mask_image_path:str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -38,89 +38,24 @@ class SampleArgs(BaseArgs):
         )
 
     @staticmethod
-    def parse_args() -> "SampleArgs":
+    def parse_args() -> 'SampleArgs':
         parser = argparse.ArgumentParser(description="One Trainer Sampling Script.")
 
         # @formatter:off
 
-        parser.add_argument(
-            "--model-type",
-            type=ModelType,
-            required=True,
-            dest="model_type",
-            help="Type of the base model",
-            choices=list(ModelType),
-        )
-        parser.add_argument(
-            "--weight-dtype",
-            type=DataType,
-            required=False,
-            default=DataType.FLOAT_32,
-            dest="weight_dtype",
-            help="The data type to use for weights during sampling",
-            choices=list(DataType),
-        )
-        parser.add_argument(
-            "--base-model-name", type=str, required=True, dest="base_model_name", help="The base model to sample from"
-        )
-        parser.add_argument(
-            "--embedding-name",
-            type=str,
-            required=False,
-            default="",
-            dest="embedding_name",
-            help="An embedding to use during sampling",
-        )
+        parser.add_argument("--model-type", type=ModelType, required=True, dest="model_type", help="Type of the base model", choices=list(ModelType))
+        parser.add_argument("--weight-dtype", type=DataType, required=False, default=DataType.FLOAT_32, dest="weight_dtype", help="The data type to use for weights during sampling", choices=list(DataType))
+        parser.add_argument("--base-model-name", type=str, required=True, dest="base_model_name", help="The base model to sample from")
+        parser.add_argument("--embedding-name", type=str, required=False, default="", dest="embedding_name", help="An embedding to use during sampling")
         parser.add_argument("--prompt", type=str, required=True, dest="prompt", help="The prompt for sampling")
-        parser.add_argument(
-            "--negative-prompt",
-            type=str,
-            required=False,
-            default="",
-            dest="negative_prompt",
-            help="The negative prompt for sampling",
-        )
-        parser.add_argument(
-            "--height", type=int, required=False, default=512, dest="height", help="Height of the image in pixel"
-        )
-        parser.add_argument(
-            "--width", type=int, required=False, default=512, dest="width", help="Width of the image in pixel"
-        )
-        parser.add_argument(
-            "--destination", type=str, required=True, dest="destination", help="The destination to save the output"
-        )
-        parser.add_argument(
-            "--text-encoder-layer-skip",
-            type=int,
-            required=False,
-            default=0,
-            dest="text_encoder_layer_skip",
-            help="Skip last layers of the text encoder",
-        )
-        parser.add_argument(
-            "--sample-inpainting",
-            action="store_true",
-            required=False,
-            default=False,
-            dest="sample_inpainting",
-            help="Enables inpainting sampling. Only available when sampling from an inpainting model.",
-        )
-        parser.add_argument(
-            "--base-image-path",
-            type=str,
-            required=False,
-            default="",
-            dest="base_image_path",
-            help="The base image used when inpainting",
-        )
-        parser.add_argument(
-            "--mask-image-path",
-            type=str,
-            required=False,
-            default="",
-            dest="mask_image_path",
-            help="The mask used when inpainting.",
-        )
+        parser.add_argument("--negative-prompt", type=str, required=False, default="", dest="negative_prompt", help="The negative prompt for sampling")
+        parser.add_argument("--height", type=int, required=False, default=512, dest="height", help="Height of the image in pixel")
+        parser.add_argument("--width", type=int, required=False, default=512, dest="width", help="Width of the image in pixel")
+        parser.add_argument("--destination", type=str, required=True, dest="destination", help="The destination to save the output")
+        parser.add_argument("--text-encoder-layer-skip", type=int, required=False, default=0, dest="text_encoder_layer_skip", help="Skip last layers of the text encoder")
+        parser.add_argument("--sample-inpainting", action="store_true", required=False, default=False, dest="sample_inpainting", help="Enables inpainting sampling. Only available when sampling from an inpainting model.")
+        parser.add_argument("--base-image-path", type=str, required=False, default="", dest="base_image_path", help="The base image used when inpainting")
+        parser.add_argument("--mask-image-path", type=str, required=False, default="", dest="mask_image_path", help="The mask used when inpainting.")
 
         # @formatter:on
 
@@ -129,7 +64,7 @@ class SampleArgs(BaseArgs):
         return args
 
     @staticmethod
-    def default_values() -> "SampleArgs":
+    def default_values() -> 'SampleArgs':
         data = []
 
         # name, default value, data type, nullable

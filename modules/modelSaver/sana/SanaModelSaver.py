@@ -16,10 +16,10 @@ class SanaModelSaver(
         super().__init__()
 
     def __save_diffusers(
-        self,
-        model: SanaModel,
-        destination: str,
-        dtype: torch.dtype | None,
+            self,
+            model: SanaModel,
+            destination: str,
+            dtype: torch.dtype | None,
     ):
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
         pipeline = model.create_pipeline()
@@ -34,7 +34,7 @@ class SanaModelSaver(
             save_pipeline = copy.deepcopy(pipeline)
             save_pipeline.to(device="cpu", dtype=dtype, silence_dtype_warnings=True)
 
-            delattr(tokenizer, "__deepcopy__")
+            delattr(tokenizer, '__deepcopy__')
         else:
             save_pipeline = pipeline
 
@@ -45,26 +45,26 @@ class SanaModelSaver(
             del save_pipeline
 
     def __save_safetensors(
-        self,
-        model: SanaModel,
-        destination: str,
-        dtype: torch.dtype | None,
+            self,
+            model: SanaModel,
+            destination: str,
+            dtype: torch.dtype | None,
     ):
         raise NotImplementedError
 
     def __save_internal(
-        self,
-        model: SanaModel,
-        destination: str,
+            self,
+            model: SanaModel,
+            destination: str,
     ):
         self.__save_diffusers(model, destination, None)
 
     def save(
-        self,
-        model: SanaModel,
-        output_model_format: ModelFormat,
-        output_model_destination: str,
-        dtype: torch.dtype,
+            self,
+            model: SanaModel,
+            output_model_format: ModelFormat,
+            output_model_destination: str,
+            dtype: torch.dtype,
     ):
         match output_model_format:
             case ModelFormat.DIFFUSERS:

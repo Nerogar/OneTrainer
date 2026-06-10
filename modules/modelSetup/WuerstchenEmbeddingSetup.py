@@ -16,10 +16,10 @@ class WuerstchenEmbeddingSetup(
     BaseWuerstchenSetup,
 ):
     def __init__(
-        self,
-        train_device: torch.device,
-        temp_device: torch.device,
-        debug_mode: bool,
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            debug_mode: bool,
     ):
         super().__init__(
             train_device=train_device,
@@ -28,25 +28,23 @@ class WuerstchenEmbeddingSetup(
         )
 
     def create_parameters(
-        self,
-        model: WuerstchenModel,
-        config: TrainConfig,
+            self,
+            model: WuerstchenModel,
+            config: TrainConfig,
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
         self._add_embedding_param_groups(
-            model.all_prior_text_encoder_embeddings(),
-            parameter_group_collection,
-            config.embedding_learning_rate,
-            "prior_embeddings",
+            model.all_prior_text_encoder_embeddings(), parameter_group_collection, config.embedding_learning_rate,
+            "prior_embeddings"
         )
 
         return parameter_group_collection
 
     def __setup_requires_grad(
-        self,
-        model: WuerstchenModel,
-        config: TrainConfig,
+            self,
+            model: WuerstchenModel,
+            config: TrainConfig,
     ):
         self._setup_embeddings_requires_grad(model, config)
         model.prior_text_encoder.requires_grad_(False)
@@ -58,9 +56,9 @@ class WuerstchenEmbeddingSetup(
         model.effnet_encoder.requires_grad_(False)
 
     def setup_model(
-        self,
-        model: WuerstchenModel,
-        config: TrainConfig,
+            self,
+            model: WuerstchenModel,
+            config: TrainConfig,
     ):
         model.prior_text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
@@ -73,9 +71,9 @@ class WuerstchenEmbeddingSetup(
         init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
-        self,
-        model: WuerstchenModel,
-        config: TrainConfig,
+            self,
+            model: WuerstchenModel,
+            config: TrainConfig,
     ):
         effnet_on_train_device = not config.latent_caching
 
@@ -97,12 +95,16 @@ class WuerstchenEmbeddingSetup(
         model.prior_text_encoder.eval()
         model.prior_prior.eval()
 
-    def after_optimizer_step(self, model: WuerstchenModel, config: TrainConfig, train_progress: TrainProgress):
+    def after_optimizer_step(
+            self,
+            model: WuerstchenModel,
+            config: TrainConfig,
+            train_progress: TrainProgress
+    ):
         if config.preserve_embedding_norm:
             self._normalize_output_embeddings(model.all_prior_text_encoder_embeddings())
             model.prior_embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
 
 factory.register(BaseModelSetup, WuerstchenEmbeddingSetup, ModelType.WUERSTCHEN_2, TrainingMethod.EMBEDDING)
 factory.register(BaseModelSetup, WuerstchenEmbeddingSetup, ModelType.STABLE_CASCADE_1, TrainingMethod.EMBEDDING)

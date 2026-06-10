@@ -47,31 +47,24 @@ class BasePixArtAlphaSetup(
         super().__init__(train_device, temp_device, debug_mode)
 
     def setup_optimizations(
-        self,
-        model: PixArtAlphaModel,
-        config: TrainConfig,
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
     ):
         if config.gradient_checkpointing.enabled():
             model.vae.enable_gradient_checkpointing()
-            model.transformer_offload_conductor = enable_checkpointing_for_basic_transformer_blocks(
-                model.transformer, config, offload_enabled=True
-            )
-            model.text_encoder_offload_conductor = enable_checkpointing_for_t5_encoder_layers(
-                model.text_encoder, config
-            )
+            model.transformer_offload_conductor = \
+                enable_checkpointing_for_basic_transformer_blocks(model.transformer, config, offload_enabled=True)
+            model.text_encoder_offload_conductor = \
+                enable_checkpointing_for_t5_encoder_layers(model.text_encoder, config)
 
-        model.autocast_context, model.train_dtype = create_autocast_context(
-            self.train_device,
-            config.train_dtype,
-            [
-                config.weight_dtypes().transformer,
-                config.weight_dtypes().text_encoder,
-                config.weight_dtypes().vae,
-                config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-                config.weight_dtypes().embedding if config.train_any_embedding() else None,
-            ],
-            config.enable_autocast_cache,
-        )
+        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
+            config.weight_dtypes().transformer,
+            config.weight_dtypes().text_encoder,
+            config.weight_dtypes().vae,
+            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
+            config.weight_dtypes().embedding if config.train_any_embedding() else None,
+        ], config.enable_autocast_cache)
 
         model.text_encoder_autocast_context, model.text_encoder_train_dtype = disable_fp16_autocast_context(
             self.train_device,
@@ -90,9 +83,9 @@ class BasePixArtAlphaSetup(
         quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
 
     def _setup_embeddings(
-        self,
-        model: PixArtAlphaModel,
-        config: TrainConfig,
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
     ):
         additional_embeddings = []
         for embedding_config in config.all_embedding_configs():
@@ -126,16 +119,16 @@ class BasePixArtAlphaSetup(
             if embedding_config.uuid == config.embedding.uuid:
                 model.embedding = embedding
             else:
-                (additional_embeddings.append(embedding),)
+                additional_embeddings.append(embedding),
 
         model.additional_embeddings = additional_embeddings
 
         self._add_embeddings_to_tokenizer(model.tokenizer, model.all_text_encoder_embeddings())
 
     def _setup_embedding_wrapper(
-        self,
-        model: PixArtAlphaModel,
-        config: TrainConfig,
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
     ):
         model.embedding_wrapper = AdditionalEmbeddingWrapper(
             tokenizer=model.tokenizer,
@@ -145,26 +138,25 @@ class BasePixArtAlphaSetup(
         model.embedding_wrapper.hook_to_module()
 
     def _setup_embeddings_requires_grad(
-        self,
-        model: PixArtAlphaModel,
-        config: TrainConfig,
+            self,
+            model: PixArtAlphaModel,
+            config: TrainConfig,
     ):
-        for embedding, embedding_config in zip(
-            model.all_text_encoder_embeddings(), config.all_embedding_configs(), strict=True
-        ):
-            train_embedding = embedding_config.train and not self.stop_embedding_training_elapsed(
-                embedding_config, model.train_progress
-            )
+        for embedding, embedding_config in zip(model.all_text_encoder_embeddings(),
+                                               config.all_embedding_configs(), strict=True):
+            train_embedding = \
+                embedding_config.train \
+                and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
             embedding.requires_grad_(train_embedding)
 
     def predict(
-        self,
-        model: PixArtAlphaModel,
-        batch: dict,
-        config: TrainConfig,
-        train_progress: TrainProgress,
-        *,
-        deterministic: bool = False,
+            self,
+            model: PixArtAlphaModel,
+            batch: dict,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+            *,
+            deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
             batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
@@ -172,32 +164,31 @@ class BasePixArtAlphaSetup(
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
 
-            vae_scaling_factor = model.vae.config["scaling_factor"]
+            vae_scaling_factor = model.vae.config['scaling_factor']
 
             text_encoder_output, text_encoder_attention_mask = model.encode_text(
                 train_device=self.train_device,
-                batch_size=batch["latent_image"].shape[0],
+                batch_size=batch['latent_image'].shape[0],
                 rand=rand,
-                tokens=batch["tokens"],
+                tokens=batch['tokens'],
                 text_encoder_layer_skip=config.text_encoder_layer_skip,
-                text_encoder_output=batch["text_encoder_hidden_state"]
-                if not config.train_text_encoder_or_embedding()
-                else None,
-                attention_mask=batch["tokens_mask"],
+                text_encoder_output=batch[
+                    'text_encoder_hidden_state'] if not config.train_text_encoder_or_embedding() else None,
+                attention_mask=batch['tokens_mask'],
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
 
-            latent_image = batch["latent_image"]
+            latent_image = batch['latent_image']
             scaled_latent_image = latent_image * vae_scaling_factor
 
             scaled_latent_conditioning_image = None
             if config.model_type.has_conditioning_image_input():
-                scaled_latent_conditioning_image = batch["latent_conditioning_image"] * vae_scaling_factor
+                scaled_latent_conditioning_image = batch['latent_conditioning_image'] * vae_scaling_factor
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
             timestep = self._get_timestep_discrete(
-                model.noise_scheduler.config["num_train_timesteps"],
+                model.noise_scheduler.config['num_train_timesteps'],
                 deterministic,
                 generator,
                 scaled_latent_image.shape[0],
@@ -213,7 +204,7 @@ class BasePixArtAlphaSetup(
 
             if config.model_type.has_mask_input() and config.model_type.has_conditioning_image_input():
                 latent_input = torch.concat(
-                    [scaled_noisy_latent_image, batch["latent_mask"], scaled_latent_conditioning_image], 1
+                    [scaled_noisy_latent_image, batch['latent_mask'], scaled_latent_conditioning_image], 1
                 )
             else:
                 latent_input = scaled_noisy_latent_image
@@ -238,19 +229,19 @@ class BasePixArtAlphaSetup(
             ).sample.chunk(2, dim=1)
 
             model_output_data = {
-                "loss_type": "target",
-                "predicted": predicted_latent_noise,
-                "target": latent_noise,
-                "noisy_latent_image": scaled_noisy_latent_image,
-                "predicted_var_values": predicted_latent_var_values,
-                "timestep": timestep,
-                "scaled_latent_image": scaled_latent_image,
+                'loss_type': 'target',
+                'predicted': predicted_latent_noise,
+                'target': latent_noise,
+                'noisy_latent_image': scaled_noisy_latent_image,
+                'predicted_var_values': predicted_latent_var_values,
+                'timestep': timestep,
+                'scaled_latent_image': scaled_latent_image,
             }
 
             if self.debug_mode:
                 with torch.no_grad():
                     self._save_text(
-                        self._decode_tokens(batch["tokens"], model.tokenizer),
+                        self._decode_tokens(batch['tokens'], model.tokenizer),
                         config.debug_dir + "/training_batches",
                         "7-prompt",
                         train_progress.global_step,
@@ -260,7 +251,10 @@ class BasePixArtAlphaSetup(
                     noise = model.vae.decode(latent_noise / vae_scaling_factor).sample
                     noise = noise.clamp(-1, 1)
                     self._save_image(
-                        noise, config.debug_dir + "/training_batches", "1-noise", train_progress.global_step
+                        noise,
+                        config.debug_dir + "/training_batches",
+                        "1-noise",
+                        train_progress.global_step
                     )
 
                     # predicted noise
@@ -270,7 +264,7 @@ class BasePixArtAlphaSetup(
                         predicted_noise,
                         config.debug_dir + "/training_batches",
                         "2-predicted_noise",
-                        train_progress.global_step,
+                        train_progress.global_step
                     )
 
                     # noisy image
@@ -278,7 +272,10 @@ class BasePixArtAlphaSetup(
                     noisy_image = model.vae.decode(noisy_latent_image).sample
                     noisy_image = noisy_image.clamp(-1, 1)
                     self._save_image(
-                        noisy_image, config.debug_dir + "/training_batches", "3-noisy_image", train_progress.global_step
+                        noisy_image,
+                        config.debug_dir + "/training_batches",
+                        "3-noisy_image",
+                        train_progress.global_step
                     )
 
                     # predicted image
@@ -289,9 +286,9 @@ class BasePixArtAlphaSetup(
                     sqrt_one_minus_alpha_prod = (1 - alphas_cumprod[timestep]) ** 0.5
                     sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten().reshape(-1, 1, 1, 1)
 
-                    scaled_predicted_latent_image = (
-                        scaled_noisy_latent_image - predicted_latent_noise * sqrt_one_minus_alpha_prod
-                    ) / sqrt_alpha_prod
+                    scaled_predicted_latent_image = \
+                        (scaled_noisy_latent_image - predicted_latent_noise
+                         * sqrt_one_minus_alpha_prod) / sqrt_alpha_prod
                     predicted_latent_image = scaled_predicted_latent_image / vae_scaling_factor
                     predicted_image = model.vae.decode(predicted_latent_image).sample
                     predicted_image = predicted_image.clamp(-1, 1)
@@ -299,38 +296,40 @@ class BasePixArtAlphaSetup(
                         predicted_image,
                         config.debug_dir + "/training_batches",
                         "4-predicted_image",
-                        model.train_progress.global_step,
+                        model.train_progress.global_step
                     )
 
                     # image
                     image = model.vae.decode(latent_image).sample
                     image = image.clamp(-1, 1)
                     self._save_image(
-                        image, config.debug_dir + "/training_batches", "5-image", model.train_progress.global_step
+                        image,
+                        config.debug_dir + "/training_batches",
+                        "5-image",
+                        model.train_progress.global_step
                     )
 
                     # conditioning image
                     if config.model_type.has_conditioning_image_input():
                         conditioning_image = model.vae.decode(
-                            scaled_latent_conditioning_image / vae_scaling_factor
-                        ).sample
+                            scaled_latent_conditioning_image / vae_scaling_factor).sample
                         conditioning_image = conditioning_image.clamp(-1, 1)
                         self._save_image(
                             conditioning_image,
                             config.debug_dir + "/training_batches",
                             "6-conditioning_image",
-                            train_progress.global_step,
+                            train_progress.global_step
                         )
 
-        model_output_data["prediction_type"] = model.noise_scheduler.config.prediction_type
+        model_output_data['prediction_type'] = model.noise_scheduler.config.prediction_type
         return model_output_data
 
     def calculate_loss(
-        self,
-        model: PixArtAlphaModel,
-        batch: dict,
-        data: dict,
-        config: TrainConfig,
+            self,
+            model: PixArtAlphaModel,
+            batch: dict,
+            data: dict,
+            config: TrainConfig,
     ) -> Tensor:
         return self._diffusion_losses(
             batch=batch,

@@ -90,21 +90,17 @@ class CheckpointLayer(BaseCheckpointLayer):
     def forward(self, *args, **kwargs):
         if torch.is_grad_enabled():
             return torch.utils.checkpoint.checkpoint(
-                self.__checkpointing_forward, self.dummy, *args, **kwargs, use_reentrant=False
+                self.__checkpointing_forward,
+                self.dummy,
+                *args,
+                **kwargs,
+                use_reentrant=False
             )
         else:
             return self.orig_forward(*args, **kwargs) if self.checkpoint is None else self.checkpoint(*args, **kwargs)
 
-
 class OffloadCheckpointLayer(BaseCheckpointLayer):
-    def __init__(
-        self,
-        orig_module: nn.Module,
-        orig_forward,
-        train_device: torch.device,
-        conductor: LayerOffloadConductor,
-        layer_index: int,
-    ):
+    def __init__(self, orig_module: nn.Module, orig_forward, train_device: torch.device, conductor: LayerOffloadConductor, layer_index: int):
         super().__init__()
 
         assert (orig_module is None or orig_forward is None) and not (orig_module is None and orig_forward is None)
@@ -140,7 +136,11 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
         args = _kwargs_to_args(self.orig_forward if self.checkpoint is None else self.checkpoint.forward, args, kwargs)
         if torch.is_grad_enabled():
             return torch.utils.checkpoint.checkpoint(
-                self.__checkpointing_forward, self.dummy, call_id, *args, use_reentrant=True
+                self.__checkpointing_forward,
+                self.dummy,
+                call_id,
+                *args,
+                use_reentrant=True
             )
         else:
             if self.layer_index == 0:
@@ -151,14 +151,13 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
             self.conductor.after_layer(self.layer_index, call_id, args)
             return output
 
-
 def create_checkpoint(
-    orig_module: nn.Module,
-    train_device: torch.device,
-    include_from_offload_param_names: list[str] = None,
-    conductor: LayerOffloadConductor | None = None,
-    layer_index: int = 0,
-    compile: bool = False,
+        orig_module: nn.Module,
+        train_device: torch.device,
+        include_from_offload_param_names: list[str] = None,
+        conductor: LayerOffloadConductor | None = None,
+        layer_index: int = 0,
+        compile: bool = False,
 ) -> Callable:
     if include_from_offload_param_names is None:
         include_from_offload_param_names = []
@@ -169,31 +168,19 @@ def create_checkpoint(
 
     if conductor is not None and conductor.offload_activated():
         if compile:
-            layer = OffloadCheckpointLayer(
-                orig_module=orig_module,
-                orig_forward=None,
-                train_device=train_device,
-                conductor=conductor,
-                layer_index=layer_index,
-            )
-            # don't compile the checkpointing layer - offloading cannot be compiled:
+            layer = OffloadCheckpointLayer(orig_module=orig_module, orig_forward=None, train_device=train_device, conductor=conductor, layer_index=layer_index)
+            #don't compile the checkpointing layer - offloading cannot be compiled:
             orig_module.compile(fullgraph=True)
             return layer
         else:
-            # only patch forward() if possible. Inserting layers is necessary for torch.compile, but causes issues with at least 1 text encoder model. we don't compile text encoders
-            layer = OffloadCheckpointLayer(
-                orig_module=None,
-                orig_forward=orig_module.forward,
-                train_device=train_device,
-                conductor=conductor,
-                layer_index=layer_index,
-            )
+            #only patch forward() if possible. Inserting layers is necessary for torch.compile, but causes issues with at least 1 text encoder model. we don't compile text encoders
+            layer = OffloadCheckpointLayer(orig_module=None, orig_forward=orig_module.forward, train_device=train_device, conductor=conductor, layer_index=layer_index)
             orig_module.forward = layer.forward
             return orig_module
     else:
         if compile:
             layer = CheckpointLayer(orig_module=orig_module, orig_forward=None, train_device=train_device)
-            # do compile the checkpointing layer - slightly faster
+            #do compile the checkpointing layer - slightly faster
             layer.compile(fullgraph=True)
             return layer
         else:
@@ -201,48 +188,43 @@ def create_checkpoint(
             orig_module.forward = layer.forward
             return orig_module
 
-
 def _create_checkpoints_for_module_list(
-    module_list: nn.ModuleList,
-    include_from_offload_param_names: list[str],
-    conductor: LayerOffloadConductor,
-    train_device: torch.device,
-    layer_index: int,
-    compile: bool,
+        module_list: nn.ModuleList,
+        include_from_offload_param_names: list[str],
+        conductor: LayerOffloadConductor,
+        train_device: torch.device,
+        layer_index: int,
+        compile: bool,
 ) -> int:
 
     for i, layer in enumerate(module_list):
         if isinstance(module_list[i], BaseCheckpointLayer):
             continue
         module_list[i] = create_checkpoint(
-            layer,
-            train_device,
-            include_from_offload_param_names,
-            conductor,
-            layer_index,
-            compile=compile,
-        )
+                layer, train_device,
+                include_from_offload_param_names,
+                conductor, layer_index, compile=compile,
+            )
         layer_index += 1
     return layer_index
-
 
 def _remove_checkpoint_keys(module, state_dict, prefix, local_metadata):
     for k in list(state_dict.keys()):
         if ".checkpoint." in k:
             state_dict[k.replace(".checkpoint.", ".")] = state_dict.pop(k)
 
-
 def enable_checkpointing(
-    model: nn.Module,
-    config: TrainConfig,
-    compile: bool,
-    lists,  # if there are multiple entries in this list, they must be in the exact order they are executed - otherwise offloading fails
-    offload_enabled: bool = True,
+        model: nn.Module,
+        config: TrainConfig,
+        compile: bool,
+        lists, # if there are multiple entries in this list, they must be in the exact order they are executed - otherwise offloading fails
+        offload_enabled: bool = True,
 ) -> LayerOffloadConductor:
     conductor = LayerOffloadConductor(model, config)
 
     layer_index = 0
     for type_or_list, param_names in lists:
+
         assert isinstance(type_or_list, (nn.ModuleList, type))
         if isinstance(type_or_list, nn.ModuleList):
             module_list = type_or_list
@@ -252,7 +234,7 @@ def enable_checkpointing(
                 conductor if offload_enabled else None,
                 torch.device(config.train_device),
                 layer_index,
-                compile=compile,
+                compile = compile,
             )
         else:
             t = type_or_list
@@ -266,294 +248,179 @@ def enable_checkpointing(
                         conductor if offload_enabled else None,
                         torch.device(config.train_device),
                         layer_index,
-                        compile=compile,
+                        compile = compile,
                     )
     model._register_state_dict_hook(_remove_checkpoint_keys)
     return conductor
 
-
 def enable_checkpointing_for_basic_transformer_blocks(
-    model: nn.Module,
-    config: TrainConfig,
-    offload_enabled: bool,
+        model: nn.Module,
+        config: TrainConfig,
+        offload_enabled: bool,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        config.compile,
-        [
-            (BasicTransformerBlock, []),
+    return enable_checkpointing(model, config, config.compile, [
+            (BasicTransformerBlock  ,        []),
         ],
-        offload_enabled=offload_enabled,
+        offload_enabled = offload_enabled,
     )
-
 
 def enable_checkpointing_for_clip_encoder_layers(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ):
-    return enable_checkpointing(
-        model,
-        config,
-        False,
-        [
-            (
-                CLIPEncoderLayer,
-                [],
-            ),  # No activation offloading for text encoders, because the output might be taken from the middle of the network
-        ],
-    )
-
+    return enable_checkpointing(model, config, False, [
+        (CLIPEncoderLayer, []), # No activation offloading for text encoders, because the output might be taken from the middle of the network
+    ])
 
 def enable_checkpointing_for_stable_cascade_blocks(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        config.compile,
-        [
-            (SDCascadeResBlock, []),
-            (SDCascadeAttnBlock, []),
-            (SDCascadeTimestepBlock, []),
-        ],
-    )
-
+    return enable_checkpointing(model, config, config.compile, [
+        (SDCascadeResBlock, []),
+        (SDCascadeAttnBlock, []),
+        (SDCascadeTimestepBlock, []),
+    ])
 
 def enable_checkpointing_for_t5_encoder_layers(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        False,
-        [
-            (T5Block, []),
-        ],
-    )
+    return enable_checkpointing(model, config, False, [
+        (T5Block, []),
+    ])
 
 
 def enable_checkpointing_for_gemma_layers(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        False,
-        [
-            (Gemma2DecoderLayer, []),
-        ],
-    )
+    return enable_checkpointing(model, config, False, [
+        (Gemma2DecoderLayer, []),
+    ])
 
 
 def enable_checkpointing_for_llama_encoder_layers(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        False,
-        [
-            (LlamaDecoderLayer, []),
-        ],
-    )
-
+    return enable_checkpointing(model, config, False, [
+        (LlamaDecoderLayer, []),
+    ])
 
 def enable_checkpointing_for_mistral_encoder_layers(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        False,
-        [
-            (MistralDecoderLayer, []),
-        ],
-    )
+    return enable_checkpointing(model, config, False, [
+        (MistralDecoderLayer, []),
+    ])
+
 
 
 def enable_checkpointing_for_qwen25vl_encoder_layers(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        False,
-        [
-            (
-                Qwen2_5_VLDecoderLayer,
-                [],
-            ),  # TODO No activation offloading for other encoders, see above. But clip skip is not implemented for QwenVL. Then do activation offloading?
-        ],
-    )
-
+    return enable_checkpointing(model, config, False, [
+        (Qwen2_5_VLDecoderLayer, []),  # TODO No activation offloading for other encoders, see above. But clip skip is not implemented for QwenVL. Then do activation offloading?
+    ])
 
 def enable_checkpointing_for_qwen3_encoder_layers(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        False,
-        [
-            (
-                Qwen3DecoderLayer,
-                [],
-            ),  # No activation offloading, because hidden states are taken from the middle of the network by Flux2
-        ],
-    )
-
+    return enable_checkpointing(model, config, False, [
+        (Qwen3DecoderLayer, []),  # No activation offloading, because hidden states are taken from the middle of the network by Flux2
+    ])
 
 def enable_checkpointing_for_stable_diffusion_3_transformer(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        config.compile,
-        [
-            (JointTransformerBlock, ["hidden_states", "encoder_hidden_states"]),
-        ],
-    )
-
+    return enable_checkpointing(model, config, config.compile, [
+        (JointTransformerBlock, ["hidden_states", "encoder_hidden_states"]),
+    ])
 
 def enable_checkpointing_for_flux_transformer(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        config.compile,
-        [
-            (model.transformer_blocks, ["hidden_states", "encoder_hidden_states"]),
-            (model.single_transformer_blocks, ["hidden_states"]),
-        ],
-    )
-
+    return enable_checkpointing(model, config, config.compile, [
+        (model.transformer_blocks,        ["hidden_states", "encoder_hidden_states"]),
+        (model.single_transformer_blocks, ["hidden_states"                         ]),
+    ])
 
 def enable_checkpointing_for_flux2_transformer(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        config.compile,
-        [
-            (model.transformer_blocks, ["hidden_states", "encoder_hidden_states"]),
-            (model.single_transformer_blocks, ["hidden_states"]),
-        ],
-    )
+    return enable_checkpointing(model, config, config.compile, [
+        (model.transformer_blocks,        ["hidden_states", "encoder_hidden_states"]),
+        (model.single_transformer_blocks, ["hidden_states"                         ]),
+    ])
 
 
 def enable_checkpointing_for_chroma_transformer(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        config.compile,
-        [
-            (model.transformer_blocks, ["hidden_states", "encoder_hidden_states"]),
-            (model.single_transformer_blocks, ["hidden_states"]),
-        ],
-    )
+    return enable_checkpointing(model, config, config.compile, [
+        (model.transformer_blocks,        ["hidden_states", "encoder_hidden_states"]),
+        (model.single_transformer_blocks, ["hidden_states"                         ]),
+    ])
 
 
 def enable_checkpointing_for_qwen_transformer(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        config.compile,
-        [
-            (model.transformer_blocks, ["hidden_states", "encoder_hidden_states"]),
-        ],
-    )
-
+    return enable_checkpointing(model, config, config.compile, [
+        (model.transformer_blocks, ["hidden_states", "encoder_hidden_states"]),
+    ])
 
 def enable_checkpointing_for_z_image_transformer(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        config.compile,
-        [
-            (model.noise_refiner, ["x"]),
-            (model.context_refiner, ["x"]),
-            (model.layers, ["x"]),
-        ],
-    )
+    return enable_checkpointing(model, config, config.compile, [
+        (model.noise_refiner, ["x"]),
+        (model.context_refiner, ["x"]),
+        (model.layers, ["x"]),
+    ])
 
 
 def enable_checkpointing_for_sana_transformer(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        config.compile,
-        [
-            (SanaTransformerBlock, ["hidden_states"]),
-        ],
-    )
-
+    return enable_checkpointing(model, config, config.compile, [
+        (SanaTransformerBlock, ["hidden_states"]),
+    ])
 
 def enable_checkpointing_for_hunyuan_video_transformer(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        config.compile,
-        [
-            (HunyuanVideoIndividualTokenRefinerBlock, ["hidden_states"]),
-            (HunyuanVideoTransformerBlock, ["hidden_states", "encoder_hidden_states"]),
-            (HunyuanVideoSingleTransformerBlock, ["hidden_states"]),
-        ],
-    )
-
+    return enable_checkpointing(model, config, config.compile, [
+        (HunyuanVideoIndividualTokenRefinerBlock, ["hidden_states"                         ]),
+        (HunyuanVideoTransformerBlock,            ["hidden_states", "encoder_hidden_states"]),
+        (HunyuanVideoSingleTransformerBlock,      ["hidden_states"                         ]),
+    ])
 
 def enable_checkpointing_for_hi_dream_transformer(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        config.compile,
-        [
-            (HiDreamImageTransformerBlock, ["hidden_states", "encoder_hidden_states"]),
-            (HiDreamImageSingleTransformerBlock, ["hidden_states"]),
-        ],
-    )
-
+    return enable_checkpointing(model, config, config.compile, [
+        (HiDreamImageTransformerBlock,       ["hidden_states", "encoder_hidden_states"]),
+        (HiDreamImageSingleTransformerBlock, ["hidden_states"                         ]),
+    ])
 
 def enable_checkpointing_for_ernie_transformer(
-    model: nn.Module,
-    config: TrainConfig,
+        model: nn.Module,
+        config: TrainConfig,
 ) -> LayerOffloadConductor:
-    return enable_checkpointing(
-        model,
-        config,
-        config.compile,
-        [
-            (model.layers, ["x"]),
-        ],
-    )
+    return enable_checkpointing(model, config, config.compile, [
+        (model.layers, ["x"]),
+    ])

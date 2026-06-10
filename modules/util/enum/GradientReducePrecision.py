@@ -4,10 +4,10 @@ import torch
 
 
 class GradientReducePrecision(Enum):
-    WEIGHT_DTYPE = "WEIGHT_DTYPE"
-    FLOAT_32 = "FLOAT_32"
-    WEIGHT_DTYPE_STOCHASTIC = "WEIGHT_DTYPE_STOCHASTIC"
-    FLOAT_32_STOCHASTIC = "FLOAT_32_STOCHASTIC"
+    WEIGHT_DTYPE = 'WEIGHT_DTYPE'
+    FLOAT_32 = 'FLOAT_32'
+    WEIGHT_DTYPE_STOCHASTIC = 'WEIGHT_DTYPE_STOCHASTIC'
+    FLOAT_32_STOCHASTIC = 'FLOAT_32_STOCHASTIC'
 
     def torch_dtype(self, weight_dtype: torch.dtype) -> torch.dtype:
         match self:

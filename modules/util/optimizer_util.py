@@ -50,13 +50,13 @@ def update_optimizer_config(train_config: TrainConfig):
 
 
 def init_model_parameters(
-    model: BaseModel,
-    parameters: NamedParameterGroupCollection,
-    train_device: torch.device,
+        model: BaseModel,
+        parameters: NamedParameterGroupCollection,
+        train_device: torch.device,
 ):
     model.parameters = parameters
-    # random (LoRA) initialisation can differ, broadcast from GPU #0 to all others
-    # to be safe, do that before the optimizer is created because the optimizer could take copies
+    #random (LoRA) initialisation can differ, broadcast from GPU #0 to all others
+    #to be safe, do that before the optimizer is created because the optimizer could take copies
     multi.broadcast_parameters(parameters.parameters(), train_device)
 
     layer_key_fn = None
@@ -64,7 +64,9 @@ def init_model_parameters(
         print("INFO: Creating layer keys for MuonWithAuxAdam.")
         layer_key_fn = build_muon_adam_key_fn(model, model.train_config)
 
-    model.optimizer = create.create_optimizer(parameters, model.optimizer_state_dict, model.train_config, layer_key_fn)
+    model.optimizer = create.create_optimizer(
+        parameters, model.optimizer_state_dict, model.train_config, layer_key_fn
+    )
 
     if model.optimizer is not None:
         optimizer_to_device_(model.optimizer, train_device)
@@ -76,12 +78,12 @@ def init_model_parameters(
         model.ema = None
     model.ema_state_dict = None
 
-    if model.optimizer is not None and any("optim_type" in g for g in model.optimizer.param_groups):
+    if model.optimizer is not None and any('optim_type' in g for g in model.optimizer.param_groups):
         new_param_group_mapping = []
         for group in model.optimizer.param_groups:
-            original_name = group.get("name")
+            original_name = group.get('name')
 
-            optim_type = group.get("optim_type", "unknown")
+            optim_type = group.get('optim_type', 'unknown')
             unique_name = f"{original_name}_{optim_type}"
             new_param_group_mapping.append(unique_name)
         model.param_group_mapping = new_param_group_mapping
@@ -302,7 +304,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "safeguard_warmup": False,
         "d0": 1e-6,
         "d_coef": 1.0,
-        "growth_rate": float("inf"),
+        "growth_rate": float('inf'),
         "fsdp_in_use": False,
         "slice_p": 11,
     },
@@ -339,7 +341,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "weight_decay": 0.0,
         "eps": 0.0,
         "d0": 1e-6,
-        "growth_rate": float("inf"),
+        "growth_rate": float('inf'),
     },
     Optimizer.DADAPT_ADAN: {
         "beta1": 0.98,
@@ -350,7 +352,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "no_prox": False,
         "log_every": 0,
         "d0": 1e-6,
-        "growth_rate": float("inf"),
+        "growth_rate": float('inf'),
     },
     Optimizer.DADAPT_ADAM: {
         "beta1": 0.9,
@@ -361,7 +363,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "decouple": False,
         "use_bias_correction": False,
         "d0": 1e-6,
-        "growth_rate": float("inf"),
+        "growth_rate": float('inf'),
         "fsdp_in_use": False,
     },
     Optimizer.DADAPT_SGD: {
@@ -369,7 +371,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "weight_decay": 0,
         "log_every": 0,
         "d0": 1e-6,
-        "growth_rate": float("inf"),
+        "growth_rate": float('inf'),
         "fsdp_in_use": False,
     },
     Optimizer.DADAPT_LION: {
@@ -444,7 +446,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "stochastic_rounding": False,
         "fused_back_pass": False,
         "min_8bit_size": 16384,
-        "quant_block_size": 2048,
+        "quant_block_size": 2048
     },
     Optimizer.ADAMW_ADV: {
         "beta1": 0.9,
@@ -495,7 +497,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "fused_back_pass": False,
         "d0": 1e-6,
         "d_coef": 1.0,
-        "growth_rate": float("inf"),
+        "growth_rate": float('inf'),
         "slice_p": 11,
         "prodigy_steps": 0,
         "d_limiter": False,

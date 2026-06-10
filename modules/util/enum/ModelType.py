@@ -2,74 +2,76 @@ from enum import Enum
 
 
 class ModelType(Enum):
-    STABLE_DIFFUSION_15 = "STABLE_DIFFUSION_15"
-    STABLE_DIFFUSION_15_INPAINTING = "STABLE_DIFFUSION_15_INPAINTING"
-    STABLE_DIFFUSION_20 = "STABLE_DIFFUSION_20"
-    STABLE_DIFFUSION_20_BASE = "STABLE_DIFFUSION_20_BASE"
-    STABLE_DIFFUSION_20_INPAINTING = "STABLE_DIFFUSION_20_INPAINTING"
-    STABLE_DIFFUSION_20_DEPTH = "STABLE_DIFFUSION_20_DEPTH"
-    STABLE_DIFFUSION_21 = "STABLE_DIFFUSION_21"
-    STABLE_DIFFUSION_21_BASE = "STABLE_DIFFUSION_21_BASE"
+    STABLE_DIFFUSION_15 = 'STABLE_DIFFUSION_15'
+    STABLE_DIFFUSION_15_INPAINTING = 'STABLE_DIFFUSION_15_INPAINTING'
+    STABLE_DIFFUSION_20 = 'STABLE_DIFFUSION_20'
+    STABLE_DIFFUSION_20_BASE = 'STABLE_DIFFUSION_20_BASE'
+    STABLE_DIFFUSION_20_INPAINTING = 'STABLE_DIFFUSION_20_INPAINTING'
+    STABLE_DIFFUSION_20_DEPTH = 'STABLE_DIFFUSION_20_DEPTH'
+    STABLE_DIFFUSION_21 = 'STABLE_DIFFUSION_21'
+    STABLE_DIFFUSION_21_BASE = 'STABLE_DIFFUSION_21_BASE'
 
-    STABLE_DIFFUSION_3 = "STABLE_DIFFUSION_3"
-    STABLE_DIFFUSION_35 = "STABLE_DIFFUSION_35"
+    STABLE_DIFFUSION_3 = 'STABLE_DIFFUSION_3'
+    STABLE_DIFFUSION_35 = 'STABLE_DIFFUSION_35'
 
-    STABLE_DIFFUSION_XL_10_BASE = "STABLE_DIFFUSION_XL_10_BASE"
-    STABLE_DIFFUSION_XL_10_BASE_INPAINTING = "STABLE_DIFFUSION_XL_10_BASE_INPAINTING"
+    STABLE_DIFFUSION_XL_10_BASE = 'STABLE_DIFFUSION_XL_10_BASE'
+    STABLE_DIFFUSION_XL_10_BASE_INPAINTING = 'STABLE_DIFFUSION_XL_10_BASE_INPAINTING'
 
-    WUERSTCHEN_2 = "WUERSTCHEN_2"
-    STABLE_CASCADE_1 = "STABLE_CASCADE_1"
+    WUERSTCHEN_2 = 'WUERSTCHEN_2'
+    STABLE_CASCADE_1 = 'STABLE_CASCADE_1'
 
-    PIXART_ALPHA = "PIXART_ALPHA"
-    PIXART_SIGMA = "PIXART_SIGMA"
+    PIXART_ALPHA = 'PIXART_ALPHA'
+    PIXART_SIGMA = 'PIXART_SIGMA'
 
-    FLUX_DEV_1 = "FLUX_DEV_1"
-    FLUX_FILL_DEV_1 = "FLUX_FILL_DEV_1"
-    FLUX_2 = "FLUX_2"
+    FLUX_DEV_1 = 'FLUX_DEV_1'
+    FLUX_FILL_DEV_1 = 'FLUX_FILL_DEV_1'
+    FLUX_2 = 'FLUX_2'
 
-    SANA = "SANA"
+    SANA = 'SANA'
 
-    HUNYUAN_VIDEO = "HUNYUAN_VIDEO"
+    HUNYUAN_VIDEO = 'HUNYUAN_VIDEO'
 
-    HI_DREAM_FULL = "HI_DREAM_FULL"
+    HI_DREAM_FULL = 'HI_DREAM_FULL'
 
-    CHROMA_1 = "CHROMA_1"
+    CHROMA_1 = 'CHROMA_1'
 
-    QWEN = "QWEN"
+    QWEN = 'QWEN'
 
-    Z_IMAGE = "Z_IMAGE"
+    Z_IMAGE = 'Z_IMAGE'
 
-    ERNIE = "ERNIE"
+    ERNIE = 'ERNIE'
 
     def __str__(self):
         return self.value
 
     def is_stable_diffusion(self):
-        return (
-            self == ModelType.STABLE_DIFFUSION_15
-            or self == ModelType.STABLE_DIFFUSION_15_INPAINTING
-            or self == ModelType.STABLE_DIFFUSION_20
-            or self == ModelType.STABLE_DIFFUSION_20_BASE
-            or self == ModelType.STABLE_DIFFUSION_20_INPAINTING
-            or self == ModelType.STABLE_DIFFUSION_20_DEPTH
-            or self == ModelType.STABLE_DIFFUSION_21
+        return self == ModelType.STABLE_DIFFUSION_15 \
+            or self == ModelType.STABLE_DIFFUSION_15_INPAINTING \
+            or self == ModelType.STABLE_DIFFUSION_20 \
+            or self == ModelType.STABLE_DIFFUSION_20_BASE \
+            or self == ModelType.STABLE_DIFFUSION_20_INPAINTING \
+            or self == ModelType.STABLE_DIFFUSION_20_DEPTH \
+            or self == ModelType.STABLE_DIFFUSION_21 \
             or self == ModelType.STABLE_DIFFUSION_21_BASE
-        )
 
     def is_stable_diffusion_xl(self):
-        return self == ModelType.STABLE_DIFFUSION_XL_10_BASE or self == ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING
+        return self == ModelType.STABLE_DIFFUSION_XL_10_BASE \
+            or self == ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING
 
     def is_stable_diffusion_3(self):
-        return self == ModelType.STABLE_DIFFUSION_3 or self == ModelType.STABLE_DIFFUSION_35
+        return self == ModelType.STABLE_DIFFUSION_3 \
+            or self == ModelType.STABLE_DIFFUSION_35
 
     def is_stable_diffusion_3_5(self):
         return self == ModelType.STABLE_DIFFUSION_35
 
     def is_wuerstchen(self):
-        return self == ModelType.WUERSTCHEN_2 or self == ModelType.STABLE_CASCADE_1
+        return self == ModelType.WUERSTCHEN_2 \
+            or self == ModelType.STABLE_CASCADE_1
 
     def is_pixart(self):
-        return self == ModelType.PIXART_ALPHA or self == ModelType.PIXART_SIGMA
+        return self == ModelType.PIXART_ALPHA \
+            or self == ModelType.PIXART_SIGMA
 
     def is_pixart_alpha(self):
         return self == ModelType.PIXART_ALPHA
@@ -78,10 +80,13 @@ class ModelType(Enum):
         return self == ModelType.PIXART_SIGMA
 
     def is_flux(self):
-        return self == ModelType.FLUX_DEV_1 or self == ModelType.FLUX_FILL_DEV_1 or self == ModelType.FLUX_2
+        return self == ModelType.FLUX_DEV_1 \
+            or self == ModelType.FLUX_FILL_DEV_1 \
+            or self == ModelType.FLUX_2
 
     def is_flux_1(self):
-        return self == ModelType.FLUX_DEV_1 or self == ModelType.FLUX_FILL_DEV_1
+        return self == ModelType.FLUX_DEV_1 \
+            or self == ModelType.FLUX_FILL_DEV_1
 
     def is_flux_2(self):
         return self == ModelType.FLUX_2
@@ -108,45 +113,38 @@ class ModelType(Enum):
         return self == ModelType.ERNIE
 
     def has_mask_input(self) -> bool:
-        return (
-            self == ModelType.STABLE_DIFFUSION_15_INPAINTING
-            or self == ModelType.STABLE_DIFFUSION_20_INPAINTING
-            or self == ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING
+        return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \
+            or self == ModelType.STABLE_DIFFUSION_20_INPAINTING \
+            or self == ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING \
             or self == ModelType.FLUX_FILL_DEV_1
-        )
 
     def has_conditioning_image_input(self) -> bool:
-        return (
-            self == ModelType.STABLE_DIFFUSION_15_INPAINTING
-            or self == ModelType.STABLE_DIFFUSION_20_INPAINTING
-            or self == ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING
+        return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \
+            or self == ModelType.STABLE_DIFFUSION_20_INPAINTING \
+            or self == ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING \
             or self == ModelType.FLUX_FILL_DEV_1
-        )
 
     def has_depth_input(self):
         return self == ModelType.STABLE_DIFFUSION_20_DEPTH
 
     def has_multiple_text_encoders(self):
-        return (
-            self.is_stable_diffusion_3()
-            or self.is_stable_diffusion_xl()
-            or self.is_flux_1()
-            or self.is_hunyuan_video()
-            or self.is_hi_dream()
-        )
+        return self.is_stable_diffusion_3() \
+            or self.is_stable_diffusion_xl() \
+            or self.is_flux_1() \
+            or self.is_hunyuan_video() \
+            or self.is_hi_dream() \
 
     def is_sd_v1(self):
-        return self == ModelType.STABLE_DIFFUSION_15 or self == ModelType.STABLE_DIFFUSION_15_INPAINTING
+        return self == ModelType.STABLE_DIFFUSION_15 \
+            or self == ModelType.STABLE_DIFFUSION_15_INPAINTING
 
     def is_sd_v2(self):
-        return (
-            self == ModelType.STABLE_DIFFUSION_20
-            or self == ModelType.STABLE_DIFFUSION_20_BASE
-            or self == ModelType.STABLE_DIFFUSION_20_INPAINTING
-            or self == ModelType.STABLE_DIFFUSION_20_DEPTH
-            or self == ModelType.STABLE_DIFFUSION_21
+        return self == ModelType.STABLE_DIFFUSION_20 \
+            or self == ModelType.STABLE_DIFFUSION_20_BASE \
+            or self == ModelType.STABLE_DIFFUSION_20_INPAINTING \
+            or self == ModelType.STABLE_DIFFUSION_20_DEPTH \
+            or self == ModelType.STABLE_DIFFUSION_21 \
             or self == ModelType.STABLE_DIFFUSION_21_BASE
-        )
 
     def is_wuerstchen_v2(self):
         return self == ModelType.WUERSTCHEN_2
@@ -155,27 +153,25 @@ class ModelType(Enum):
         return self == ModelType.STABLE_CASCADE_1
 
     def is_flow_matching(self) -> bool:
-        return (
-            self.is_stable_diffusion_3()
-            or self.is_flux()
-            or self.is_chroma()
-            or self.is_qwen()
-            or self.is_sana()
-            or self.is_hunyuan_video()
-            or self.is_hi_dream()
-            or self.is_z_image()
+        return self.is_stable_diffusion_3() \
+            or self.is_flux() \
+            or self.is_chroma() \
+            or self.is_qwen() \
+            or self.is_sana() \
+            or self.is_hunyuan_video() \
+            or self.is_hi_dream() \
+            or self.is_z_image() \
             or self.is_ernie()
-        )
 
     def is_video_model(self) -> bool:
-        return self.is_hunyuan_video()  # incase we add more video models in the future
+        return self.is_hunyuan_video() #incase we add more video models in the future
 
 
 class PeftType(Enum):
-    LORA = "LORA"
-    LOHA = "LOHA"
-    OFT_2 = "OFT_2"
-    LOKR = "LOKR"
+    LORA = 'LORA'
+    LOHA = 'LOHA'
+    OFT_2 = 'OFT_2'
+    LOKR = 'LOKR'
 
     def __str__(self):
         return self.value

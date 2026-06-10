@@ -21,11 +21,11 @@ from tqdm import tqdm
 
 class HiDreamSampler(BaseModelSampler):
     def __init__(
-        self,
-        train_device: torch.device,
-        temp_device: torch.device,
-        model: HiDreamModel,
-        model_type: ModelType,
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            model: HiDreamModel,
+            model_type: ModelType,
     ):
         super().__init__(train_device, temp_device)
 
@@ -35,19 +35,19 @@ class HiDreamSampler(BaseModelSampler):
 
     @torch.no_grad()
     def __sample_base(
-        self,
-        prompt: str,
-        negative_prompt: str,
-        height: int,
-        width: int,
-        seed: int,
-        random_seed: bool,
-        diffusion_steps: int,
-        cfg_scale: float,
-        noise_scheduler: NoiseScheduler,
-        text_encoder_3_layer_skip: int = 0,
-        transformer_attention_mask: bool = False,
-        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+            self,
+            prompt: str,
+            negative_prompt: str,
+            height: int,
+            width: int,
+            seed: int,
+            random_seed: bool,
+            diffusion_steps: int,
+            cfg_scale: float,
+            noise_scheduler: NoiseScheduler,
+            text_encoder_3_layer_skip: int = 0,
+            transformer_attention_mask: bool = False,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
             generator = torch.Generator(device=self.train_device)
@@ -66,39 +66,30 @@ class HiDreamSampler(BaseModelSampler):
             # prepare prompt
             self.model.text_encoder_to(self.train_device)
 
-            text_encoder_3_prompt_embedding, text_encoder_4_prompt_embedding, pooled_prompt_embedding = (
+            text_encoder_3_prompt_embedding, text_encoder_4_prompt_embedding, pooled_prompt_embedding = \
                 self.model.combine_text_encoder_output(
                     *self.model.encode_text(
                         text=prompt,
                         train_device=self.train_device,
                         text_encoder_3_layer_skip=text_encoder_3_layer_skip,
                         apply_attention_mask=transformer_attention_mask,
-                    )
-                )
-            )
+                    ))
 
-            (
-                negative_text_encoder_3_prompt_embedding,
-                negative_text_encoder_4_prompt_embedding,
-                negative_pooled_prompt_embedding,
-            ) = self.model.combine_text_encoder_output(
-                *self.model.encode_text(
-                    text=negative_prompt,
-                    train_device=self.train_device,
-                    text_encoder_3_layer_skip=text_encoder_3_layer_skip,
-                    apply_attention_mask=transformer_attention_mask,
-                )
-            )
+            negative_text_encoder_3_prompt_embedding, negative_text_encoder_4_prompt_embedding, negative_pooled_prompt_embedding = \
+                self.model.combine_text_encoder_output(
+                    *self.model.encode_text(
+                        text=negative_prompt,
+                        train_device=self.train_device,
+                        text_encoder_3_layer_skip=text_encoder_3_layer_skip,
+                        apply_attention_mask=transformer_attention_mask,
+                    ))
 
             combined_text_encoder_3_prompt_embedding = torch.cat(
-                [negative_text_encoder_3_prompt_embedding, text_encoder_3_prompt_embedding], dim=0
-            )
+                [negative_text_encoder_3_prompt_embedding, text_encoder_3_prompt_embedding], dim=0)
             combined_text_encoder_4_prompt_embedding = torch.cat(
-                [negative_text_encoder_4_prompt_embedding, text_encoder_4_prompt_embedding], dim=1
-            )
+                [negative_text_encoder_4_prompt_embedding, text_encoder_4_prompt_embedding], dim=1)
             combined_pooled_prompt_embedding = torch.cat(
-                [negative_pooled_prompt_embedding, pooled_prompt_embedding], dim=0
-            )
+                [negative_pooled_prompt_embedding, pooled_prompt_embedding], dim=0)
 
             self.model.text_encoder_to(self.temp_device)
             torch_gc()
@@ -129,16 +120,13 @@ class HiDreamSampler(BaseModelSampler):
                     noise_pred = transformer(
                         hidden_states=latent_model_input.to(dtype=self.model.transformer_train_dtype.torch_dtype()),
                         timesteps=expanded_timestep,
-                        encoder_hidden_states_t5=combined_text_encoder_3_prompt_embedding.to(
-                            dtype=self.model.transformer_train_dtype.torch_dtype()
-                        ),
-                        encoder_hidden_states_llama3=combined_text_encoder_4_prompt_embedding.to(
-                            dtype=self.model.transformer_train_dtype.torch_dtype()
-                        ),
-                        pooled_embeds=combined_pooled_prompt_embedding.to(
-                            dtype=self.model.transformer_train_dtype.torch_dtype()
-                        ),
-                        return_dict=True,
+                        encoder_hidden_states_t5=combined_text_encoder_3_prompt_embedding \
+                            .to(dtype=self.model.transformer_train_dtype.torch_dtype()),
+                        encoder_hidden_states_llama3=combined_text_encoder_4_prompt_embedding \
+                            .to(dtype=self.model.transformer_train_dtype.torch_dtype()),
+                        pooled_embeds=combined_pooled_prompt_embedding \
+                            .to(dtype=self.model.transformer_train_dtype.torch_dtype()),
+                        return_dict=True
                     ).sample
                 noise_pred = -noise_pred
 
@@ -163,7 +151,7 @@ class HiDreamSampler(BaseModelSampler):
             image = vae.decode(latents, return_dict=False)[0]
 
             do_denormalize = [True] * image.shape[0]
-            image = image_processor.postprocess(image, output_type="pil", do_denormalize=do_denormalize)
+            image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
             self.model.vae_to(self.temp_device)
             torch_gc()
@@ -174,14 +162,14 @@ class HiDreamSampler(BaseModelSampler):
             )
 
     def sample(
-        self,
-        sample_config: SampleConfig,
-        destination: str,
-        image_format: ImageFormat | None = None,
-        video_format: VideoFormat | None = None,
-        audio_format: AudioFormat | None = None,
-        on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
-        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+            self,
+            sample_config: SampleConfig,
+            destination: str,
+            image_format: ImageFormat | None = None,
+            video_format: VideoFormat | None = None,
+            audio_format: AudioFormat | None = None,
+            on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         sampler_output = self.__sample_base(
             prompt=sample_config.prompt,
@@ -199,14 +187,10 @@ class HiDreamSampler(BaseModelSampler):
         )
 
         self.save_sampler_output(
-            sampler_output,
-            destination,
-            image_format,
-            video_format,
-            audio_format,
+            sampler_output, destination,
+            image_format, video_format, audio_format,
         )
 
         on_sample(sampler_output)
-
 
 factory.register(BaseModelSampler, HiDreamSampler, ModelType.HI_DREAM_FULL)

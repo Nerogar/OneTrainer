@@ -21,11 +21,11 @@ from tqdm import tqdm
 
 class WuerstchenSampler(BaseModelSampler):
     def __init__(
-        self,
-        train_device: torch.device,
-        temp_device: torch.device,
-        model: WuerstchenModel,
-        model_type: ModelType,
+            self,
+            train_device: torch.device,
+            temp_device: torch.device,
+            model: WuerstchenModel,
+            model_type: ModelType,
     ):
         super().__init__(train_device, temp_device)
 
@@ -34,18 +34,18 @@ class WuerstchenSampler(BaseModelSampler):
         self.pipeline = model.create_pipeline()
 
     def __sample_prior(
-        self,
-        prompt,
-        negative_prompt,
-        height,
-        width,
-        generator,
-        diffusion_steps,
-        cfg_scale,
-        text_encoder_layer_skip,
-        prior_noise_scheduler,
-        prior_prior,
-        on_update_progress,
+            self,
+            prompt,
+            negative_prompt,
+            height,
+            width,
+            generator,
+            diffusion_steps,
+            cfg_scale,
+            text_encoder_layer_skip,
+            prior_noise_scheduler,
+            prior_prior,
+            on_update_progress,
     ):
         # prepare prompt
         self.model.prior_text_encoder_to(self.train_device)
@@ -62,13 +62,11 @@ class WuerstchenSampler(BaseModelSampler):
             text_encoder_layer_skip=text_encoder_layer_skip,
         )
 
-        combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]).to(
-            dtype=self.model.prior_train_dtype.torch_dtype()
-        )
+        combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
+            .to(dtype=self.model.prior_train_dtype.torch_dtype())
         if self.model_type.is_stable_cascade():
-            combined_pooled_prompt_embedding = torch.cat(
-                [pooled_negative_prompt_embedding, pooled_prompt_embedding]
-            ).to(dtype=self.model.prior_train_dtype.torch_dtype())
+            combined_pooled_prompt_embedding = torch.cat([pooled_negative_prompt_embedding, pooled_prompt_embedding]) \
+                .to(dtype=self.model.prior_train_dtype.torch_dtype())
 
         self.model.prior_text_encoder_to(self.temp_device)
         torch_gc()
@@ -81,24 +79,19 @@ class WuerstchenSampler(BaseModelSampler):
         num_channels_latents = 16
         latent_width = int((width * 0.75) / 32.0)
         latent_height = int((height * 0.75) / 32.0)
-        latent_image = (
-            torch.randn(
-                size=(1, num_channels_latents, latent_height, latent_width),
-                generator=generator,
-                device=self.train_device,
-                dtype=self.model.prior_train_dtype.torch_dtype(),
-            )
-            * prior_noise_scheduler.init_noise_sigma
-        )
+        latent_image = torch.randn(
+            size=(1, num_channels_latents, latent_height, latent_width),
+            generator=generator,
+            device=self.train_device,
+            dtype=self.model.prior_train_dtype.torch_dtype(),
+        ) * prior_noise_scheduler.init_noise_sigma
 
         # denoising loop
         extra_step_kwargs = {}
         if "generator" in set(inspect.signature(prior_noise_scheduler.step).parameters.keys()):
             extra_step_kwargs["generator"] = generator
 
-        clip_img = torch.zeros(
-            size=(2, 1, 768), dtype=self.model.prior_train_dtype.torch_dtype(), device=combined_prompt_embedding.device
-        )
+        clip_img = torch.zeros(size=(2, 1, 768), dtype=self.model.prior_train_dtype.torch_dtype(), device=combined_prompt_embedding.device)
 
         self.model.prior_prior_to(self.train_device)
         for i, timestep in enumerate(tqdm(timesteps[:-1], desc="sampling")):
@@ -110,13 +103,13 @@ class WuerstchenSampler(BaseModelSampler):
             with self.model.prior_autocast_context:
                 if self.model_type.is_wuerstchen_v2():
                     prior_kwargs = {
-                        "c": combined_prompt_embedding,
+                        'c': combined_prompt_embedding,
                     }
                 elif self.model_type.is_stable_cascade():
                     prior_kwargs = {
-                        "clip_text": combined_prompt_embedding,
-                        "clip_text_pooled": combined_pooled_prompt_embedding,
-                        "clip_img": clip_img,
+                        'clip_text': combined_prompt_embedding,
+                        'clip_text_pooled': combined_pooled_prompt_embedding,
+                        'clip_img': clip_img,
                     }
 
                 noise_pred = prior_prior(
@@ -150,19 +143,19 @@ class WuerstchenSampler(BaseModelSampler):
         return latent_image
 
     def __sample_decoder(
-        self,
-        prompt,
-        height,
-        width,
-        generator,
-        diffusion_steps,
-        text_encoder_layer_skip,
-        image_embedding,
-        decoder_tokenizer,
-        decoder_text_encoder,
-        decoder_noise_scheduler,
-        decoder_decoder,
-        on_update_progress,
+            self,
+            prompt,
+            height,
+            width,
+            generator,
+            diffusion_steps,
+            text_encoder_layer_skip,
+            image_embedding,
+            decoder_tokenizer,
+            decoder_text_encoder,
+            decoder_noise_scheduler,
+            decoder_decoder,
+            on_update_progress,
     ):
         # prepare prompt
         if self.model_type.is_wuerstchen_v2():
@@ -171,7 +164,7 @@ class WuerstchenSampler(BaseModelSampler):
             self.model.prior_text_encoder_to(self.train_device)
         tokenizer_output = decoder_tokenizer(
             prompt,
-            padding="max_length",
+            padding='max_length',
             truncation=True,
             max_length=decoder_tokenizer.model_max_length,
             return_tensors="pt",
@@ -186,7 +179,9 @@ class WuerstchenSampler(BaseModelSampler):
             output_hidden_states=True,
         )
         final_layer_norm = decoder_text_encoder.text_model.final_layer_norm
-        prompt_embedding = final_layer_norm(text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)])
+        prompt_embedding = final_layer_norm(
+            text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+        )
 
         if self.model_type.is_stable_cascade():
             prompt_embedding = text_encoder_output.text_embeds.unsqueeze(1)
@@ -205,15 +200,12 @@ class WuerstchenSampler(BaseModelSampler):
         num_channels_latents = 4
         latent_width = width // 4
         latent_height = height // 4
-        latent_image = (
-            torch.randn(
-                size=(1, num_channels_latents, latent_height, latent_width),
-                generator=generator,
-                device=self.train_device,
-                dtype=self.model.prior_train_dtype.torch_dtype(),
-            )
-            * decoder_noise_scheduler.init_noise_sigma
-        )
+        latent_image = torch.randn(
+            size=(1, num_channels_latents, latent_height, latent_width),
+            generator=generator,
+            device=self.train_device,
+            dtype=self.model.prior_train_dtype.torch_dtype(),
+        ) * decoder_noise_scheduler.init_noise_sigma
 
         # denoising loop
         extra_step_kwargs = {}
@@ -229,13 +221,13 @@ class WuerstchenSampler(BaseModelSampler):
             # predict the noise residual
             if self.model_type.is_wuerstchen_v2():
                 decoder_kwargs = {
-                    "effnet": image_embedding,
-                    "clip": prompt_embedding,
+                    'effnet': image_embedding,
+                    'clip': prompt_embedding,
                 }
             elif self.model_type.is_stable_cascade():
                 decoder_kwargs = {
-                    "clip_text_pooled": prompt_embedding,
-                    "effnet": image_embedding,
+                    'clip_text_pooled': prompt_embedding,
+                    'effnet': image_embedding,
                 }
 
             noise_pred = decoder_decoder(
@@ -261,18 +253,18 @@ class WuerstchenSampler(BaseModelSampler):
 
     @torch.no_grad()
     def __sample_base(
-        self,
-        prompt: str,
-        negative_prompt: str,
-        height: int,
-        width: int,
-        seed: int,
-        random_seed: bool,
-        diffusion_steps: int,
-        cfg_scale: float,
-        noise_scheduler: NoiseScheduler,
-        text_encoder_layer_skip: int = 0,
-        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+            self,
+            prompt: str,
+            negative_prompt: str,
+            height: int,
+            width: int,
+            seed: int,
+            random_seed: bool,
+            diffusion_steps: int,
+            cfg_scale: float,
+            noise_scheduler: NoiseScheduler,
+            text_encoder_layer_skip: int = 0,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         generator = torch.Generator(device=self.train_device)
         if random_seed:
@@ -344,14 +336,14 @@ class WuerstchenSampler(BaseModelSampler):
         )
 
     def sample(
-        self,
-        sample_config: SampleConfig,
-        destination: str,
-        image_format: ImageFormat | None = None,
-        video_format: VideoFormat | None = None,
-        audio_format: AudioFormat | None = None,
-        on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
-        on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+            self,
+            sample_config: SampleConfig,
+            destination: str,
+            image_format: ImageFormat | None = None,
+            video_format: VideoFormat | None = None,
+            audio_format: AudioFormat | None = None,
+            on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
         sampler_output = self.__sample_base(
             prompt=sample_config.prompt,
@@ -368,15 +360,11 @@ class WuerstchenSampler(BaseModelSampler):
         )
 
         self.save_sampler_output(
-            sampler_output,
-            destination,
-            image_format,
-            video_format,
-            audio_format,
+            sampler_output, destination,
+            image_format, video_format, audio_format,
         )
 
         on_sample(sampler_output)
-
 
 factory.register(BaseModelSampler, WuerstchenSampler, ModelType.WUERSTCHEN_2)
 factory.register(BaseModelSampler, WuerstchenSampler, ModelType.STABLE_CASCADE_1)

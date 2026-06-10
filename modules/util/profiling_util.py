@@ -6,7 +6,7 @@ import torch
 class TorchMemoryRecorder:
     def __init__(self, filename: str = "memory.pickle", enabled: bool = True):
         self.filename = filename
-        self.enabled = enabled and platform.system() == "Linux"
+        self.enabled = enabled and platform.system() == 'Linux'
 
     def __enter__(self):
         if self.enabled:
@@ -21,7 +21,6 @@ class TorchMemoryRecorder:
 
             torch.cuda.memory._record_memory_history(enabled=None)
 
-
 class TorchProfiler:
     def __init__(self, filename: str, enabled: bool = True):
         self.filename = filename
@@ -31,7 +30,10 @@ class TorchProfiler:
     def __enter__(self):
         if self.enabled:
             profiler_context = torch.profiler.profile(
-                activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+                activities=[
+                    torch.profiler.ProfilerActivity.CPU,
+                    torch.profiler.ProfilerActivity.CUDA
+                ],
             )
             self.profiler = profiler_context.__enter__()
             return self.profiler

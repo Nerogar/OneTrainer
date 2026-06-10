@@ -2,7 +2,7 @@ from enum import Enum
 
 
 class AudioFormat(Enum):
-    MP3 = "MP3"
+    MP3 = 'MP3'
 
     def __str__(self):
         return self.value

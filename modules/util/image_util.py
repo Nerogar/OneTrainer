@@ -1,7 +1,7 @@
 from PIL import Image, ImageOps
 
 
-def load_image(path: str, convert_mode: str = "RGB") -> Image.Image:
+def load_image(path: str, convert_mode: str = 'RGB') -> Image.Image:
     image = Image.open(path)
     image = ImageOps.exif_transpose(image)
     if convert_mode:
