@@ -6,12 +6,11 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dpo_curation_util import (
     check_dpo_pairs,
     correct_all_captions_to_chosen,
-    dpo_concept_pairs,
     find_caption_mismatches,
     fix_multiline_captions,
     remove_finalized_pair,
 )
-from modules.util.enum.ConceptType import ConceptType
+from modules.util.dpo_pattern_util import dpo_concept_pattern_dirs
 from modules.util.enum.RLHFMode import RLHFMode
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -320,7 +319,7 @@ class RLHFTab:
 
     def _review_pairs(self):
         try:
-            concept_pairs = self._load_all_concept_pairs()
+            concept_pairs = self._load_concept_pairs()
         except Exception as ex:
             messagebox.showerror("Review Pairs Error", str(ex))
             return
@@ -335,25 +334,12 @@ class RLHFTab:
         DPOBucketAnalysisWindow(self.master.winfo_toplevel(), self.train_config)
 
     def _load_concept_pairs(self):
-        concepts = self._load_concepts()
-        concept_types = {ConceptType(concept.type) for concept in concepts if concept.enabled}
-        if ConceptType.DPO_CHOSEN in concept_types or ConceptType.DPO_REJECTED in concept_types:
-            return dpo_concept_pairs(concepts, is_validation=False)
-        if ConceptType.DPO_CHOSEN_VAL in concept_types or ConceptType.DPO_REJECTED_VAL in concept_types:
-            return dpo_concept_pairs(concepts, is_validation=True)
-        raise RuntimeError("Need explicit chosen/rejected DPO concepts for training or validation.")
-
-    def _load_all_concept_pairs(self):
-        concepts = self._load_concepts()
-        concept_types = {ConceptType(concept.type) for concept in concepts if concept.enabled}
-        pairs = []
-        if ConceptType.DPO_CHOSEN in concept_types or ConceptType.DPO_REJECTED in concept_types:
-            pairs.extend(dpo_concept_pairs(concepts, is_validation=False))
-        if ConceptType.DPO_CHOSEN_VAL in concept_types or ConceptType.DPO_REJECTED_VAL in concept_types:
-            pairs.extend(dpo_concept_pairs(concepts, is_validation=True))
-        if not pairs:
-            raise RuntimeError("Need explicit chosen/rejected DPO concepts for training or validation.")
-        return pairs
+        concept_pairs = dpo_concept_pattern_dirs(self._load_concepts())
+        if not concept_pairs:
+            raise RuntimeError(
+                "No DPO concepts found. Set the chosen/rejected patterns on a concept in the Concepts tab."
+            )
+        return concept_pairs
 
     def _load_concepts(self):
         concepts = self.train_config.concepts

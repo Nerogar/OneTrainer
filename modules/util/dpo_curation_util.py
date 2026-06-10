@@ -404,33 +404,6 @@ def is_byte_identical_used(used_fingerprints: dict[int, set[str]], path: str) ->
     return digest is not None and digest in candidates
 
 
-def is_dpo_concept_type(concept_type: ConceptType) -> bool:
-    return concept_type in {
-        ConceptType.DPO_CHOSEN,
-        ConceptType.DPO_REJECTED,
-        ConceptType.DPO_CHOSEN_VAL,
-        ConceptType.DPO_REJECTED_VAL,
-    }
-
-
-def dpo_concept_pairs(concepts: list[ConceptConfig], is_validation: bool = False) -> list[tuple[str, str]]:
-    enabled = [concept for concept in concepts if concept.enabled]
-    chosen_type = ConceptType.DPO_CHOSEN_VAL if is_validation else ConceptType.DPO_CHOSEN
-    rejected_type = ConceptType.DPO_REJECTED_VAL if is_validation else ConceptType.DPO_REJECTED
-    chosen = [concept for concept in enabled if ConceptType(concept.type) == chosen_type]
-    rejected = [concept for concept in enabled if ConceptType(concept.type) == rejected_type]
-
-    if not chosen and not rejected:
-        raise RuntimeError(f"Need explicit {chosen_type.value}/{rejected_type.value} concepts for RLHF DPO pairs.")
-    if len(chosen) != len(rejected):
-        raise RuntimeError(f"Mismatched DPO concept counts: {len(chosen)} chosen, {len(rejected)} rejected.")
-
-    return [
-        (chosen_concept.path, rejected_concept.path)
-        for chosen_concept, rejected_concept in zip(chosen, rejected, strict=True)
-    ]
-
-
 def load_manifest(output_dir: str) -> dict:
     manifest_path = os.path.join(output_dir, "manifest.json")
     if os.path.isfile(manifest_path):
