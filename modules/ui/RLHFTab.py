@@ -12,7 +12,6 @@ from modules.util.dpo_curation_util import (
     remove_finalized_pair,
 )
 from modules.util.enum.ConceptType import ConceptType
-from modules.util.enum.DPOPatienceMode import DPOPatienceMode
 from modules.util.enum.RLHFMode import RLHFMode
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -127,19 +126,6 @@ class RLHFTab:
             tooltip="How many validation checks can pass without improvement before training stops.",
         )
         components.entry(self.scroll_frame, 5, 4, self.ui_state, "rlhf_dpo_patience_value")
-
-        patience_mode_options = [
-            ("Either", DPOPatienceMode.EITHER),
-            ("Both", DPOPatienceMode.BOTH),
-        ]
-        components.label(
-            self.scroll_frame,
-            6,
-            0,
-            "Patience Trigger",
-            tooltip="Which metric must improve to reset the patience counter: accuracy, loss, or both.",
-        )
-        components.options_kv(self.scroll_frame, 6, 1, patience_mode_options, self.ui_state, "rlhf_dpo_patience_mode")
 
         components.label(
             self.scroll_frame,

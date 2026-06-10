@@ -25,7 +25,6 @@ from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
 from modules.util.enum.ConceptType import ConceptType
-from modules.util.enum.DPOPatienceMode import DPOPatienceMode
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
@@ -170,7 +169,7 @@ class GenericTrainer(BaseTrainer):
 
         self._dpo_patience_counter = 0
         self._dpo_best_accuracy = float("-inf")
-        self._dpo_best_loss = float("inf")
+        self._dpo_best_margin = float("-inf")
         self._dpo_best_backup_path: str | None = None
 
     def __save_config_to_workspace(self):
@@ -372,7 +371,6 @@ class GenericTrainer(BaseTrainer):
                 total=current_epoch_length_validation)
 
             if self.config.rlhf_dpo_validation:
-                dpo_val_loss = []
                 dpo_val_accuracy = []
                 dpo_val_chosen_reward = []
                 dpo_val_rejected_reward = []
@@ -385,27 +383,27 @@ class GenericTrainer(BaseTrainer):
                     with torch.no_grad():
                         self.model_setup.calculate_dpo_loss(self.model, validation_batch, self.config, train_progress)
                     dpo_metrics = self.model_setup.get_last_dpo_metrics()
-                    dpo_val_loss.append(dpo_metrics["dpo_loss"])
                     dpo_val_accuracy.append(dpo_metrics["accuracy"])
                     dpo_val_chosen_reward.append(dpo_metrics["chosen_reward"])
                     dpo_val_rejected_reward.append(dpo_metrics["rejected_reward"])
                     dpo_val_reward_margin.append(dpo_metrics["reward_margin"])
 
-                if dpo_val_loss:
-                    val_loss = sum(dpo_val_loss) / len(dpo_val_loss)
+                if dpo_val_accuracy:
+                    # Validation loss is intentionally not tracked: reward hacking
+                    # drives it toward zero, so a low val loss is not evidence of a
+                    # good model. Held-out ranking accuracy is hack-resistant.
                     val_accuracy = sum(dpo_val_accuracy) / len(dpo_val_accuracy)
                     val_chosen_reward = sum(dpo_val_chosen_reward) / len(dpo_val_chosen_reward)
                     val_rejected_reward = sum(dpo_val_rejected_reward) / len(dpo_val_rejected_reward)
                     val_reward_margin = sum(dpo_val_reward_margin) / len(dpo_val_reward_margin)
 
-                    self.tensorboard.add_scalar("dpo/val_loss", val_loss, train_progress.global_step)
                     self.tensorboard.add_scalar("dpo/val_accuracy", val_accuracy, train_progress.global_step)
                     self.tensorboard.add_scalar("dpo/val_chosen_reward", val_chosen_reward, train_progress.global_step)
                     self.tensorboard.add_scalar(
                         "dpo/val_rejected_reward", val_rejected_reward, train_progress.global_step
                     )
                     self.tensorboard.add_scalar("dpo/val_reward_margin", val_reward_margin, train_progress.global_step)
-                    self.__check_dpo_patience(val_accuracy, val_loss, train_progress)
+                    self.__check_dpo_patience(val_accuracy, val_reward_margin, train_progress)
 
                 # DPO validation uses a different data pipeline (paired samples) than
                 # standard validation, so they cannot share the same data loader.
@@ -462,36 +460,28 @@ class GenericTrainer(BaseTrainer):
                                             total_average_loss,
                                             train_progress.global_step)
 
-    def __check_dpo_patience(self, val_accuracy: float, val_loss: float, train_progress: TrainProgress):
+    def __check_dpo_patience(self, val_accuracy: float, val_reward_margin: float, train_progress: TrainProgress):
         rounded_accuracy = round(val_accuracy, 5)
-        rounded_loss = round(val_loss, 5)
         rounded_best_accuracy = round(self._dpo_best_accuracy, 5)
-        rounded_best_loss = round(self._dpo_best_loss, 5)
 
-        accuracy_improved = rounded_accuracy > rounded_best_accuracy
-        loss_improved = rounded_loss < rounded_best_loss
-
-        mode = self.config.rlhf_dpo_patience_mode
-        if mode == DPOPatienceMode.BOTH:
-            is_new_best = accuracy_improved and loss_improved
-        else:
-            is_new_best = accuracy_improved or loss_improved
+        is_new_best = rounded_accuracy > rounded_best_accuracy or (
+            rounded_accuracy == rounded_best_accuracy and val_reward_margin > self._dpo_best_margin
+        )
 
         if is_new_best and self.config.rlhf_dpo_save_best:
-            self._dpo_best_backup_path = self.__save_dpo_best(val_accuracy, val_loss, train_progress)
+            self._dpo_best_backup_path = self.__save_dpo_best(val_accuracy, val_reward_margin, train_progress)
+
+        if is_new_best:
+            self._dpo_best_accuracy = val_accuracy
+            self._dpo_best_margin = val_reward_margin
 
         if not self.config.rlhf_dpo_patience_enabled:
-            self._dpo_best_accuracy = max(self._dpo_best_accuracy, val_accuracy)
-            self._dpo_best_loss = min(self._dpo_best_loss, val_loss)
             return
 
         if is_new_best:
             self._dpo_patience_counter = 0
         else:
             self._dpo_patience_counter += 1
-
-        self._dpo_best_accuracy = max(self._dpo_best_accuracy, val_accuracy)
-        self._dpo_best_loss = min(self._dpo_best_loss, val_loss)
 
         self.tensorboard.add_scalar("dpo/patience_counter", self._dpo_patience_counter, train_progress.global_step)
 
@@ -502,13 +492,16 @@ class GenericTrainer(BaseTrainer):
             )
             self.commands.stop()
 
-    def __save_dpo_best(self, val_accuracy: float, val_loss: float, train_progress: TrainProgress) -> str:
+    def __save_dpo_best(self, val_accuracy: float, val_reward_margin: float, train_progress: TrainProgress) -> str:
         best_path = os.path.join(self.config.workspace_dir, "backup", "dpo-best.pt")
         os.makedirs(os.path.dirname(best_path), exist_ok=True)
         try:
             state = [p.data.clone().cpu() for p in self.parameters]
             torch.save(state, best_path)
-            print(f"Saved DPO best checkpoint (accuracy={val_accuracy:.4f}, loss={val_loss:.4f}) to {best_path}")
+            print(
+                f"Saved DPO best checkpoint (accuracy={val_accuracy:.4f}, "
+                f"margin={val_reward_margin:.6f}) to {best_path}"
+            )
         except Exception:
             traceback.print_exc()
             print("Could not save DPO best checkpoint.")

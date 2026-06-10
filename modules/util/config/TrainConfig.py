@@ -12,7 +12,6 @@ from modules.util.config.SecretsConfig import SecretsConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
-from modules.util.enum.DPOPatienceMode import DPOPatienceMode
 from modules.util.enum.DPORefMode import DPORefMode
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
@@ -553,7 +552,6 @@ class TrainConfig(BaseConfig):
     rlhf_dpo_validation_percentage: float
     rlhf_dpo_patience_enabled: bool
     rlhf_dpo_patience_value: int
-    rlhf_dpo_patience_mode: DPOPatienceMode
     rlhf_dpo_save_best: bool
 
     # optimizer
@@ -1263,7 +1261,6 @@ class TrainConfig(BaseConfig):
         data.append(("rlhf_dpo_validation_percentage", 10.0, float, False))
         data.append(("rlhf_dpo_patience_enabled", False, bool, False))
         data.append(("rlhf_dpo_patience_value", 5, int, False))
-        data.append(("rlhf_dpo_patience_mode", DPOPatienceMode.EITHER, DPOPatienceMode, False))
         data.append(("rlhf_dpo_save_best", True, bool, False))
 
         # optimizer
