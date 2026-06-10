@@ -1,4 +1,3 @@
-import math
 import os
 import random
 import threading
@@ -24,6 +23,7 @@ from modules.util.dpo_curation_util import (
     resolve_aspect_ratio,
     walk_skipping_dotted,
 )
+from modules.util.dpo_swiss_service import SwissTournament, outermost_pairs
 from modules.util.image_metadata_util import extract_metadata, strip_angle_bracket_segments
 from modules.util.ui.ui_utils import set_window_icon
 
@@ -60,16 +60,20 @@ class DPOCurationWindow(ctk.CTkToplevel):
         self._worker_finished = False
         self._current_group: dict | None = None
 
-        # ELO state
-        self.elo_ratings: dict[str, float] = {}
-        self.elo_comparisons_done = 0
-        self.elo_pair: tuple[str, str] | None = None
+        # Tournament state
+        self.swiss: SwissTournament | None = None
+        self.swiss_match: tuple[str, str] | None = None
+        self.ranked_order: list[str] = []
+        self.rank_selected_idx: int | None = None
+        self.swiss_export_pairs_var = ctk.StringVar(value="1")
+        self._rank_badges: list = []
+        self._thumb_cache: dict[str, tuple] = {}
 
         # Selection state
         self.selection_phase = "best"  # "best" or "worst"
         self.selected_best: str | None = None
 
-        self.mode = "selection"  # "elo" or "selection"
+        self.mode = "selection"  # "swiss" or "selection"
         self.pairs_per_group_var = ctk.StringVar(value="1")
 
         # Review mode state
@@ -146,7 +150,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         # Action buttons
         btn_frame = ctk.CTkFrame(frame, fg_color="transparent")
         btn_frame.pack(pady=(0, 10))
-        ctk.CTkButton(btn_frame, text="Start (ELO)", width=250, command=lambda: self._start("elo")).pack(
+        ctk.CTkButton(btn_frame, text="Start (Tournament)", width=250, command=lambda: self._start("swiss")).pack(
             side="left", padx=10
         )
         ctk.CTkButton(btn_frame, text="Start (Selection)", width=250, command=lambda: self._start("selection")).pack(
@@ -427,8 +431,8 @@ class DPOCurationWindow(ctk.CTkToplevel):
             self.pairs_created_in_group = pairs_done
             self.current_remaining_images = list(group["images"])
 
-            if self.mode == "elo":
-                self._start_elo_round()
+            if self.mode == "swiss":
+                self._start_swiss_round()
             else:
                 self._start_selection_round()
             return
@@ -451,35 +455,29 @@ class DPOCurationWindow(ctk.CTkToplevel):
         else:
             self.after(100, self._poll_waiting)
 
-    # ---- ELO Mode ----
+    # ---- Tournament Mode ----
 
-    def _start_elo_round(self):
-        self.elo_ratings = dict.fromkeys(self.current_remaining_images, 1500.0)
-        self.elo_comparisons_done = 0
-        self._elo_next_pair()
-
-    def _elo_suggested_comparisons(self) -> int:
-        n = len(self.current_remaining_images)
-        return max(15, math.ceil(n * math.log2(max(n, 2))))
-
-    def _elo_next_pair(self):
-        images = self.current_remaining_images
-
-        sorted_imgs = sorted(images, key=lambda x: self.elo_ratings[x])
-        if len(sorted_imgs) < 2:
+    def _start_swiss_round(self):
+        if len(self.current_remaining_images) < 2:
             self._advance_group()
             return
+        self.swiss = SwissTournament(self.current_remaining_images)
+        self._thumb_cache = {}
+        self._swiss_next_match()
 
-        idx = random.randint(0, len(sorted_imgs) - 2)
-        self.elo_pair = (sorted_imgs[idx], sorted_imgs[idx + 1])
-        self._build_elo_ui()
+    def _swiss_next_match(self):
+        match = self.swiss.next_match()
+        if match is None:
+            self._start_ranked_review()
+            return
+        self.swiss_match = match
+        self._build_swiss_ui()
 
-    def _build_elo_ui(self):
+    def _build_swiss_ui(self):
         for widget in self.winfo_children():
             widget.destroy()
 
         group = self._current_group
-        suggested = self._elo_suggested_comparisons()
 
         # Header
         self._build_prompt_expander(self, group["prompt"])
@@ -491,7 +489,10 @@ class DPOCurationWindow(ctk.CTkToplevel):
             side="left", padx=15
         )
         ctk.CTkLabel(
-            header, text=f"Comparisons: {self.elo_comparisons_done}/{suggested} suggested", font=("", 12)
+            header,
+            text=f"Round {self.swiss.current_round}/{self.swiss.total_rounds}"
+            f" — Match {self.swiss.matches_played() + 1}/{self.swiss.matches_total()}",
+            font=("", 12, "bold"),
         ).pack(side="left", padx=15)
 
         # Images
@@ -501,87 +502,195 @@ class DPOCurationWindow(ctk.CTkToplevel):
         img_frame.grid_columnconfigure(1, weight=1)
         img_frame.grid_rowconfigure(0, weight=1)
 
-        for col, path in enumerate(self.elo_pair):
+        for col, path in enumerate(self.swiss_match):
             self._display_image(img_frame, path, row=0, col=col)
-            rating = self.elo_ratings.get(path, 1500.0)
-            ctk.CTkLabel(img_frame, text=f"ELO: {rating:.0f}", font=("", 12)).grid(row=1, column=col, pady=(0, 5))
+            player = self.swiss.player(path)
+            ctk.CTkLabel(img_frame, text=f"Score {player.score:g} · Elo {player.elo:.0f}", font=("", 12)).grid(
+                row=1, column=col, pady=(0, 5)
+            )
 
         # Buttons
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.pack(fill="x", padx=10, pady=10)
-        ctk.CTkButton(btn_frame, text="A is Better (←)", width=200, command=lambda: self._elo_vote("a")).pack(
+        ctk.CTkButton(btn_frame, text="A is Better (←)", width=200, command=lambda: self._swiss_vote("a")).pack(
             side="left", padx=20, expand=True
         )
-        ctk.CTkButton(btn_frame, text="Tie / Skip (↓)", width=200, command=lambda: self._elo_vote("tie")).pack(
+        ctk.CTkButton(btn_frame, text="Tie (↓)", width=200, command=lambda: self._swiss_vote("tie")).pack(
             side="left", padx=20, expand=True
         )
-        ctk.CTkButton(btn_frame, text="B is Better (→)", width=200, command=lambda: self._elo_vote("b")).pack(
+        ctk.CTkButton(btn_frame, text="B is Better (→)", width=200, command=lambda: self._swiss_vote("b")).pack(
             side="left", padx=20, expand=True
         )
         ctk.CTkButton(btn_frame, text="Skip Group", width=150, fg_color="#8B4513", command=self._skip_group).pack(
             side="right", padx=10
         )
-        ctk.CTkButton(btn_frame, text="Accept Pair", width=150, fg_color="gray", command=self._elo_finish_round).pack(
+        ctk.CTkButton(
+            btn_frame, text="Finish Early", width=150, fg_color="gray", command=self._start_ranked_review
+        ).pack(side="right", padx=10)
+
+        # Keyboard bindings
+        self.bind("<Left>", lambda e: self._swiss_vote("a"))
+        self.bind("<Right>", lambda e: self._swiss_vote("b"))
+        self.bind("<Down>", lambda e: self._swiss_vote("tie"))
+
+    def _swiss_vote(self, winner: str):
+        a, b = self.swiss_match
+        self.swiss.report(a, b, winner)
+        self._swiss_next_match()
+
+    # ---- Ranked Review (after the tournament rounds) ----
+
+    def _start_ranked_review(self):
+        self.ranked_order = self.swiss.standings()
+        self.rank_selected_idx = None
+        max_pairs = len(self.ranked_order) // 2
+        default_pairs = min(max(1, self.pairs_per_group - self.pairs_created_in_group), max_pairs)
+        self.swiss_export_pairs_var.set(str(default_pairs))
+        self._build_ranked_review_ui()
+
+    def _parse_export_pairs(self) -> int:
+        try:
+            value = int(str(self.swiss_export_pairs_var.get()).strip())
+        except (TypeError, ValueError):
+            value = 1
+        return max(0, min(value, len(self.ranked_order) // 2))
+
+    def _build_ranked_review_ui(self):
+        for widget in self.winfo_children():
+            widget.destroy()
+        for key in ("<Left>", "<Right>", "<Down>"):
+            self.unbind(key)
+
+        group = self._current_group
+
+        # Header
+        self._build_prompt_expander(self, group["prompt"])
+
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=10, pady=5)
+        ctk.CTkLabel(header, text=f"AR: {group['aspectratio']}", font=("", 12)).pack(side="left", padx=15)
+        ctk.CTkLabel(header, text=f"Group {self._groups_shown} / {self._groups_queued}", font=("", 12)).pack(
+            side="left", padx=15
+        )
+        ctk.CTkLabel(
+            header,
+            text="Ranked best → worst. Left-click two images to swap them; right-click to preview.",
+            font=("", 13, "bold"),
+        ).pack(side="right", padx=15)
+
+        # Ranked thumbnail grid
+        grid_frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        grid_frame.pack(expand=True, fill="both", padx=10, pady=5)
+
+        cols = max(1, min(5, int(self.winfo_width() / 300) or 4))
+        self._rank_badges = []
+        for index, path in enumerate(self.ranked_order):
+            row, col = divmod(index, cols)
+            grid_frame.grid_columnconfigure(col, weight=1)
+            selected = index == self.rank_selected_idx
+            tile = ctk.CTkFrame(
+                grid_frame,
+                fg_color="transparent",
+                border_width=3 if selected else 0,
+                border_color="#1F6AA5",
+            )
+            tile.grid(row=row, column=col, padx=5, pady=5)
+
+            player = self.swiss.player(path)
+            badge = ctk.CTkLabel(tile, text=f"#{index + 1} · {player.score:g} pts", font=("", 12, "bold"))
+            badge.pack(pady=(4, 0))
+            self._rank_badges.append(badge)
+
+            thumb = self._ranked_thumbnail(tile, path)
+            thumb.pack(padx=4, pady=4)
+            for widget in (badge, thumb):
+                widget.bind("<Button-1>", lambda e, i=index: self._rank_click(i))
+                widget.bind("<Button-3>", lambda e, p=path: self._selection_preview(p, pick=False))
+
+        self._update_rank_badges()
+
+        # Footer
+        footer = ctk.CTkFrame(self, fg_color="transparent")
+        footer.pack(fill="x", padx=10, pady=10)
+        ctk.CTkLabel(footer, text="Pairs to export:").pack(side="left", padx=(15, 10))
+        pairs_entry = ctk.CTkEntry(footer, textvariable=self.swiss_export_pairs_var, width=60)
+        pairs_entry.pack(side="left")
+        pairs_entry.bind("<KeyRelease>", lambda e: self._update_rank_badges())
+        ctk.CTkLabel(
+            footer, text="Pair 1 = green #1 vs red last, pair 2 = next pair inward, ...", text_color="gray"
+        ).pack(side="left", padx=(10, 0))
+        ctk.CTkButton(footer, text="Skip Group", width=150, fg_color="#8B4513", command=self._skip_group).pack(
+            side="right", padx=10
+        )
+        ctk.CTkButton(footer, text="Export Pairs", width=200, command=self._export_ranked_pairs).pack(
             side="right", padx=10
         )
 
-        # Keyboard bindings
-        self.bind("<Left>", lambda e: self._elo_vote("a"))
-        self.bind("<Right>", lambda e: self._elo_vote("b"))
-        self.bind("<Down>", lambda e: self._elo_vote("tie"))
+    def _ranked_thumbnail(self, master, path: str):
+        thumb_size = 220
+        cached = self._thumb_cache.get(path)
+        if cached is None:
+            try:
+                with Image.open(path) as _raw:
+                    pil_img = self._fit_image(_raw, thumb_size, thumb_size).copy()
+                cached = (ctk.CTkImage(light_image=pil_img, size=pil_img.size), pil_img)
+            except Exception:
+                cached = (None, None)
+            self._thumb_cache[path] = cached
+        ctk_img, pil_img = cached
+        if ctk_img is None:
+            return ctk.CTkLabel(master, text=os.path.basename(path))
+        label = ctk.CTkLabel(master, text="", image=ctk_img)
+        label.image = ctk_img  # prevent GC
+        label.pil_image = pil_img  # prevent GC - CTkImage needs the PIL data alive for DPI re-rendering
+        return label
 
-    def _elo_vote(self, winner: str):
-        a, b = self.elo_pair
-        K = 32.0
+    def _update_rank_badges(self):
+        pair_count = self._parse_export_pairs()
+        total = len(self._rank_badges)
+        for index, badge in enumerate(self._rank_badges):
+            if index < pair_count:
+                badge.configure(text_color="#2FA572")  # exported as chosen
+            elif index >= total - pair_count:
+                badge.configure(text_color="#C84B4B")  # exported as rejected
+            else:
+                badge.configure(text_color=("gray10", "gray90"))
 
-        if winner == "a":
-            sa, sb = 1.0, 0.0
-        elif winner == "b":
-            sa, sb = 0.0, 1.0
+    def _rank_click(self, index: int):
+        if self.rank_selected_idx is None:
+            self.rank_selected_idx = index
+        elif self.rank_selected_idx == index:
+            self.rank_selected_idx = None
         else:
-            sa, sb = 0.5, 0.5
+            order = self.ranked_order
+            order[self.rank_selected_idx], order[index] = order[index], order[self.rank_selected_idx]
+            self.rank_selected_idx = None
+        self._build_ranked_review_ui()
 
-        ea = 1.0 / (1.0 + 10.0 ** ((self.elo_ratings[b] - self.elo_ratings[a]) / 400.0))
-        eb = 1.0 - ea
-        self.elo_ratings[a] += K * (sa - ea)
-        self.elo_ratings[b] += K * (sb - eb)
+    def _export_ranked_pairs(self):
+        pairs = outermost_pairs(self.ranked_order, self._parse_export_pairs())
+        if not pairs:
+            self._advance_group()
+            return
 
-        self.elo_comparisons_done += 1
-        self._elo_next_pair()
-
-    def _elo_finish_round(self):
-        sorted_imgs = sorted(self.elo_ratings.keys(), key=lambda x: self.elo_ratings[x], reverse=True)
-        best = sorted_imgs[0]
-        worst = sorted_imgs[-1]
-        best_rating = self.elo_ratings[best]
-        worst_rating = self.elo_ratings[worst]
-        best_name = os.path.basename(best)
-        worst_name = os.path.basename(worst)
-
-        remaining_after = [img for img in self.current_remaining_images if img not in {best, worst}]
-        can_continue = len(remaining_after) >= 2
-
-        if can_continue:
-            result = messagebox.askyesnocancel(
-                "Accept Pair",
-                f"Best: {best_name} (ELO {best_rating:.0f})\n"
-                f"Worst: {worst_name} (ELO {worst_rating:.0f})\n\n"
-                f"Yes = Accept & keep scoring this prompt\n"
-                f"No = Accept & move to next group\n"
-                f"Cancel = Don't accept",
+        group = self._current_group
+        exported: set[str] = set()
+        for chosen, rejected in pairs:
+            export_single_pair(
+                self.output_dir,
+                self.manifest,
+                chosen,
+                rejected,
+                group["prompt"],
+                group["aspectratio"],
             )
-            if result is None:
-                return
-            self._register_pair(best, worst, continue_scoring=result)
-        else:
-            if not messagebox.askyesno(
-                "Accept Pair",
-                f"Best: {best_name} (ELO {best_rating:.0f})\n"
-                f"Worst: {worst_name} (ELO {worst_rating:.0f})\n\n"
-                f"Accept this pair?",
-            ):
-                return
-            self._register_pair(best, worst)
+            exported |= {chosen, rejected}
+
+        self.current_remaining_images = [
+            image for image in self.current_remaining_images if image not in exported
+        ]
+        self.pairs_created_in_group += len(pairs)
+        self._advance_group()
 
     # ---- Selection Mode ----
 
@@ -660,9 +769,9 @@ class DPOCurationWindow(ctk.CTkToplevel):
         except Exception:
             ctk.CTkLabel(master, text=os.path.basename(path)).grid(row=row, column=col, padx=5, pady=5)
 
-    def _selection_preview(self, path: str):
+    def _selection_preview(self, path: str, pick: bool = True):
         preview = ctk.CTkToplevel(self)
-        preview.title("Preview — Right-click to select")
+        preview.title("Preview — Right-click to select" if pick else "Preview — Esc to close")
         preview.attributes("-fullscreen", True)
         preview.transient(self)
         preview.wait_visibility()
@@ -684,7 +793,10 @@ class DPOCurationWindow(ctk.CTkToplevel):
                 preview.destroy()
                 self._selection_pick(path)
 
-            label.bind("<Button-3>", on_select)
+            if pick:
+                label.bind("<Button-3>", on_select)
+            else:
+                label.bind("<Button-3>", lambda e: preview.destroy())
         except Exception:
             ctk.CTkLabel(preview, text="Failed to load image").pack(expand=True)
 
@@ -734,8 +846,8 @@ class DPOCurationWindow(ctk.CTkToplevel):
         is_unconditional = group["prompt"] == "UNCONDITIONAL"
         keep_going = continue_scoring or is_unconditional or self.pairs_created_in_group < self.pairs_per_group
         if keep_going and len(self.current_remaining_images) >= 2:
-            if self.mode == "elo":
-                self._start_elo_round()
+            if self.mode == "swiss":
+                self._start_swiss_round()
             else:
                 self._start_selection_round()
         else:
