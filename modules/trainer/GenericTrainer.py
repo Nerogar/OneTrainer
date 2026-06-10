@@ -3,6 +3,7 @@ import copy
 import json
 import math
 import os
+import random
 import shutil
 import traceback
 from collections.abc import Callable
@@ -23,6 +24,7 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.compile_util import init_compile
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.dataset_fingerprint import compute_concept_fingerprint
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.EMAMode import EMAMode
@@ -43,6 +45,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
 
 import huggingface_hub
+import numpy as np
 from requests.exceptions import ConnectionError
 from tqdm import tqdm
 
@@ -80,6 +83,11 @@ class GenericTrainer(BaseTrainer):
         self.model = None
         self.one_step_trained = False
         self.grad_hook_handles = []
+
+        # Loop locals mirrored so __backup/__save can read them without threading.
+        self._loop_accumulated_loss: float = 0.0
+        self._loop_accumulated_loss_tensor: torch.Tensor | None = None
+        self._loop_scaler = None
 
     def start(self):
         if multi.is_master():
@@ -448,6 +456,7 @@ class GenericTrainer(BaseTrainer):
             if print_msg:
                 print_cb("Creating Backup " + backup_path)
 
+            self._stage_accumulator_state_for_save()
             self.model_saver.save(
                 self.model,
                 self.config.model_type,
@@ -467,6 +476,7 @@ class GenericTrainer(BaseTrainer):
                 traceback.print_exc()
                 print("Could not delete partial backup")
         finally:
+            self._clear_staged_accumulator_state()
             if self.config.rolling_backup:
                 self.__prune_backups(self.config.rolling_backup_count)
 
@@ -499,6 +509,7 @@ class GenericTrainer(BaseTrainer):
             if self.config.optimizer.optimizer.is_schedule_free:
                 torch.clear_autocast_cache()
                 self.model.optimizer.eval()
+            self._stage_accumulator_state_for_save()
             self.model_saver.save(
                 model=self.model,
                 model_type=self.config.model_type,
@@ -506,10 +517,12 @@ class GenericTrainer(BaseTrainer):
                 output_model_destination=save_path,
                 dtype=self.config.output_dtype.torch_dtype()
             )
+            self._clear_staged_accumulator_state()
             if self.config.optimizer.optimizer.is_schedule_free:
                 torch.clear_autocast_cache()
                 self.model.optimizer.train()
         except Exception:
+            self._clear_staged_accumulator_state()
             traceback.print_exc()
             print("Could not save model. Check your disk space!")
             try:
@@ -555,6 +568,142 @@ class GenericTrainer(BaseTrainer):
         return self.repeating_action_needed(
             "update_step", self.config.gradient_accumulation_steps, TimeUnit.STEP, train_progress, start_at_zero=False
         )
+
+    def _stage_accumulator_state_for_save(self):
+        # Build the in-flight grad-accum snapshot for InternalModelSaverMixin.
+        if not multi.is_master():
+            self.model.accumulator_state = None
+            return
+
+        if self._loop_accumulated_loss_tensor is not None and \
+                isinstance(self._loop_accumulated_loss_tensor, torch.Tensor):
+            try:
+                acc_loss_f = float(self._loop_accumulated_loss_tensor.item())
+            except Exception:
+                acc_loss_f = float(self._loop_accumulated_loss)
+        else:
+            acc_loss_f = float(self._loop_accumulated_loss)
+
+        param_grads: dict[str, torch.Tensor] = {}
+        if self.model is not None and self.model.parameters is not None:
+            for key, p in self.model.parameters.iter_named_parameters():
+                if not p.requires_grad or p.grad is None:
+                    continue
+                param_grads[key] = p.grad.detach().to(device="cpu", copy=True)
+
+        scaler_state = None
+        if self._loop_scaler is not None:
+            try:
+                scaler_state = self._loop_scaler.state_dict()
+            except Exception:
+                scaler_state = None
+
+        rng: dict = {
+            "torch_cpu": torch.get_rng_state(),
+            "torch_cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
+            "python": random.getstate(),
+            # Snapshots the GLOBAL numpy RNG; Generator-based snapshots don't round-trip with set_state.
+            "numpy": np.random.get_state(legacy=True),  # noqa: NPY002
+        }
+
+        fp_hash, fp_count = compute_concept_fingerprint(
+            getattr(self.config, "concepts", None),
+            getattr(self.config, "concept_file_name", None),
+        )
+        self.model.accumulator_state = {
+            "accumulated_loss": acc_loss_f,
+            "param_grads": param_grads,
+            "scaler": scaler_state,
+            "rng": rng,
+            "fingerprint": {
+                "gradient_accumulation_steps": int(self.config.gradient_accumulation_steps),
+                "dataset_hash": fp_hash,
+                "concept_count": fp_count,
+            },
+        }
+
+    def _clear_staged_accumulator_state(self):
+        if self.model is not None:
+            self.model.accumulator_state = None
+
+    def _restore_accumulator_state(
+            self,
+            accumulated_loss: torch.Tensor,
+            train_device: torch.device,
+            scaler,
+    ) -> tuple[torch.Tensor, bool]:
+        # Returns (accumulated_loss, has_gradient). Warn-only on mismatch; never discards state.
+        if not multi.is_master():
+            return accumulated_loss, False
+        state = getattr(self.model, "accumulator_state", None)
+        if state is None:
+            return accumulated_loss, False
+
+        fp = state.get("fingerprint", {})
+        saved_acc = fp.get("gradient_accumulation_steps")
+        if saved_acc is not None and saved_acc != self.config.gradient_accumulation_steps:
+            print(
+                f"Warning: gradient_accumulation_steps mismatch on resume: "
+                f"saved={saved_acc} current={self.config.gradient_accumulation_steps}; "
+                f"restoring partial accumulator state anyway."
+            )
+        current_hash, current_count = compute_concept_fingerprint(
+            getattr(self.config, "concepts", None),
+            getattr(self.config, "concept_file_name", None),
+        )
+        if fp.get("dataset_hash") and fp.get("dataset_hash") != current_hash:
+            delta = current_count - int(fp.get("concept_count", current_count))
+            print(
+                f"Warning: dataset fingerprint mismatch on resume: "
+                f"saved_concepts={fp.get('concept_count')} current_concepts={current_count} "
+                f"(delta={delta}); restoring partial accumulator state anyway."
+            )
+
+        acc_loss_f = float(state.get("accumulated_loss", 0.0) or 0.0)
+        accumulated_loss = torch.tensor(acc_loss_f, device=train_device)
+
+        saved_grads: dict = state.get("param_grads", {}) or {}
+        if self.model is not None and self.model.parameters is not None:
+            current_keys = {k for k, _ in self.model.parameters.iter_named_parameters()}
+            missing = [k for k in saved_grads if k not in current_keys]
+            if saved_grads and len(missing) / len(saved_grads) > 0.10:
+                print(
+                    f"Warning: {len(missing)} of {len(saved_grads)} saved grad keys are "
+                    f"absent in the current model; skipping those grads."
+                )
+            applied = 0
+            for key, p in self.model.parameters.iter_named_parameters():
+                if not p.requires_grad:
+                    continue
+                if key in saved_grads:
+                    p.grad = saved_grads[key].to(device=p.device, dtype=p.dtype, non_blocking=True)
+                    applied += 1
+                else:
+                    p.grad = None
+            has_gradient = applied > 0
+        else:
+            has_gradient = False
+
+        if scaler is not None and state.get("scaler") is not None:
+            try:
+                scaler.load_state_dict(state["scaler"])
+            except Exception:
+                print("Warning: could not restore GradScaler state; continuing with a fresh scaler.")
+
+        rng = state.get("rng", {}) or {}
+        if "torch_cpu" in rng and rng["torch_cpu"] is not None:
+            torch.set_rng_state(rng["torch_cpu"])
+        if rng.get("torch_cuda") is not None and torch.cuda.is_available():
+            with contextlib.suppress(Exception):
+                torch.cuda.set_rng_state_all(rng["torch_cuda"])
+        if "python" in rng and rng["python"] is not None:
+            random.setstate(rng["python"])
+        if rng.get("numpy") is not None:
+            with contextlib.suppress(Exception):
+                np.random.set_state(rng["numpy"])  # noqa: NPY002
+
+        self.model.accumulator_state = None
+        return accumulated_loss, has_gradient
 
     def __apply_fused_back_pass(self, scaler):
         fused_optimizer_step = self.config.optimizer.optimizer.supports_fused_back_pass() and self.config.optimizer.fused_back_pass
@@ -624,6 +773,7 @@ class GenericTrainer(BaseTrainer):
             return
 
         scaler = create_grad_scaler() if enable_grad_scaling(self.config.train_dtype, self.parameters) else None
+        self._loop_scaler = scaler  # mirror so save-side staging can capture state_dict
 
         self.__apply_fused_back_pass(scaler)
 
@@ -636,6 +786,15 @@ class GenericTrainer(BaseTrainer):
         ema_loss = None
         ema_loss_steps = 0
         epochs = range(train_progress.epoch, self.config.epochs, 1)
+
+        # If resuming from a mid-window save, restore in-flight accumulator + grads + RNG.
+        accumulated_loss, restored_has_grad = self._restore_accumulator_state(
+            accumulated_loss, train_device, scaler,
+        )
+        if restored_has_grad:
+            has_gradient = True
+        self._loop_accumulated_loss_tensor = accumulated_loss
+        self._loop_accumulated_loss = float(accumulated_loss.item()) if accumulated_loss is not None else 0.0
 
         for _epoch in tqdm(epochs, desc="epoch") if multi.is_master() else epochs:
             multi.sync_commands(self.commands)
@@ -764,6 +923,7 @@ class GenericTrainer(BaseTrainer):
                     detached_loss = loss.detach()
                     multi.reduce_tensor_mean(detached_loss)
                     accumulated_loss += detached_loss
+                    self._loop_accumulated_loss_tensor = accumulated_loss  # save-side stage mirror
 
                     if self.__is_update_step(train_progress):
                         if self.config.fused_gradient_reduce:
@@ -810,6 +970,8 @@ class GenericTrainer(BaseTrainer):
                             self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, train_progress.global_step)
 
                         accumulated_loss = 0.0
+                        self._loop_accumulated_loss = 0.0  # clear save-side mirror at boundary
+                        self._loop_accumulated_loss_tensor = None
                         self.model_setup.after_optimizer_step(self.model, self.config, train_progress)
 
                         if self.model.ema:
