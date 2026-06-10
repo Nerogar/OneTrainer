@@ -143,7 +143,7 @@ def create_optimizer(
 
     if config.optimizer.optimizer.is_adv:
         # Tag PEFT parameters based on parameter names.
-        tag_peft_parameters(model)
+        tag_peft_parameters(model, config)
 
     match config.optimizer.optimizer:
 
