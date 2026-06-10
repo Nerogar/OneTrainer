@@ -1162,7 +1162,7 @@ class TrainConfig(BaseConfig):
         data.append(("oft_block_size", 32, int, False))
         data.append(("oft_block_share", False, bool, False))
         data.append(("oft_scaled", False, bool, False))
-        data.append(("oft_clipped_norm", 1.0, float, True))
+        data.append(("oft_clipped_norm", 0.95, float, True))
 
         # lokr
         data.append(("lokr_dim", 16, int, False))
