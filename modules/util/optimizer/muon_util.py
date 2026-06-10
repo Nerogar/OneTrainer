@@ -68,7 +68,7 @@ def build_muon_adam_key_fn(
                     "double_stream_blocks",
                     "single_stream_blocks",
                 ]
-            case ModelType.Z_IMAGE:
+            case ModelType.Z_IMAGE | ModelType.ERNIE:
                 default_patterns = [
                     "layers",
                     "refiner",

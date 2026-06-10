@@ -939,7 +939,6 @@ def create_optimizer(
                 nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
-                cautious_mask=optimizer_config.cautious_mask if optimizer_config.cautious_mask is not None else False,
                 orthogonal_gradient=optimizer_config.orthogonal_gradient
                 if optimizer_config.orthogonal_gradient is not None
                 else False,

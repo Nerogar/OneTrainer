@@ -39,6 +39,8 @@ class ModelType(Enum):
 
     Z_IMAGE = "Z_IMAGE"
 
+    ERNIE = "ERNIE"
+
     def __str__(self):
         return self.value
 
@@ -102,6 +104,9 @@ class ModelType(Enum):
     def is_z_image(self):
         return self == ModelType.Z_IMAGE
 
+    def is_ernie(self):
+        return self == ModelType.ERNIE
+
     def has_mask_input(self) -> bool:
         return (
             self == ModelType.STABLE_DIFFUSION_15_INPAINTING
@@ -159,6 +164,7 @@ class ModelType(Enum):
             or self.is_hunyuan_video()
             or self.is_hi_dream()
             or self.is_z_image()
+            or self.is_ernie()
         )
 
     def is_video_model(self) -> bool:
@@ -169,6 +175,7 @@ class PeftType(Enum):
     LORA = "LORA"
     LOHA = "LOHA"
     OFT_2 = "OFT_2"
+    LOKR = "LOKR"
 
     def __str__(self):
         return self.value

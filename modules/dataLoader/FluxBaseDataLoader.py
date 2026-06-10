@@ -78,7 +78,7 @@ class FluxBaseDataLoader(
             tokens_out_name="tokens_1",
             mask_out_name="tokens_mask_1",
             tokenizer=model.tokenizer_1,
-            max_token_length=model.tokenizer_1.model_max_length,
+            max_token_length=77,
         )
         tokenize_prompt_2 = Tokenize(
             in_name="prompt_2",

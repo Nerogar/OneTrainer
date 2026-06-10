@@ -116,7 +116,7 @@ class HiDreamModelLoader(
         tokenizer_2 = (
             CLIPTokenizer.from_pretrained(
                 base_model_name,
-                subfolder="tokenizer",
+                subfolder="tokenizer_2",
             )
             if include_text_encoder_2
             else None
@@ -135,7 +135,7 @@ class HiDreamModelLoader(
             LlamaTokenizerFast.from_pretrained(
                 text_encoder_4_model_name,
             )
-            if include_text_encoder_1
+            if include_text_encoder_4
             else None
         )
 

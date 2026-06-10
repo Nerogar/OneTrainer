@@ -12,7 +12,7 @@ from modules.util.ModelWeightDtypes import ModelWeightDtypes
 
 from diffusers import DDPMWuerstchenScheduler
 from diffusers.models import StableCascadeUNet
-from diffusers.pipelines.wuerstchen import PaellaVQModel, WuerstchenDiffNeXt, WuerstchenPrior
+from diffusers.pipelines.deprecated.wuerstchen import PaellaVQModel, WuerstchenDiffNeXt, WuerstchenPrior
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 from safetensors import safe_open

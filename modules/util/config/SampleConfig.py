@@ -147,7 +147,7 @@ def _get_model_defaults(model_type) -> dict:
                 "cfg_scale": 4.5,
             }
         )
-    elif model_type.is_wuerstchen():
+    elif model_type.is_wuerstchen() or model_type.is_ernie():
         defaults.update(
             {
                 "width": 1024,

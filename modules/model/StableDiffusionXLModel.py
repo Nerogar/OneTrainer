@@ -275,7 +275,7 @@ class StableDiffusionXLModel(BaseModel):
         )
 
         # apply dropout
-        if text_encoder_1_dropout_probability is not None:
+        if text_encoder_1_dropout_probability is not None and text_encoder_1_dropout_probability > 0.0:
             dropout_text_encoder_1_mask = (
                 torch.tensor(
                     [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)], device=train_device
@@ -283,7 +283,7 @@ class StableDiffusionXLModel(BaseModel):
             ).float()
             text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None, None]
 
-        if text_encoder_2_dropout_probability is not None:
+        if text_encoder_2_dropout_probability is not None and text_encoder_2_dropout_probability > 0.0:
             dropout_text_encoder_2_mask = (
                 torch.tensor(
                     [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)], device=train_device

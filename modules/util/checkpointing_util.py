@@ -116,6 +116,9 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
         self.layer_index = layer_index
 
     def __checkpointing_forward(self, dummy: torch.Tensor, call_id: int, *args):
+        # during the backward pass, this runs on an autograd worker thread, which needs its own
+        # dynamo config initialization (see init_compile)
+        init_compile()
         if self.layer_index == 0 and not torch.is_grad_enabled():
             self.conductor.start_forward(True)
 
@@ -538,5 +541,19 @@ def enable_checkpointing_for_hi_dream_transformer(
         [
             (HiDreamImageTransformerBlock, ["hidden_states", "encoder_hidden_states"]),
             (HiDreamImageSingleTransformerBlock, ["hidden_states"]),
+        ],
+    )
+
+
+def enable_checkpointing_for_ernie_transformer(
+    model: nn.Module,
+    config: TrainConfig,
+) -> LayerOffloadConductor:
+    return enable_checkpointing(
+        model,
+        config,
+        config.compile,
+        [
+            (model.layers, ["x"]),
         ],
     )
