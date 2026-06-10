@@ -3,6 +3,7 @@ from contextlib import contextmanager
 
 from modules.model.BaseModel import BaseModel
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig, TrainModelPartConfig
+from modules.util.enum.DPOObjective import DPOObjective
 from modules.util.enum.DPORefMode import DPORefMode
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModuleFilter import ModuleFilter
@@ -235,13 +236,23 @@ class BaseModelSetup(
 
         chosen_ratio = policy_chosen_logp - ref_chosen_logp.detach()
         rejected_ratio = policy_rejected_logp - ref_rejected_logp.detach()
-        logits = beta * (chosen_ratio - rejected_ratio)
-        dpo_loss = -F.logsigmoid(logits).mean()
-        loss = dpo_loss
+        margin = chosen_ratio - rejected_ratio
 
-        if config.rlhf_dpo_label_smoothing > 0:
-            s = config.rlhf_dpo_label_smoothing
-            loss = (1 - s) * loss + s * (-F.logsigmoid(-logits).mean())
+        if config.rlhf_dpo_objective == DPOObjective.IPO:
+            # IPO regresses the raw margin toward the fixed target 1/(2*tau)
+            # instead of pushing it to infinity, which structurally resists
+            # reward hacking. tau plays beta's role; label smoothing and beta
+            # do not apply.
+            dpo_loss = (margin - 1.0 / (2.0 * config.rlhf_dpo_ipo_tau)).pow(2).mean()
+            loss = dpo_loss
+        else:
+            logits = beta * margin
+            dpo_loss = -F.logsigmoid(logits).mean()
+            loss = dpo_loss
+
+            if config.rlhf_dpo_label_smoothing > 0:
+                s = config.rlhf_dpo_label_smoothing
+                loss = (1 - s) * loss + s * (-F.logsigmoid(-logits).mean())
 
         if supervised_loss is not None:
             loss = loss + config.rlhf_supervised_mix * supervised_loss
@@ -252,7 +263,7 @@ class BaseModelSetup(
             "dpo_loss": dpo_loss.detach().item(),
             "chosen_reward": chosen_ratio.detach().mean().item(),
             "rejected_reward": rejected_ratio.detach().mean().item(),
-            "reward_margin": (chosen_ratio - rejected_ratio).detach().mean().item(),
+            "reward_margin": margin.detach().mean().item(),
             "accuracy": (chosen_ratio > rejected_ratio).float().mean().item(),
         }
 

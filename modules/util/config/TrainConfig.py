@@ -12,6 +12,7 @@ from modules.util.config.SecretsConfig import SecretsConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
+from modules.util.enum.DPOObjective import DPOObjective
 from modules.util.enum.DPORefMode import DPORefMode
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
@@ -546,6 +547,8 @@ class TrainConfig(BaseConfig):
     rlhf_enabled: bool
     rlhf_dpo_beta: float
     rlhf_dpo_label_smoothing: float
+    rlhf_dpo_objective: DPOObjective
+    rlhf_dpo_ipo_tau: float
     rlhf_dpo_ref_mode: DPORefMode
     rlhf_supervised_mix: float
     rlhf_dpo_validation: bool
@@ -608,6 +611,7 @@ class TrainConfig(BaseConfig):
                 13: self.__migration_13,
                 14: self.__migration_14,
                 15: self.__migration_15,
+                16: self.__migration_16,
             }
         )
 
@@ -867,6 +871,12 @@ class TrainConfig(BaseConfig):
     def __migration_15(self, data: dict) -> dict:
         migrated_data = data.copy()
         migrated_data.setdefault("rlhf_dpo_save_best", True)
+        return migrated_data
+
+    def __migration_16(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        migrated_data.setdefault("rlhf_dpo_objective", "SIGMOID")
+        migrated_data.setdefault("rlhf_dpo_ipo_tau", 1000.0)
         return migrated_data
 
     def effective_dpo_ref_mode(self) -> DPORefMode:
@@ -1255,6 +1265,8 @@ class TrainConfig(BaseConfig):
         data.append(("rlhf_enabled", False, bool, False))
         data.append(("rlhf_dpo_beta", 300.0, float, False))
         data.append(("rlhf_dpo_label_smoothing", 0.0, float, False))
+        data.append(("rlhf_dpo_objective", DPOObjective.SIGMOID, DPOObjective, False))
+        data.append(("rlhf_dpo_ipo_tau", 1000.0, float, False))
         data.append(("rlhf_dpo_ref_mode", DPORefMode.NEW_ADAPTER, DPORefMode, False))
         data.append(("rlhf_supervised_mix", 0.0, float, False))
         data.append(("rlhf_dpo_validation", False, bool, False))
