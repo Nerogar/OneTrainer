@@ -36,6 +36,7 @@ class BaseModelSetup(
         self.frozen_parameters = {}
         self._dpo_ref_params = None
         self._last_dpo_metrics = None
+        self._dpo_paired_half = None  # read by ModelSetupNoiseMixin._apply_dpo_paired_rng
 
     @abstractmethod
     def create_parameters(
@@ -238,15 +239,19 @@ class BaseModelSetup(
             # 2 forwards: 1 batched ref (no_grad) + 1 batched policy.
             batched_input, chosen_b = self._create_dpo_batched_batch(batch)
 
-            with torch.no_grad(), self.reference_model(model, config):
-                ref_output = self.predict(model, batched_input, config, chosen_progress)
-                ref_predicted = ref_output["predicted"].float()
-                ref_target = ref_output["target"].float()
-                ref_chosen_logp = -mse_per_sample(ref_predicted[:chosen_b], ref_target[:chosen_b])
-                ref_rejected_logp = -mse_per_sample(ref_predicted[chosen_b:], ref_target[chosen_b:])
-                del ref_output, ref_predicted, ref_target
+            self._dpo_paired_half = chosen_b
+            try:
+                with torch.no_grad(), self.reference_model(model, config):
+                    ref_output = self.predict(model, batched_input, config, chosen_progress)
+                    ref_predicted = ref_output["predicted"].float()
+                    ref_target = ref_output["target"].float()
+                    ref_chosen_logp = -mse_per_sample(ref_predicted[:chosen_b], ref_target[:chosen_b])
+                    ref_rejected_logp = -mse_per_sample(ref_predicted[chosen_b:], ref_target[chosen_b:])
+                    del ref_output, ref_predicted, ref_target
 
-            policy_output = self.predict(model, batched_input, config, chosen_progress)
+                policy_output = self.predict(model, batched_input, config, chosen_progress)
+            finally:
+                self._dpo_paired_half = None
             policy_predicted = policy_output["predicted"].float()
             policy_target = policy_output["target"].float()
             policy_chosen_logp = -mse_per_sample(policy_predicted[:chosen_b], policy_target[:chosen_b])
@@ -272,7 +277,11 @@ class BaseModelSetup(
                 del ref_rejected_output
 
             batched_input, chosen_b = self._create_dpo_batched_batch(batch)
-            policy_output = self.predict(model, batched_input, config, chosen_progress)
+            self._dpo_paired_half = chosen_b
+            try:
+                policy_output = self.predict(model, batched_input, config, chosen_progress)
+            finally:
+                self._dpo_paired_half = None
             policy_predicted = policy_output["predicted"].float()
             policy_target = policy_output["target"].float()
             policy_chosen_logp = -mse_per_sample(policy_predicted[:chosen_b], policy_target[:chosen_b])
