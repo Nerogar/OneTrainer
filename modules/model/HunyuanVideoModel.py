@@ -196,15 +196,15 @@ class HunyuanVideoModel(BaseModel):
             self.text_encoder_2.eval()
         self.transformer.eval()
 
-    def create_pipeline(self, use_original_modules: bool) -> DiffusionPipeline:
+    def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
         return HunyuanVideoPipeline(
             transformer=self.transformer,
             scheduler=self.noise_scheduler,
             vae=self.vae,
             text_encoder=self.text_encoder_1,
-            tokenizer=self.orig_tokenizer_1 if use_original_modules else self.tokenizer_1,
+            tokenizer=self.orig_tokenizer_1 if use_original_tokenizers else self.tokenizer_1,
             text_encoder_2=self.text_encoder_2,
-            tokenizer_2=self.orig_tokenizer_2 if use_original_modules else self.tokenizer_2,
+            tokenizer_2=self.orig_tokenizer_2 if use_original_tokenizers else self.tokenizer_2,
         )
 
     def add_text_encoder_1_embeddings_to_prompt(self, prompt: str) -> str:
