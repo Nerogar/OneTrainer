@@ -3,6 +3,7 @@ import os
 import random
 import threading
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from queue import Empty, Full, Queue
 from tkinter import filedialog, messagebox
 
@@ -12,16 +13,18 @@ from modules.util.dpo_curation_util import (
     finalize_export,
     find_exported_file,
     find_orphaned_pairs,
+    is_byte_identical_used,
     is_source_used,
     load_manifest,
     manifest_pair_counts,
+    manifest_used_fingerprints,
     manifest_used_sources,
-    normalize_prompt_for_grouping,
     prune_orphaned_pairs,
     remove_pair,
     resolve_aspect_ratio,
+    walk_skipping_dotted,
 )
-from modules.util.image_metadata_util import extract_metadata
+from modules.util.image_metadata_util import extract_metadata, strip_angle_bracket_segments
 from modules.util.ui.ui_utils import set_window_icon
 
 import customtkinter as ctk
@@ -217,39 +220,30 @@ class DPOCurationWindow(ctk.CTkToplevel):
         self._show_scanning_ui()
 
     @staticmethod
-    def _dedup_by_content_hash(images: list[str]) -> list[str]:
-        """Drop byte-identical files within a group, keeping the latest mtime
-        copy. DPO is *meant* to discriminate between near-duplicates from
-        different seeds, so we use BLAKE3 on raw file bytes — only literal
-        copies (re-runs writing the same file twice, manual duplicates) get
-        collapsed; perceptually similar but byte-different generations stay
-        as separate candidates. Memory-mapped read keeps this fast even on
-        large PNGs."""
-        import blake3
+    def _dhash(path: str, hash_size: int = 8) -> int:
+        """Compute a difference hash for duplicate detection."""
+        with Image.open(path) as img:
+            img = img.convert("L").resize((hash_size + 1, hash_size), Image.Resampling.LANCZOS)
+            pixels = list(img.getdata())
+        bits = 0
+        for row in range(hash_size):
+            for col in range(hash_size):
+                idx = row * (hash_size + 1) + col
+                if pixels[idx] < pixels[idx + 1]:
+                    bits |= 1 << (row * hash_size + col)
+        return bits
 
-        seen: dict[str, int] = {}
+    @staticmethod
+    def _dedup_by_dhash(images: list[str]) -> list[str]:
+        """Remove visually identical images from a list, keeping the latest mtime of each."""
+        seen: dict[int, int] = {}
         unique: list[str] = []
         for path in images:
             try:
-                hasher = blake3.blake3()
-                hasher.update_mmap(path)
-                h = hasher.hexdigest()
-            except (OSError, ValueError):
-                # mmap fails on empty files; fall back to streaming read so a
-                # zero-byte placeholder still gets a stable hash rather than
-                # being silently passed through unduped.
-                try:
-                    hasher = blake3.blake3()
-                    with open(path, "rb") as f:
-                        while True:
-                            chunk = f.read(1 << 20)
-                            if not chunk:
-                                break
-                            hasher.update(chunk)
-                    h = hasher.hexdigest()
-                except OSError:
-                    unique.append(path)
-                    continue
+                h = DPOCurationWindow._dhash(path)
+            except Exception:
+                unique.append(path)
+                continue
             if h not in seen:
                 seen[h] = len(unique)
                 unique.append(path)
@@ -262,28 +256,66 @@ class DPOCurationWindow(ctk.CTkToplevel):
                     continue
         return unique
 
+    @staticmethod
+    def _extract_group_key(path: str) -> tuple[str, str]:
+        """Run metadata extraction for one file and reduce it to the (prompt, aspectratio)
+        bucket key. The aspect component is the trainer bucket label (e.g. "7:4"), derived
+        from actual pixel dimensions — so 1344x768 and 1680x960 (both ~16:9 presets) group
+        together, exactly as AspectBucketing crops them to the same bucket at train time.
+        Safe to call from a worker thread."""
+        meta = extract_metadata(path)
+        prompt = meta.get("prompt", "").strip()
+        ar = resolve_aspect_ratio(meta.get("aspectratio", ""), path)
+        if prompt:
+            prompt = strip_angle_bracket_segments(prompt)
+        if not prompt:
+            prompt = "UNCONDITIONAL"
+        return prompt, ar
+
+    @staticmethod
+    def _scan_worker_count() -> int:
+        # Metadata extraction is I/O-bound (file open + small read + parse), so oversubscribing
+        # the CPU pays off — but cap it so we don't thrash on HDDs or hit Windows' per-process
+        # thread limits.
+        return min(16, (os.cpu_count() or 4) * 2)
+
     def _background_scan_and_dedup(self, folder: str):
         supported = path_util.supported_image_extensions()
-        groups_dict: defaultdict[tuple[str, str], list[str]] = defaultdict(list)
 
-        for root, _, files in os.walk(folder):
-            for filename in sorted(files):
-                if self._worker_stop.is_set():
-                    return
+        # Pass 1: enumerate candidate paths up front. os.walk uses scandir under the hood
+        # so this is cheap even on large trees, and collecting paths first lets us fan
+        # the expensive per-file metadata reads out across a thread pool. Dot-prefixed
+        # subdirectories (.thumbnails, .cache, ...) are pruned from the walk entirely.
+        candidate_paths: list[str] = []
+        for root, files in walk_skipping_dotted(folder):
+            if self._worker_stop.is_set():
+                return
+            for filename in files:
                 ext = os.path.splitext(filename)[1].lower()
-                if ext not in supported:
-                    continue
-                path = os.path.join(root, filename)
-                meta = extract_metadata(path)
-                # Most non-SwarmUI generators don't write an aspectratio
-                # metadata field, so fall back to the file's actual pixel
-                # dimensions. Without this, every such image collapses into
-                # the same empty-AR bucket and pairs end up shape-mismatched
-                # at train time.
-                ar = resolve_aspect_ratio(meta.get("aspectratio", ""), path)
-                prompt = normalize_prompt_for_grouping(meta.get("prompt", ""))
-                groups_dict[(prompt, ar)].append(path)
-                self._scan_count += 1
+                if ext in supported:
+                    candidate_paths.append(os.path.join(root, filename))
+
+        # Pass 2: parallel metadata extraction. The grouping dict is mutated only on the
+        # consumer side of `as_completed`, so no lock is needed; `_scan_count` is a plain
+        # int updated here too (single writer).
+        groups_dict: defaultdict[tuple[str, str], list[str]] = defaultdict(list)
+        if candidate_paths:
+            with ThreadPoolExecutor(max_workers=self._scan_worker_count()) as pool:
+                future_to_path = {pool.submit(self._extract_group_key, p): p for p in candidate_paths}
+                for future in as_completed(future_to_path):
+                    if self._worker_stop.is_set():
+                        # Don't wait for in-flight futures on cancel — each is a single
+                        # file read and will finish on its own. cancel_futures handles
+                        # the rest of the queue.
+                        pool.shutdown(wait=False, cancel_futures=True)
+                        return
+                    try:
+                        prompt, ar = future.result()
+                    except Exception:
+                        self._scan_count += 1
+                        continue
+                    groups_dict[(prompt, ar)].append(future_to_path[future])
+                    self._scan_count += 1
 
         raw_groups = [
             {"prompt": prompt, "aspectratio": ar, "images": images}
@@ -293,7 +325,11 @@ class DPOCurationWindow(ctk.CTkToplevel):
         random.shuffle(raw_groups)
 
         existing_counts = manifest_pair_counts(self.manifest)
+        # Path-based filter is cheap; fingerprint filter backfills SHA-256 for legacy
+        # entries (one-shot disk read per old pair) then uses size as a pre-filter so
+        # candidates only get hashed when their byte-length matches an existing pair.
         used_sources = manifest_used_sources(self.manifest)
+        used_fingerprints = manifest_used_fingerprints(self.manifest, self.output_dir)
 
         for group in raw_groups:
             if self._worker_stop.is_set():
@@ -304,13 +340,18 @@ class DPOCurationWindow(ctk.CTkToplevel):
             if not is_unconditional and existing_counts.get(group_key, 0) >= self.pairs_per_group:
                 continue
 
-            # Drop images already committed in any prior pair before dedup so
-            # the content-hash pass doesn't waste work on sources we'll discard.
-            fresh = [i for i in group["images"] if not is_source_used(used_sources, i)]
-            if len(fresh) < 2:
+            filtered: list[str] = []
+            for path in group["images"]:
+                if is_source_used(used_sources, path):
+                    continue
+                if is_byte_identical_used(used_fingerprints, path):
+                    continue
+                filtered.append(path)
+            if len(filtered) < 2:
                 continue
+            group["images"] = filtered
 
-            deduped = self._dedup_by_content_hash(fresh)
+            deduped = self._dedup_by_dhash(group["images"])
             if len(deduped) >= 2:
                 group["images"] = deduped
                 self._groups_queued += 1
@@ -381,20 +422,10 @@ class DPOCurationWindow(ctk.CTkToplevel):
             if not is_unconditional and pairs_done >= self.pairs_per_group:
                 continue
 
-            # Re-filter against the manifest at present-time. The scan-time
-            # filter is best-effort (the manifest may have grown since), and
-            # for groups already partway through pairs_per_group we need to
-            # drop any sources that were committed in earlier passes so the
-            # same image cannot end up on both sides of a future pair.
-            used_sources = manifest_used_sources(self.manifest)
-            available = [i for i in group["images"] if not is_source_used(used_sources, i)]
-            if len(available) < 2:
-                continue
-
             self._current_group = group
             self._groups_shown += 1
             self.pairs_created_in_group = pairs_done
-            self.current_remaining_images = available
+            self.current_remaining_images = list(group["images"])
 
             if self.mode == "elo":
                 self._start_elo_round()
@@ -665,12 +696,6 @@ class DPOCurationWindow(ctk.CTkToplevel):
             self.selection_phase = "worst"
             self._build_selection_ui()
         else:
-            # Defensive: never let the same image land on both sides of a
-            # pair. The grid filters the best out of the worst-pick UI, but
-            # any future regression there shouldn't be able to corrupt the
-            # exported pair.
-            if path == self.selected_best:
-                return
             remaining_after = [img for img in self.current_remaining_images if img not in {self.selected_best, path}]
             can_continue = len(remaining_after) >= 2
 

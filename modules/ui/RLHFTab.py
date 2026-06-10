@@ -5,12 +5,15 @@ from tkinter import messagebox
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dpo_curation_util import (
     check_dpo_pairs,
+    correct_all_captions_to_chosen,
     dpo_concept_pairs,
+    find_caption_mismatches,
     fix_multiline_captions,
     remove_finalized_pair,
 )
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.DPOExecutionMode import DPOExecutionMode
+from modules.util.enum.DPOPatienceMode import DPOPatienceMode
 from modules.util.enum.RLHFMode import RLHFMode
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -94,7 +97,9 @@ class RLHFTab:
             3,
             0,
             "Supervised Mix",
-            tooltip="Blends regular training with preference training. Higher values keep the model closer to what it already learned.",
+            tooltip="Blends an NLL term on the CHOSEN images of each DPO pair into the loss. "
+            "Anchors the policy to its own chosen samples. Distinct from SFT Anchor, "
+            "which uses a separate set of standard concepts.",
         )
         components.entry(self.scroll_frame, 3, 1, self.ui_state, "rlhf_supervised_mix")
 
@@ -151,6 +156,19 @@ class RLHFTab:
         )
         components.entry(self.scroll_frame, 5, 4, self.ui_state, "rlhf_dpo_patience_value")
 
+        patience_mode_options = [
+            ("Either", DPOPatienceMode.EITHER),
+            ("Both", DPOPatienceMode.BOTH),
+        ]
+        components.label(
+            self.scroll_frame,
+            6,
+            0,
+            "Patience Trigger",
+            tooltip="Which metric must improve to reset the patience counter: accuracy, loss, or both.",
+        )
+        components.options_kv(self.scroll_frame, 6, 1, patience_mode_options, self.ui_state, "rlhf_dpo_patience_mode")
+
         components.label(
             self.scroll_frame,
             6,
@@ -161,9 +179,20 @@ class RLHFTab:
         )
         components.switch(self.scroll_frame, 6, 4, self.ui_state, "rlhf_dpo_save_best")
 
-        components.button(
+        components.label(
             self.scroll_frame,
             7,
+            0,
+            "SFT Anchor Weight",
+            tooltip="Weight on a supervised loss computed from your STANDARD concepts during a DPO run. "
+            "When >0 and standard concepts are present, the loader runs them in parallel and adds "
+            "weight * sft_loss to the DPO loss. Set to 0 to silently drop standard concepts (legacy behavior).",
+        )
+        components.entry(self.scroll_frame, 7, 1, self.ui_state, "rlhf_sft_anchor_weight")
+
+        components.button(
+            self.scroll_frame,
+            8,
             0,
             "Check Pairs",
             command=self._check_pairs,
@@ -171,7 +200,7 @@ class RLHFTab:
         )
         components.button(
             self.scroll_frame,
-            7,
+            8,
             1,
             "Review Pairs",
             command=self._review_pairs,
@@ -188,14 +217,14 @@ class RLHFTab:
 
         components.label(
             self.scroll_frame,
-            8,
+            9,
             0,
             "Training Type:",
             tooltip="Shows whether DPO is starting from a fresh adapter or refining a loaded adapter. The output is always an adapter file.",
         )
         components.label(
             self.scroll_frame,
-            8,
+            9,
             1,
             training_type,
             tooltip="DPO always writes an adapter file. New Adapter means the adapter starts from scratch. Existing Adapter means DPO refines a loaded adapter.",
@@ -270,6 +299,35 @@ class RLHFTab:
             if fix:
                 fixed = fix_multiline_captions(concept_pairs)
                 messagebox.showinfo("Captions Fixed", f"Flattened {fixed} caption file(s) to single lines.")
+
+        # Caption-content mismatch resolution: chosen.txt vs rejected.txt for
+        # matched image pairs. Runs last so any earlier stray/multiline fixes
+        # are reflected in the matched-pair set this scans.
+        try:
+            mismatches = find_caption_mismatches(concept_pairs)
+        except Exception as ex:
+            messagebox.showerror("Caption Mismatch Error", f"Error checking captions: {ex}")
+            return
+
+        if not mismatches:
+            return
+
+        from modules.ui.DPOCaptionMismatchWindow import (
+            DPOCaptionMismatchChoiceDialog,
+            DPOCaptionMismatchWindow,
+        )
+
+        dialog = DPOCaptionMismatchChoiceDialog(self.master.winfo_toplevel(), len(mismatches))
+        self.master.winfo_toplevel().wait_window(dialog)
+        choice = dialog.result
+        if choice == "correct_all":
+            corrected = correct_all_captions_to_chosen(mismatches)
+            messagebox.showinfo(
+                "Captions Corrected",
+                f"Overwrote {corrected} rejected caption file(s) with the chosen caption.",
+            )
+        elif choice == "manual":
+            DPOCaptionMismatchWindow(self.master.winfo_toplevel(), concept_pairs)
 
     def _remove_strays(self, concept_pairs, result) -> int:
         from modules.util.dpo_curation_util import dpo_pair_key

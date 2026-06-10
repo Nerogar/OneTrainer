@@ -133,13 +133,48 @@ def label_aspect(h: int, w: int) -> str:
     return f"~{frac.numerator}:{frac.denominator} {orient}"
 
 
-def _iter_image_files(concept_path: str):
+_DEFAULT_EXCLUDE_POSTFIX = ("-masklabel", "-condlabel")
+
+
+def _iter_image_files(
+    concept_path: str,
+    include_subdirectories: bool = True,
+    exclude_postfix: tuple[str, ...] = _DEFAULT_EXCLUDE_POSTFIX,
+):
+    """Yield image paths under concept_path using OneTrainer's CollectPaths rules:
+
+    - Skip subdirectories whose basename starts with '.'
+    - Filter to supported image extensions
+    - Exclude filenames whose stem ends with any of `exclude_postfix`
+      (defaults to '-masklabel' and '-condlabel', matching the data loader)
+    - Recurse only when `include_subdirectories` is True
+    """
     exts = supported_image_extensions()
-    for root, _dirs, files in os.walk(concept_path):
-        for fname in files:
-            ext = os.path.splitext(fname)[1].lower()
-            if ext in exts:
-                yield os.path.join(root, fname)
+    if not os.path.isdir(concept_path):
+        return
+
+    def _matches(fname: str) -> bool:
+        stem, ext = os.path.splitext(fname)
+        if ext.lower() not in exts:
+            return False
+        return not any(stem.endswith(pf) for pf in exclude_postfix)
+
+    if include_subdirectories:
+        for root, dirs, files in os.walk(concept_path):
+            # Mutate dirs in place to prevent os.walk from descending into dotted dirs.
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
+            for fname in files:
+                if _matches(fname):
+                    yield os.path.join(root, fname)
+    else:
+        try:
+            entries = os.listdir(concept_path)
+        except OSError:
+            return
+        for fname in entries:
+            full = os.path.join(concept_path, fname)
+            if os.path.isfile(full) and _matches(fname):
+                yield full
 
 
 def _read_image_size(path: str):
@@ -155,9 +190,14 @@ def analyze_concept(
     batch_size: int,
     target_resolutions: list[int],
     quantization: int,
+    include_subdirectories: bool = True,
 ) -> dict:
     """Bucket every image under concept_path and compute drop/add/remove counts
     per bucket for the given batch_size, for each target resolution.
+
+    Image discovery mirrors the trainer's CollectPaths pipeline module: dotted
+    subdirectories are skipped, '-masklabel' / '-condlabel' files are excluded,
+    and recursion follows the per-concept `include_subdirectories` flag.
     """
     if batch_size <= 0:
         raise ValueError("batch_size must be a positive integer")
@@ -172,7 +212,7 @@ def analyze_concept(
     scanned = 0
     unreadable = 0
     dims: list[tuple[int, int]] = []  # list of (h, w)
-    for img_path in _iter_image_files(concept_path):
+    for img_path in _iter_image_files(concept_path, include_subdirectories=include_subdirectories):
         scanned += 1
         size = _read_image_size(img_path)
         if size is None:

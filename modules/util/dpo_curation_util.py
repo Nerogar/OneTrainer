@@ -1,9 +1,12 @@
+import hashlib
 import json
 import os
 import random
 import re
 import shutil
-from math import gcd
+import threading
+
+_SHA256_CHUNK_BYTES = 65536
 
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.enum.ConceptType import ConceptType
@@ -13,37 +16,107 @@ from modules.util.path_util import supported_image_extensions
 UNCONDITIONAL_PROMPT = "UNCONDITIONAL"
 
 
-def _aspect_ratio_from_dimensions(width: int, height: int) -> str:
-    """Reduced ``W:H`` string for the given pixel dimensions. Returns ``""``
-    for non-positive inputs so the caller can fall through to its own
-    handling. Two images of the same shape (e.g. 1024x768 and 4096x3072)
-    both reduce to ``4:3`` and group together — matching the bucketing
-    semantics the trainer applies during DPO."""
+def walk_skipping_dotted(folder: str):
+    """``os.walk`` wrapper that prunes dot-prefixed subdirectories in-place
+    (``.thumbnails``, ``.cache``, ``.stversions``, ...) so their contents are
+    never yielded — gallery apps and sync tools plant resized previews there
+    that would otherwise dhash-collide with (or duplicate) the real images.
+    Yields ``(root, files)`` pairs. The top-level ``folder`` itself is always
+    walked, even when its own name starts with a dot — only subdirectories
+    are filtered."""
+    for root, dirs, files in os.walk(folder):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        yield root, files
+
+
+# Mirrors mgds AspectBucketing.all_possible_input_aspects: the trainer snaps
+# every image's aspect to the nearest of these ratios (and their inverses)
+# regardless of target resolution, then center-crops to fit. Each entry is the
+# (W, H) label parts of the landscape orientation — aspect value W/H.
+_TRAINER_BUCKET_RATIOS: tuple[tuple[int, int], ...] = (
+    (1, 1),
+    (5, 4),
+    (3, 2),
+    (7, 4),
+    (2, 1),
+    (5, 2),
+    (3, 1),
+    (7, 2),
+    (4, 1),
+)
+
+
+def trainer_bucket_key(width: float, height: float) -> str:
+    """Label (``7:4``, ``4:7``, ``1:1``, ...) of the trainer aspect bucket the
+    image falls into, mirroring AspectBucketing's nearest-aspect assignment
+    (argmin over ``h/w`` against every bucket aspect and its inverse). Returns
+    ``""`` for non-positive inputs so the caller can fall through to its own
+    handling.
+
+    Bucket-level grouping is what lets 1344x768 and 1680x960 (both ~16:9
+    inference presets, true ratio 1.75) curate together: the trainer crops
+    both to the same bucket, so requiring exact pixel-ratio equality would
+    split pairs the trainer itself considers identical."""
     if width <= 0 or height <= 0:
         return ""
-    divisor = gcd(width, height)
-    return f"{width // divisor}:{height // divisor}"
+    aspect = height / width
+    best_label = ""
+    best_diff: float | None = None
+    for num, den in _TRAINER_BUCKET_RATIOS:
+        for bucket_aspect, label in ((den / num, f"{num}:{den}"), (num / den, f"{den}:{num}")):
+            diff = abs(bucket_aspect - aspect)
+            if best_diff is None or diff < best_diff:
+                best_diff = diff
+                best_label = label
+    return best_label
+
+
+def _parse_aspect_string(value: str) -> tuple[float, float] | None:
+    """Parse a ``16:9`` / ``16x9`` / ``1.78`` style aspect string into a
+    (width, height) ratio pair, or None when it doesn't look like one."""
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return None
+    match = re.fullmatch(r"(\d+(?:\.\d+)?)\s*[:/xX×]\s*(\d+(?:\.\d+)?)", cleaned)
+    if match:
+        w, h = float(match.group(1)), float(match.group(2))
+        return (w, h) if w > 0 and h > 0 else None
+    try:
+        ratio = float(cleaned)
+    except ValueError:
+        return None
+    return (ratio, 1.0) if ratio > 0 else None
+
+
+def normalize_aspect_for_grouping(aspectratio: str) -> str:
+    """Map any stored/metadata aspect string onto its trainer bucket label so
+    manifest entries written before bucket-aware grouping (SwarmUI ``16:9``,
+    exact reductions like ``1343:768``) count against the same groups as
+    freshly scanned images. Strings that don't parse pass through unchanged."""
+    parsed = _parse_aspect_string(aspectratio)
+    if parsed is None:
+        return (aspectratio or "").strip()
+    return trainer_bucket_key(*parsed)
 
 
 def resolve_aspect_ratio(meta_aspectratio: str, image_path: str) -> str:
-    """Return ``meta_aspectratio`` if non-empty, otherwise derive a reduced
-    ``W:H`` string from the image's actual pixel dimensions. Necessary
-    because most non-SwarmUI generators don't write an ``aspectratio``
-    metadata field — without this, every such image would collapse into a
-    single empty-AR bucket and produce tensor-shape mismatches at train
-    time. PIL ``Image.open`` is lazy and only reads the header, so the
-    extra I/O is per-file but cheap."""
-    cleaned = (meta_aspectratio or "").strip()
-    if cleaned:
-        return cleaned
+    """Trainer bucket label for the image, preferring actual pixel dimensions —
+    AspectBucketing never reads generator metadata, so pixels are the
+    authority (a SwarmUI ``16:9`` preset actually emits a 1.75 image). Falls
+    back to parsing the metadata string when the image can't be decoded, and
+    ``""`` when neither works. PIL ``Image.open`` is lazy and only reads the
+    header, so the per-file cost is one small read."""
+    width = height = 0
     try:
         from PIL import Image
 
         with Image.open(image_path) as img:
             width, height = img.size
     except Exception:
-        return ""
-    return _aspect_ratio_from_dimensions(width, height)
+        pass
+    if width > 0 and height > 0:
+        return trainer_bucket_key(width, height)
+    return normalize_aspect_for_grouping(meta_aspectratio)
 
 
 def _has_meaningful_content(prompt: str) -> bool:
@@ -99,6 +172,238 @@ def is_source_used(used_sources: set[str], path: str) -> bool:
     return normed is not None and normed in used_sources
 
 
+def compute_file_sha256(path: str) -> str | None:
+    """Streaming SHA-256 of a file's bytes — returns hex digest or None on I/O error.
+    Used to detect byte-identical images across renames or re-saved copies that
+    path-based filtering can't catch."""
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            while True:
+                chunk = f.read(_SHA256_CHUNK_BYTES)
+                if not chunk:
+                    break
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
+def compute_pixel_hash(path: str) -> str | None:
+    """BLAKE3 over the decoded pixel buffer (mode, size, raw bytes) rather than
+    the file: PNG text chunks, EXIF, ICC profiles, and re-encoded container
+    metadata don't count as a difference, but a single different pixel does.
+    Falls back to BLAKE3 of the raw file bytes when PIL can't decode (corrupt,
+    unsupported, zero-byte) so the file still gets a stable hash. Returns None
+    only when the file can't be read at all."""
+    import blake3
+    from PIL import Image, UnidentifiedImageError
+
+    try:
+        with Image.open(path) as im:
+            im.load()
+            hasher = blake3.blake3()
+            hasher.update(f"{im.mode}|{im.size[0]}x{im.size[1]}|".encode())
+            hasher.update(im.tobytes())
+            return hasher.hexdigest()
+    except (OSError, ValueError, UnidentifiedImageError, Image.DecompressionBombError):
+        pass
+    try:
+        hasher = blake3.blake3()
+        hasher.update_mmap(path)
+        return hasher.hexdigest()
+    except (OSError, ValueError):
+        pass
+    try:
+        hasher = blake3.blake3()
+        with open(path, "rb") as f:
+            while True:
+                chunk = f.read(1 << 20)
+                if not chunk:
+                    break
+                hasher.update(chunk)
+        return hasher.hexdigest()
+    except OSError:
+        return None
+
+
+class DpoScanCache:
+    """Thread-safe, JSON-backed per-file cache for DPO curation scans, keyed by
+    absolute path and validated by (size, mtime_ns). Caches the two expensive
+    per-file operations: the pixel-content hash (a full image decode) and the
+    grouping key (metadata extraction — which, for files without embedded
+    prompt markers, reads the whole file and scans it character by character).
+    With both cached, rescanning an unchanged folder costs one ``os.stat`` per
+    file. Field getters are safe to call from a thread pool — the expensive
+    compute happens outside the lock so workers don't serialize on each other.
+
+    Bump ``_VERSION`` whenever the semantics of a cached field change (hash
+    algorithm, prompt normalization, aspect-ratio derivation): stale values
+    are otherwise served forever for unchanged files."""
+
+    # v2: group_key aspect component changed from exact reduced/metadata
+    # strings to trainer bucket labels (trainer_bucket_key).
+    _VERSION = 2
+
+    def __init__(self, cache_path: str):
+        self._cache_path = cache_path
+        self._lock = threading.Lock()
+        self._entries: dict[str, dict] = {}
+        self._dirty = False
+        # Rough counters for UI feedback ("N served from cache"). Updated from
+        # worker threads without atomics — close enough for a progress display.
+        self.hits = 0
+        self.misses = 0
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if (
+                isinstance(data, dict)
+                and data.get("version") == self._VERSION
+                and isinstance(data.get("entries"), dict)
+            ):
+                self._entries = data["entries"]
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    def _get_field(self, path: str, field: str, compute):
+        """Cached ``field`` for ``path``, recomputing via ``compute(path)`` on a
+        size/mtime mismatch or when the field is missing. Fields merge into one
+        entry per file, so computing the hash never discards a cached group key
+        (and vice versa)."""
+        try:
+            st = os.stat(path)
+        except OSError:
+            return None
+        key = os.path.normcase(os.path.abspath(path))
+        with self._lock:
+            entry = self._entries.get(key)
+            if (
+                entry is not None
+                and entry.get("size") == st.st_size
+                and entry.get("mtime_ns") == st.st_mtime_ns
+                and field in entry
+            ):
+                self.hits += 1
+                return entry[field]
+        self.misses += 1
+        value = compute(path)
+        if value is None:
+            return None
+        with self._lock:
+            entry = self._entries.get(key)
+            if entry is None or entry.get("size") != st.st_size or entry.get("mtime_ns") != st.st_mtime_ns:
+                entry = {"size": st.st_size, "mtime_ns": st.st_mtime_ns}
+                self._entries[key] = entry
+            entry[field] = value
+            self._dirty = True
+        return value
+
+    def get_pixel_hash(self, path: str) -> str | None:
+        return self._get_field(path, "hash", compute_pixel_hash)
+
+    def get_group_key(self, path: str, compute) -> tuple[str, str] | None:
+        """Cached (prompt, aspectratio) grouping key. ``compute(path)`` must
+        return that tuple; exceptions propagate so callers can count the file
+        as scanned-but-unusable, matching uncached behavior."""
+        value = self._get_field(path, "group_key", lambda p: list(compute(p)))
+        if value is None:
+            return None
+        return tuple(value)
+
+    def save(self) -> None:
+        """Persist to disk (atomic replace). Entries whose file no longer exists
+        are pruned so renames/finalize moves don't grow the cache forever. No-op
+        when nothing changed since the last save. The lock is held across the
+        file write so concurrent saves (e.g. cancel_session racing the scan
+        worker's final save) serialize instead of corrupting the file."""
+        with self._lock:
+            if not self._dirty:
+                return
+            self._entries = {key: entry for key, entry in self._entries.items() if os.path.isfile(key)}
+            self._dirty = False
+            tmp_path = self._cache_path + ".tmp"
+            try:
+                with open(tmp_path, "w", encoding="utf-8") as f:
+                    json.dump({"version": self._VERSION, "entries": self._entries}, f)
+                os.replace(tmp_path, self._cache_path)
+            except OSError:
+                pass
+
+
+def _backfill_pair_fingerprint(entry: dict, output_dir: str) -> bool:
+    """Populate missing chosen/rejected sha256+size on an old manifest `entry` by
+    hashing the original source path or the exported copy. Returns True if any
+    field was added. Existing fingerprints are left alone."""
+    modified = False
+    sides = (
+        ("chosen_source", "chosen_sha256", "chosen_size", "chosen_file", "chosen"),
+        ("rejected_source", "rejected_sha256", "rejected_size", "rejected_file", "rejected"),
+    )
+    for source_key, hash_key, size_key, file_key, subdir in sides:
+        if entry.get(hash_key) and isinstance(entry.get(size_key), int):
+            continue
+        candidate_paths: list[str] = []
+        source = entry.get(source_key)
+        if source and os.path.isfile(source):
+            candidate_paths.append(source)
+        exported = find_exported_file(os.path.join(output_dir, subdir), entry.get(file_key, ""))
+        if exported and exported not in candidate_paths:
+            candidate_paths.append(exported)
+        for path in candidate_paths:
+            try:
+                size = os.path.getsize(path)
+            except OSError:
+                continue
+            digest = compute_file_sha256(path)
+            if digest is None:
+                continue
+            entry[hash_key] = digest
+            entry[size_key] = size
+            modified = True
+            break
+    return modified
+
+
+def manifest_used_fingerprints(manifest: dict, output_dir: str | None = None) -> dict[int, set[str]]:
+    """Map of ``{file_size: {sha256_hex, ...}}`` for every pair in the manifest. When
+    ``output_dir`` is provided, entries missing fingerprints are backfilled from the
+    source path or exported copy and the manifest is saved back so the cost is paid
+    only once. Designed for ``is_byte_identical_used`` — the size key acts as a
+    cheap pre-filter so we only hash candidates whose size matches an existing
+    pair."""
+    fingerprints: dict[int, set[str]] = {}
+    modified = False
+    for entry in manifest.get("pairs", []):
+        if output_dir is not None and _backfill_pair_fingerprint(entry, output_dir):
+            modified = True
+        for hash_key, size_key in (("chosen_sha256", "chosen_size"), ("rejected_sha256", "rejected_size")):
+            digest = entry.get(hash_key)
+            size = entry.get(size_key)
+            if digest and isinstance(size, int):
+                fingerprints.setdefault(size, set()).add(digest)
+    if modified and output_dir is not None:
+        save_manifest(output_dir, manifest)
+    return fingerprints
+
+
+def is_byte_identical_used(used_fingerprints: dict[int, set[str]], path: str) -> bool:
+    """True when ``path``'s bytes match any pair in ``used_fingerprints``. Skips
+    hashing when no committed pair shares the candidate's size, so an empty/small
+    manifest makes this nearly free."""
+    if not used_fingerprints:
+        return False
+    try:
+        size = os.path.getsize(path)
+    except OSError:
+        return False
+    candidates = used_fingerprints.get(size)
+    if not candidates:
+        return False
+    digest = compute_file_sha256(path)
+    return digest is not None and digest in candidates
+
+
 def is_dpo_concept_type(concept_type: ConceptType) -> bool:
     return concept_type in {
         ConceptType.DPO_CHOSEN,
@@ -143,7 +448,13 @@ def save_manifest(output_dir: str, manifest: dict):
 def manifest_pair_counts(manifest: dict) -> dict[tuple[str, str], int]:
     counts: dict[tuple[str, str], int] = {}
     for entry in manifest.get("pairs", []):
-        key = (normalize_prompt_for_grouping(entry["prompt"]), entry.get("aspectratio", ""))
+        # Aspect strings are normalized to trainer bucket labels so pairs
+        # exported before bucket-aware grouping ("16:9", exact reductions)
+        # count against the same group as newly scanned images.
+        key = (
+            normalize_prompt_for_grouping(entry["prompt"]),
+            normalize_aspect_for_grouping(entry.get("aspectratio", "")),
+        )
         counts[key] = counts.get(key, 0) + 1
     return counts
 
@@ -175,6 +486,19 @@ def export_single_pair(
     chosen_ext = os.path.splitext(chosen_path)[1].lower()
     rejected_ext = os.path.splitext(rejected_path)[1].lower()
 
+    # Capture fingerprints before copy — keeps the dedup check honest even if the
+    # exported copy is later edited in place or replaced.
+    try:
+        chosen_size: int | None = os.path.getsize(chosen_path)
+    except OSError:
+        chosen_size = None
+    try:
+        rejected_size: int | None = os.path.getsize(rejected_path)
+    except OSError:
+        rejected_size = None
+    chosen_sha256 = compute_file_sha256(chosen_path)
+    rejected_sha256 = compute_file_sha256(rejected_path)
+
     _copy_image(chosen_path, os.path.join(chosen_dir, safe_name + chosen_ext))
     _copy_image(rejected_path, os.path.join(rejected_dir, safe_name + rejected_ext))
     for subdir in (chosen_dir, rejected_dir):
@@ -194,6 +518,13 @@ def export_single_pair(
             # pairs-per-group cap to skip them on resume).
             "chosen_source": _normalize_source_path(chosen_path),
             "rejected_source": _normalize_source_path(rejected_path),
+            # SHA-256 + size catch byte-identical images even after the user
+            # renames, moves, or duplicates them — path matching alone misses
+            # those.
+            "chosen_sha256": chosen_sha256,
+            "rejected_sha256": rejected_sha256,
+            "chosen_size": chosen_size,
+            "rejected_size": rejected_size,
         }
     )
     save_manifest(output_dir, manifest)
@@ -500,6 +831,100 @@ def fix_multiline_captions(concept_pairs: list[tuple[str, str]]) -> int:
                         f.write(fixed_content)
                     fixed += 1
     return fixed
+
+
+def _read_caption(image_path: str) -> tuple[str | None, str]:
+    """Return (txt_path, caption_text) for the .txt sidecar of `image_path`.
+    txt_path is None if no sidecar exists; caption_text is '' in that case."""
+    txt = os.path.splitext(image_path)[0] + ".txt"
+    if not os.path.isfile(txt):
+        return None, ""
+    try:
+        with open(txt, "r", encoding="utf-8") as f:
+            return txt, f.read()
+    except OSError:
+        return txt, ""
+
+
+def find_caption_mismatches(concept_pairs: list[tuple[str, str]]) -> list[dict]:
+    """For each chosen/rejected image pair that matches by basename key, compare
+    the .txt sidecar contents. Return entries where the captions differ.
+
+    Compares with .rstrip('\\n') on both sides so a trailing-newline difference
+    does not register as a mismatch (use fix_multiline_captions for that).
+    A missing sidecar on one side counts as a mismatch with caption == ''.
+    """
+    exts = supported_image_extensions()
+    mismatches: list[dict] = []
+
+    for index, (chosen_path, rejected_path) in enumerate(concept_pairs):
+        chosen_keys: dict[str, str] = {}
+        rejected_keys: dict[str, str] = {}
+
+        for root, _dirs, files in os.walk(chosen_path):
+            for fname in files:
+                ext = os.path.splitext(fname)[1].lower()
+                if ext in exts:
+                    full = os.path.join(root, fname)
+                    chosen_keys[dpo_pair_key(full, chosen_path)] = full
+
+        for root, _dirs, files in os.walk(rejected_path):
+            for fname in files:
+                ext = os.path.splitext(fname)[1].lower()
+                if ext in exts:
+                    full = os.path.join(root, fname)
+                    rejected_keys[dpo_pair_key(full, rejected_path)] = full
+
+        for key in sorted(set(chosen_keys) & set(rejected_keys)):
+            chosen_image = chosen_keys[key]
+            rejected_image = rejected_keys[key]
+            chosen_txt, chosen_caption = _read_caption(chosen_image)
+            rejected_txt, rejected_caption = _read_caption(rejected_image)
+            captions_match = chosen_caption.rstrip("\n") == rejected_caption.rstrip("\n")
+            both_present = chosen_txt is not None and rejected_txt is not None
+            if captions_match and both_present:
+                continue
+            mismatches.append(
+                {
+                    "concept_pair_index": index,
+                    "key": key,
+                    "chosen_image": chosen_image,
+                    "rejected_image": rejected_image,
+                    "chosen_caption_path": chosen_txt,
+                    "rejected_caption_path": rejected_txt,
+                    "chosen_caption": chosen_caption,
+                    "rejected_caption": rejected_caption,
+                }
+            )
+
+    return mismatches
+
+
+def apply_caption_to_pair(chosen_image: str, rejected_image: str, caption_text: str) -> None:
+    """Write `caption_text` to BOTH .txt sidecars for the pair. Creates the file
+    if missing, overwrites if it exists. UTF-8, no trailing newline added."""
+    for image_path in (chosen_image, rejected_image):
+        if not image_path:
+            continue
+        txt = os.path.splitext(image_path)[0] + ".txt"
+        with open(txt, "w", encoding="utf-8") as f:
+            f.write(caption_text)
+
+
+def correct_all_captions_to_chosen(mismatches: list[dict]) -> int:
+    """For each mismatch entry, overwrite the rejected .txt with the chosen
+    caption text. Returns the number of pairs corrected."""
+    corrected = 0
+    for entry in mismatches:
+        rejected_image = entry.get("rejected_image")
+        if not rejected_image:
+            continue
+        caption_text = entry.get("chosen_caption", "")
+        txt = os.path.splitext(rejected_image)[0] + ".txt"
+        with open(txt, "w", encoding="utf-8") as f:
+            f.write(caption_text)
+        corrected += 1
+    return corrected
 
 
 def _copy_image(source_path: str, target_path: str):

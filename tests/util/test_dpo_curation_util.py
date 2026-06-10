@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -194,3 +195,263 @@ class DPOCurationUtilExportTest(unittest.TestCase):
             self.assertEqual(train_count + val_count, 4)
             self.assertTrue(val_count >= 1)  # at least some go to val with 50%
             self.assertTrue((output_dir / "concepts.json").exists())
+
+
+class DPOCaptionMismatchTest(unittest.TestCase):
+    def _build_pair(self, root: Path, name: str, chosen_caption: str | None, rejected_caption: str | None):
+        """Create chosen/rejected image pair with optional sidecar captions.
+        None means 'no .txt sidecar'; '' means an empty sidecar file."""
+        chosen_dir = root / "chosen"
+        rejected_dir = root / "rejected"
+        chosen_dir.mkdir(exist_ok=True)
+        rejected_dir.mkdir(exist_ok=True)
+        chosen_img = chosen_dir / f"{name}.png"
+        rejected_img = rejected_dir / f"{name}.png"
+        Image.new("RGB", (4, 4), color="red").save(chosen_img)
+        Image.new("RGB", (4, 4), color="blue").save(rejected_img)
+        if chosen_caption is not None:
+            (chosen_dir / f"{name}.txt").write_text(chosen_caption, encoding="utf-8")
+        if rejected_caption is not None:
+            (rejected_dir / f"{name}.txt").write_text(rejected_caption, encoding="utf-8")
+        return chosen_dir, rejected_dir, chosen_img, rejected_img
+
+    def test_identical_captions_have_no_mismatches(self):
+        from modules.util.dpo_curation_util import find_caption_mismatches
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            chosen_dir, rejected_dir, _, _ = self._build_pair(root, "pair_0001", "a cat", "a cat")
+            mismatches = find_caption_mismatches([(str(chosen_dir), str(rejected_dir))])
+            self.assertEqual(mismatches, [])
+
+    def test_trailing_newline_difference_is_not_a_mismatch(self):
+        from modules.util.dpo_curation_util import find_caption_mismatches
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            chosen_dir, rejected_dir, _, _ = self._build_pair(root, "pair_0001", "a cat", "a cat\n")
+            mismatches = find_caption_mismatches([(str(chosen_dir), str(rejected_dir))])
+            self.assertEqual(mismatches, [])
+
+    def test_differing_captions_produce_mismatch_entry(self):
+        from modules.util.dpo_curation_util import find_caption_mismatches
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            chosen_dir, rejected_dir, chosen_img, rejected_img = self._build_pair(
+                root,
+                "pair_0001",
+                "a cat",
+                "a dog",
+            )
+            mismatches = find_caption_mismatches([(str(chosen_dir), str(rejected_dir))])
+            self.assertEqual(len(mismatches), 1)
+            entry = mismatches[0]
+            self.assertEqual(entry["key"], "pair_0001")
+            self.assertEqual(entry["chosen_image"], str(chosen_img))
+            self.assertEqual(entry["rejected_image"], str(rejected_img))
+            self.assertEqual(entry["chosen_caption"], "a cat")
+            self.assertEqual(entry["rejected_caption"], "a dog")
+            self.assertIsNotNone(entry["chosen_caption_path"])
+            self.assertIsNotNone(entry["rejected_caption_path"])
+
+    def test_missing_rejected_sidecar_counts_as_mismatch(self):
+        from modules.util.dpo_curation_util import find_caption_mismatches
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            chosen_dir, rejected_dir, _, _ = self._build_pair(root, "pair_0001", "a cat", None)
+            mismatches = find_caption_mismatches([(str(chosen_dir), str(rejected_dir))])
+            self.assertEqual(len(mismatches), 1)
+            self.assertEqual(mismatches[0]["chosen_caption"], "a cat")
+            self.assertEqual(mismatches[0]["rejected_caption"], "")
+            self.assertIsNone(mismatches[0]["rejected_caption_path"])
+
+    def test_unmatched_strays_are_not_in_caption_mismatches(self):
+        from modules.util.dpo_curation_util import find_caption_mismatches
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            chosen_dir = root / "chosen"
+            rejected_dir = root / "rejected"
+            chosen_dir.mkdir()
+            rejected_dir.mkdir()
+            # Chosen-only stray (no rejected counterpart)
+            Image.new("RGB", (4, 4)).save(chosen_dir / "lonely.png")
+            (chosen_dir / "lonely.txt").write_text("solo", encoding="utf-8")
+            mismatches = find_caption_mismatches([(str(chosen_dir), str(rejected_dir))])
+            self.assertEqual(mismatches, [])
+
+    def test_apply_caption_to_pair_writes_both_sidecars(self):
+        from modules.util.dpo_curation_util import apply_caption_to_pair
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _, _, chosen_img, rejected_img = self._build_pair(root, "pair_0001", "old", "older")
+            apply_caption_to_pair(str(chosen_img), str(rejected_img), "new caption")
+            chosen_txt = chosen_img.with_suffix(".txt")
+            rejected_txt = rejected_img.with_suffix(".txt")
+            self.assertEqual(chosen_txt.read_text(encoding="utf-8"), "new caption")
+            self.assertEqual(rejected_txt.read_text(encoding="utf-8"), "new caption")
+
+    def test_apply_caption_to_pair_creates_missing_sidecar(self):
+        from modules.util.dpo_curation_util import apply_caption_to_pair
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            _, _, chosen_img, rejected_img = self._build_pair(root, "pair_0001", "old", None)
+            apply_caption_to_pair(str(chosen_img), str(rejected_img), "fresh")
+            self.assertEqual(chosen_img.with_suffix(".txt").read_text(encoding="utf-8"), "fresh")
+            self.assertEqual(rejected_img.with_suffix(".txt").read_text(encoding="utf-8"), "fresh")
+
+    def test_correct_all_captions_to_chosen_overwrites_rejected(self):
+        from modules.util.dpo_curation_util import (
+            correct_all_captions_to_chosen,
+            find_caption_mismatches,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            chosen_dir, rejected_dir, chosen_img, rejected_img = self._build_pair(
+                root,
+                "pair_0001",
+                "the truth",
+                "garbled",
+            )
+            mismatches = find_caption_mismatches([(str(chosen_dir), str(rejected_dir))])
+            corrected = correct_all_captions_to_chosen(mismatches)
+            self.assertEqual(corrected, 1)
+            self.assertEqual(rejected_img.with_suffix(".txt").read_text(encoding="utf-8"), "the truth")
+            # Re-run detector: zero mismatches now (idempotent)
+            self.assertEqual(find_caption_mismatches([(str(chosen_dir), str(rejected_dir))]), [])
+
+    def test_correct_all_creates_rejected_sidecar_when_missing(self):
+        from modules.util.dpo_curation_util import (
+            correct_all_captions_to_chosen,
+            find_caption_mismatches,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            chosen_dir, rejected_dir, _, rejected_img = self._build_pair(
+                root,
+                "pair_0001",
+                "canonical",
+                None,
+            )
+            mismatches = find_caption_mismatches([(str(chosen_dir), str(rejected_dir))])
+            self.assertEqual(correct_all_captions_to_chosen(mismatches), 1)
+            self.assertEqual(rejected_img.with_suffix(".txt").read_text(encoding="utf-8"), "canonical")
+
+
+class WalkSkippingDottedTest(unittest.TestCase):
+    def test_dotted_subdirectories_are_pruned_at_any_depth(self):
+        from modules.util.dpo_curation_util import walk_skipping_dotted
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "keep").mkdir()
+            (root / ".thumbnails").mkdir()
+            (root / "keep" / ".cache" / "deep").mkdir(parents=True)
+            (root / "visible.png").touch()
+            (root / "keep" / "nested.png").touch()
+            (root / ".thumbnails" / "thumb.png").touch()
+            (root / "keep" / ".cache" / "deep" / "preview.png").touch()
+
+            found = [os.path.join(r, f) for r, files in walk_skipping_dotted(str(root)) for f in files]
+            names = sorted(os.path.basename(p) for p in found)
+            self.assertEqual(names, ["nested.png", "visible.png"])
+
+    def test_explicitly_selected_dotted_root_is_still_walked(self):
+        from modules.util.dpo_curation_util import walk_skipping_dotted
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dotted_root = Path(temp_dir) / ".my_folder"
+            dotted_root.mkdir()
+            (dotted_root / "img.png").touch()
+            found = [f for _r, files in walk_skipping_dotted(str(dotted_root)) for f in files]
+            self.assertEqual(found, ["img.png"])
+
+
+class TrainerBucketKeyTest(unittest.TestCase):
+    """Grouping must mirror the trainer's AspectBucketing: images that crop to
+    the same bucket belong in the same curation group, regardless of exact
+    pixel dimensions or generator metadata strings."""
+
+    def test_common_16_9_inference_resolutions_share_a_bucket(self):
+        from modules.util.dpo_curation_util import trainer_bucket_key
+
+        # Both marketed as 16:9 by inference frontends; true ratio 1.75 -> 7:4.
+        self.assertEqual(trainer_bucket_key(1344, 768), "7:4")
+        self.assertEqual(trainer_bucket_key(1680, 960), "7:4")
+
+    def test_one_pixel_off_still_lands_in_same_bucket(self):
+        from modules.util.dpo_curation_util import trainer_bucket_key
+
+        self.assertEqual(trainer_bucket_key(1343, 768), trainer_bucket_key(1344, 768))
+        self.assertEqual(trainer_bucket_key(1344, 769), trainer_bucket_key(1344, 768))
+
+    def test_orientation_is_preserved(self):
+        from modules.util.dpo_curation_util import trainer_bucket_key
+
+        self.assertEqual(trainer_bucket_key(768, 1344), "4:7")
+        self.assertEqual(trainer_bucket_key(1024, 1024), "1:1")
+
+    def test_extreme_aspect_clamps_to_widest_bucket(self):
+        from modules.util.dpo_curation_util import trainer_bucket_key
+
+        self.assertEqual(trainer_bucket_key(5000, 1000), "4:1")
+        self.assertEqual(trainer_bucket_key(1000, 5000), "1:4")
+
+    def test_non_positive_dimensions_return_empty(self):
+        from modules.util.dpo_curation_util import trainer_bucket_key
+
+        self.assertEqual(trainer_bucket_key(0, 768), "")
+        self.assertEqual(trainer_bucket_key(1344, 0), "")
+
+    def test_normalize_aspect_maps_metadata_strings_to_buckets(self):
+        from modules.util.dpo_curation_util import normalize_aspect_for_grouping
+
+        # SwarmUI writes "16:9" while actually generating 1.75 images.
+        self.assertEqual(normalize_aspect_for_grouping("16:9"), "7:4")
+        self.assertEqual(normalize_aspect_for_grouping("1:1"), "1:1")
+        self.assertEqual(normalize_aspect_for_grouping("1343:768"), "7:4")
+        self.assertEqual(normalize_aspect_for_grouping("1.78"), "7:4")
+        # Unparseable strings pass through so legacy keys never silently merge.
+        self.assertEqual(normalize_aspect_for_grouping(""), "")
+        self.assertEqual(normalize_aspect_for_grouping("portrait"), "portrait")
+
+    def test_resolve_aspect_ratio_prefers_pixels_over_metadata(self):
+        from modules.util.dpo_curation_util import resolve_aspect_ratio
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "img.png"
+            Image.new("RGB", (1344, 768)).save(path)
+            # Metadata says 16:9, pixels say 1.75 — both snap to 7:4, but the
+            # pixel dimensions are the authority (the trainer never reads
+            # metadata).
+            self.assertEqual(resolve_aspect_ratio("16:9", str(path)), "7:4")
+            self.assertEqual(resolve_aspect_ratio("", str(path)), "7:4")
+
+    def test_resolve_aspect_ratio_falls_back_to_metadata_when_undecodable(self):
+        from modules.util.dpo_curation_util import resolve_aspect_ratio
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "broken.png"
+            path.write_bytes(b"not an image")
+            self.assertEqual(resolve_aspect_ratio("16:9", str(path)), "7:4")
+            self.assertEqual(resolve_aspect_ratio("", str(path)), "")
+
+    def test_manifest_pair_counts_normalizes_legacy_aspect_strings(self):
+        from modules.util.dpo_curation_util import manifest_pair_counts
+
+        manifest = {
+            "pairs": [
+                {"prompt": "a sunset", "aspectratio": "16:9"},
+                {"prompt": "a sunset", "aspectratio": "7:4"},
+            ]
+        }
+        counts = manifest_pair_counts(manifest)
+        # Legacy "16:9" and bucket-native "7:4" are the same trainer bucket,
+        # so they must count against the same group.
+        self.assertEqual(counts, {("a sunset", "7:4"): 2})
