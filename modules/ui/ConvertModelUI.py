@@ -105,6 +105,7 @@ class ConvertModelUI(ctk.CTkToplevel):
         components.options_kv(master, 4, 1, [
             ("Safetensors", ModelFormat.SAFETENSORS),
             ("Diffusers", ModelFormat.DIFFUSERS),
+            ("Comfy LoRA", ModelFormat.COMFY_LORA),
         ], self.ui_state, "output_model_format")
 
         # output model destination
