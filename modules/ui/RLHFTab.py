@@ -12,7 +12,6 @@ from modules.util.dpo_curation_util import (
     remove_finalized_pair,
 )
 from modules.util.enum.ConceptType import ConceptType
-from modules.util.enum.DPOExecutionMode import DPOExecutionMode
 from modules.util.enum.DPOPatienceMode import DPOPatienceMode
 from modules.util.enum.RLHFMode import RLHFMode
 from modules.util.ui import components
@@ -110,32 +109,6 @@ class RLHFTab:
             tooltip="How many prompt groups the DPO Pair Tool leaves out for validation.",
         )
         components.entry(self.scroll_frame, 3, 4, self.ui_state, "rlhf_dpo_validation_percentage")
-
-        components.label(
-            self.scroll_frame,
-            4,
-            0,
-            "Shared Noise",
-            tooltip="Uses the same noise for chosen and rejected comparisons, which makes the comparison fairer. Leave it on unless you're experimenting.",
-        )
-        components.switch(self.scroll_frame, 4, 1, self.ui_state, "rlhf_dpo_shared_noise")
-
-        execution_options = [
-            ("Sequential", DPOExecutionMode.SEQUENTIAL),
-            ("Policy Concurrent", DPOExecutionMode.POLICY_CONCURRENT),
-            ("Full Concurrent", DPOExecutionMode.FULL_CONCURRENT),
-        ]
-        components.label(
-            self.scroll_frame,
-            5,
-            0,
-            "Execution Mode",
-            tooltip="VRAM/speed trade-off for DPO. Sequential runs 4 separate forward passes per step — lowest VRAM. "
-            "Policy Concurrent batches the two policy forwards together for 3 passes total — medium. "
-            "Full Concurrent batches the reference forwards too for 2 passes total — fastest. "
-            "Batching requires Shared Noise enabled (the default); with shared noise off, all modes fall back to 4 passes.",
-        )
-        components.options_kv(self.scroll_frame, 5, 1, execution_options, self.ui_state, "rlhf_dpo_execution_mode")
 
         components.label(
             self.scroll_frame,

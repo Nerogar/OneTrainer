@@ -3,7 +3,6 @@ from contextlib import contextmanager
 
 from modules.model.BaseModel import BaseModel
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig, TrainModelPartConfig
-from modules.util.enum.DPOExecutionMode import DPOExecutionMode
 from modules.util.enum.DPORefMode import DPORefMode
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModuleFilter import ModuleFilter
@@ -150,14 +149,6 @@ class BaseModelSetup(
         return key.endswith("_rejected")
 
     @classmethod
-    def _create_dpo_rejected_batch(cls, batch: dict) -> dict:
-        rejected_batch = dict(batch)
-        for key, value in batch.items():
-            if cls._is_dpo_rejected_key(key):
-                rejected_batch[key.removesuffix("_rejected")] = value
-        return rejected_batch
-
-    @classmethod
     def _create_dpo_batched_batch(cls, batch: dict) -> tuple[dict, int]:
         # Returns a batch where every <key>/<key>_rejected pair is concatenated
         # as [chosen; rejected] on dim 0, shared per-sample tensors are duplicated
@@ -192,15 +183,6 @@ class BaseModelSetup(
                 rejected_out[key] = value
         return chosen_out, rejected_out
 
-    @staticmethod
-    def _create_dpo_progress(train_progress: TrainProgress, offset: int = 0) -> TrainProgress:
-        return TrainProgress(
-            epoch=train_progress.epoch,
-            epoch_step=train_progress.epoch_step,
-            epoch_sample=train_progress.epoch_sample,
-            global_step=train_progress.global_step + offset,
-        )
-
     def get_last_dpo_metrics(self) -> dict[str, float]:
         return self._last_dpo_metrics or {}
 
@@ -216,139 +198,40 @@ class BaseModelSetup(
                 "RLHF DPO requires paired chosen/rejected batches, but the dataloader did not provide rejected samples."
             )
 
-        rejected_batch = self._create_dpo_rejected_batch(batch)
-        chosen_progress = self._create_dpo_progress(train_progress)
-        rejected_progress = (
-            chosen_progress if config.rlhf_dpo_shared_noise else self._create_dpo_progress(train_progress, offset=1)
-        )  # Shared noise depends on predict() seeding from global_step.
-
         def mse_per_sample(pred, target):
             return ((pred - target) ** 2).mean(dim=list(range(1, pred.ndim)))
 
         beta = config.rlhf_dpo_beta
-        execution_mode = getattr(config, "rlhf_dpo_execution_mode", DPOExecutionMode.FULL_CONCURRENT)
         supervised_loss = None
 
-        # Batching chosen+rejected into a single forward (along dim 0) requires
-        # both halves to share timestep+noise, which predict() seeds from
-        # global_step. When shared_noise is off, chosen runs at global_step and
-        # rejected at global_step+1, so they cannot share a forward.
-        can_batch = config.rlhf_dpo_shared_noise
+        # 2 forwards: 1 batched ref (no_grad) + 1 batched policy, each over the
+        # [chosen; rejected] batch. Both halves share per-pair timestep+noise via
+        # _dpo_paired_half, and ref/policy share them too because predict()
+        # seeds its generator from global_step.
+        batched_input, chosen_b = self._create_dpo_batched_batch(batch)
 
-        if can_batch and execution_mode == DPOExecutionMode.FULL_CONCURRENT:
-            # 2 forwards: 1 batched ref (no_grad) + 1 batched policy.
-            batched_input, chosen_b = self._create_dpo_batched_batch(batch)
-
-            self._dpo_paired_half = chosen_b
-            try:
-                with torch.no_grad(), self.reference_model(model, config):
-                    ref_output = self.predict(model, batched_input, config, chosen_progress)
-                    ref_predicted = ref_output["predicted"].float()
-                    ref_target = ref_output["target"].float()
-                    ref_chosen_logp = -mse_per_sample(ref_predicted[:chosen_b], ref_target[:chosen_b])
-                    ref_rejected_logp = -mse_per_sample(ref_predicted[chosen_b:], ref_target[chosen_b:])
-                    del ref_output, ref_predicted, ref_target
-
-                policy_output = self.predict(model, batched_input, config, chosen_progress)
-            finally:
-                self._dpo_paired_half = None
-            policy_predicted = policy_output["predicted"].float()
-            policy_target = policy_output["target"].float()
-            policy_chosen_logp = -mse_per_sample(policy_predicted[:chosen_b], policy_target[:chosen_b])
-            policy_rejected_logp = -mse_per_sample(policy_predicted[chosen_b:], policy_target[chosen_b:])
-            if config.rlhf_supervised_mix > 0:
-                chosen_output, _ = self._split_dpo_batched_output(policy_output, chosen_b)
-                supervised_loss = self.calculate_loss(model, batch, chosen_output, config)
-                del chosen_output
-            del policy_output, policy_predicted, policy_target
-
-        elif can_batch and execution_mode == DPOExecutionMode.POLICY_CONCURRENT:
-            # 3 forwards: 2 ref serial (no_grad) + 1 batched policy.
+        self._dpo_paired_half = chosen_b
+        try:
             with torch.no_grad(), self.reference_model(model, config):
-                ref_chosen_output = self.predict(model, batch, config, chosen_progress)
-                ref_chosen_logp = -mse_per_sample(
-                    ref_chosen_output["predicted"].float(), ref_chosen_output["target"].float()
-                )
-                del ref_chosen_output
-                ref_rejected_output = self.predict(model, rejected_batch, config, rejected_progress)
-                ref_rejected_logp = -mse_per_sample(
-                    ref_rejected_output["predicted"].float(), ref_rejected_output["target"].float()
-                )
-                del ref_rejected_output
+                ref_output = self.predict(model, batched_input, config, train_progress)
+                ref_predicted = ref_output["predicted"].float()
+                ref_target = ref_output["target"].float()
+                ref_chosen_logp = -mse_per_sample(ref_predicted[:chosen_b], ref_target[:chosen_b])
+                ref_rejected_logp = -mse_per_sample(ref_predicted[chosen_b:], ref_target[chosen_b:])
+                del ref_output, ref_predicted, ref_target
 
-            batched_input, chosen_b = self._create_dpo_batched_batch(batch)
-            self._dpo_paired_half = chosen_b
-            try:
-                policy_output = self.predict(model, batched_input, config, chosen_progress)
-            finally:
-                self._dpo_paired_half = None
-            policy_predicted = policy_output["predicted"].float()
-            policy_target = policy_output["target"].float()
-            policy_chosen_logp = -mse_per_sample(policy_predicted[:chosen_b], policy_target[:chosen_b])
-            policy_rejected_logp = -mse_per_sample(policy_predicted[chosen_b:], policy_target[chosen_b:])
-            if config.rlhf_supervised_mix > 0:
-                chosen_output, _ = self._split_dpo_batched_output(policy_output, chosen_b)
-                supervised_loss = self.calculate_loss(model, batch, chosen_output, config)
-                del chosen_output
-            del policy_output, policy_predicted, policy_target
-
-        elif execution_mode == DPOExecutionMode.FULL_CONCURRENT:
-            # Fallback (shared_noise=False) — preserves original 4-forward FULL_CONCURRENT memory schedule.
-            with torch.no_grad(), self.reference_model(model, config):
-                ref_chosen_output = self.predict(model, batch, config, chosen_progress)
-                ref_rejected_output = self.predict(model, rejected_batch, config, rejected_progress)
-
-            policy_chosen_output = self.predict(model, batch, config, chosen_progress)
-            policy_rejected_output = self.predict(model, rejected_batch, config, rejected_progress)
-
-            ref_chosen_logp = -mse_per_sample(
-                ref_chosen_output["predicted"].float(), ref_chosen_output["target"].float()
-            )
-            ref_rejected_logp = -mse_per_sample(
-                ref_rejected_output["predicted"].float(), ref_rejected_output["target"].float()
-            )
-            policy_chosen_logp = -mse_per_sample(
-                policy_chosen_output["predicted"].float(), policy_chosen_output["target"].float()
-            )
-            if config.rlhf_supervised_mix > 0:
-                supervised_loss = self.calculate_loss(model, batch, policy_chosen_output, config)
-            policy_rejected_logp = -mse_per_sample(
-                policy_rejected_output["predicted"].float(), policy_rejected_output["target"].float()
-            )
-            del ref_chosen_output
-            del ref_rejected_output
-            del policy_chosen_output
-            del policy_rejected_output
-        else:
-            # SEQUENTIAL (any noise setting), or POLICY_CONCURRENT fallback when shared_noise=False.
-            with torch.no_grad(), self.reference_model(model, config):
-                ref_chosen_output = self.predict(model, batch, config, chosen_progress)
-                ref_chosen_logp = -mse_per_sample(
-                    ref_chosen_output["predicted"].float(), ref_chosen_output["target"].float()
-                )
-                del ref_chosen_output
-                ref_rejected_output = self.predict(model, rejected_batch, config, rejected_progress)
-                ref_rejected_logp = -mse_per_sample(
-                    ref_rejected_output["predicted"].float(), ref_rejected_output["target"].float()
-                )
-                del ref_rejected_output
-
-            policy_chosen_output = self.predict(model, batch, config, chosen_progress)
-            policy_chosen_logp = -mse_per_sample(
-                policy_chosen_output["predicted"].float(), policy_chosen_output["target"].float()
-            )
-            if config.rlhf_supervised_mix > 0:
-                supervised_loss = self.calculate_loss(model, batch, policy_chosen_output, config)
-            if execution_mode == DPOExecutionMode.SEQUENTIAL:
-                del policy_chosen_output
-
-            policy_rejected_output = self.predict(model, rejected_batch, config, rejected_progress)
-            policy_rejected_logp = -mse_per_sample(
-                policy_rejected_output["predicted"].float(), policy_rejected_output["target"].float()
-            )
-            if execution_mode != DPOExecutionMode.SEQUENTIAL:
-                del policy_chosen_output
-            del policy_rejected_output
+            policy_output = self.predict(model, batched_input, config, train_progress)
+        finally:
+            self._dpo_paired_half = None
+        policy_predicted = policy_output["predicted"].float()
+        policy_target = policy_output["target"].float()
+        policy_chosen_logp = -mse_per_sample(policy_predicted[:chosen_b], policy_target[:chosen_b])
+        policy_rejected_logp = -mse_per_sample(policy_predicted[chosen_b:], policy_target[chosen_b:])
+        if config.rlhf_supervised_mix > 0:
+            chosen_output, _ = self._split_dpo_batched_output(policy_output, chosen_b)
+            supervised_loss = self.calculate_loss(model, batch, chosen_output, config)
+            del chosen_output
+        del policy_output, policy_predicted, policy_target
 
         chosen_ratio = policy_chosen_logp - ref_chosen_logp.detach()
         rejected_ratio = policy_rejected_logp - ref_rejected_logp.detach()

@@ -12,7 +12,6 @@ from modules.util.config.SecretsConfig import SecretsConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
-from modules.util.enum.DPOExecutionMode import DPOExecutionMode
 from modules.util.enum.DPOPatienceMode import DPOPatienceMode
 from modules.util.enum.DPORefMode import DPORefMode
 from modules.util.enum.EMAMode import EMAMode
@@ -549,9 +548,7 @@ class TrainConfig(BaseConfig):
     rlhf_dpo_beta: float
     rlhf_dpo_label_smoothing: float
     rlhf_dpo_ref_mode: DPORefMode
-    rlhf_dpo_execution_mode: DPOExecutionMode
     rlhf_supervised_mix: float
-    rlhf_dpo_shared_noise: bool
     rlhf_dpo_validation: bool
     rlhf_dpo_validation_percentage: float
     rlhf_dpo_patience_enabled: bool
@@ -1261,9 +1258,7 @@ class TrainConfig(BaseConfig):
         data.append(("rlhf_dpo_beta", 300.0, float, False))
         data.append(("rlhf_dpo_label_smoothing", 0.0, float, False))
         data.append(("rlhf_dpo_ref_mode", DPORefMode.NEW_ADAPTER, DPORefMode, False))
-        data.append(("rlhf_dpo_execution_mode", DPOExecutionMode.FULL_CONCURRENT, DPOExecutionMode, False))
         data.append(("rlhf_supervised_mix", 0.0, float, False))
-        data.append(("rlhf_dpo_shared_noise", True, bool, False))
         data.append(("rlhf_dpo_validation", False, bool, False))
         data.append(("rlhf_dpo_validation_percentage", 10.0, float, False))
         data.append(("rlhf_dpo_patience_enabled", False, bool, False))
