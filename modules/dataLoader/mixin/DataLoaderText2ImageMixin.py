@@ -1,18 +1,16 @@
-import json
 import os
 import re
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable
 
 import modules.util.multi_gpu_util as multi
-from modules.dataLoader.dpo.PairByFilename import PairByFilename
+from modules.dataLoader.dpo.DeriveDPORejectedPath import DeriveDPORejectedPath
+from modules.dataLoader.dpo.FilterDPOChosenPaths import FilterDPOChosenPaths
 from modules.model.BaseModel import BaseModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.util import path_util
-from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.dpo_curation_util import dpo_concept_pairs
 from modules.util.enum.DataType import DataType
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
@@ -27,6 +25,7 @@ from mgds.pipelineModules.DiskCache import DiskCache
 from mgds.pipelineModules.DistributedSampler import DistributedSampler
 from mgds.pipelineModules.DownloadHuggingfaceDatasets import DownloadHuggingfaceDatasets
 from mgds.pipelineModules.DropTags import DropTags
+from mgds.pipelineModules.EncodeVAE import EncodeVAE
 from mgds.pipelineModules.GenerateImageLike import GenerateImageLike
 from mgds.pipelineModules.GenerateMaskedConditioningImage import GenerateMaskedConditioningImage
 from mgds.pipelineModules.GetFilename import GetFilename
@@ -46,6 +45,8 @@ from mgds.pipelineModules.RandomLatentMaskRemove import RandomLatentMaskRemove
 from mgds.pipelineModules.RandomMaskRotateCrop import RandomMaskRotateCrop
 from mgds.pipelineModules.RandomRotate import RandomRotate
 from mgds.pipelineModules.RandomSaturation import RandomSaturation
+from mgds.pipelineModules.RescaleImageChannels import RescaleImageChannels
+from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.ScaleCropImage import ScaleCropImage
 from mgds.pipelineModules.SelectFirstInput import SelectFirstInput
 from mgds.pipelineModules.SelectInput import SelectInput
@@ -63,20 +64,6 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
     @staticmethod
     def __as_output_mapping(name: str | tuple[str, str]) -> tuple[str, str]:
         return name if isinstance(name, tuple) else (name, name)
-
-    @staticmethod
-    def __is_dpo_rejected_name(name: str) -> bool:
-        return name == "image_path" or name.startswith("latent_") or name.endswith(("_resolution", "_offset"))
-
-    def __load_concepts(self, config: TrainConfig) -> list[ConceptConfig]:
-        concepts = config.concepts
-        if concepts is None:
-            with open(config.concept_file_name, "r") as f:
-                concepts = [ConceptConfig.default_values().from_dict(c) for c in json.load(f)]
-        return concepts
-
-    def __dpo_concept_pairs(self, config: TrainConfig, is_validation: bool = False) -> list[tuple[str, str]]:
-        return dpo_concept_pairs(self.__load_concepts(config), is_validation=is_validation)
 
     def _enumerate_input_modules(self, config: TrainConfig, allow_videos: bool = False) -> list:
         supported_extensions = set()
@@ -100,8 +87,10 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
         cond_path = ModifyPath(in_name='image_path', out_name='cond_path', postfix='-condlabel', extension='.png')
         sample_prompt_path = ModifyPath(in_name='image_path', out_name='sample_prompt_path', postfix='', extension='.txt')
 
-        modules = [download_datasets, collect_paths, sample_prompt_path]
+        modules = [download_datasets, collect_paths, FilterDPOChosenPaths(), sample_prompt_path]
 
+        if config.rlhf_enabled:
+            modules.append(DeriveDPORejectedPath())
         if config.masked_training:
             modules.append(mask_path)
         if config.custom_conditioning_image:
@@ -137,8 +126,13 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
 
         modules = [load_image, load_video]
 
+        if config.rlhf_enabled:
+            modules.append(LoadImage(path_in_name='image_path_rejected', image_out_name='image_rejected', range_min=0, range_max=1, supported_extensions=path_util.supported_image_extensions(), dtype=train_dtype.torch_dtype()))
+
         if vae_frame_dim:
             modules.append(image_to_video)
+            if config.rlhf_enabled:
+                modules.append(ImageToVideo(in_name='image_rejected', out_name='image_rejected'))
 
         modules.extend([load_sample_prompts, load_concept_prompts, filename_prompt, select_prompt_input, select_random_text])
 
@@ -158,6 +152,9 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
 
     def _mask_augmentation_modules(self, config: TrainConfig) -> list:
         inputs = ['image']
+
+        if config.rlhf_enabled:
+            inputs.append('image_rejected')
 
         lowest_resolution = min([int(x.strip()) for x in re.split(r'\D', config.resolution) if x.strip() != ''])
         circular_mask_shrink = RandomCircularMaskShrink(mask_name='mask', shrink_probability=1.0, shrink_factor_min=0.2, shrink_factor_max=1.0, enabled_in_name='concept.image.enable_random_circular_mask_shrink')
@@ -211,6 +208,11 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
     def _crop_modules(self, config: TrainConfig):
         inputs = ['image']
 
+        if config.rlhf_enabled:
+            # Same ScaleCropImage instance -> same scale, jitter and crop offsets
+            # for both halves of each DPO pair, like masks stay aligned today.
+            inputs.append('image_rejected')
+
         if config.masked_training or config.model_type.has_mask_input():
             inputs.append('mask')
 
@@ -229,6 +231,12 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
     def _augmentation_modules(self, config: TrainConfig):
         inputs = ['image']
         image_inputs = ['image']
+
+        if config.rlhf_enabled:
+            # Each augmentation draws once per sample and applies the identical
+            # transform to every listed name, keeping DPO pairs comparable.
+            inputs.append('image_rejected')
+            image_inputs.append('image_rejected')
 
         if config.masked_training or config.model_type.has_mask_input():
             inputs.append('mask')
@@ -303,6 +311,9 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
                 torch_gc()
             before_cache_image_fun = prepare_vae
 
+        if config.rlhf_enabled:
+            output_names = output_names + ['latent_image_rejected']
+
         resolved_output_names = [self.__as_output_mapping(name) for name in output_names]
 
         output_names = resolved_output_names + [
@@ -331,22 +342,6 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
         if config.model_type.has_mask_input():
             modules.append(mask_remove)
 
-        if config.rlhf_enabled:
-            rejected_names = [
-                (in_name, out_name + "_rejected")
-                for in_name, out_name in resolved_output_names
-                if self.__is_dpo_rejected_name(out_name)
-            ]
-            modules.append(
-                PairByFilename(
-                    concept_pairs=self.__dpo_concept_pairs(config, is_validation),
-                    chosen_names=output_names + [("concept", "concept")],
-                    rejected_names=rejected_names,
-                )
-            )
-            final_output_names += [out_name for _, out_name in rejected_names]
-            sort_names = final_output_names + ["concept"]
-
         world_size = (
             multi.world_size() if config.multi_gpu else 1
         )  # world_size can be 1 for validation dataloader, even if multi.world_size() returns > 1
@@ -357,7 +352,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             batch_sorting = InlineAspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size * world_size)
             distributed_sampler = InlineDistributedSampler(names=sort_names, world_size=world_size, rank=multi.rank())
 
-        output = OutputPipelineModule(names=final_output_names if config.rlhf_enabled else output_names)
+        output = OutputPipelineModule(names=output_names)
 
         modules.append(batch_sorting)
         if world_size > 1:
@@ -393,12 +388,17 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
         def before_cache_text_fun():
             model_setup.prepare_text_caching(model, config)
 
+        if config.rlhf_enabled:
+            image_split_names = image_split_names + ['latent_image_rejected']
+
+        # The DPO patterns change which rows a concept produces, so they are part
+        # of the cache group key.
         image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations',
-                                     balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'],
+                                     balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image', 'concept.dpo_chosen_pattern', 'concept.dpo_rejected_pattern'],
                                      group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
 
         text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',
-                                    variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
+                                    variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text', 'concept.dpo_chosen_pattern', 'concept.dpo_rejected_pattern'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
 
         modules = []
 
@@ -414,7 +414,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
 
         if len(sort_names) > 0:
             variation_sorting = VariationSorting(names=sort_names, balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',
-                                                 variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled')
+                                                 variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text', 'concept.dpo_chosen_pattern', 'concept.dpo_rejected_pattern'], group_enabled_in_name='concept.enabled')
 
             modules.append(variation_sorting)
 
@@ -442,7 +442,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
         augmentation_modules = self._augmentation_modules(config)
         if supports_inpainting:
             inpainting_modules = self._inpainting_modules(config)
-        preparation_modules = self._preparation_modules(config, model)
+        preparation_modules = self._preparation_modules(config, model) + self._dpo_rejected_preparation_modules(config, model)
         cache_modules = self._cache_modules(config, model, model_setup)
         output_modules = self._output_modules(config, model, model_setup, is_validation=is_validation)
 
@@ -468,6 +468,18 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             train_progress,
             is_validation
         )
+
+    def _dpo_rejected_preparation_modules(self, config: TrainConfig, model: BaseModel) -> list:
+        # Mirrors the standard chosen-image VAE encode for 'image_rejected'.
+        # Dataloaders whose encode deviates from this pattern override it.
+        if not config.rlhf_enabled:
+            return []
+
+        rescale_image = RescaleImageChannels(image_in_name='image_rejected', image_out_name='image_rejected', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
+        encode_image = EncodeVAE(in_name='image_rejected', out_name='latent_image_rejected_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        image_sample = SampleVAEDistribution(in_name='latent_image_rejected_distribution', out_name='latent_image_rejected', mode='mean')
+
+        return [rescale_image, encode_image, image_sample]
 
     @abstractmethod
     def _preparation_modules(self, config: TrainConfig, model: BaseModel):

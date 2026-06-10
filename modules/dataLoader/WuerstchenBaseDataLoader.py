@@ -27,6 +27,11 @@ class WuerstchenBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
 ):
+    def _dpo_rejected_preparation_modules(self, config: TrainConfig, model: WuerstchenModel) -> list:
+        if config.rlhf_enabled:
+            raise NotImplementedError("RLHF DPO is not supported for Wuerstchen models.")
+        return []
+
     def _preparation_modules(self, config: TrainConfig, model: WuerstchenModel):
         downscale_image = ScaleImage(in_name='image', out_name='image', factor=0.75)
         normalize_image = NormalizeImageChannels(image_in_name='image', image_out_name='image', mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))

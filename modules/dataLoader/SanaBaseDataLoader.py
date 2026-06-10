@@ -27,6 +27,15 @@ class SanaBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
 ):
+    def _dpo_rejected_preparation_modules(self, config: TrainConfig, model: SanaModel) -> list:
+        if not config.rlhf_enabled:
+            return []
+
+        rescale_image = RescaleImageChannels(image_in_name='image_rejected', image_out_name='image_rejected', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
+        encode_image = EncodeVAE(in_name='image_rejected', out_name='latent_image_rejected', vae=model.vae, autocast_contexts=[model.autocast_context, model.vae_autocast_context], dtype=model.train_dtype.torch_dtype())
+
+        return [rescale_image, encode_image]
+
     def _preparation_modules(self, config: TrainConfig, model: SanaModel):
         max_token_length = 300
 
