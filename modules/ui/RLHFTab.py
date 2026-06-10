@@ -98,8 +98,7 @@ class RLHFTab:
             0,
             "Supervised Mix",
             tooltip="Blends an NLL term on the CHOSEN images of each DPO pair into the loss. "
-            "Anchors the policy to its own chosen samples. Distinct from SFT Anchor, "
-            "which uses a separate set of standard concepts.",
+            "Anchors the policy to its own chosen samples.",
         )
         components.entry(self.scroll_frame, 3, 1, self.ui_state, "rlhf_supervised_mix")
 
@@ -179,20 +178,9 @@ class RLHFTab:
         )
         components.switch(self.scroll_frame, 6, 4, self.ui_state, "rlhf_dpo_save_best")
 
-        components.label(
-            self.scroll_frame,
-            7,
-            0,
-            "SFT Anchor Weight",
-            tooltip="Weight on a supervised loss computed from your STANDARD concepts during a DPO run. "
-            "When >0 and standard concepts are present, the loader runs them in parallel and adds "
-            "weight * sft_loss to the DPO loss. Set to 0 to silently drop standard concepts (legacy behavior).",
-        )
-        components.entry(self.scroll_frame, 7, 1, self.ui_state, "rlhf_sft_anchor_weight")
-
         components.button(
             self.scroll_frame,
-            8,
+            7,
             0,
             "Check Pairs",
             command=self._check_pairs,
@@ -200,7 +188,7 @@ class RLHFTab:
         )
         components.button(
             self.scroll_frame,
-            8,
+            7,
             1,
             "Review Pairs",
             command=self._review_pairs,
@@ -217,14 +205,14 @@ class RLHFTab:
 
         components.label(
             self.scroll_frame,
-            9,
+            8,
             0,
             "Training Type:",
             tooltip="Shows whether DPO is starting from a fresh adapter or refining a loaded adapter. The output is always an adapter file.",
         )
         components.label(
             self.scroll_frame,
-            9,
+            8,
             1,
             training_type,
             tooltip="DPO always writes an adapter file. New Adapter means the adapter starts from scratch. Existing Adapter means DPO refines a loaded adapter.",
