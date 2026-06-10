@@ -207,7 +207,9 @@ class BaseModelSetup(
             )
 
         def mse_per_sample(pred, target):
-            return ((pred - target) ** 2).mean(dim=list(range(1, pred.ndim)))
+            # fp32 accumulation in the reduction instead of upcasting the full
+            # [2B,C,H,W] tensors - avoids four fp32 copies per step.
+            return (pred - target).pow(2).mean(dim=list(range(1, pred.ndim)), dtype=torch.float32)
 
         beta = config.rlhf_dpo_beta if self._dpo_runtime_beta is None else self._dpo_runtime_beta
         supervised_loss = None
@@ -215,15 +217,17 @@ class BaseModelSetup(
         # 2 forwards: 1 batched ref (no_grad) + 1 batched policy, each over the
         # [chosen; rejected] batch. Both halves share per-pair timestep+noise via
         # _dpo_paired_half, and ref/policy share them too because predict()
-        # seeds its generator from global_step.
+        # seeds its generator from global_step. Note for torch.compile users:
+        # supervised/validation batches are B-sized while DPO batches are
+        # 2B-sized, so mixing them in one session compiles two graphs.
         batched_input, chosen_b = self._create_dpo_batched_batch(batch)
 
         self._dpo_paired_half = chosen_b
         try:
             with torch.no_grad(), self.reference_model(model, config):
                 ref_output = self.predict(model, batched_input, config, train_progress)
-                ref_predicted = ref_output["predicted"].float()
-                ref_target = ref_output["target"].float()
+                ref_predicted = ref_output["predicted"]
+                ref_target = ref_output["target"]
                 ref_chosen_logp = -mse_per_sample(ref_predicted[:chosen_b], ref_target[:chosen_b])
                 ref_rejected_logp = -mse_per_sample(ref_predicted[chosen_b:], ref_target[chosen_b:])
                 del ref_output, ref_predicted, ref_target
@@ -232,8 +236,8 @@ class BaseModelSetup(
         finally:
             self._dpo_paired_half = None
         policy_timestep = policy_output.get("timestep")
-        policy_predicted = policy_output["predicted"].float()
-        policy_target = policy_output["target"].float()
+        policy_predicted = policy_output["predicted"]
+        policy_target = policy_output["target"]
         policy_chosen_logp = -mse_per_sample(policy_predicted[:chosen_b], policy_target[:chosen_b])
         policy_rejected_logp = -mse_per_sample(policy_predicted[chosen_b:], policy_target[chosen_b:])
         if config.rlhf_supervised_mix > 0:
