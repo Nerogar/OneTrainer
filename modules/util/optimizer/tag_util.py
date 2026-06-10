@@ -1,8 +1,9 @@
+import math
+
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.config.TrainConfig import TrainConfig
 
 import torch
-import math
 
 
 def tag_peft_parameters(model: torch.nn.Module | None, config: TrainConfig):
