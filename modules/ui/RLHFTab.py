@@ -129,6 +129,18 @@ class RLHFTab:
 
         components.label(
             self.scroll_frame,
+            6,
+            0,
+            "Adaptive Beta",
+            tooltip="Adjusts Beta per optimizer step from the smoothed reward margin (beta-DPO): informative "
+            "batches with above-average margins raise Beta, uninformative ones lower it, bounded to "
+            "[Beta/4, Beta*4]. Beta is the starting point. Only applies to the DPO (sigmoid) objective. "
+            "Note that Beta and learning rate are coupled - if you double Beta, halve the learning rate.",
+        )
+        components.switch(self.scroll_frame, 6, 1, self.ui_state, "rlhf_dpo_adaptive_beta")
+
+        components.label(
+            self.scroll_frame,
             3,
             3,
             "Validation %",
@@ -163,6 +175,16 @@ class RLHFTab:
             "The best checkpoint is restored at the end of training.",
         )
         components.switch(self.scroll_frame, 6, 4, self.ui_state, "rlhf_dpo_save_best")
+
+        components.label(
+            self.scroll_frame,
+            8,
+            3,
+            "Timestep Margins",
+            tooltip="Logs the reward margin bucketed by timestep quartile (dpo/margin_by_t/q1..q4) to TensorBoard. "
+            "Useful to verify pairs are compared evenly across noise levels.",
+        )
+        components.switch(self.scroll_frame, 8, 4, self.ui_state, "rlhf_dpo_timestep_margin_logging")
 
         components.button(
             self.scroll_frame,

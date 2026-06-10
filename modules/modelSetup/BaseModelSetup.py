@@ -37,6 +37,7 @@ class BaseModelSetup(
         self._dpo_ref_params = None
         self._last_dpo_metrics = None
         self._dpo_paired_half = None  # read by ModelSetupNoiseMixin._apply_dpo_paired_rng
+        self._dpo_runtime_beta = None
 
     @abstractmethod
     def create_parameters(
@@ -187,6 +188,12 @@ class BaseModelSetup(
     def get_last_dpo_metrics(self) -> dict[str, float]:
         return self._last_dpo_metrics or {}
 
+    def set_dpo_runtime_beta(self, beta: float | None):
+        # Adaptive-beta override from the trainer. The logged reward metrics
+        # are computed before beta is applied, so adapting beta from them does
+        # not create a feedback loop.
+        self._dpo_runtime_beta = beta
+
     def calculate_dpo_loss(
         self,
         model: BaseModel,
@@ -202,7 +209,7 @@ class BaseModelSetup(
         def mse_per_sample(pred, target):
             return ((pred - target) ** 2).mean(dim=list(range(1, pred.ndim)))
 
-        beta = config.rlhf_dpo_beta
+        beta = config.rlhf_dpo_beta if self._dpo_runtime_beta is None else self._dpo_runtime_beta
         supervised_loss = None
 
         # 2 forwards: 1 batched ref (no_grad) + 1 batched policy, each over the
@@ -224,6 +231,7 @@ class BaseModelSetup(
             policy_output = self.predict(model, batched_input, config, train_progress)
         finally:
             self._dpo_paired_half = None
+        policy_timestep = policy_output.get("timestep")
         policy_predicted = policy_output["predicted"].float()
         policy_target = policy_output["target"].float()
         policy_chosen_logp = -mse_per_sample(policy_predicted[:chosen_b], policy_target[:chosen_b])
@@ -266,6 +274,20 @@ class BaseModelSetup(
             "reward_margin": margin.detach().mean().item(),
             "accuracy": (chosen_ratio > rejected_ratio).float().mean().item(),
         }
+
+        if config.rlhf_dpo_timestep_margin_logging and policy_timestep is not None:
+            # Per-sample raw margins bucketed by the chosen half's timestep
+            # quartile. Sums and counts are emitted for every quartile so the
+            # trainer's accumulation always sees the same key set.
+            t = policy_timestep[:chosen_b].detach().float()
+            if t.numel() > 0 and t.max() > 1.0:
+                t = t / 1000.0  # discrete schedulers train on 1000 timesteps
+            quartile_index = (t * 4).long().clamp(0, 3)
+            per_sample_margin = margin.detach()
+            for quartile in range(4):
+                mask = quartile_index == quartile
+                self._last_dpo_metrics[f"margin_t_q{quartile + 1}_sum"] = per_sample_margin[mask].sum().item()
+                self._last_dpo_metrics[f"margin_t_q{quartile + 1}_count"] = float(mask.sum().item())
 
         return loss
 

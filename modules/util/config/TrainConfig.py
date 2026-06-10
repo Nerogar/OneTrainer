@@ -549,6 +549,8 @@ class TrainConfig(BaseConfig):
     rlhf_dpo_label_smoothing: float
     rlhf_dpo_objective: DPOObjective
     rlhf_dpo_ipo_tau: float
+    rlhf_dpo_adaptive_beta: bool
+    rlhf_dpo_timestep_margin_logging: bool
     rlhf_dpo_ref_mode: DPORefMode
     rlhf_supervised_mix: float
     rlhf_dpo_validation: bool
@@ -877,6 +879,8 @@ class TrainConfig(BaseConfig):
         migrated_data = data.copy()
         migrated_data.setdefault("rlhf_dpo_objective", "SIGMOID")
         migrated_data.setdefault("rlhf_dpo_ipo_tau", 1000.0)
+        migrated_data.setdefault("rlhf_dpo_adaptive_beta", False)
+        migrated_data.setdefault("rlhf_dpo_timestep_margin_logging", False)
         return migrated_data
 
     def effective_dpo_ref_mode(self) -> DPORefMode:
@@ -1267,6 +1271,8 @@ class TrainConfig(BaseConfig):
         data.append(("rlhf_dpo_label_smoothing", 0.0, float, False))
         data.append(("rlhf_dpo_objective", DPOObjective.SIGMOID, DPOObjective, False))
         data.append(("rlhf_dpo_ipo_tau", 1000.0, float, False))
+        data.append(("rlhf_dpo_adaptive_beta", False, bool, False))
+        data.append(("rlhf_dpo_timestep_margin_logging", False, bool, False))
         data.append(("rlhf_dpo_ref_mode", DPORefMode.NEW_ADAPTER, DPORefMode, False))
         data.append(("rlhf_supervised_mix", 0.0, float, False))
         data.append(("rlhf_dpo_validation", False, bool, False))

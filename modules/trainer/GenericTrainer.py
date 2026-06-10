@@ -23,8 +23,10 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.compile_util import init_compile
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.dpo_beta_controller import DPOBetaController
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
 from modules.util.enum.ConceptType import ConceptType
+from modules.util.enum.DPOObjective import DPOObjective
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
@@ -171,6 +173,7 @@ class GenericTrainer(BaseTrainer):
         self._dpo_best_accuracy = float("-inf")
         self._dpo_best_margin = float("-inf")
         self._dpo_best_backup_path: str | None = None
+        self._dpo_beta_controller: DPOBetaController | None = None
 
     def __save_config_to_workspace(self):
         path = path_util.canonical_join(self.config.workspace_dir, "config")
@@ -730,6 +733,9 @@ class GenericTrainer(BaseTrainer):
         ema_loss_steps = 0
         ema_reward_margin = None
         ema_reward_margin_steps = 0
+        ema_chosen_reward = None
+        ema_dpo_accuracy = None
+        reward_hacking_streak = 0
         epochs = range(train_progress.epoch, self.config.epochs, 1)
 
         for _epoch in tqdm(epochs, desc="epoch") if multi.is_master() else epochs:
@@ -946,6 +952,56 @@ class GenericTrainer(BaseTrainer):
                                 self.tensorboard.add_scalar(
                                     "dpo/accuracy", dpo_metrics["accuracy"], train_progress.global_step
                                 )
+
+                                # Reward-hacking signature: the margin keeps growing while
+                                # BOTH rewards go negative (the model degrades chosen and
+                                # rejected alike) and held-out ranking saturates.
+                                ema_chosen_reward = ema_chosen_reward or dpo_metrics["chosen_reward"]
+                                ema_chosen_reward = (ema_chosen_reward * ema_reward_margin_decay) + (
+                                    dpo_metrics["chosen_reward"] * (1 - ema_reward_margin_decay)
+                                )
+                                ema_dpo_accuracy = ema_dpo_accuracy or dpo_metrics["accuracy"]
+                                ema_dpo_accuracy = (ema_dpo_accuracy * ema_reward_margin_decay) + (
+                                    dpo_metrics["accuracy"] * (1 - ema_reward_margin_decay)
+                                )
+                                if ema_chosen_reward < 0 and ema_dpo_accuracy > 0.95:
+                                    reward_hacking_streak += 1
+                                else:
+                                    reward_hacking_streak = 0
+                                if reward_hacking_streak == 25:
+                                    warning = (
+                                        "DPO reward-hacking signature detected: chosen reward has stayed "
+                                        "negative while training accuracy is saturated. The margin is likely "
+                                        "growing by degrading both images of each pair. Lower the learning "
+                                        "rate, raise beta, or switch to the IPO objective."
+                                    )
+                                    print(warning)
+                                    self.tensorboard.add_text("dpo/warnings", warning, train_progress.global_step)
+
+                                if (
+                                    self.config.rlhf_dpo_adaptive_beta
+                                    and self.config.rlhf_dpo_objective == DPOObjective.SIGMOID
+                                ):
+                                    if self._dpo_beta_controller is None:
+                                        self._dpo_beta_controller = DPOBetaController(self.config.rlhf_dpo_beta)
+                                    adaptive_beta = self._dpo_beta_controller.update(dpo_metrics["reward_margin"])
+                                    self.model_setup.set_dpo_runtime_beta(adaptive_beta)
+                                    self.tensorboard.add_scalar("dpo/beta", adaptive_beta, train_progress.global_step)
+                                    self.tensorboard.add_scalar(
+                                        "dpo/raw_margin_ema",
+                                        self._dpo_beta_controller.margin_ema,
+                                        train_progress.global_step,
+                                    )
+
+                                if self.config.rlhf_dpo_timestep_margin_logging:
+                                    for quartile in range(4):
+                                        quartile_count = dpo_metrics.get(f"margin_t_q{quartile + 1}_count", 0.0)
+                                        if quartile_count > 0:
+                                            self.tensorboard.add_scalar(
+                                                f"dpo/margin_by_t/q{quartile + 1}",
+                                                dpo_metrics[f"margin_t_q{quartile + 1}_sum"] / quartile_count,
+                                                train_progress.global_step,
+                                            )
                             ema_loss = ema_loss or accumulated_loss_cpu
                             ema_loss_steps += 1
                             ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
