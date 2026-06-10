@@ -137,6 +137,8 @@ class ConceptConfig(BaseConfig):
     repeats: float
     loss_weight: float
     concept_stats: dict
+    dpo_chosen_pattern: str
+    dpo_rejected_pattern: str
 
     image: ConceptImageConfig
     text: ConceptTextConfig
@@ -177,6 +179,9 @@ class ConceptConfig(BaseConfig):
         as_dict['text'] = self.text.to_dict()
         return as_dict
 
+    def is_dpo(self) -> bool:
+        return bool(self.dpo_chosen_pattern) and bool(self.dpo_rejected_pattern)
+
     @staticmethod
     def default_values():
         data = []
@@ -196,5 +201,7 @@ class ConceptConfig(BaseConfig):
         data.append(("balancing_strategy", BalancingStrategy.REPEATS, BalancingStrategy, False))
         data.append(("loss_weight", 1.0, float, False))
         data.append(("concept_stats", {}, dict, False))
+        data.append(("dpo_chosen_pattern", "", str, False))
+        data.append(("dpo_rejected_pattern", "", str, False))
 
         return ConceptConfig(data)
