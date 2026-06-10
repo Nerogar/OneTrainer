@@ -501,9 +501,9 @@ def export_single_pair(
 
     _copy_image(chosen_path, os.path.join(chosen_dir, safe_name + chosen_ext))
     _copy_image(rejected_path, os.path.join(rejected_dir, safe_name + rejected_ext))
-    for subdir in (chosen_dir, rejected_dir):
-        with open(os.path.join(subdir, safe_name + ".txt"), "w", encoding="utf-8") as f:
-            f.write(caption)
+    # Single-concept pattern pairing reads the caption from the chosen side only.
+    with open(os.path.join(chosen_dir, safe_name + ".txt"), "w", encoding="utf-8") as f:
+        f.write(caption)
 
     manifest.setdefault("pairs", []).append(
         {
@@ -622,24 +622,28 @@ def finalize_export(output_dir: str, manifest: dict, val_percentage: float = 0.0
         else:
             train_count += 1
 
-    abs_output = os.path.abspath(output_dir)
-    concept_entries = [
-        (os.path.join(abs_output, "chosen", "train"), ConceptType.DPO_CHOSEN),
-        (os.path.join(abs_output, "rejected", "train"), ConceptType.DPO_REJECTED),
-        (os.path.join(abs_output, "chosen", "val"), ConceptType.DPO_CHOSEN_VAL),
-        (os.path.join(abs_output, "rejected", "val"), ConceptType.DPO_REJECTED_VAL),
-    ]
+    _write_pattern_concepts(os.path.abspath(output_dir))
+
+    return train_count, val_count
+
+
+def _write_pattern_concepts(abs_output: str):
+    """Writes a concepts.json with one pattern concept per train/val split. The
+    concept path is the export root; the patterns pair chosen/<split>/<stem>
+    with rejected/<split>/<stem> inside one sample."""
     concepts = []
-    for path, concept_type in concept_entries:
+    for subdir, concept_type in (("train", ConceptType.STANDARD), ("val", ConceptType.VALIDATION)):
         cfg = ConceptConfig.default_values()
-        cfg.path = path
+        cfg.name = f"DPO {subdir}"
+        cfg.path = abs_output
         cfg.type = concept_type
         cfg.enabled = True
+        cfg.include_subdirectories = True
+        cfg.dpo_chosen_pattern = f"chosen/{subdir}/{{}}"
+        cfg.dpo_rejected_pattern = f"rejected/{subdir}/{{}}"
         concepts.append(cfg.to_dict())
     with open(os.path.join(abs_output, "concepts.json"), "w", encoding="utf-8") as f:
         json.dump(concepts, f, indent=2)
-
-    return train_count, val_count
 
 
 def has_existing_exports(output_dir: str) -> bool:
@@ -690,31 +694,15 @@ def export_curated_pairs(
             rejected_ext = os.path.splitext(pair["rejected"])[1].lower()
             _copy_image(pair["chosen"], os.path.join(chosen_dir, safe_name + chosen_ext))
             _copy_image(pair["rejected"], os.path.join(rejected_dir, safe_name + rejected_ext))
-            for subdir in (chosen_dir, rejected_dir):
-                with open(os.path.join(subdir, safe_name + ".txt"), "w", encoding="utf-8") as f:
-                    f.write(caption)
+            with open(os.path.join(chosen_dir, safe_name + ".txt"), "w", encoding="utf-8") as f:
+                f.write(caption)
 
         if is_val:
             val_count += len(pairs)
         else:
             train_count += len(pairs)
 
-    abs_output = os.path.abspath(output_dir)
-    concept_entries = [
-        (os.path.join(abs_output, "chosen", "train"), ConceptType.DPO_CHOSEN),
-        (os.path.join(abs_output, "rejected", "train"), ConceptType.DPO_REJECTED),
-        (os.path.join(abs_output, "chosen", "val"), ConceptType.DPO_CHOSEN_VAL),
-        (os.path.join(abs_output, "rejected", "val"), ConceptType.DPO_REJECTED_VAL),
-    ]
-    concepts = []
-    for path, concept_type in concept_entries:
-        cfg = ConceptConfig.default_values()
-        cfg.path = path
-        cfg.type = concept_type
-        cfg.enabled = True
-        concepts.append(cfg.to_dict())
-    with open(os.path.join(abs_output, "concepts.json"), "w", encoding="utf-8") as f:
-        json.dump(concepts, f, indent=2)
+    _write_pattern_concepts(os.path.abspath(output_dir))
 
     return (
         chosen_train_dir,
