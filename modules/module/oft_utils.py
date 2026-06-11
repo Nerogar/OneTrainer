@@ -175,6 +175,9 @@ class OFTRotationModule(nn.Module):
             # While FP32 takes 7 steps to converge to ortho error ~1e-6
             steps = 5 if G.dtype == torch.bfloat16 else 7
             R = self._cans_newton_schulz_iteration(G=G, steps=steps)
+            # Squaring the matrix doubles the rotation range from (-90°, 90°) to (-180°, 180°) and 
+            # matches Cayley (I + 2Q).
+            R = torch.bmm(R, R)
         else:
             R = torch.linalg.solve(self.id_mat + Q_skew, self.id_mat - Q_skew, left=False)
 
@@ -187,13 +190,8 @@ class OFTRotationModule(nn.Module):
 
         orig_shape = x.shape
 
-        if self.oft_scaled:
-            scaling_factor = math.sqrt(self.block_size - 1)
-            if not self.oft_cans:
-                scaling_factor = scaling_factor * 2
-            effective_weight = self.weight / scaling_factor
-        else:
-            effective_weight = self.weight
+        scaling_factor = 2 * math.sqrt(self.block_size - 1) if self.oft_scaled else 1
+        effective_weight = self.weight / scaling_factor
 
         orth_rotate = self._cayley_batch(
             effective_weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms, self.oft_cans
