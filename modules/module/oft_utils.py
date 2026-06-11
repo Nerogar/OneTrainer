@@ -175,7 +175,7 @@ class OFTRotationModule(nn.Module):
             # While FP32 takes 7 steps to converge to ortho error ~1e-6
             steps = 5 if G.dtype == torch.bfloat16 else 7
             R_half = self._cans_newton_schulz_iteration(G=G, steps=steps)
-            # Squaring the matrix doubles the rotation range from (-90°, 90°) to (-180°, 180°) and 
+            # Squaring the matrix doubles the rotation range from (-90°, 90°) to (-180°, 180°) and
             # matches Cayley (I + 2Q).
             R = torch.bmm(R_half, R_half)
         else:
