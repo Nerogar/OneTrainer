@@ -334,6 +334,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             config: TrainConfig,
             text_caching: bool,
             before_cache_image_fun: Callable[[], None] | None = None,
+            text_cache_build_workers: int | None = None,
     ):
         image_cache_dir = os.path.join(config.cache_dir, "image")
         text_cache_dir = os.path.join(config.cache_dir, "text")
@@ -359,9 +360,14 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
                                          group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun, stop_check_fun=stop_check,
                                          modeltype=config.model_type.value, source_path_in_name='image_path', sourceless=sourceless)
 
+        # content_key_in_name: the final post-augmentation prompt string fully
+        # determines the cached text payload, so identical caption lines are
+        # encoded once and reused across variations, files and concepts.
+        # Editing one line of a multi-line caption re-encodes only that line.
         text_disk_cache = SmartDiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',
                                         variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun, stop_check_fun=stop_check,
-                                        modeltype=config.model_type.value, source_path_in_name='sample_prompt_path', sourceless=sourceless)
+                                        modeltype=config.model_type.value, source_path_in_name='sample_prompt_path', sourceless=sourceless,
+                                        content_key_in_name='prompt', build_max_workers=text_cache_build_workers)
 
         modules = []
 

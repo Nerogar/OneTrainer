@@ -26,6 +26,20 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+def _text_encode_batch_size() -> int:
+    """Encode batch size and build worker count for the text cache.
+
+    Batching several captions per forward amortizes the per-forward fixed
+    cost (weight streaming under layer offload, dequant, kernel launches)
+    that dominates a bs=1 encode through the 4B Qwen encoder. Set
+    OT_TEXT_CACHE_BATCH=1 to restore strictly serial bs=1 encoding.
+    """
+    try:
+        return max(1, int(os.environ.get('OT_TEXT_CACHE_BATCH', '8')))
+    except ValueError:
+        return 8
+
+
 class ZImageBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -38,10 +52,18 @@ class ZImageBaseDataLoader(
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=PROMPT_MAX_LENGTH,
                                     apply_chat_template = lambda caption: format_input(caption), apply_chat_template_kwargs = {'add_generation_prompt': True, 'enable_thinking': True}
                                   )
-        if config.dataloader_threads > 1:
+        text_encode_batch = _text_encode_batch_size()
+        if config.dataloader_threads > 1 or text_encode_batch > 1:
             apply_thread_safe_forward(model.text_encoder)  # workaround for transformers#42673
+        # trim_padding/batch_collector are gated on latent_caching:
+        # PruneMaskedTokens then discards every padded hidden-state row before
+        # the cache stores it, so trimming the padding off the forward (and
+        # zero-filling those rows) yields an equivalent cached artifact.
+        # Without caching, padded rows flow to the trainer and must stay the
+        # encoder's own outputs.
         encode_prompt = EncodeQwenText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask',
-                                       text_encoder=model.text_encoder, hidden_state_output_index=-2, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+                                       text_encoder=model.text_encoder, hidden_state_output_index=-2, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(),
+                                       trim_padding=config.latent_caching, batch_collector=config.latent_caching and text_encode_batch > 1, max_batch_size=text_encode_batch)
         prune_masked_tokens = PruneMaskedTokens(tokens_name='tokens', tokens_mask_name='tokens_mask', hidden_state_name='text_encoder_hidden_state')
 
         modules = [rescale_image, encode_image, image_sample]
@@ -81,6 +103,9 @@ class ZImageBaseDataLoader(
             sort_names=sort_names,
             config=config,
             text_caching=True,
+            # Match the encoder's batch collector so a full batch of encode
+            # requests can be in flight during the text cache build.
+            text_cache_build_workers=_text_encode_batch_size() if config.latent_caching else None,
         )
 
     def _output_modules(self, config: TrainConfig, model: ZImageModel, model_setup: BaseZImageSetup):
