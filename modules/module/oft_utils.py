@@ -134,7 +134,7 @@ class OFTRotationModule(nn.Module):
             # Dynamically update bounds for the next step
             eps_val = (K - L) / denom
 
-            # bmm acts as an opaque boundary, forcing Inductor to 
+            # bmm acts as an opaque boundary, forcing Inductor to
             # materialize eps_val and severing the exponential AST tree.
             # Shape is (B, 1, 1), so ones_like acts as an identity.
             eps_val = torch.bmm(eps_val, torch.ones_like(eps_val))
