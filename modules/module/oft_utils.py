@@ -113,8 +113,7 @@ class OFTRotationModule(nn.Module):
 
         # Since min_singular_value(I + Q) >= 1, the min_singular_value of normalized X
         # is guaranteed to be >= 1 / ||G||_F.
-        # We clamp it to prevent numerical edge cases (e.g. extremely large norms).
-        lower_bound = (1.0 / g_norm).clamp(min=1e-5, max=0.9)
+        lower_bound = (1.0 / g_norm)
         upper_bound = 1
 
         for _ in range(steps):
