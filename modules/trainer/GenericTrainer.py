@@ -110,6 +110,8 @@ class GenericTrainer(BaseTrainer):
                     model_names.embedding.model_name = last_backup_path
                 else:  # fine-tunes
                     model_names.base_model = last_backup_path
+                    # drop submodule overrides so the backup is loaded in full
+                    model_names.clear_overrides()
 
                 print(f"Continuing training from backup '{last_backup_path}'...")
             else:
