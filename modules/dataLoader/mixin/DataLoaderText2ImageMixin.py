@@ -55,6 +55,21 @@ import torch
 from diffusers import AutoencoderKL
 
 
+def text_encode_batch_size() -> int:
+    """Encode batch size and build worker count for text caches.
+
+    Batching several captions per forward amortizes the per-forward fixed
+    cost (weight streaming under layer offload, dequant, kernel launches)
+    that dominates a bs=1 encode through a multi-billion-parameter text
+    encoder. Set OT_TEXT_CACHE_BATCH=1 to restore strictly serial bs=1
+    encoding.
+    """
+    try:
+        return max(1, int(os.environ.get('OT_TEXT_CACHE_BATCH', '8')))
+    except ValueError:
+        return 8
+
+
 class DataLoaderText2ImageMixin(metaclass=ABCMeta):
     def _enumerate_input_modules(self, config: TrainConfig, allow_videos: bool = False) -> list:
         supported_extensions = set()

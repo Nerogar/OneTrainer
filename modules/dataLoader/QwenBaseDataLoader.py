@@ -1,7 +1,7 @@
 import os
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
-from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
+from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin, text_encode_batch_size
 from modules.model.BaseModel import BaseModel
 from modules.model.QwenModel import (
     DEFAULT_PROMPT_TEMPLATE,
@@ -14,6 +14,7 @@ from modules.modelSetup.BaseQwenSetup import BaseQwenSetup
 from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
+from modules.util.thread_safety import apply_thread_safe_forward
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
@@ -41,8 +42,19 @@ class QwenBaseDataLoader(
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=PROMPT_MAX_LENGTH,
                                    format_text=DEFAULT_PROMPT_TEMPLATE, additional_format_text_tokens=DEFAULT_PROMPT_TEMPLATE_CROP_START)
+        # Mirrors the Z-Image wiring: PruneMaskedTokens (added below under the
+        # same condition) discards every padded hidden-state row before the
+        # cache stores it, so trimming the padding off the forward and
+        # batching concurrent cache-build encodes yield equivalent cached
+        # artifacts. crop_start composes with trim: one slices the template
+        # head after encoding, the other skips the padded tail.
+        text_caching_active = config.latent_caching and not config.train_text_encoder_or_embedding()
+        text_encode_batch = text_encode_batch_size()
+        if text_caching_active and (config.dataloader_threads > 1 or text_encode_batch > 1):
+            apply_thread_safe_forward(model.text_encoder)  # workaround for transformers#42673
         encode_prompt = EncodeQwenText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask',
-                                       text_encoder=model.text_encoder, hidden_state_output_index=-1, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(), crop_start=DEFAULT_PROMPT_TEMPLATE_CROP_START)
+                                       text_encoder=model.text_encoder, hidden_state_output_index=-1, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(), crop_start=DEFAULT_PROMPT_TEMPLATE_CROP_START,
+                                       trim_padding=text_caching_active, batch_collector=text_caching_active and text_encode_batch > 1, max_batch_size=text_encode_batch)
         prune_masked_tokens = PruneMaskedTokens(tokens_name='tokens', tokens_mask_name='tokens_mask', hidden_state_name='text_encoder_hidden_state')
 
         modules = [rescale_image, encode_image, image_sample]
@@ -85,6 +97,9 @@ class QwenBaseDataLoader(
             sort_names=sort_names,
             config=config,
             text_caching=not config.train_text_encoder_or_embedding(),
+            # Match the encoder's batch collector so a full batch of encode
+            # requests can be in flight during the text cache build.
+            text_cache_build_workers=text_encode_batch_size() if config.latent_caching and not config.train_text_encoder_or_embedding() else None,
         )
 
     def _output_modules(self, config: TrainConfig, model: QwenModel, model_setup: BaseQwenSetup):

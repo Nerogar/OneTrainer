@@ -2,7 +2,7 @@ import os
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.flux.ShuffleFluxFillMaskChannels import ShuffleFluxFillMaskChannels
-from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
+from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin, text_encode_batch_size
 from modules.model.BaseModel import BaseModel
 from modules.model.HiDreamModel import HiDreamModel
 from modules.modelSetup.BaseHiDreamSetup import BaseHiDreamSetup
@@ -10,6 +10,7 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
+from modules.util.thread_safety import apply_thread_safe_forward
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
@@ -57,8 +58,20 @@ class HiDreamBaseDataLoader(
         encode_prompt_3 = EncodeT5Text(tokens_in_name='tokens_3', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_3_hidden_state', pooled_out_name=None, add_layer_norm=True,
                                        text_encoder=model.text_encoder_3, hidden_state_output_index=-(1 + config.text_encoder_3_layer_skip), autocast_contexts=[model.autocast_context, model.text_encoder_3_autocast_context],
                                        dtype=model.text_encoder_3_train_dtype.torch_dtype())
+        # Batch concurrent cache-build encodes through the 8B Llama; the CLIP
+        # and T5 encoders stay bs=1 but get the thread-safe forward wrapper so
+        # the widened text cache build pool can drive them from multiple
+        # threads (transformers#42673). Collector only, no trim_padding: this
+        # pipeline caches full padded hidden states.
+        text_encode_batch = text_encode_batch_size()
+        use_batch_collector = config.latent_caching and text_encode_batch > 1
+        if config.dataloader_threads > 1 or text_encode_batch > 1:
+            for text_encoder in [model.text_encoder_1, model.text_encoder_2, model.text_encoder_3, model.text_encoder_4]:
+                if text_encoder is not None:
+                    apply_thread_safe_forward(text_encoder)
         encode_prompt_4 = EncodeLlamaText(tokens_name='tokens_4', tokens_attention_mask_in_name='tokens_mask_4', hidden_state_out_name='text_encoder_4_hidden_state', tokens_attention_mask_out_name='tokens_mask_4', text_encoder=model.text_encoder_4,
-                                          output_all_hidden_states=True, all_hidden_state_output_indices=model.transformer.config.llama_layers, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+                                          output_all_hidden_states=True, all_hidden_state_output_indices=model.transformer.config.llama_layers, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(),
+                                          batch_collector=use_batch_collector, max_batch_size=text_encode_batch)
 
         modules = [rescale_image, encode_image, image_sample]
         if config.model_type.has_mask_input():
@@ -136,6 +149,9 @@ class HiDreamBaseDataLoader(
                       or not config.train_text_encoder_2_or_embedding() \
                       or not config.train_text_encoder_3_or_embedding() \
                       or not config.train_text_encoder_4_or_embedding(),
+            # Match the Llama encoder's batch collector so a full batch of
+            # encode requests can be in flight during the text cache build.
+            text_cache_build_workers=text_encode_batch_size() if config.latent_caching else None,
         )
 
     def _output_modules(self, config: TrainConfig, model: HiDreamModel, model_setup: BaseHiDreamSetup):

@@ -1,7 +1,7 @@
 import os
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
-from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
+from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin, text_encode_batch_size
 from modules.model.BaseModel import BaseModel
 from modules.model.HunyuanVideoModel import (
     DEFAULT_PROMPT_TEMPLATE,
@@ -13,6 +13,7 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
+from modules.util.thread_safety import apply_thread_safe_forward
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
@@ -43,8 +44,20 @@ class HunyuanVideoBaseDataLoader(
         tokenize_prompt_1 = Tokenize(in_name='prompt_1', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=77,
                                      format_text=DEFAULT_PROMPT_TEMPLATE, additional_format_text_tokens=DEFAULT_PROMPT_TEMPLATE_CROP_START)
         tokenize_prompt_2 = Tokenize(in_name='prompt_2', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=77)
+        # Batch concurrent cache-build encodes through the Llama encoder; the
+        # CLIP encoder stays bs=1 but gets the thread-safe forward wrapper so
+        # the widened text cache build pool can drive it from multiple threads
+        # (transformers#42673). Collector only, no trim_padding: this pipeline
+        # caches full padded hidden states.
+        text_encode_batch = text_encode_batch_size()
+        use_batch_collector = config.latent_caching and text_encode_batch > 1
+        if config.dataloader_threads > 1 or text_encode_batch > 1:
+            for text_encoder in [model.text_encoder_1, model.text_encoder_2]:
+                if text_encoder is not None:
+                    apply_thread_safe_forward(text_encoder)
         encode_prompt_1 = EncodeLlamaText(tokens_name='tokens_1', tokens_attention_mask_in_name='tokens_mask_1', hidden_state_out_name='text_encoder_1_hidden_state', tokens_attention_mask_out_name='tokens_mask_1', text_encoder=model.text_encoder_1,
-                                          hidden_state_output_index=-(1 + config.text_encoder_2_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(), crop_start=DEFAULT_PROMPT_TEMPLATE_CROP_START)
+                                          hidden_state_output_index=-(1 + config.text_encoder_2_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(), crop_start=DEFAULT_PROMPT_TEMPLATE_CROP_START,
+                                          batch_collector=use_batch_collector, max_batch_size=text_encode_batch)
         encode_prompt_2 = EncodeClipText(in_name='tokens_2', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_2_hidden_states', pooled_out_name='text_encoder_2_pooled_state', add_layer_norm=False,
                                          text_encoder=model.text_encoder_2, hidden_state_output_index=-(2 + config.text_encoder_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
 
@@ -98,6 +111,9 @@ class HunyuanVideoBaseDataLoader(
             sort_names=sort_names,
             config=config,
             text_caching=not config.train_text_encoder_or_embedding() or not config.train_text_encoder_2_or_embedding(),
+            # Match the Llama encoder's batch collector so a full batch of
+            # encode requests can be in flight during the text cache build.
+            text_cache_build_workers=text_encode_batch_size() if config.latent_caching else None,
         )
 
     def _output_modules(self, config: TrainConfig, model: HunyuanVideoModel, model_setup: BaseHunyuanVideoSetup):
