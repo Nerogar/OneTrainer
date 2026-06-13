@@ -1,4 +1,3 @@
-import copy
 import os
 import traceback
 
@@ -87,7 +86,6 @@ class PixArtAlphaModelLoader(
 
         model.model_type = model_type
         model.tokenizer = tokenizer
-        model.orig_tokenizer = copy.deepcopy(tokenizer)
         model.noise_scheduler = noise_scheduler
         model.text_encoder = text_encoder
         model.vae = vae

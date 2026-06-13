@@ -74,6 +74,7 @@ class PixArtAlphaFineTuneSetup(
         if config.train_any_embedding():
             model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
+        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 

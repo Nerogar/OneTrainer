@@ -94,6 +94,7 @@ class SanaLoRASetup(
         model.transformer_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
         model.transformer_lora.hook_to_module()
 
+        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
