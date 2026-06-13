@@ -13,14 +13,26 @@ from transformers import (
     CLIPTextModelWithProjection,
     Gemma2Model,
     LlamaModel,
-    PreTrainedTokenizer,
     T5EncoderModel,
 )
+from transformers.tokenization_utils import PreTrainedTokenizer, Trie
 
 
 class ModelSetupEmbeddingMixin(metaclass=ABCMeta):
     def __init__(self):
         super().__init__()
+
+    def _remove_added_embeddings_from_tokenizer(
+            self,
+            tokenizer: PreTrainedTokenizer,
+    ):
+        if tokenizer:
+            added_tokens = list(filter(lambda item: not item[1].special, tokenizer._added_tokens_decoder.items()))
+            for key, added_token in added_tokens:
+                tokenizer._added_tokens_decoder.pop(key)
+                tokenizer._added_tokens_encoder.pop(added_token.content)
+            tokenizer.tokens_trie = Trie()
+            tokenizer._update_trie()
 
     def _create_new_embedding(
             self,
