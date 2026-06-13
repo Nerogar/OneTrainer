@@ -230,6 +230,9 @@ def enable_checkpointing(
         lists, # if there are multiple entries in this list, they must be in the exact order they are executed - otherwise offloading fails
         offload_enabled: bool = True,
 ) -> LayerOffloadConductor | None:
+    if not part.checkpointing_or_offloading_enabled() and not compile:
+        return None
+
     # a conductor exists iff this part actually offloads (and the component supports conductor offloading)
     offload = offload_enabled and part.offloading_enabled()
     conductor = LayerOffloadConductor(model, config, part) if offload else None

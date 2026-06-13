@@ -45,9 +45,8 @@ class BaseFlux2Setup(
             model: Flux2Model,
             config: TrainConfig,
     ):
-        if config.transformer.checkpointing_or_offloading_enabled():
-            model.transformer_offload_conductor = enable_checkpointing_for_flux2_transformer(model.transformer, config, config.transformer)
-        if model.text_encoder is not None and config.text_encoder.checkpointing_or_offloading_enabled():
+        model.transformer_offload_conductor = enable_checkpointing_for_flux2_transformer(model.transformer, config, config.transformer)
+        if model.text_encoder is not None:
             if model.is_dev():
                 model.text_encoder_offload_conductor = enable_checkpointing_for_mistral_encoder_layers(model.text_encoder, config, config.text_encoder)
             else:
