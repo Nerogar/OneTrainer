@@ -62,6 +62,19 @@ class Flux2ModelLoader(
             vae_model_name: str,
             quantization: QuantizationConfig,
     ):
+        diffusers_sub = []
+        transformers_sub = ["text_encoder"]
+        if not transformer_model_name:
+            diffusers_sub.append("transformer")
+        if not vae_model_name:
+            diffusers_sub.append("vae")
+
+        self._prepare_sub_modules(
+            base_model_name,
+            diffusers_modules=diffusers_sub,
+            transformers_modules=transformers_sub,
+        )
+
         if transformer_model_name:
             transformer = Flux2Transformer2DModel.from_single_file(
                 transformer_model_name,

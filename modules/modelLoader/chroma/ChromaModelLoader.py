@@ -1,4 +1,3 @@
-import copy
 import os
 import traceback
 
@@ -53,6 +52,18 @@ class ChromaModelLoader(
             vae_model_name: str,
             quantization: QuantizationConfig,
     ):
+        diffusers_sub = []
+        if not transformer_model_name:
+            diffusers_sub.append("transformer")
+        if not vae_model_name:
+            diffusers_sub.append("vae")
+
+        self._prepare_sub_modules(
+            base_model_name,
+            diffusers_modules=diffusers_sub,
+            transformers_modules=["text_encoder"],
+        )
+
         tokenizer = T5Tokenizer.from_pretrained(
             base_model_name,
             subfolder="tokenizer",
@@ -109,7 +120,6 @@ class ChromaModelLoader(
 
         model.model_type = model_type
         model.tokenizer = tokenizer
-        model.orig_tokenizer = copy.deepcopy(tokenizer)
         model.noise_scheduler = noise_scheduler
         model.text_encoder = text_encoder
         model.vae = vae

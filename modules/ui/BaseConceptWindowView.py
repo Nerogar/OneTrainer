@@ -575,8 +575,7 @@ class ConceptWindow(ctk.CTkToplevel):
 
     def __download_dataset(self):
         try:
-            if self.train_config.secrets.huggingface_token != "":
-                huggingface_hub.login(token=self.train_config.secrets.huggingface_token)
+            huggingface_hub.login(token=self.train_config.secrets.huggingface_token, new_session=False)
             huggingface_hub.snapshot_download(repo_id=self.concept.path, repo_type="dataset")
         except Exception:
             traceback.print_exc()
