@@ -8,13 +8,12 @@ from modules.util.ui.validation import (
     DEFAULT_MAX_UNDO,
     ERROR_BORDER_COLOR,
     BaseFieldValidator,
+    _active_validators,
     _validate_path_field,
 )
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QLineEdit
-
-_active_qt_validators: set["PySide6FieldValidator"] = set()
 
 
 class PySide6FieldValidator(BaseFieldValidator):
@@ -58,13 +57,13 @@ class PySide6FieldValidator(BaseFieldValidator):
         self.component.destroyed.connect(self._on_destroyed)
 
         self._bound = True
-        _active_qt_validators.add(self)
+        _active_validators.add(self)
 
     def detach(self) -> None:
         if not self._bound:
             return
         self._bound = False
-        _active_qt_validators.discard(self)
+        _active_validators.discard(self)
         self._debounce.stop()
         self._commit()
         try:
@@ -81,7 +80,7 @@ class PySide6FieldValidator(BaseFieldValidator):
         if not self._bound:
             return
         self._bound = False
-        _active_qt_validators.discard(self)
+        _active_validators.discard(self)
         self._debounce.stop()
         if self._var_trace_id is not None:
             self.var.trace_remove("write", self._var_trace_id)
@@ -159,18 +158,3 @@ class PySide6PathValidator(PySide6FieldValidator):
 
     def revalidate(self) -> None:
         self._validate_and_style(self.component.text())
-
-
-def flush_and_validate_all_qt() -> list[str]:
-    invalid: list[str] = []
-    for v in list(_active_qt_validators):
-        v._debounce.stop()
-        val = v.component.text()
-        error = v.validate(val)
-        if error is not None:
-            v._apply_error()
-            invalid.append(f"{v.var_name}: {error}")
-        else:
-            v._clear_error()
-            v._commit()
-    return invalid
