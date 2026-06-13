@@ -1,56 +1,20 @@
-import traceback
-from uuid import uuid4
-
-from modules.util import create
-from modules.util.args.ConvertModelArgs import ConvertModelArgs
-from modules.util.config.TrainConfig import QuantizationConfig
+from modules.util import path_util
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.ModelNames import EmbeddingName, ModelNames
-from modules.util.torch_util import torch_gc
-from modules.util.ui import components
-from modules.util.ui.ui_utils import set_window_icon
-from modules.util.ui.UIState import UIState
-
-import customtkinter as ctk
 
 
-class ConvertModelUI(ctk.CTkToplevel):
-    def __init__(self, parent, *args, **kwargs):
-        super().__init__(parent, *args, **kwargs)
-        self.parent = parent
+class BaseConvertModelUIView:
+    def __init__(self, components):
+        self.components = components
 
-        self.parent = parent
-        self.convert_model_args = ConvertModelArgs.default_values()
-        self.ui_state = UIState(self, self.convert_model_args)
-        self.button = None
-
-
-        self.title("Convert models")
-        self.geometry("550x350")
-        self.resizable(True, True)
-
-        self.frame = ctk.CTkFrame(self, width=600, height=300)
-        self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        self.frame.grid_columnconfigure(0, weight=0)
-        self.frame.grid_columnconfigure(1, weight=1)
-
-        self.main_frame(self.frame)
-        self.frame.pack(fill="both", expand=True)
-
-        self.wait_visibility()
-        self.focus_set()
-        self.after(200, lambda: set_window_icon(self))
-
-
-    def main_frame(self, master):
+    def build_content(self, frame, controller, ui_state):
         # model type
-        components.label(master, 0, 0, "Model Type",
+        self.components.label(frame, 0, 0, "Model Type",
                          tooltip="Type of the model")
-        components.options_kv(master, 0, 1, [ #TODO simplify
+        self.components.options_kv(frame, 0, 1, [ #TODO simplify
             ("Stable Diffusion 1.5", ModelType.STABLE_DIFFUSION_15),
             ("Stable Diffusion 1.5 Inpainting", ModelType.STABLE_DIFFUSION_15_INPAINTING),
             ("Stable Diffusion 2.0", ModelType.STABLE_DIFFUSION_20),
@@ -71,100 +35,49 @@ class ConvertModelUI(ctk.CTkToplevel):
             ("Chroma1", ModelType.CHROMA_1), #TODO does this just work? HiDream is not here
             ("QwenImage", ModelType.QWEN), #TODO does this just work? HiDream is not here
             ("ZImage", ModelType.Z_IMAGE),
-        ], self.ui_state, "model_type")
+        ], ui_state, "model_type")
 
         # training method
-        components.label(master, 1, 0, "Model Type",
+        self.components.label(frame, 1, 0, "Model Type",
                          tooltip="The type of model to convert")
-        components.options_kv(master, 1, 1, [
+        self.components.options_kv(frame, 1, 1, [
             ("Base Model", TrainingMethod.FINE_TUNE),
             ("LoRA", TrainingMethod.LORA),
             ("Embedding", TrainingMethod.EMBEDDING),
-        ], self.ui_state, "training_method")
+        ], ui_state, "training_method")
 
         # input name
-        components.label(master, 2, 0, "Input name",
+        self.components.label(frame, 2, 0, "Input name",
                          tooltip="Filename, directory or hugging face repository of the base model")
-        components.path_entry(
-            master, 2, 1, self.ui_state, "input_name",
-            mode="file", path_modifier=components.json_path_modifier
+        self.components.path_entry(
+            frame, 2, 1, ui_state, "input_name",
+            mode="file", path_modifier=path_util.json_path_modifier
         )
 
         # output data type
-        components.label(master, 3, 0, "Output Data Type",
+        self.components.label(frame, 3, 0, "Output Data Type",
                          tooltip="Precision to use when saving the output model")
-        components.options_kv(master, 3, 1, [
+        self.components.options_kv(frame, 3, 1, [
             ("float32", DataType.FLOAT_32),
             ("float16", DataType.FLOAT_16),
             ("bfloat16", DataType.BFLOAT_16),
-        ], self.ui_state, "output_dtype")
+        ], ui_state, "output_dtype")
 
         # output format
-        components.label(master, 4, 0, "Output Format",
+        self.components.label(frame, 4, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
-        components.options_kv(master, 4, 1, [
+        self.components.options_kv(frame, 4, 1, [
             ("Safetensors", ModelFormat.SAFETENSORS),
             ("Diffusers", ModelFormat.DIFFUSERS),
-        ], self.ui_state, "output_model_format")
+        ], ui_state, "output_model_format")
 
         # output model destination
-        components.label(master, 5, 0, "Model Output Destination",
+        self.components.label(frame, 5, 0, "Model Output Destination",
                          tooltip="Filename or directory where the output model is saved")
-        components.path_entry(
-            master, 5, 1, self.ui_state, "output_model_destination",
+        self.components.path_entry(
+            frame, 5, 1, ui_state, "output_model_destination",
             mode="file",
             io_type=PathIOType.MODEL,
         )
 
-        self.button = components.button(master, 6, 1, "Convert", self.convert_model)
-
-    def convert_model(self):
-        try:
-            self.button.configure(state="disabled")
-            model_loader = create.create_model_loader(
-                model_type=self.convert_model_args.model_type,
-                training_method=self.convert_model_args.training_method
-            )
-            model_saver = create.create_model_saver(
-                model_type=self.convert_model_args.model_type,
-                training_method=self.convert_model_args.training_method
-            )
-
-            print("Loading model " + self.convert_model_args.input_name)
-            if self.convert_model_args.training_method in [TrainingMethod.FINE_TUNE]:
-                model = model_loader.load(
-                    model_type=self.convert_model_args.model_type,
-                    model_names=ModelNames(
-                        base_model=self.convert_model_args.input_name,
-                    ),
-                    weight_dtypes=self.convert_model_args.weight_dtypes(),
-                    quantization=QuantizationConfig.default_values(),
-                )
-            elif self.convert_model_args.training_method in [TrainingMethod.LORA, TrainingMethod.EMBEDDING]:
-                model = model_loader.load(
-                    model_type=self.convert_model_args.model_type,
-                    model_names=ModelNames(
-                        base_model=None,
-                        lora=self.convert_model_args.input_name,
-                        embedding=EmbeddingName(str(uuid4()), self.convert_model_args.input_name),
-                    ),
-                    weight_dtypes=self.convert_model_args.weight_dtypes(),
-                    quantization=QuantizationConfig.default_values(),
-                )
-            else:
-                raise Exception("could not load model: " + self.convert_model_args.input_name)
-
-            print("Saving model " + self.convert_model_args.output_model_destination)
-            model_saver.save(
-                model=model,
-                model_type=self.convert_model_args.model_type,
-                output_model_format=self.convert_model_args.output_model_format,
-                output_model_destination=self.convert_model_args.output_model_destination,
-                dtype=self.convert_model_args.output_dtype.torch_dtype(),
-            )
-            print("Model converted")
-        except Exception:
-            traceback.print_exc()
-
-        torch_gc()
-        self.button.configure(state="normal")
+        self.button = self.components.button(frame, 6, 1, "Convert", controller.convert_model)

@@ -43,7 +43,6 @@ class StableDiffusionModelEmbedding:
 class StableDiffusionModel(BaseModel):
     # base model data
     tokenizer: CLIPTokenizer | None
-    orig_tokenizer: CLIPTokenizer | None
     noise_scheduler: DDIMScheduler | None
     text_encoder: CLIPTextModel | None
     vae: AutoencoderKL | None
@@ -73,7 +72,6 @@ class StableDiffusionModel(BaseModel):
         )
 
         self.tokenizer = None
-        self.orig_tokenizer = None
         self.noise_scheduler = None
         self.text_encoder = None
         self.vae = None
@@ -138,13 +136,12 @@ class StableDiffusionModel(BaseModel):
         self.text_encoder.eval()
         self.unet.eval()
 
-    def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
-        tokenizer = self.orig_tokenizer if use_original_tokenizers else self.tokenizer
+    def create_pipeline(self) -> DiffusionPipeline:
         if self.model_type.has_depth_input():
             return StableDiffusionDepth2ImgPipeline(
                 vae=self.vae,
                 text_encoder=self.text_encoder,
-                tokenizer=tokenizer,
+                tokenizer=self.tokenizer,
                 unet=self.unet,
                 scheduler=self.noise_scheduler,
                 depth_estimator=self.depth_estimator,
@@ -154,7 +151,7 @@ class StableDiffusionModel(BaseModel):
             return StableDiffusionInpaintPipeline(
                 vae=self.vae,
                 text_encoder=self.text_encoder,
-                tokenizer=tokenizer,
+                tokenizer=self.tokenizer,
                 unet=self.unet,
                 scheduler=self.noise_scheduler,
                 safety_checker=None,
@@ -165,7 +162,7 @@ class StableDiffusionModel(BaseModel):
             return StableDiffusionPipeline(
                 vae=self.vae,
                 text_encoder=self.text_encoder,
-                tokenizer=tokenizer,
+                tokenizer=self.tokenizer,
                 unet=self.unet,
                 scheduler=self.noise_scheduler,
                 safety_checker=None,

@@ -1,27 +1,63 @@
-import contextlib
 import copy
 import json
 import os
-import tkinter as tk
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 
 from modules.util import path_util
-from modules.util.config.BaseConfig import BaseConfig
-from modules.util.config.TrainConfig import TrainConfig
 from modules.util.path_util import write_json_atomic
-from modules.util.ui import components, dialogs
-from modules.util.ui.UIState import UIState
 
 import customtkinter as ctk
 
 
-class ConfigList(metaclass=ABCMeta):
+class BaseConfigListView(ABC):
 
-    def __init__(
+    def __init__(self, components):
+        self.components = components
+
+    @abstractmethod
+    def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
+        pass
+
+    @abstractmethod
+    def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
+        pass
+
+    @abstractmethod
+    def _create_top_frame(self, master):
+        pass
+
+    @abstractmethod
+    def _create_element_list_frame(self, master):
+        pass
+
+    @abstractmethod
+    def _remove_widget_from_layout(self, widget):
+        pass
+
+    @abstractmethod
+    def _destroy_widget(self, widget):
+        pass
+
+    @abstractmethod
+    def _destroy_frame(self, frame):
+        pass
+
+    @abstractmethod
+    def _wait_for_window(self, window):
+        pass
+
+    @abstractmethod
+    def _show_name_dialog(self, callback):
+        pass
+
+    def _refresh_show_disabled_text(self):
+        return
+
+    def build(
             self,
             master,
-            train_config: TrainConfig,
-            ui_state: UIState,
+            controller,
+            ui_state,
             from_external_file: bool,
             attr_name: str = "",
             enable_key: str = "enabled",
@@ -29,11 +65,11 @@ class ConfigList(metaclass=ABCMeta):
             default_config_name: str = "",
             add_button_text: str = "",
             add_button_tooltip: str = "",
-            is_full_width: bool = "",
+            is_full_width: bool = False,
             show_toggle_button: bool = False,
     ):
         self.master = master
-        self.train_config = train_config
+        self.controller = controller
         self.ui_state = ui_state
         self.from_external_file = from_external_file
         self.attr_name = attr_name
@@ -54,13 +90,8 @@ class ConfigList(metaclass=ABCMeta):
         self.is_opening_window = False
         self._is_current_item_enabled = False
 
-        self.master.grid_rowconfigure(0, weight=0)
-        self.master.grid_rowconfigure(1, weight=1)
-        self.master.grid_columnconfigure(0, weight=1)
-
         if self.from_external_file:
-            self.top_frame = ctk.CTkFrame(self.master, fg_color="transparent")
-            self.top_frame.grid(row=0, column=0, sticky="nsew")
+            self.top_frame = self._create_top_frame(master)
 
             self.configs_dropdown = None
             self.element_list = None
@@ -68,58 +99,26 @@ class ConfigList(metaclass=ABCMeta):
             self.configs = []
             self.__load_available_config_names()
 
-            self.current_config = getattr(self.train_config, self.attr_name)
+            self.current_config = getattr(self.controller.train_config, self.attr_name)
             self.widgets = []
-            self.__load_current_config(getattr(self.train_config, self.attr_name))
+            self.__load_current_config(getattr(self.controller.train_config, self.attr_name))
 
             self.__create_configs_dropdown()
-            components.button(self.top_frame, 0, 1, "Add Config", self.__add_config, tooltip="Adds a new config, which are containers for concepts, which themselves contain your dataset", width=20, padx=5)
-            components.button(self.top_frame, 0, 2, add_button_text, self.__add_element, tooltip=add_button_tooltip, width=30, padx=5)
+            self.components.button(self.top_frame, 0, 1, "Add Config", self.__add_config, tooltip="Adds a new config, which are containers for concepts, which themselves contain your dataset", width=20, padx=5)
+            self.components.button(self.top_frame, 0, 2, add_button_text, self.__add_element, tooltip=add_button_tooltip, width=30, padx=5)
         else:
-            self.top_frame = ctk.CTkFrame(self.master, fg_color="transparent")
-            self.top_frame.grid(row=0, column=0, sticky="nsew")
-            components.button(self.top_frame, 0, 2, add_button_text, self.__add_element, width=20, padx=5)
+            self.top_frame = self._create_top_frame(master)
+            self.components.button(self.top_frame, 0, 2, add_button_text, self.__add_element, width=20, padx=5)
 
-            self.current_config = getattr(self.train_config, self.attr_name)
+            self.current_config = getattr(self.controller.train_config, self.attr_name)
 
             self.element_list = None
             self._create_element_list()
 
         if show_toggle_button:
             # tooltips break if you initialize with an empty string, default to a single space
-            self.toggle_button = components.button(self.top_frame, 0, 3, " ", self._toggle, tooltip="Disables/Enables all visible items in the current view", width=30, padx=5)
+            self.toggle_button = self.components.button(self.top_frame, 0, 3, " ", self._toggle, tooltip="Disables/Enables all visible items in the current view", width=30, padx=5)
             self._update_toggle_button_text()
-
-
-
-    @abstractmethod
-    def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        pass
-
-    @abstractmethod
-    def create_new_element(self) -> BaseConfig:
-        pass
-
-    @abstractmethod
-    def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
-        pass
-
-    def _refresh_show_disabled_text(self):
-        return
-
-    def _reset_filters(self):  # pragma: no cover - default noop
-        search_var = getattr(self, 'search_var', None)
-        filter_var = getattr(self, 'filter_var', None)
-        show_disabled_var = getattr(self, 'show_disabled_var', None)
-
-        if search_var:
-            search_var.set("")
-        if filter_var:
-            filter_var.set("ALL")
-        if show_disabled_var:
-            show_disabled_var.set(True)
-        if search_var and hasattr(self, '_update_filters'):
-            self._update_filters()
 
     def _update_item_enabled_state(self):
         # Only count items that match current filters
@@ -154,14 +153,14 @@ class ConfigList(metaclass=ABCMeta):
         if self.configs_dropdown is not None:
             self.configs_dropdown.destroy()
 
-        self.configs_dropdown = components.options_kv(
+        self.configs_dropdown = self.components.options_kv(
             self.top_frame, 0, 0, self.configs, self.ui_state, self.attr_name, self.__load_current_config
         )
         self._update_toggle_button_text()
 
     def _create_element_list(self, **filters):
         if not self.from_external_file:
-            self.current_config = getattr(self.train_config, self.attr_name)
+            self.current_config = getattr(self.controller.train_config, self.attr_name)
 
         self.filters.update(filters)
 
@@ -175,13 +174,9 @@ class ConfigList(metaclass=ABCMeta):
     def _initialize_all_widgets(self):
         self.widgets = []
         if self.element_list is not None:
-            self.element_list.destroy()
+            self._destroy_frame(self.element_list)
 
-        self.element_list = ctk.CTkScrollableFrame(self.master, fg_color="transparent")
-        self.element_list.grid(row=1, column=0, sticky="nsew")
-
-        if self.is_full_width:
-            self.element_list.grid_columnconfigure(0, weight=1)
+        self.element_list = self._create_element_list_frame(self.master)
 
         for i, element in enumerate(self.current_config):
             widget = self.create_widget(
@@ -205,7 +200,7 @@ class ConfigList(metaclass=ABCMeta):
                     widget.place_in_list()
                     visible_index += 1
                 else:
-                    widget.grid_remove()
+                    self._remove_widget_from_layout(widget)
 
     def __load_available_config_names(self):
         if os.path.isdir(self.config_dir):
@@ -228,10 +223,10 @@ class ConfigList(metaclass=ABCMeta):
         self.__create_configs_dropdown()
 
     def __add_config(self):
-        dialogs.StringInputDialog(self.master, "name", "Name", self.__create_config)
+        self._show_name_dialog(self.__create_config)
 
     def __add_element(self):
-        new_element = self.create_new_element()
+        new_element = self.controller.create_new_element()
         self.current_config.append(new_element)
         # incremental insertion if widgets already initialized, else fall back to full rebuild
         if self.widgets_initialized and self.element_list is not None:
@@ -276,8 +271,7 @@ class ConfigList(metaclass=ABCMeta):
         self.current_config.pop(remove_i)
         if self.widgets_initialized and 0 <= remove_i < len(self.widgets):
             removed = self.widgets.pop(remove_i)
-            with contextlib.suppress(tk.TclError, AttributeError):
-                removed.destroy()
+            self._destroy_widget(removed)
             # Reindex remaining widgets
             for idx, widget in enumerate(self.widgets):
                 widget.i = idx
@@ -294,7 +288,7 @@ class ConfigList(metaclass=ABCMeta):
 
                 loaded_config_json = json.load(f)
                 for element_json in loaded_config_json:
-                    element = self.create_new_element().from_dict(element_json)
+                    element = self.controller.create_new_element().from_dict(element_json)
                     self.current_config.append(element)
         except (FileNotFoundError, json.JSONDecodeError) as e:
             print(f"Failed to load config from {filename}: {e}")
@@ -315,7 +309,7 @@ class ConfigList(metaclass=ABCMeta):
                     os.makedirs(self.config_dir, exist_ok=True)
 
                 write_json_atomic(
-                    getattr(self.train_config, self.attr_name),
+                    getattr(self.controller.train_config, self.attr_name),
                     [element.to_dict() for element in self.current_config]
                 )
             except (OSError) as e:
@@ -324,10 +318,7 @@ class ConfigList(metaclass=ABCMeta):
         self._update_toggle_button_text()
 
         if self.widgets_initialized:
-            try:
-                self._update_widget_visibility()
-            except (tk.TclError, AttributeError) as e:
-                print.debug(f"Widget visibility update failed: {e}")
+            self._update_widget_visibility()
 
         # let subclass refresh any show-disabled UI
         if hasattr(self, '_refresh_show_disabled_text'):
@@ -336,13 +327,27 @@ class ConfigList(metaclass=ABCMeta):
     def _element_matches_filters(self, element):
         return True  # Show all by default
 
+    def _reset_filters(self):  # pragma: no cover - default noop
+        search_var = getattr(self, 'search_var', None)
+        filter_var = getattr(self, 'filter_var', None)
+        show_disabled_var = getattr(self, 'show_disabled_var', None)
+
+        if search_var:
+            search_var.set("")
+        if filter_var:
+            filter_var.set("ALL")
+        if show_disabled_var:
+            show_disabled_var.set(True)
+        if search_var and hasattr(self, '_update_filters'):
+            self._update_filters()
+
     def __open_element_window(self, i, ui_state):
         if self.is_opening_window:
             return
         self.is_opening_window = True
         try:
             window = self.open_element_window(i, ui_state)
-            self.master.wait_window(window)
+            self._wait_for_window(window)
             try:
                 if self.widgets is not None and 0 <= i < len(self.widgets):
                     self.widgets[i].configure_element()
