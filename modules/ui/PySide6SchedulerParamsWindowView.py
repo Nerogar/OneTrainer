@@ -1,96 +1,93 @@
 from modules.ui.BaseSchedulerParamsWindowView import BaseKvParamsView, BaseSchedulerParamsWindowView
-from modules.ui.CtkConfigListView import CtkConfigListView
+from modules.ui.PySide6ConfigListView import PySide6ConfigListView
 from modules.ui.SchedulerParamsWindowController import KvParamsController, SchedulerParamsWindowController
-from modules.util.ui import ctk_components
-from modules.util.ui.CtkUIState import CtkUIState
-from modules.util.ui.ui_utils import set_window_icon
+from modules.util.ui import pyside6_components
+from modules.util.ui.PySide6UIState import PySide6UIState
 
-import customtkinter as ctk
+from PySide6.QtWidgets import QDialog, QGridLayout, QPushButton, QScrollArea, QWidget
 
 
-class CtkKvParamsView(CtkConfigListView, BaseKvParamsView):
+class PySide6KvParamsView(PySide6ConfigListView, BaseKvParamsView):
     def __init__(self, master, controller: KvParamsController, ui_state):
-        CtkConfigListView.__init__(
+        PySide6ConfigListView.__init__(
             self, master, controller, ui_state,
             attr_name="scheduler_params",
             from_external_file=False,
             add_button_text="add parameter",
             is_full_width=True,
         )
-        BaseKvParamsView.__init__(self, ctk_components)
+        BaseKvParamsView.__init__(self, pyside6_components)
 
     def refresh_ui(self):
         self._create_element_list()
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        return KvWidget(master, element, i, open_command, remove_command, clone_command, save_command)
+        return PySide6KvWidget(master, element, i, open_command, remove_command, clone_command, save_command)
 
 
-class KvWidget(ctk.CTkFrame):
+class PySide6KvWidget(QWidget):
     def __init__(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        super().__init__(master=master, bg_color="transparent")
+        super().__init__(master)
         self.element = element
-        self.ui_state = CtkUIState(self, element)
+        self.ui_state = PySide6UIState(element)
         self.i = i
         self.save_command = save_command
 
-        self.grid_columnconfigure(0, weight=0)
-        self.grid_columnconfigure(1, weight=1, uniform=1)
-        self.grid_columnconfigure(2, weight=1, uniform=1)
+        lo = pyside6_components._layout(self)
+        lo.setColumnStretch(1, 1)
+        lo.setColumnStretch(2, 1)
 
-        close_button = ctk.CTkButton(
-            master=self,
-            width=20,
-            height=20,
-            text="X",
-            corner_radius=2,
-            fg_color="#C00000",
-            command=lambda: remove_command(self.i))
-        close_button.grid(row=0, column=0)
+        pyside6_components.colored_icon_button(self, 0, 0, "X", "#C00000", lambda: remove_command(self.i))
 
         # Key
-        tooltip_key = "Key name for an argument in your scheduler"
-        self.key = ctk_components.entry(self, 0, 1, self.ui_state, "key",
-                                    tooltip=tooltip_key, wide_tooltip=True)
-        self.key.bind("<FocusOut>", lambda _: save_command())
-        self.key.configure(width=50)
+        self.key = pyside6_components.entry(self, 0, 1, self.ui_state, "key",
+                                            tooltip="Key name for an argument in your scheduler",
+                                            wide_tooltip=True, width=50)
+        self.key.editingFinished.connect(save_command)
 
         # Value
-        tooltip_val = "Value for an argument in your scheduler. Some special values can be used, wrapped in percent signs: LR, EPOCHS, STEPS_PER_EPOCH, TOTAL_STEPS, SCHEDULER_STEPS. Note that OneTrainer calls step() after every individual learning step, not every epoch, so what Torch calls 'epoch' you should treat as 'step'."
-        self.value = ctk_components.entry(self, 0, 2, self.ui_state, "value",
-                                      tooltip=tooltip_val, wide_tooltip=True)
-        self.value.bind("<FocusOut>", lambda _: save_command())
-        self.value.configure(width=50)
+        self.value = pyside6_components.entry(self, 0, 2, self.ui_state, "value",
+                                              tooltip="Value for an argument in your scheduler. Some special values can be used, wrapped in percent signs: LR, EPOCHS, STEPS_PER_EPOCH, TOTAL_STEPS, SCHEDULER_STEPS. Note that OneTrainer calls step() after every individual learning step, not every epoch, so what Torch calls 'epoch' you should treat as 'step'.",
+                                              wide_tooltip=True, width=50)
+        self.value.editingFinished.connect(save_command)
 
     def place_in_list(self):
-        self.grid(row=self.i, column=0, padx=5, pady=5, sticky="new")
+        pyside6_components._layout(self.parent()).addWidget(self, getattr(self, 'visible_index', self.i), 0)
+        self.show()
+
+    def destroy(self):
+        self.deleteLater()
 
 
-class CtkSchedulerParamsWindowView(BaseSchedulerParamsWindowView, ctk.CTkToplevel):
-    def __init__(self, parent, controller: SchedulerParamsWindowController, ui_state, *args, **kwargs):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
-        BaseSchedulerParamsWindowView.__init__(self, ctk_components)
+class PySide6SchedulerParamsWindowView(BaseSchedulerParamsWindowView, QDialog):
+    def __init__(self, parent, controller: SchedulerParamsWindowController, ui_state):
+        QDialog.__init__(self, parent)
+        BaseSchedulerParamsWindowView.__init__(self, pyside6_components)
 
-        self.title("Learning Rate Scheduler Settings")
-        self.geometry("800x400")
-        self.resizable(True, True)
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=0)
-        self.grid_columnconfigure(0, weight=1)
+        self.setWindowTitle("Learning Rate Scheduler Settings")
+        self.resize(800, 500)
 
-        frame = ctk.CTkFrame(self)
-        frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, weight=1)
+        outer = QGridLayout(self)
+        outer.setRowStretch(0, 1)
 
-        expand_frame = ctk.CTkFrame(frame, bg_color="transparent")
-        expand_frame.grid(row=1, column=0, columnspan=2, sticky="nsew")
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        inner = QWidget()
+        scroll.setWidget(inner)
+        inner_lo = pyside6_components._layout(inner)
+        inner_lo.setColumnStretch(1, 1)
 
-        self.components.button(self, 1, 0, "ok", command=self.destroy)
-        self.build_content(frame, controller, ui_state)
-        CtkKvParamsView(expand_frame, KvParamsController(controller.config), ui_state)
+        self.build_content(inner, controller, ui_state)
 
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
-        self.after(200, lambda: set_window_icon(self))
+        expand_frame = QWidget(inner)
+        inner_lo.addWidget(expand_frame, inner_lo.rowCount(), 0, 1, 2)
+        # Must be assigned to an instance variable — PySide6ConfigListView is not a QWidget,
+        # so Qt won't keep it alive. Without this, the GC collects it and the button's
+        # clicked signal loses its connection to __add_element.
+        self._kv_params_view = PySide6KvParamsView(expand_frame, KvParamsController(controller.config), ui_state)
+
+        outer.addWidget(scroll, 0, 0)
+
+        ok = QPushButton("ok", self)
+        ok.clicked.connect(self.accept)
+        outer.addWidget(ok, 1, 0)

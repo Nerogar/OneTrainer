@@ -1,31 +1,27 @@
 from modules.ui.BaseOffloadingWindowView import BaseOffloadingWindowView
 from modules.ui.OffloadingWindowController import OffloadingWindowController
-from modules.util.ui import ctk_components
-from modules.util.ui.ui_utils import set_window_icon
+from modules.util.ui import pyside6_components
 
-import customtkinter as ctk
+from PySide6.QtWidgets import QDialog, QGridLayout, QPushButton
 
 
-class CtkOffloadingWindowView(BaseOffloadingWindowView, ctk.CTkToplevel):
-    def __init__(self, parent, controller: OffloadingWindowController, ui_state, *args, **kwargs):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
-        BaseOffloadingWindowView.__init__(self, ctk_components)
+class PySide6OffloadingWindowView(BaseOffloadingWindowView, QDialog):
+    def __init__(self, parent, controller: OffloadingWindowController, ui_state):
+        QDialog.__init__(self, parent)
+        BaseOffloadingWindowView.__init__(self, pyside6_components)
 
-        self.title("Offloading")
-        self.geometry("800x400")
-        self.resizable(True, True)
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=1)
+        self.setWindowTitle("Offloading")
+        self.resize(800, 400)
 
-        frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=1)
-        frame.grid_columnconfigure(1, weight=1)
+        outer = QGridLayout(self)
+        outer.setRowStretch(0, 1)
+
+        scroll, frame = pyside6_components.scrollable_frame(self)
+        pyside6_components._layout(frame).setColumnStretch(0, 1)
+        pyside6_components._layout(frame).setColumnStretch(1, 1)
         self.build_content(frame, controller, ui_state)
-        frame.pack(fill="both", expand=1)
-        frame.grid(row=0, column=0, sticky='nsew')
-        self.components.button(self, 1, 0, "ok", self.destroy)
+        outer.addWidget(scroll, 0, 0)
 
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
-        self.after(200, lambda: set_window_icon(self))
+        ok = QPushButton("ok", self)
+        ok.clicked.connect(self.accept)
+        outer.addWidget(ok, 1, 0)

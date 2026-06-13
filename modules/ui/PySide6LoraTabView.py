@@ -1,15 +1,17 @@
-
 from modules.ui.BaseLoraTabView import BaseLoraTabView
 from modules.ui.LoraTabController import LoraTabController
 from modules.util.enum.ModelType import PeftType
-from modules.util.ui import ctk_components
+from modules.util.ui import pyside6_components
 
-import customtkinter as ctk
+from PySide6.QtWidgets import QWidget
 
 
-class CtkLoraTabView(BaseLoraTabView):
+class PySide6LoraTabView(BaseLoraTabView, QWidget):
+
     def __init__(self, master, controller: LoraTabController, ui_state):
-        BaseLoraTabView.__init__(self, ctk_components)
+        QWidget.__init__(self, master)
+        BaseLoraTabView.__init__(self, pyside6_components)
+
         self.master = master
         self.controller = controller
         self.ui_state = ui_state
@@ -18,24 +20,28 @@ class CtkLoraTabView(BaseLoraTabView):
         self.refresh_ui()
 
     def refresh_ui(self):
-        if self.scroll_frame:
-            self.scroll_frame.destroy()
-        self.scroll_frame = ctk.CTkFrame(self.master, fg_color="transparent")
-        self.scroll_frame.grid(row=0, column=0, sticky="nsew")
-        self.scroll_frame.grid_columnconfigure(0, weight=0)
-        self.scroll_frame.grid_columnconfigure(1, weight=1)
-        self.scroll_frame.grid_columnconfigure(2, weight=2)
+        if self.scroll_frame is not None:
+            self.scroll_frame.hide()
+            self.scroll_frame.deleteLater()
+
+        self.scroll_frame = QWidget(self)
+        pyside6_components._layout(self).addWidget(self.scroll_frame, 0, 0)
+        lo = pyside6_components._layout(self.scroll_frame)
+        lo.setContentsMargins(pyside6_components.PAD, pyside6_components.PAD, pyside6_components.PAD, pyside6_components.PAD)
+        lo.setColumnStretch(1, 1)
+        lo.setColumnStretch(2, 2)
         self.build(self.scroll_frame, self.controller, self.ui_state, self.setup_lora)
+        pyside6_components._pack_form(self.scroll_frame)
 
     def setup_lora(self, peft_type: PeftType):
-        if self.options_frame:
-            self.options_frame.destroy()
-        self.options_frame = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
-        self.options_frame.grid(row=1, column=0, columnspan=3, sticky="nsew")
-        master = self.options_frame
-        master.grid_columnconfigure(0, weight=0, uniform="a")
-        master.grid_columnconfigure(1, weight=1, uniform="a")
-        master.grid_columnconfigure(2, minsize=50, uniform="a")
-        master.grid_columnconfigure(3, weight=0, uniform="a")
-        master.grid_columnconfigure(4, weight=1, uniform="a")
-        self.build_lora_options(master, self.controller, self.ui_state, peft_type)
+        if self.options_frame is not None:
+            self.options_frame.hide()
+            self.options_frame.deleteLater()
+
+        self.options_frame = QWidget(self.scroll_frame)
+        pyside6_components._layout(self.scroll_frame).addWidget(self.options_frame, 1, 0, 1, 3)
+        lo = pyside6_components._layout(self.options_frame)
+        lo.setColumnStretch(1, 1)
+        lo.setColumnStretch(4, 1)
+        self.build_lora_options(self.options_frame, self.controller, self.ui_state, peft_type)
+        pyside6_components._pack_form(self.options_frame)

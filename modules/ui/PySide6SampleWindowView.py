@@ -1,102 +1,85 @@
-import contextlib
-import tkinter as tk
-import traceback
+import threading
 
 from modules.modelSampler.BaseModelSampler import (
     ModelSamplerOutput,
 )
 from modules.ui.BaseSampleWindowView import BaseSampleWindowView
-from modules.ui.CtkSampleFrameView import CtkSampleFrameView
+from modules.ui.PySide6SampleFrameView import PySide6SampleFrameView
 from modules.ui.SampleFrameController import SampleFrameController
 from modules.ui.SampleWindowController import SampleWindowController
 from modules.util.enum.FileType import FileType
-from modules.util.ui import ctk_components
-from modules.util.ui.CtkUIState import CtkUIState
-from modules.util.ui.ui_utils import set_window_icon
+from modules.util.ui import pyside6_components
+from modules.util.ui.PySide6UIState import PySide6UIState
 
-import customtkinter as ctk
-from PIL import Image
+from PIL.ImageQt import ImageQt
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QDialog, QGridLayout, QLabel, QProgressBar, QPushButton
 
 
-class CtkSampleWindowView(BaseSampleWindowView, ctk.CTkToplevel):
-    def __init__(
-            self,
-            parent,
-            controller: SampleWindowController,
-            *args, **kwargs
-    ):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
-        BaseSampleWindowView.__init__(self, ctk_components)
+class PySide6SampleWindowView(BaseSampleWindowView, QDialog):
+    def __init__(self, parent, controller: SampleWindowController):
+        QDialog.__init__(self, parent)
+        BaseSampleWindowView.__init__(self, pyside6_components)
 
-        self.title("Sample")
-        self.geometry("1200x800")
-        self.resizable(True, True)
+        self.setWindowTitle("Sample")
+        self.resize(1200, 800)
 
-        model_type = controller.get_model_type()
-        self.ui_state = CtkUIState(self, controller.sample)
+        self.ui_state = PySide6UIState(controller.sample)
 
         if controller.use_external_model:
-            controller.callbacks.set_on_sample_custom(self.__update_preview)
-            controller.callbacks.set_on_update_sample_custom_progress(self.__update_progress)
+            controller.callbacks.set_on_sample_custom(self._update_preview)
+            controller.callbacks.set_on_update_sample_custom_progress(self._update_progress)
 
-        self.grid_rowconfigure(0, weight=0)
-        self.grid_rowconfigure(1, weight=1)
-        self.grid_rowconfigure(2, weight=0)
-        self.grid_rowconfigure(3, weight=0)
-        self.grid_columnconfigure(0, weight=0)
-        self.grid_columnconfigure(1, weight=1)
+        outer = QGridLayout(self)
+        outer.setRowStretch(1, 1)
+        outer.setColumnStretch(1, 1)
 
-        prompt_frame = CtkSampleFrameView(self, SampleFrameController(controller.sample, model_type), self.ui_state, include_settings=False)
-        prompt_frame.grid(row=0, column=0, columnspan=2, padx=0, pady=0, sticky="nsew")
+        model_type = controller.get_model_type()
+        frame_controller = SampleFrameController(controller.sample, model_type)
 
-        settings_frame = CtkSampleFrameView(self, SampleFrameController(controller.sample, model_type), self.ui_state, include_prompt=False)
-        settings_frame.grid(row=1, column=0, padx=0, pady=0, sticky="nsew")
+        prompt_frame = PySide6SampleFrameView(self, frame_controller, self.ui_state, include_settings=False)
+        outer.addWidget(prompt_frame, 0, 0, 1, 2)
 
-        # image
-        self.image = ctk.CTkImage(
-            light_image=self.__dummy_image(),
-            size=(512, 512)
+        settings_frame = PySide6SampleFrameView(self, frame_controller, self.ui_state, include_prompt=False)
+        outer.addWidget(settings_frame, 1, 0)
+
+        self._image_label = QLabel(self)
+        self._image_label.setFixedSize(512, 512)
+        self._image_label.setAlignment(Qt.AlignCenter)
+        self._image_label.setStyleSheet("background: black;")
+        outer.addWidget(self._image_label, 1, 1, 3, 1)
+
+        self._progress = QProgressBar(self)
+        self._progress.setRange(0, 1000)
+        outer.addWidget(self._progress, 2, 0)
+
+        sample_btn = QPushButton("sample", self)
+        # Run in a background thread so the Qt event loop stays responsive during sampling
+        sample_btn.clicked.connect(
+            lambda: threading.Thread(
+                target=lambda: controller.do_sample(self._update_preview, self._update_progress),
+                daemon=True,
+            ).start()
         )
+        outer.addWidget(sample_btn, 3, 0)
 
-        image_label = ctk.CTkLabel(master=self, text="", image=self.image, height=512, width=512)
-        image_label.grid(row=1, column=1, rowspan=3, sticky="nsew")
 
-        self.progress = self.components.progress(self, 2, 0)
-        self.components.button(self, 3, 0, "sample",
-                               lambda: controller.do_sample(self.__update_preview, self.__update_progress))
+    def schedule_on_main_thread(self, fn):
+        QTimer.singleShot(0, self, fn)
 
-        self.wait_visibility()
-        self.focus_set()
-        self.after(200, lambda: set_window_icon(self))
-
-    def __update_preview(self, sampler_output: ModelSamplerOutput):
+    def _update_preview(self, sampler_output: ModelSamplerOutput):
+        # Called from training thread — capture data and dispatch to main thread
         if sampler_output.file_type == FileType.IMAGE:
             image = sampler_output.data
-            self.image.configure(
-                light_image=image,
-                size=(image.width, image.height),
-            )
+            self.schedule_on_main_thread(lambda: self._do_update_preview(image))
 
-    def __update_progress(self, progress: int, max_progress: int):
-        self.progress.set(progress / max_progress)
-        self.update()
+    def _do_update_preview(self, image):
+        pixmap = QPixmap.fromImage(ImageQt(image.convert("RGBA")))
+        self._image_label.setFixedSize(pixmap.size())
+        self._image_label.setPixmap(pixmap)
 
-    def __dummy_image(self) -> Image:
-        return Image.new(mode="RGB", size=(512, 512), color=(0, 0, 0))
-
-    def destroy(self):
-        try:
-            if hasattr(self, "_icon_image_ref"):
-                del self._icon_image_ref
-
-            # Remove any pending after callbacks
-            for after_id in self.tk.call('after', 'info'):
-                with contextlib.suppress(tk.TclError, RuntimeError):
-                    self.after_cancel(after_id)
-
-            super().destroy()
-        except (tk.TclError, RuntimeError) as e:
-            print(f"Error destroying window: {e}")
-        except Exception as e:
-            print(f"Unexpected error destroying window: {e}")
-            traceback.print_exc()
+    def _update_progress(self, progress: int, max_progress: int):
+        # Called from training thread — dispatch to main thread
+        value = int(progress / max_progress * 1000)
+        self.schedule_on_main_thread(lambda: self._progress.setValue(value))
