@@ -42,6 +42,26 @@ class DtypeModelSaverMixin:
             else:
                 state_dict[key] = value.contiguous()
 
+    def _copy_pipeline_to_dtype(
+            self,
+            pipeline,
+            dtype: torch.dtype | None,
+    ):
+        if dtype is None:
+            return pipeline
+
+        # replace the tokenizer's __deepcopy__ before calling deepcopy, to prevent a copy being made.
+        # the tokenizer tries to reload from the file system otherwise
+        tokenizer = pipeline.tokenizer
+        tokenizer.__deepcopy__ = lambda memo: tokenizer
+
+        save_pipeline = copy.deepcopy(pipeline)
+        save_pipeline.to(device="cpu", dtype=dtype, silence_dtype_warnings=True)
+
+        delattr(tokenizer, '__deepcopy__')
+
+        return save_pipeline
+
     def __calculate_safetensors_hash(
             self,
             state_dict: dict[str, Tensor] | None = None,
