@@ -51,10 +51,8 @@ class BaseStableDiffusionXLSetup(
         if config.unet.checkpointing_or_offloading_enabled():
             model.unet.enable_gradient_checkpointing()
             enable_checkpointing_for_basic_transformer_blocks(model.unet, config, config.unet, offload_enabled=False)
-        if config.text_encoder.checkpointing_or_offloading_enabled():
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config, config.text_encoder)
-        if config.text_encoder_2.checkpointing_or_offloading_enabled():
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config, config.text_encoder_2)
+        enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config, config.text_encoder)
+        enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config, config.text_encoder_2)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.vae)

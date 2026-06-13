@@ -48,13 +48,12 @@ class BaseStableDiffusion3Setup(
             model: StableDiffusion3Model,
             config: TrainConfig,
     ):
-        if config.transformer.checkpointing_or_offloading_enabled():
-            model.transformer_offload_conductor = enable_checkpointing_for_stable_diffusion_3_transformer(model.transformer, config, config.transformer)
-        if model.text_encoder_1 is not None and config.text_encoder.checkpointing_or_offloading_enabled():
+        model.transformer_offload_conductor = enable_checkpointing_for_stable_diffusion_3_transformer(model.transformer, config, config.transformer)
+        if model.text_encoder_1 is not None:
             enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config, config.text_encoder)
-        if model.text_encoder_2 is not None and config.text_encoder_2.checkpointing_or_offloading_enabled():
+        if model.text_encoder_2 is not None:
             enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config, config.text_encoder_2)
-        if model.text_encoder_3 is not None and config.text_encoder_3.checkpointing_or_offloading_enabled():
+        if model.text_encoder_3 is not None:
             model.text_encoder_3_offload_conductor = enable_checkpointing_for_t5_encoder_layers(model.text_encoder_3, config, config.text_encoder_3)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
