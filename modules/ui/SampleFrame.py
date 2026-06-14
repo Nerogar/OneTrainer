@@ -26,6 +26,7 @@ class SampleFrame(ctk.CTkFrame):
         is_flow_matching = model_type.is_flow_matching()
         is_inpainting_model = model_type.has_conditioning_image_input()
         is_video_model = model_type.is_video_model()
+        supports_negative_prompt = not model_type.is_ideogram()
 
         if include_prompt and include_prompt:
             self.grid_rowconfigure(0, weight=0)
@@ -54,8 +55,9 @@ class SampleFrame(ctk.CTkFrame):
             components.entry(top_frame, 0, 1, self.ui_state, "prompt")
 
             # negative prompt
-            components.label(top_frame, 1, 0, "negative prompt:")
-            components.entry(top_frame, 1, 1, self.ui_state, "negative_prompt")
+            if supports_negative_prompt:
+                components.label(top_frame, 1, 0, "negative prompt:")
+                components.entry(top_frame, 1, 1, self.ui_state, "negative_prompt")
 
         if include_settings:
             # width

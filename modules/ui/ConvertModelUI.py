@@ -71,6 +71,7 @@ class ConvertModelUI(ctk.CTkToplevel):
             ("Chroma1", ModelType.CHROMA_1), #TODO does this just work? HiDream is not here
             ("QwenImage", ModelType.QWEN), #TODO does this just work? HiDream is not here
             ("ZImage", ModelType.Z_IMAGE),
+            ("Ideogram 4", ModelType.IDEOGRAM_4),
         ], self.ui_state, "model_type")
 
         # training method

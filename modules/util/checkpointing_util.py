@@ -461,3 +461,13 @@ def enable_checkpointing_for_ernie_transformer(
     return enable_checkpointing(model, config, part, config.compile, [
         (model.layers, ["x"]),
     ])
+
+
+def enable_checkpointing_for_ideogram_transformer(
+        model: nn.Module,
+        config: TrainConfig,
+        part: TrainModelPartConfig,
+) -> LayerOffloadConductor | None:
+    return enable_checkpointing(model, config, part, config.compile, [
+        (model.layers, ["hidden_states"]),
+    ])

@@ -87,6 +87,8 @@ class TrainingTab:
             self.__setup_z_image_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_ernie():
             self.__setup_ernie_ui(column_0, column_1, column_2)
+        elif self.train_config.model_type.is_ideogram():
+            self.__setup_ideogram_ui(column_0, column_1, column_2)
 
 
     def __setup_stable_diffusion_ui(self, column_0, column_1, column_2):
@@ -229,6 +231,19 @@ class TrainingTab:
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False, supports_force_attention_mask=False)
         self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
+
+        self.__create_masked_frame(column_2, 1)
+        self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
+
+    def __setup_ideogram_ui(self, column_0, column_1, column_2):
+        self.__create_base_frame(column_0, 0)
+        self.__create_text_encoder_frame(column_0, 1, supports_clip_skip=False, supports_training=False, supports_dropout=False)
+
+        self.__create_base2_frame(column_1, 0)
+        self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False, supports_force_attention_mask=False)
+        self.__create_unconditional_transformer_frame(column_1, 2)
+        self.__create_noise_frame(column_1, 3, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
@@ -442,7 +457,7 @@ class TrainingTab:
 
         return row
 
-    def __create_text_encoder_frame(self, master, row, supports_clip_skip=True, supports_training=True, supports_sequence_length=False):
+    def __create_text_encoder_frame(self, master, row, supports_clip_skip=True, supports_training=True, supports_sequence_length=False, supports_dropout=True):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
@@ -460,11 +475,12 @@ class TrainingTab:
 
         row = self.__create_offloading_widgets(frame, row, "text_encoder", supports_checkpointing=supports_training)
 
-        # dropout
-        components.label(frame, row, 0, "Caption Dropout Probability",
-                         tooltip="The Probability for dropping the text encoder conditioning")
-        components.entry(frame, row, 1, self.ui_state, "text_encoder.dropout_probability")
-        row += 1
+        if supports_dropout:
+            # dropout
+            components.label(frame, row, 0, "Caption Dropout Probability",
+                             tooltip="The Probability for dropping the text encoder conditioning")
+            components.entry(frame, row, 1, self.ui_state, "text_encoder.dropout_probability")
+            row += 1
 
         if supports_training:
             # train text encoder epochs
@@ -696,6 +712,21 @@ class TrainingTab:
             components.entry(frame, row, 1, self.ui_state, "transformer.guidance_scale")
             row += 1
 
+    def __create_unconditional_transformer_frame(self, master, row):
+        frame = ctk.CTkFrame(master=master, corner_radius=5)
+        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
+        row = 0
+
+        # include unconditional transformer
+        components.label(frame, row, 0, "Include Unconditional Transformer",
+                         tooltip="Loads the unconditional transformer, needed for CFG values above 1.0 during sampling. "
+                                 "If disabled, only CFG 1.0 sampling is possible, but VRAM and load time are reduced")
+        components.switch(frame, row, 1, self.ui_state, "unconditional_transformer.include")
+        row += 1
+
+        row = self.__create_offloading_widgets(frame, row, "unconditional_transformer", supports_checkpointing=False)
+
     def __create_noise_frame(self, master, row, supports_generalized_offset_noise: bool = False, supports_dynamic_timestep_shifting: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
@@ -753,7 +784,7 @@ class TrainingTab:
         if supports_dynamic_timestep_shifting:
             # dynamic timestep shifting
             components.label(frame, 9, 0, "Dynamic Timestep Shifting",
-                             tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. Note: For Z-Image and Flux2, the dynamic shifting parameters are likely wrong and unknown. Use with care or set your own, fixed shift.", wide_tooltip=True)
+                             tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. For Ideogram, the shifting instead follows the model's own resolution-aware sampling schedule. Note: For Z-Image and Flux2, the dynamic shifting parameters are likely wrong and unknown. Use with care or set your own, fixed shift.", wide_tooltip=True)
             components.switch(frame, 9, 1, self.ui_state, "dynamic_timestep_shifting")
 
 
