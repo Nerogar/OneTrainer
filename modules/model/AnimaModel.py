@@ -149,6 +149,11 @@ class AnimaModel(BaseModel):
         self.text_encoder_to(device)
         self.transformer_to(device)
 
+    def release(self):
+        self.vae_to(self.train_config.temp_device)
+        self.text_encoder_to(self.train_config.temp_device)
+        self.transformer_to(self.train_config.temp_device)
+
     def eval(self):
         self.vae.eval()
         if self.text_encoder is not None:
