@@ -49,19 +49,15 @@ class BaseHiDreamSetup(
             model: HiDreamModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_hi_dream_transformer(model.transformer, config)
-            if model.text_encoder_1 is not None:
-                enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config)
-            if model.text_encoder_2 is not None:
-                enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config)
-            if model.text_encoder_3 is not None:
-                model.text_encoder_3_offload_conductor = \
-                    enable_checkpointing_for_t5_encoder_layers(model.text_encoder_3, config)
-            if model.text_encoder_4 is not None:
-                model.text_encoder_4_offload_conductor = \
-                    enable_checkpointing_for_llama_encoder_layers(model.text_encoder_4, config)
+        model.transformer_offload_conductor = enable_checkpointing_for_hi_dream_transformer(model.transformer, config, config.transformer)
+        if model.text_encoder_1 is not None:
+            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config, config.text_encoder)
+        if model.text_encoder_2 is not None:
+            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config, config.text_encoder_2)
+        if model.text_encoder_3 is not None:
+            model.text_encoder_3_offload_conductor = enable_checkpointing_for_t5_encoder_layers(model.text_encoder_3, config, config.text_encoder_3)
+        if model.text_encoder_4 is not None:
+            model.text_encoder_4_offload_conductor = enable_checkpointing_for_llama_encoder_layers(model.text_encoder_4, config, config.text_encoder_4)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
