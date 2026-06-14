@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.ERNIE, TrainingMethod.FINE_TUNE)
 class ErnieFineTuneSetup(
     BaseErnieSetup,
 ):
@@ -85,6 +86,3 @@ class ErnieFineTuneSetup(
             train_progress: TrainProgress,
     ):
         self.__setup_requires_grad(model, config)
-
-
-factory.register(BaseModelSetup, ErnieFineTuneSetup, ModelType.ERNIE, TrainingMethod.FINE_TUNE)

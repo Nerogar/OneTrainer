@@ -12,6 +12,8 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.FLUX_DEV_1, TrainingMethod.EMBEDDING)
+@factory.register(BaseModelSetup, ModelType.FLUX_FILL_DEV_1, TrainingMethod.EMBEDDING)
 class FluxEmbeddingSetup(
     BaseFluxSetup,
 ):
@@ -112,6 +114,3 @@ class FluxEmbeddingSetup(
             if model.embedding_wrapper_2 is not None:
                 model.embedding_wrapper_2.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, FluxEmbeddingSetup, ModelType.FLUX_DEV_1, TrainingMethod.EMBEDDING)
-factory.register(BaseModelSetup, FluxEmbeddingSetup, ModelType.FLUX_FILL_DEV_1, TrainingMethod.EMBEDDING)

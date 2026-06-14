@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.Z_IMAGE, TrainingMethod.FINE_TUNE)
 class ZImageFineTuneSetup(
     BaseZImageSetup,
 ):
@@ -85,5 +86,3 @@ class ZImageFineTuneSetup(
             train_progress: TrainProgress
     ):
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, ZImageFineTuneSetup, ModelType.Z_IMAGE, TrainingMethod.FINE_TUNE)

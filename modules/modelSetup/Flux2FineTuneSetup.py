@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.FLUX_2, TrainingMethod.FINE_TUNE)
 class Flux2FineTuneSetup(
     BaseFlux2Setup,
 ):
@@ -85,5 +86,3 @@ class Flux2FineTuneSetup(
             train_progress: TrainProgress
     ):
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, Flux2FineTuneSetup, ModelType.FLUX_2, TrainingMethod.FINE_TUNE)

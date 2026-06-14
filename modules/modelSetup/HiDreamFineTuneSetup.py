@@ -15,6 +15,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.HI_DREAM_FULL, TrainingMethod.FINE_TUNE)
 class HiDreamFineTuneSetup(
     BaseHiDreamSetup,
 ):
@@ -192,5 +193,3 @@ class HiDreamFineTuneSetup(
             if model.embedding_wrapper_4 is not None:
                 model.embedding_wrapper_4.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, HiDreamFineTuneSetup, ModelType.HI_DREAM_FULL, TrainingMethod.FINE_TUNE)
