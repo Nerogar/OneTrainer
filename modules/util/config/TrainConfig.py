@@ -544,6 +544,7 @@ class TrainConfig(BaseConfig):
     oft_block_share: bool
     oft_scaled: bool
     oft_clipped_norm: float | None
+    oft_cans: bool
 
     # lokr
     lokr_dim: int
@@ -1257,6 +1258,7 @@ class TrainConfig(BaseConfig):
         data.append(("oft_block_share", False, bool, False))
         data.append(("oft_scaled", False, bool, False))
         data.append(("oft_clipped_norm", 0.95, float, True))
+        data.append(("oft_cans", False, bool, False))
 
         # lokr
         data.append(("lokr_dim", 16, int, False))

@@ -105,6 +105,11 @@ class BaseLoraTabView:
                                   tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
             self.components.switch(master, 4, 1, ui_state, "bundle_additional_embeddings")
 
+            # CANS OFT
+            self.components.label(master, 4, 3, "Accelerated Newton-Schulz",
+                                  tooltip="Replaces Cayley-Neumann with Chebyshev-Optimized Newton-Schulz (CANS) to improve orthogonalization stability and reduce error without the high computational cost of the exact solver.")
+            self.components.switch(master, 4, 4, ui_state, "oft_cans")
+
             # Clip OFT max norm
             self.components.label(master, 5, 0, "Spectral Norm Clipping",
                                   tooltip="Strictly clips the spectral norm of the OFT matrix to guarantee convergence of the Cayley parametrization (requires norm <= 1.0). Smaller values constrain the learned rotation to stay near the identity matrix, limiting adaptation. Default: 1.0 (e.g. 0.8 = 80% of maximum expressiveness). Leave empty to disable.")
