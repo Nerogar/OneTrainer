@@ -28,6 +28,9 @@ omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
 
 # other models
+git+https://github.com/dxqb/Lens.git@daba3a8#egg=lens
+kernels==0.14.1 # Triton kernel loader for Lens GPT-OSS MXFP4 text encoder
+einops==0.8.2
 pooch==1.8.2
 open-clip-torch==2.32.0
 
