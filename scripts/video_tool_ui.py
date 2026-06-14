@@ -2,7 +2,7 @@ from util.import_util import script_imports
 
 script_imports()
 
-from modules.ui.VideoToolUI import VideoToolUI
+from modules.ui.CtkVideoToolUIView import VideoToolUI
 
 
 def main():
