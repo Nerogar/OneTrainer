@@ -717,11 +717,20 @@ class BaseTrainingTabView(ABC):
                               tooltip="Shift the timestep distribution. Use the preview to see more details.")
         self.components.entry(frame, 8, 1, ui_state, "timestep_shift", required=True)
 
+        row = 9
+
         if supports_dynamic_timestep_shifting:
             # dynamic timestep shifting
-            self.components.label(frame, 9, 0, "Dynamic Timestep Shifting",
+            self.components.label(frame, row, 0, "Dynamic Timestep Shifting",
                                   tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. Note: For Z-Image and Flux2, the dynamic shifting parameters are likely wrong and unknown. Use with care or set your own, fixed shift.", wide_tooltip=True)
-            self.components.switch(frame, 9, 1, ui_state, "dynamic_timestep_shifting")
+            self.components.switch(frame, row, 1, ui_state, "dynamic_timestep_shifting")
+            row += 1
+
+        # CEP gamma
+        self.components.label(frame, row, 0, "CEP Gamma",
+                              tooltip="Conditional Embedding Perturbation. Inject a slight noise into the TEs outputs to enhance the quality, diversity, and fidelity of the generated images. Gamma controls perturbation noise magnitude, paper's default is 1.")
+        self.components.entry(frame, row, 1, ui_state, "cep_gamma", required=True)
+        row += 1
 
     def __create_masked_frame(self, master, row, ui_state):
         frame = self.components.section_frame(master, row)
