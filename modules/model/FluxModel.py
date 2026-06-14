@@ -50,7 +50,9 @@ class FluxModelEmbedding:
 class FluxModel(BaseModel):
     # base model data
     tokenizer_1: CLIPTokenizer | None
+    orig_tokenizer_1: CLIPTokenizer | None
     tokenizer_2: T5Tokenizer | None
+    orig_tokenizer_2: T5Tokenizer | None
     noise_scheduler: FlowMatchEulerDiscreteScheduler | None
     text_encoder_1: CLIPTextModel | None
     text_encoder_2: T5EncoderModel | None
@@ -86,7 +88,9 @@ class FluxModel(BaseModel):
         )
 
         self.tokenizer_1 = None
+        self.orig_tokenizer_1 = None
         self.tokenizer_2 = None
+        self.orig_tokenizer_2 = None
         self.noise_scheduler = None
         self.text_encoder_1 = None
         self.text_encoder_2 = None
@@ -177,15 +181,15 @@ class FluxModel(BaseModel):
             self.text_encoder_2.eval()
         self.transformer.eval()
 
-    def create_pipeline(self) -> DiffusionPipeline:
+    def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
         return FluxPipeline(
             transformer=self.transformer,
             scheduler=self.noise_scheduler,
             vae=self.vae,
             text_encoder=self.text_encoder_1,
-            tokenizer=self.tokenizer_1,
+            tokenizer=self.orig_tokenizer_1 if use_original_tokenizers else self.tokenizer_1,
             text_encoder_2=self.text_encoder_2,
-            tokenizer_2=self.tokenizer_2,
+            tokenizer_2=self.orig_tokenizer_2 if use_original_tokenizers else self.tokenizer_2,
         )
 
     def add_text_encoder_1_embeddings_to_prompt(self, prompt: str) -> str:

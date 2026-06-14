@@ -118,10 +118,7 @@ class GenericTrainer(BaseTrainer):
         if self.config.secrets.huggingface_token != "":
             self.callbacks.on_update_status("logging into Hugging Face")
             with contextlib.suppress(ConnectionError):
-                huggingface_hub.login(
-                    token = self.config.secrets.huggingface_token,
-                    new_session = False,
-                )
+                huggingface_hub.login(token=self.config.secrets.huggingface_token)
 
         self.callbacks.on_update_status("loading the model")
 
