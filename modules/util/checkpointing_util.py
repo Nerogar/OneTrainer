@@ -117,9 +117,7 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
         self.layer_index = layer_index
 
     def __checkpointing_forward(self, dummy: torch.Tensor, call_id: int, *args):
-        # during the backward pass, this runs on an autograd worker thread, which needs its own
-        # dynamo config initialization (see init_compile)
-        init_compile()
+        init_compile()  # workaround for https://github.com/pytorch/pytorch/issues/186537
         if self.layer_index == 0 and not torch.is_grad_enabled():
             self.conductor.start_forward(True)
 
