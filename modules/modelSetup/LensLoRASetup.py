@@ -76,8 +76,8 @@ class LensLoRASetup(
             model: LensModel,
             config: TrainConfig,
     ):
-        vae_on_train_device = not config.latent_caching
-        text_encoder_on_train_device = not config.latent_caching
+        vae_on_train_device = not config.image_caching
+        text_encoder_on_train_device = not config.text_caching
 
         # the encoder is always on-demand for Lens, so materialize it when training needs it and
         # discard it (freeing VRAM) otherwise -- text_encoder_to would be a no-op on the proxy.
