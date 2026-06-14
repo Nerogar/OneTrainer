@@ -587,6 +587,7 @@ class GenericTrainer(BaseTrainer):
                             tensor.grad = None
 
                     def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
+                        init_compile()
                         if self.__is_update_step(self.model.train_progress):
                             if fused_reduce:
                                 multi.reduce_grads_mean(
