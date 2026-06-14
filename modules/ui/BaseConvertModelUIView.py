@@ -69,6 +69,7 @@ class BaseConvertModelUIView:
         self.components.options_kv(frame, 4, 1, [
             ("Safetensors", ModelFormat.SAFETENSORS),
             ("Diffusers", ModelFormat.DIFFUSERS),
+            ("Comfy LoRA", ModelFormat.COMFY_LORA),
         ], ui_state, "output_model_format")
 
         # output model destination
