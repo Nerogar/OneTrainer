@@ -13,6 +13,8 @@ from mgds.pipelineModules.DecodeTokens import DecodeTokens
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
 from mgds.pipelineModules.EncodeMistralText import EncodeMistralText
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
+from mgds.pipelineModules.PadMaskedTokens import PadMaskedTokens
+from mgds.pipelineModules.PruneMaskedTokens import PruneMaskedTokens
 from mgds.pipelineModules.RescaleImageChannels import RescaleImageChannels
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.SaveImage import SaveImage
@@ -34,11 +36,16 @@ class ErnieBaseDataLoader(
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=PROMPT_MAX_LENGTH)
         encode_prompt = EncodeMistralText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask',
                                           text_encoder=model.text_encoder, hidden_state_output_index=HIDDEN_STATES_LAYER, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        prune_masked_tokens = PruneMaskedTokens(tokens_name='tokens', tokens_mask_name='tokens_mask', hidden_state_name='text_encoder_hidden_state')
 
         modules = [rescale_image, encode_image, image_sample]
         if config.masked_training or config.model_type.has_mask_input():
             modules.append(downscale_mask)
         modules += [tokenize_prompt, encode_prompt]
+
+        if config.latent_caching:
+            modules.append(prune_masked_tokens)
+
         return modules
 
     def _cache_modules(self, config: TrainConfig, model: ErnieModel, model_setup: BaseErnieSetup):
@@ -69,6 +76,8 @@ class ErnieBaseDataLoader(
         )
 
     def _output_modules(self, config: TrainConfig, model: ErnieModel, model_setup: BaseErnieSetup):
+        pad_masked_tokens = PadMaskedTokens(tokens_name='tokens', tokens_mask_name='tokens_mask', hidden_state_name='text_encoder_hidden_state', max_length=PROMPT_MAX_LENGTH)
+
         output_names = [
             'image_path', 'latent_image',
             'prompt',
@@ -82,7 +91,7 @@ class ErnieBaseDataLoader(
 
         output_names.append('text_encoder_hidden_state')
 
-        return self._output_modules_from_out_names(
+        output_module_list = self._output_modules_from_out_names(
             model, model_setup,
             output_names=output_names,
             config=config,
@@ -91,6 +100,11 @@ class ErnieBaseDataLoader(
             autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
         )
+
+        if config.latent_caching:
+            output_module_list = [pad_masked_tokens] + output_module_list
+
+        return output_module_list
 
     def _debug_modules(self, config: TrainConfig, model: ErnieModel):
         debug_dir = os.path.join(config.debug_dir, "dataloader")
