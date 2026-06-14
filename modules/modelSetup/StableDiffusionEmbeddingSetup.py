@@ -74,7 +74,7 @@ class StableDiffusionEmbeddingSetup(
             model: StableDiffusionModel,
             config: TrainConfig,
     ):
-        vae_on_train_device = self.debug_mode or not config.latent_caching
+        vae_on_train_device = self.debug_mode or not config.image_caching
 
         model.text_encoder_to(self.train_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)

@@ -403,7 +403,8 @@ class TrainConfig(BaseConfig):
     concept_file_name: str
     concepts: list[ConceptConfig]
     aspect_ratio_bucketing: bool
-    latent_caching: bool
+    image_caching: bool
+    text_caching: bool
     clear_cache_before_training: bool
 
     # training settings
@@ -851,6 +852,11 @@ class TrainConfig(BaseConfig):
         fan_out("decoder_text_encoder")
         fan_out("decoder_vqgan")
 
+        if "latent_caching" in migrated_data:
+            latent_caching = migrated_data.pop("latent_caching")
+            migrated_data["image_caching"] = latent_caching
+            migrated_data["text_caching"] = latent_caching
+
         return migrated_data
 
     def model_part_configs(self) -> list[TrainModelPartConfig]:
@@ -939,22 +945,22 @@ class TrainConfig(BaseConfig):
     def text_encoder_on_demand(self) -> bool:
         return self.text_encoder.load_on_demand \
             and not self.train_text_encoder_or_embedding() \
-            and self.latent_caching
+            and self.text_caching
 
     def text_encoder_2_on_demand(self) -> bool:
         return self.text_encoder_2.load_on_demand \
             and not self.train_text_encoder_2_or_embedding() \
-            and self.latent_caching
+            and self.text_caching
 
     def text_encoder_3_on_demand(self) -> bool:
         return self.text_encoder_3.load_on_demand \
             and not self.train_text_encoder_3_or_embedding() \
-            and self.latent_caching
+            and self.text_caching
 
     def text_encoder_4_on_demand(self) -> bool:
         return self.text_encoder_4.load_on_demand \
             and not self.train_text_encoder_4_or_embedding() \
-            and self.latent_caching
+            and self.text_caching
 
     def all_embedding_configs(self):
         if self.training_method == TrainingMethod.EMBEDDING:
@@ -1061,7 +1067,8 @@ class TrainConfig(BaseConfig):
         data.append(("concept_file_name", "training_concepts/concepts.json", str, False))
         data.append(("concepts", None, list[ConceptConfig], True))
         data.append(("aspect_ratio_bucketing", True, bool, False))
-        data.append(("latent_caching", True, bool, False))
+        data.append(("image_caching", True, bool, False))
+        data.append(("text_caching", True, bool, False))
         data.append(("clear_cache_before_training", True, bool, False))
 
         # training settings
