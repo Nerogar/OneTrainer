@@ -83,7 +83,7 @@ class ChromaBaseDataLoader(
             text_caching = not config.train_text_encoder_or_embedding(),
         )
 
-    def _output_modules(self, config: TrainConfig, model: ChromaModel, model_setup: BaseChromaSetup):
+    def _output_modules(self, config: TrainConfig, model: ChromaModel, model_setup: BaseChromaSetup, is_validation: bool = False):
         pad_masked_tokens = PadMaskedTokens(tokens_name='tokens', tokens_mask_name='tokens_mask', hidden_state_name='text_encoder_hidden_state', max_length=model.tokenizer.model_max_length)
 
         output_names = [
@@ -108,6 +108,7 @@ class ChromaBaseDataLoader(
             vae=model.vae,
             autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
+            is_validation=is_validation,
         )
 
         if config.latent_caching and not config.train_text_encoder_or_embedding():

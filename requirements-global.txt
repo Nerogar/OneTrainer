@@ -3,6 +3,7 @@ numpy==2.2.6
 opencv-python==4.11.0.86
 pillow==12.2.0
 imagesize==1.4.1 #for concept statistics
+blake3==1.0.8 # fast content hashing for DPO dedup
 tqdm==4.67.1
 PyYAML==6.0.2
 huggingface-hub==0.34.4

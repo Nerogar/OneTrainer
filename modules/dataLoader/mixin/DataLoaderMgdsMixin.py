@@ -3,6 +3,7 @@ from abc import ABCMeta
 
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.dpo_pattern_util import validate_dpo_patterns
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.TrainProgress import TrainProgress
 
@@ -13,6 +14,27 @@ import torch
 
 
 class DataLoaderMgdsMixin(metaclass=ABCMeta):
+    @staticmethod
+    def __filter_dpo_concepts(concepts: list[ConceptConfig]) -> list[ConceptConfig]:
+        # An RLHF DPO run trains on chosen/rejected pairs only. Concepts without
+        # patterns have no pair data, so they are dropped (previously they were
+        # dropped silently at pair-matching time).
+        for concept in concepts:
+            if concept.enabled:
+                validate_dpo_patterns(concept.dpo_chosen_pattern, concept.dpo_rejected_pattern)
+
+        dpo_concepts = [c for c in concepts if c.is_dpo()]
+        skipped = [c.name or c.path for c in concepts if c.enabled and not c.is_dpo()]
+
+        if not any(c.enabled for c in dpo_concepts):
+            raise RuntimeError(
+                "RLHF DPO requires at least one enabled concept with chosen/rejected patterns "
+                "(set 'DPO Chosen Pattern' and 'DPO Rejected Pattern' in the concept window)."
+            )
+        if skipped:
+            print(f"RLHF DPO: skipping {len(skipped)} concepts without DPO patterns: " + ", ".join(skipped))
+
+        return dpo_concepts
 
     def _create_mgds(
             self,
@@ -26,10 +48,10 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
             with open(config.concept_file_name, 'r') as f:
                 concepts = [ConceptConfig.default_values().from_dict(c) for c in json.load(f)]
 
-        # choose all validation concepts, or none of them, depending on is_validation
-        concepts = [concept for concept in concepts if (ConceptType(concept.type) == ConceptType.VALIDATION) == is_validation]
-
-        # convert before passing to MGDS
+        valid_types = {ConceptType.VALIDATION} if is_validation else {ConceptType.STANDARD, ConceptType.PRIOR_PREDICTION}
+        concepts = [concept for concept in concepts if ConceptType(concept.type) in valid_types]
+        if config.rlhf_enabled:
+            concepts = self.__filter_dpo_concepts(concepts)
         concepts = [c.to_dict() for c in concepts]
 
         settings = {
@@ -37,7 +59,6 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
             "target_frames": config.frames,
         }
 
-        # Just defaults for now.
         ds = MGDS(
             torch.device(config.train_device),
             concepts,

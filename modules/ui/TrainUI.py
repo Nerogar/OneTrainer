@@ -23,6 +23,7 @@ from modules.ui.ConvertModelUI import ConvertModelUI
 from modules.ui.LoraTab import LoraTab
 from modules.ui.ModelTab import ModelTab
 from modules.ui.ProfilingWindow import ProfilingWindow
+from modules.ui.RLHFTab import RLHFTab
 from modules.ui.SampleWindow import SampleWindow
 from modules.ui.SamplingTab import SamplingTab
 from modules.ui.TopBar import TopBar
@@ -121,6 +122,7 @@ class TrainUI(ctk.CTk):
         self.model_tab = None
         self.training_tab = None
         self.lora_tab = None
+        self.rlhf_tab = None
         self.cloud_tab = None
         self.additional_embeddings_tab = None
 
@@ -561,6 +563,15 @@ class TrainUI(ctk.CTk):
                          tooltip="Open the profiling tools.")
         components.button(frame, 4, 1, "Open", self.open_profiling_tool)
 
+        components.label(
+            frame,
+            5,
+            0,
+            "DPO Pair Tool",
+            tooltip="Score generated images and create chosen/rejected preference pair folders for DPO training",
+        )
+        components.button(frame, 5, 1, "Open", self.open_dpo_curation_tool)
+
         frame.pack(fill="both", expand=1)
         return frame
 
@@ -592,12 +603,36 @@ class TrainUI(ctk.CTk):
         if training_method == TrainingMethod.EMBEDDING and "embedding" not in self.tabview._tab_dict:
             self.embedding_tab(self.tabview.add("embedding"))
 
+        self._update_rlhf_controls()
+        self._update_rlhf_tab()
+
+    def _rlhf_is_supported(self) -> bool:
+        return self.train_config.training_method == TrainingMethod.LORA
+
+    def _update_rlhf_controls(self):
+        if self.rlhf_tab:
+            self.rlhf_tab.refresh_ui()
+
+    def _update_rlhf_tab(self):
+        if not self.tabview:
+            return
+
+        if self._rlhf_is_supported() and "RLHF" not in self.tabview._tab_dict:
+            self.rlhf_tab = RLHFTab(self.tabview.add("RLHF"), self.train_config, self.ui_state)
+        elif self._rlhf_is_supported() and self.rlhf_tab:
+            self.rlhf_tab.refresh_ui()
+        elif not self._rlhf_is_supported() and "RLHF" in self.tabview._tab_dict:
+            self.tabview.delete("RLHF")
+            self.rlhf_tab = None
+
     def load_preset(self):
         if not self.tabview:
             return
 
         if self.additional_embeddings_tab:
             self.additional_embeddings_tab.refresh_ui()
+
+        self.change_training_method(self.train_config.training_method)
 
     def open_tensorboard(self):
         webbrowser.open("http://localhost:" + str(self.train_config.tensorboard_port), new=0, autoraise=False)
@@ -677,6 +712,11 @@ class TrainUI(ctk.CTk):
 
     def open_profiling_tool(self):
         self.profiling_window.deiconify()
+
+    def open_dpo_curation_tool(self):
+        from modules.ui.DPOCurationWindow import DPOCurationWindow
+
+        DPOCurationWindow(self)
 
     def generate_debug_package(self):
         zip_path = filedialog.askdirectory(
