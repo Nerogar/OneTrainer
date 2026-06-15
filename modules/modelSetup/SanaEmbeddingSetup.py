@@ -12,6 +12,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.SANA, TrainingMethod.EMBEDDING)
 class SanaEmbeddingSetup(
     BaseSanaSetup,
 ):
@@ -91,5 +92,3 @@ class SanaEmbeddingSetup(
             self._normalize_output_embeddings(model.all_text_encoder_embeddings())
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, SanaEmbeddingSetup, ModelType.SANA, TrainingMethod.EMBEDDING)

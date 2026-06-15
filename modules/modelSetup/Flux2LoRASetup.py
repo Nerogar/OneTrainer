@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.FLUX_2, TrainingMethod.LORA)
 class Flux2LoRASetup(
     BaseFlux2Setup,
 ):
@@ -97,5 +98,3 @@ class Flux2LoRASetup(
             train_progress: TrainProgress
     ):
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, Flux2LoRASetup, ModelType.FLUX_2, TrainingMethod.LORA)

@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.ERNIE, TrainingMethod.LORA)
 class ErnieLoRASetup(
     BaseErnieSetup,
 ):
@@ -95,6 +96,3 @@ class ErnieLoRASetup(
             train_progress: TrainProgress,
     ):
         self.__setup_requires_grad(model, config)
-
-
-factory.register(BaseModelSetup, ErnieLoRASetup, ModelType.ERNIE, TrainingMethod.LORA)

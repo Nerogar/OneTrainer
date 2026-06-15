@@ -14,6 +14,8 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.PIXART_ALPHA, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.PIXART_SIGMA, TrainingMethod.LORA)
 class PixArtAlphaLoRASetup(
     BasePixArtAlphaSetup,
 ):
@@ -139,6 +141,3 @@ class PixArtAlphaLoRASetup(
             self._normalize_output_embeddings(model.all_text_encoder_embeddings())
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, PixArtAlphaLoRASetup, ModelType.PIXART_ALPHA, TrainingMethod.LORA)
-factory.register(BaseModelSetup, PixArtAlphaLoRASetup, ModelType.PIXART_SIGMA, TrainingMethod.LORA)
