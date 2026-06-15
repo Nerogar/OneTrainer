@@ -150,6 +150,20 @@ class TrainOptimizerConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
 
+    def from_dict(self, data: dict) -> "TrainOptimizerConfig":
+        sp = data.get("state_precision")
+        valid_sp = {"auto", "factored", "fp32", "fp16", "bf16_sr", "int8_sr"}
+        if sp is not None and sp not in valid_sp:
+            print(f"WARN: invalid optimizer state_precision '{sp}' in config, falling back to 'auto'.")
+            data = data.copy()
+            data["state_precision"] = "auto"
+        # orthogonal_gradient was a bool before adv_optm 2.5 made it a mode string
+        og_ortho = data.get("orthogonal_gradient")
+        if isinstance(og_ortho, bool):
+            data = data.copy()
+            data["orthogonal_gradient"] = "flattened" if og_ortho else "disabled"
+        return super().from_dict(data)
+
     @staticmethod
     def default_values():
         data = []
