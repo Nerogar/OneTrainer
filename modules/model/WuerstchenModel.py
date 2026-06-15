@@ -244,7 +244,7 @@ class WuerstchenModel(BaseModel):
                 return_dict=True,
             )
             if self.model_type.is_wuerstchen_v2():
-                final_layer_norm = self.prior_text_encoder.text_model.final_layer_norm
+                final_layer_norm = self.prior_text_encoder.final_layer_norm
                 pooled_text_encoder_output = None
                 text_encoder_output = final_layer_norm(
                     text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]

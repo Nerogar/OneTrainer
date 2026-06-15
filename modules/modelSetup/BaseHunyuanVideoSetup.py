@@ -148,7 +148,7 @@ class BaseHunyuanVideoSetup(
         if model.tokenizer_2 is not None and model.text_encoder_2 is not None:
             model.embedding_wrapper_2 = AdditionalEmbeddingWrapper(
                 tokenizer=model.tokenizer_2,
-                orig_module=model.text_encoder_2.text_model.embeddings.token_embedding,
+                orig_module=model.text_encoder_2.embeddings.token_embedding,
                 embeddings=model.all_text_encoder_2_embeddings(),
             )
 

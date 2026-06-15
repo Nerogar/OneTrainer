@@ -119,7 +119,7 @@ class BaseStableDiffusionSetup(
     ):
         model.embedding_wrapper = AdditionalEmbeddingWrapper(
             tokenizer=model.tokenizer,
-            orig_module=model.text_encoder.text_model.embeddings.token_embedding,
+            orig_module=model.text_encoder.embeddings.token_embedding,
             embeddings=model.all_text_encoder_embeddings(),
         )
         model.embedding_wrapper.hook_to_module()
