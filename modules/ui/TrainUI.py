@@ -449,32 +449,32 @@ class TrainUI(ctk.CTk):
         components.switch(frame, 1, 1, self.ui_state, "rolling_backup")
 
         # rolling backup count
-        components.label(frame, 1, 3, "Rolling Backup Count",
+        components.label(frame, 2, 0, "Rolling Backup Count",
                          tooltip="Defines the number of backups to keep if rolling backups are enabled")
-        components.entry(frame, 1, 4, self.ui_state, "rolling_backup_count")
+        components.entry(frame, 2, 1, self.ui_state, "rolling_backup_count")
 
         # backup before save
-        components.label(frame, 2, 0, "Backup Before Save",
+        components.label(frame, 3, 0, "Backup Before Save",
                          tooltip="Create a full backup before saving the final model")
-        components.switch(frame, 2, 1, self.ui_state, "backup_before_save")
+        components.switch(frame, 3, 1, self.ui_state, "backup_before_save")
 
         # save after
-        components.label(frame, 3, 0, "Save Every",
+        components.label(frame, 4, 0, "Save Every",
                          tooltip="The interval used when automatically saving the model during training")
-        components.time_entry(frame, 3, 1, self.ui_state, "save_every", "save_every_unit")
+        components.time_entry(frame, 4, 1, self.ui_state, "save_every", "save_every_unit")
 
         # save now
-        components.button(frame, 3, 3, "save now", self.save_now)
+        components.button(frame, 4, 3, "save now", self.save_now)
 
         # skip save
-        components.label(frame, 4, 0, "Skip First",
+        components.label(frame, 5, 0, "Skip First",
                          tooltip="Start saving automatically after this interval has elapsed")
-        components.entry(frame, 4, 1, self.ui_state, "save_skip_first", width=50, sticky="nw")
+        components.entry(frame, 5, 1, self.ui_state, "save_skip_first", width=50, sticky="nw")
 
         # save filename prefix
-        components.label(frame, 5, 0, "Save Filename Prefix",
+        components.label(frame, 6, 0, "Save Filename Prefix",
                          tooltip="The prefix for filenames used when saving the model during training")
-        components.entry(frame, 5, 1, self.ui_state, "save_filename_prefix")
+        components.entry(frame, 6, 1, self.ui_state, "save_filename_prefix")
 
         frame.pack(fill="both", expand=1)
         return frame

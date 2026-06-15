@@ -143,7 +143,7 @@ def create_optimizer(
 
     if config.optimizer.optimizer.is_adv:
         # Tag PEFT parameters based on parameter names.
-        tag_peft_parameters(model)
+        tag_peft_parameters(model, config)
 
     match config.optimizer.optimizer:
 
@@ -680,7 +680,7 @@ def create_optimizer(
                 nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
                 orthogonal_sinkhorn=optimizer_config.orthogonal_sinkhorn if optimizer_config.orthogonal_sinkhorn is not None else False,
                 sinkhorn_iterations=optimizer_config.sinkhorn_iterations if optimizer_config.sinkhorn_iterations is not None else 5,
@@ -707,7 +707,7 @@ def create_optimizer(
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
                 k_warmup_steps=(config.learning_rate_warmup_steps / config.gradient_accumulation_steps),
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
@@ -734,7 +734,7 @@ def create_optimizer(
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
                 k_warmup_steps=(config.learning_rate_warmup_steps / config.gradient_accumulation_steps),
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
@@ -768,7 +768,7 @@ def create_optimizer(
                 prodigy_steps=optimizer_config.prodigy_steps if optimizer_config.prodigy_steps is not None else 0,
                 d_limiter=optimizer_config.d_limiter if optimizer_config.d_limiter is not None else False,
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
                 k_warmup_steps=(config.learning_rate_warmup_steps / config.gradient_accumulation_steps),
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
@@ -791,7 +791,7 @@ def create_optimizer(
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
                 spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
@@ -812,11 +812,10 @@ def create_optimizer(
                 betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
-                clip_threshold=optimizer_config.clip_threshold if optimizer_config.clip_threshold is not None else 0.0,
                 nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
                 stochastic_sign=optimizer_config.stochastic_sign if optimizer_config.stochastic_sign is not None else False,
                 spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
@@ -868,7 +867,7 @@ def create_optimizer(
                 low_rank_ortho=optimizer_config.low_rank_ortho if optimizer_config.low_rank_ortho is not None else False,
                 ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
                 accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
                 approx_mars=optimizer_config.approx_mars if optimizer_config.approx_mars is not None else False,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
                 spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
@@ -925,7 +924,7 @@ def create_optimizer(
                 ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
                 normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
                 accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
                 approx_mars=optimizer_config.approx_mars if optimizer_config.approx_mars is not None else False,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
                 spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
