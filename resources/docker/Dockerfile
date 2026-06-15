@@ -9,6 +9,7 @@ ENV OT_PLATFORM=cuda
 ENV OT_SCRIPT_DEBUG=true
 ENV PATH=/root/.pixi/bin:${PATH}
 ENV TZ=Etc/UTC
+ENV OT_SCRIPT_DEBUG=true
 
 WORKDIR /
 RUN apt-get update && \
@@ -17,11 +18,18 @@ RUN apt-get update && \
     curl \
     ssh
 
-ADD . /OneTrainer
+WORKDIR /OneTrainer
 
-RUN cd OneTrainer \
-    && export OT_PLATFORM=cuda \
-    && export OT_SCRIPT_DEBUG=true \
-    && ./install.sh 2>&1
+COPY --link ./install-pixi.sh ./
+
+RUN ./install-pixi.sh
+
+COPY --link pyproject.toml README.md pixi.lock ./
+
+RUN --mount=type=cache,target=/root/.cache/rattler/cache <<EOF
+pixi install --locked -v -e ${OT_PLATFORM} --skip OneTrainer
+EOF
+
+COPY . /OneTrainer
 
 ENTRYPOINT [ "/usr/bin/bash", "/OneTrainer/docker.init.sh" ]
