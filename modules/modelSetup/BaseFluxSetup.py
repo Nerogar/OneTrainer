@@ -141,7 +141,7 @@ class BaseFluxSetup(
         if model.tokenizer_1 is not None and model.text_encoder_1 is not None:
             model.embedding_wrapper_1 = AdditionalEmbeddingWrapper(
                 tokenizer=model.tokenizer_1,
-                orig_module=model.text_encoder_1.text_model.embeddings.token_embedding,
+                orig_module=model.text_encoder_1.embeddings.token_embedding,
                 embeddings=model.all_text_encoder_1_embeddings(),
             )
         if model.tokenizer_2 is not None and model.text_encoder_2 is not None:

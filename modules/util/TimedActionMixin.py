@@ -21,6 +21,9 @@ class TimedActionMixin:
         if name not in self.__previous_action:
             self.__previous_action[name] = -1
 
+        if interval is None:
+            return False
+
         match unit:
             case TimeUnit.EPOCH:
                 if int(interval) == 0:

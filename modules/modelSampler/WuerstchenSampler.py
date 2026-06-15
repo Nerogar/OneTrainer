@@ -180,7 +180,7 @@ class WuerstchenSampler(BaseModelSampler):
             return_dict=True,
             output_hidden_states=True,
         )
-        final_layer_norm = decoder_text_encoder.text_model.final_layer_norm
+        final_layer_norm = decoder_text_encoder.final_layer_norm
         prompt_embedding = final_layer_norm(
             text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
         )

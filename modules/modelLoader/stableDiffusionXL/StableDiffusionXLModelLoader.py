@@ -162,7 +162,7 @@ class StableDiffusionXLModelLoader(
             )
 
         text_encoder_1 = pipeline.text_encoder.to(dtype=weight_dtypes.text_encoder.torch_dtype())
-        text_encoder_1.text_model.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
+        text_encoder_1.embeddings.to(dtype=weight_dtypes.text_encoder.torch_dtype(False))
         text_encoder_2 = pipeline.text_encoder_2.to(dtype=weight_dtypes.text_encoder_2.torch_dtype())
         text_encoder_2.text_model.embeddings.to(dtype=weight_dtypes.text_encoder_2.torch_dtype(False))
         vae = pipeline.vae.to(dtype=weight_dtypes.vae.torch_dtype())

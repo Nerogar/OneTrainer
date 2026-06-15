@@ -37,7 +37,7 @@ def encode_clip(
         text_encoder_output = text_encoder_output.hidden_states[default_layer - layer_skip] if add_output else None
 
         if add_layer_norm and text_encoder_output is not None:
-            final_layer_norm = text_encoder.text_model.final_layer_norm
+            final_layer_norm = text_encoder.text_model.final_layer_norm if hasattr(text_encoder, 'text_model') else text_encoder.final_layer_norm
             text_encoder_output = final_layer_norm(text_encoder_output)
 
     return text_encoder_output, pooled_text_encoder_output

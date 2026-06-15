@@ -128,7 +128,8 @@ class BaseUIState(ABC):
                     try:
                         obj[name] = int(string_var)
                     except ValueError:
-                        obj[name] = None
+                        if nullable:
+                            obj[name] = None
                 self.__call_var_traces(name)
         else:
             def update(_0, _1, _2):
@@ -143,7 +144,8 @@ class BaseUIState(ABC):
                     try:
                         setattr(obj, name, int(string_var))
                     except ValueError:
-                        setattr(obj, name, None)
+                        if nullable:
+                            setattr(obj, name, None)
                 self.__call_var_traces(name)
         return update
 
@@ -161,7 +163,8 @@ class BaseUIState(ABC):
                     try:
                         obj[name] = float(string_var)
                     except ValueError:
-                        obj[name] = None
+                        if nullable:
+                            obj[name] = None
                 self.__call_var_traces(name)
         else:
             def update(_0, _1, _2):
@@ -176,7 +179,8 @@ class BaseUIState(ABC):
                     try:
                         setattr(obj, name, float(string_var))
                     except ValueError:
-                        setattr(obj, name, None)
+                        if nullable:
+                            setattr(obj, name, None)
                 self.__call_var_traces(name)
         return update
 

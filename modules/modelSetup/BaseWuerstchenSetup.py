@@ -149,7 +149,7 @@ class BaseWuerstchenSetup(
     ):
         model.prior_embedding_wrapper = AdditionalEmbeddingWrapper(
             tokenizer=model.prior_tokenizer,
-            orig_module=model.prior_text_encoder.text_model.embeddings.token_embedding,
+            orig_module=model.prior_text_encoder.embeddings.token_embedding,
             embeddings=model.all_prior_text_encoder_embeddings(),
         )
         model.prior_embedding_wrapper.hook_to_module()

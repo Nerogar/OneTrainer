@@ -142,7 +142,7 @@ class BaseStableDiffusionXLSetup(
     ):
         model.embedding_wrapper_1 = AdditionalEmbeddingWrapper(
             tokenizer=model.tokenizer_1,
-            orig_module=model.text_encoder_1.text_model.embeddings.token_embedding,
+            orig_module=model.text_encoder_1.embeddings.token_embedding,
             embeddings=model.all_text_encoder_1_embeddings(),
         )
         model.embedding_wrapper_2 = AdditionalEmbeddingWrapper(
