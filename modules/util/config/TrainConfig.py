@@ -260,7 +260,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("centered_wd_mode", "full", str, False))
         data.append(("factored_2nd", False, bool, False))
         data.append(("fisher_wd", False, bool, False))
-        data.append(("state_precision", "float8", str, False))
+        data.append(("state_precision", "auto", str, False))
         data.append(("orthogonal_sinkhorn", False, bool, False))
         data.append(("sinkhorn_iterations", None, int, True))
         data.append(("normed_momentum", False, bool, False))
