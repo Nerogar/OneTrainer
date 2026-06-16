@@ -24,7 +24,7 @@ def main():
             train_config.from_dict(json.load(f), migrate=False)
 
     with open(args.config_path, "r") as f:
-        train_config.from_dict(json.load(f))
+        train_config.from_dict(json.load(f), migrate=args.preset_path is None)
 
     try:
         with open("secrets.json" if args.secrets_path is None else args.secrets_path, "r") as f:

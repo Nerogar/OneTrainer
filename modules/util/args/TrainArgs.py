@@ -18,7 +18,7 @@ class TrainArgs(BaseArgs):
 
         # @formatter:off
 
-        parser.add_argument("--preset-path", type=str, required=False, dest="preset_path", help="The path to a built-in preset file, applied before --config-path")
+        parser.add_argument("--preset-path", type=str, required=False, dest="preset_path", help="The path to a built-in preset file, applied before --config-path. When set, config migration is skipped for both files, so both the preset and the config must be in the current format.")
         parser.add_argument("--config-path", type=str, required=True, dest="config_path", help="The path to the config file")
         parser.add_argument("--secrets-path", type=str, required=False, dest="secrets_path", help="The path to the secrets file")
         parser.add_argument("--callback-path", type=str, required=False, dest="callback_path", help="The path to the callback pickle file")
