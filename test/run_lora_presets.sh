@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o pipefail
 
 CONFIG="test/minimal.json"
 LOG_DIR="test"
@@ -30,7 +31,7 @@ for preset in "${presets[@]}"; do
     name=$(basename "$preset" .json)
     logfile="$LOG_DIR/${name#\#}.log"
     echo "=== $name ===" | tee "$logfile"
-    if ./run-cmd.sh train --preset-path "$preset" --config-path "$CONFIG" >> "$logfile" 2>&1; then
+    if ./run-cmd.sh train --preset-path "$preset" --config-path "$CONFIG" 2>&1 | tee -a "$logfile"; then
         echo "OK: $name"
     else
         echo "FAILED: $name" | tee -a "$ERROR_LOG"
