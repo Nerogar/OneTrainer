@@ -146,6 +146,7 @@ class TrainOptimizerConfig(BaseConfig):
     nesterov_coef: float
     snr_cond: False
     geometric_wd: False
+    MSign_interval: int
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -281,6 +282,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("nesterov_coef", None, float, True))
         data.append(("snr_cond", False, bool, False))
         data.append(("geometric_wd", False, bool, False))
+        data.append(("MSign_interval", None, int, True))
 
         return TrainOptimizerConfig(data)
 

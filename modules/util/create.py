@@ -690,6 +690,7 @@ def create_optimizer(
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
                 snr_cond=optimizer_config.snr_cond if optimizer_config.snr_cond is not None else False,
                 geometric_wd=optimizer_config.geometric_wd if optimizer_config.geometric_wd is not None else False,
+                MSign_interval=optimizer_config.MSign_interval if optimizer_config.MSign_interval is not None else None,
             )
 
         # ADAMW_ADV Optimizer
@@ -717,6 +718,7 @@ def create_optimizer(
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
                 nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
+                MSign_interval=optimizer_config.MSign_interval if optimizer_config.MSign_interval is not None else None,
             )
 
         # ADOPT_ADV Optimizer
@@ -744,6 +746,7 @@ def create_optimizer(
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
                 nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
+                MSign_interval=optimizer_config.MSign_interval if optimizer_config.MSign_interval is not None else None,
             )
 
         # PRODIGY_ADV Optimizer
@@ -777,6 +780,7 @@ def create_optimizer(
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
                 nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
+                MSign_interval=optimizer_config.MSign_interval if optimizer_config.MSign_interval is not None else None,
             )
 
         # SignSGD_ADV Optimizer
@@ -801,6 +805,7 @@ def create_optimizer(
                 nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
                 snr_cond=optimizer_config.snr_cond if optimizer_config.snr_cond is not None else False,
                 geometric_wd=optimizer_config.geometric_wd if optimizer_config.geometric_wd is not None else False,
+                MSign_interval=optimizer_config.MSign_interval if optimizer_config.MSign_interval is not None else None,
             )
 
         # LION_ADV Optimizer
@@ -821,6 +826,7 @@ def create_optimizer(
                 spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
+                MSign_interval=optimizer_config.MSign_interval if optimizer_config.MSign_interval is not None else None,
             )
 
         # MUON_ADV Optimizer
@@ -874,6 +880,7 @@ def create_optimizer(
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
+                MSign_interval=optimizer_config.MSign_interval if optimizer_config.MSign_interval is not None else None,
                 **adam_kwargs
             )
 
@@ -931,6 +938,7 @@ def create_optimizer(
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
+                MSign_interval=optimizer_config.MSign_interval if optimizer_config.MSign_interval is not None else None,
                 **adam_kwargs
             )
 

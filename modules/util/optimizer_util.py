@@ -461,6 +461,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "centered_wd": 0.0,
         "centered_wd_mode": "full",
         "state_precision": "auto",
+        "MSign_interval": None,
     },
     Optimizer.ADAMW_ADV: {
         "beta1": 0.9,
@@ -482,6 +483,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "centered_wd": 0.0,
         "centered_wd_mode": "full",
         "state_precision": "auto",
+        "MSign_interval": None,
     },
     Optimizer.ADOPT_ADV: {
         "beta1": 0.9,
@@ -503,6 +505,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "centered_wd": 0.0,
         "centered_wd_mode": "full",
         "state_precision": "auto",
+        "MSign_interval": None,
     },
     Optimizer.PRODIGY_ADV: {
         "beta1": 0.9,
@@ -530,6 +533,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "kourkoutas_beta": False,
         "centered_wd": 0.0,
         "centered_wd_mode": "full",
+        "MSign_interval": None,
     },
     Optimizer.SIGNSGD_ADV: {
         "stochastic_sign": False,
@@ -549,6 +553,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "centered_wd": 0.0,
         "centered_wd_mode": "full",
         "state_precision": "auto",
+        "MSign_interval": None,
     },
     Optimizer.LION_ADV: {
         "stochastic_sign": False,
@@ -564,6 +569,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "spectral_normalization": False,
         "centered_wd": 0.0,
         "centered_wd_mode": "full",
+        "MSign_interval": None,
     },
     Optimizer.MUON_ADV: {
         "beta1": 0.9,
@@ -593,6 +599,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "centered_wd": 0.0,
         "centered_wd_mode": "full",
         "state_precision": "auto",
+        "MSign_interval": None,
         "muon_adam_config": {},
     },
     Optimizer.ADAMUON_ADV: {
@@ -625,6 +632,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "centered_wd": 0.0,
         "centered_wd_mode": "full",
         "state_precision": "auto",
+        "MSign_interval": None,
         "muon_adam_config": {},
     },
     Optimizer.ADABELIEF: {

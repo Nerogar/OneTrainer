@@ -202,6 +202,7 @@ class OptimizerParamsWindow(ctk.CTkToplevel):
             'nesterov_coef': {'title': 'Nesterov Coef', 'tooltip': 'Controls the mixing coefficient between momentum gradients and raw gradients in Nesterov momentum. For a factor of 0.8, the final update will be 80% of the momentum gradients and 20% raw gradient. Leaving it unset toggles the standard Nestrov behavior (where nesterov_coef = beta1 or momentum). Setting it to 0 cancels momentum contribution.', 'type': 'float'},
             'snr_cond': {'title': 'SNR Preconditioning', 'tooltip': 'Applies a Signal-to-Noise Ratio (SNR) precondition to reshape the optimization curve. It prioritizes high-confidence signals and dampens noise. On-the-fly math with zero memory overhead. Requires Normalization-then-Momentum (NtM). ', 'type': 'bool'},
             'geometric_wd': {'title': 'Geometric Weight Decay', 'tooltip': 'Regularizes weights based on the geometric structure of the optimizer. Compatible with cautious weight decay.', 'type': 'bool'},
+            'MSign_interval': {'title': 'MSign Interval', 'tooltip': 'Periodically applies a Matrix-Sign operation to orthogonalize weights every X steps. This restores the stable rank of the matrices, improving performance. Recommended: 100. Leave empty to disable.', 'type': 'int'},
         }
         # @formatter:on
 
