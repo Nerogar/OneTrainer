@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.ANIMA, TrainingMethod.LORA)
 class AnimaLoRASetup(
     BaseAnimaSetup,
 ):
@@ -101,5 +102,3 @@ class AnimaLoRASetup(
             train_progress: TrainProgress
     ):
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, AnimaLoRASetup, ModelType.ANIMA, TrainingMethod.LORA)

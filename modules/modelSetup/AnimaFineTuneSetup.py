@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.ANIMA, TrainingMethod.FINE_TUNE)
 class AnimaFineTuneSetup(
     BaseAnimaSetup,
 ):
@@ -89,5 +90,3 @@ class AnimaFineTuneSetup(
             train_progress: TrainProgress
     ):
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, AnimaFineTuneSetup, ModelType.ANIMA, TrainingMethod.FINE_TUNE)

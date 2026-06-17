@@ -23,6 +23,7 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.ANIMA)
 class AnimaBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -157,5 +158,3 @@ class AnimaBaseDataLoader(
             allow_video_files=False, #don't allow video files, but...
             vae_frame_dim=True,  #...Anima has a video-capable VAE. convert images to video dimensions
         )
-
-factory.register(BaseDataLoader, AnimaBaseDataLoader, ModelType.ANIMA)

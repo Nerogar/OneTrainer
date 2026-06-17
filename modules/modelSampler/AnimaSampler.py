@@ -22,6 +22,7 @@ import numpy as np
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.ANIMA)
 class AnimaSampler(BaseModelSampler):
     def __init__(
             self,
@@ -169,5 +170,3 @@ class AnimaSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, AnimaSampler, ModelType.ANIMA)
