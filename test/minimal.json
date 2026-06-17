@@ -1,5 +1,6 @@
 {
     "epochs": 2,
+    "tensorboard": false,
     "concepts": [
         {
             "path": "resources/icons",
