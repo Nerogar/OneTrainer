@@ -58,7 +58,7 @@ class BaseWuerstchenSetup(
             config: TrainConfig,
     ):
         if model.model_type.is_wuerstchen_v2():
-            if config.prior.checkpointing_or_offloading_enabled():
+            if config.prior.checkpointing_enabled():
                 model.prior_prior.enable_gradient_checkpointing()
         elif model.model_type.is_stable_cascade():
             enable_checkpointing_for_stable_cascade_blocks(model.prior_prior, config, config.prior)
