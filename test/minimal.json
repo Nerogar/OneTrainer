@@ -1,5 +1,6 @@
 {
     "epochs": 2,
+    "batch_size": 2,
     "tensorboard": false,
     "concepts": [
         {
