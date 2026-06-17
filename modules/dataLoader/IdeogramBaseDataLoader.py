@@ -23,6 +23,7 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.IDEOGRAM_4)
 class IdeogramBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -156,6 +157,3 @@ class IdeogramBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
         )
-
-
-factory.register(BaseDataLoader, IdeogramBaseDataLoader, ModelType.IDEOGRAM_4)

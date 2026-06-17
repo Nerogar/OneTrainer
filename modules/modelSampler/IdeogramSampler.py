@@ -22,6 +22,7 @@ from PIL import Image as PILImage
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.IDEOGRAM_4)
 class IdeogramSampler(BaseModelSampler):
     def __init__(
             self,
@@ -220,6 +221,3 @@ class IdeogramSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-
-factory.register(BaseModelSampler, IdeogramSampler, ModelType.IDEOGRAM_4)

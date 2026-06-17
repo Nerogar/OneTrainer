@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.IDEOGRAM_4, TrainingMethod.LORA)
 class IdeogramLoRASetup(
     BaseIdeogramSetup,
 ):
@@ -101,6 +102,3 @@ class IdeogramLoRASetup(
             train_progress: TrainProgress,
     ):
         self.__setup_requires_grad(model, config)
-
-
-factory.register(BaseModelSetup, IdeogramLoRASetup, ModelType.IDEOGRAM_4, TrainingMethod.LORA)
