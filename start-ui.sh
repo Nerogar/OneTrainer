@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e pipefail
+set -eo pipefail
 
 if [ "$OT_PIP_INSTALL" = "true" ]; then
     echo "[OneTrainer] Running UI inside virtual environment..."

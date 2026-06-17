@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e pipefail
+set -eo pipefail
 
 # Detect absolute path to the directory where "lib.include.sh" resides.
 export SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
@@ -170,13 +170,13 @@ function run_in_env {
 
 function get_or_update_pixi {
     if can_exec pixi; then
-        print_debug "`pixi` already available at $(which pixi)."
+        print_debug "pixi already available at $(which pixi)."
         if [[ "$1" == "upgrade" ]]; then
-            print_debug '`pixi` found, updating.'
-            run_cmd pixi self-update --no-release-notes || print_warning "`pixi` couldn't be updated, assuming compatibility."
+            print_debug 'pixi found, updating.'
+            run_cmd pixi self-update --no-release-notes || print_warning "pixi couldn't be updated, assuming compatibility."
         fi
     else
-        print_debug "`pixi` not found, attempting installation."
+        print_debug "pixi not found, attempting installation."
         ./install-pixi.sh
         export PATH="${HOME:-/root}/.pixi/bin:${PATH}"
     fi

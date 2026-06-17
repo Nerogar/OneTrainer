@@ -1,4 +1,5 @@
 # development
+.git/
 .idea
 *.bak
 *.pyc

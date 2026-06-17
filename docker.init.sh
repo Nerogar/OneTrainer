@@ -1,5 +1,5 @@
 #!/bin/bash
-set -exo pipefail
+set -eo pipefail
 
 # Export useful ENV variables, including all Runpod specific vars, to /etc/rp_environment
 # This file can then later be sourced in a login shell
