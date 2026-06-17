@@ -143,6 +143,7 @@ class GenericTrainer(BaseTrainer):
         self.model_setup.setup_train_device(self.model, self.config)
         self.model_setup.setup_model(self.model, self.config)
         self.model.release()
+        self.model.eval()
         torch_gc()
 
         self.callbacks.on_update_status("creating the data loader/caching")
@@ -256,6 +257,7 @@ class GenericTrainer(BaseTrainer):
                 on_update_progress = self.callbacks.on_update_sample_custom_progress if is_custom_sample else self.callbacks.on_update_sample_default_progress
 
                 self.model.release()
+                self.model.eval()
 
                 sample_config = copy.copy(sample_config)
                 sample_config.from_train_config(self.config)
