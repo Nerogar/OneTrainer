@@ -98,9 +98,10 @@ class ZImageModel(BaseModel):
             self.transformer_lora.to(device)
 
     def release(self):
-        self.vae_to(self.train_config.temp_device)
-        self.text_encoder_to(self.train_config.temp_device)
-        self.transformer_to(self.train_config.temp_device)
+        temp_device = torch.device(self.train_config.temp_device)
+        self.vae_to(temp_device)
+        self.text_encoder_to(temp_device)
+        self.transformer_to(temp_device)
 
     def eval(self):
         self.vae.eval()

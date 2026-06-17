@@ -124,10 +124,11 @@ class StableDiffusionModel(BaseModel):
             self.unet_lora.to(device)
 
     def release(self):
-        self.vae_to(self.train_config.temp_device)
-        self.depth_estimator_to(self.train_config.temp_device)
-        self.text_encoder_to(self.train_config.temp_device)
-        self.unet_to(self.train_config.temp_device)
+        temp_device = torch.device(self.train_config.temp_device)
+        self.vae_to(temp_device)
+        self.depth_estimator_to(temp_device)
+        self.text_encoder_to(temp_device)
+        self.unet_to(temp_device)
 
     def eval(self):
         self.vae.eval()
