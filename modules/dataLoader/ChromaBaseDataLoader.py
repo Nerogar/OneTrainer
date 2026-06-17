@@ -26,6 +26,7 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.CHROMA_1)
 class ChromaBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -154,5 +155,3 @@ class ChromaBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
         )
-
-factory.register(BaseDataLoader, ChromaBaseDataLoader, ModelType.CHROMA_1)
