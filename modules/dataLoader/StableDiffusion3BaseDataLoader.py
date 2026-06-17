@@ -25,6 +25,8 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_3)
+@factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_35)
 class StableDiffusion3BaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -198,5 +200,3 @@ class StableDiffusion3BaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
         )
-
-factory.register(BaseDataLoader, StableDiffusion3BaseDataLoader, ModelType.STABLE_DIFFUSION_35)

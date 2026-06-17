@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.HUNYUAN_VIDEO, TrainingMethod.FINE_TUNE)
 class HunyuanVideoFineTuneSetup(
     BaseHunyuanVideoSetup,
 ):
@@ -139,5 +140,3 @@ class HunyuanVideoFineTuneSetup(
             if model.embedding_wrapper_2 is not None:
                 model.embedding_wrapper_2.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, HunyuanVideoFineTuneSetup, ModelType.HUNYUAN_VIDEO, TrainingMethod.FINE_TUNE)

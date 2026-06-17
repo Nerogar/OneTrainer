@@ -17,6 +17,14 @@ from torchvision.transforms import transforms
 from PIL import Image
 
 
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE_VAE)
 class StableDiffusionVaeSampler(BaseModelSampler):
     def __init__(
             self,
@@ -78,12 +86,3 @@ class StableDiffusionVaeSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE_VAE)
-factory.register(BaseModelSampler, StableDiffusionVaeSampler, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE_VAE)

@@ -19,6 +19,7 @@ import torch
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.Z_IMAGE)
 class ZImageSampler(BaseModelSampler):
     def __init__(
             self,
@@ -163,5 +164,3 @@ class ZImageSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, ZImageSampler, ModelType.Z_IMAGE)

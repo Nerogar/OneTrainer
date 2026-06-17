@@ -19,6 +19,7 @@ import torch
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.CHROMA_1)
 class ChromaSampler(BaseModelSampler):
     def __init__(
             self,
@@ -189,5 +190,3 @@ class ChromaSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, ChromaSampler, ModelType.CHROMA_1)
