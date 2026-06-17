@@ -26,6 +26,7 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.LENS)
 class LensBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -156,6 +157,3 @@ class LensBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
         )
-
-
-factory.register(BaseDataLoader, LensBaseDataLoader, ModelType.LENS)

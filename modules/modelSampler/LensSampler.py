@@ -21,6 +21,7 @@ from lens.pipeline import LensPipeline, compute_empirical_mu
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.LENS)
 class LensSampler(BaseModelSampler):
     def __init__(
             self,
@@ -185,5 +186,3 @@ class LensSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, LensSampler, ModelType.LENS)
