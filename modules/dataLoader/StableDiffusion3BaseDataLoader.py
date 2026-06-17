@@ -25,6 +25,7 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_3)
 @factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_35)
 class StableDiffusion3BaseDataLoader(
     BaseDataLoader,
