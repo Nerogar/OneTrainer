@@ -122,7 +122,10 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         #some checkpoints (e.g. Ernie's Mistral3 text encoder, Qwen's Qwen2_5_VL text encoder) were saved with an
         #older module layout than the one transformers builds from the config in this version. transformers' own
         #from_pretrained applies the same renaming via its checkpoint conversion registry, so we reuse it here.
-        weight_renamings = get_checkpoint_conversion_mapping(sub_module.config.model_type)
+        #diffusers sub-modules have no such registry (their config is a plain FrozenDict, no model_type), and
+        #never need this renaming.
+        weight_renamings = get_checkpoint_conversion_mapping(sub_module.config.model_type) \
+            if hasattr(sub_module.config, 'model_type') else None
         if weight_renamings:
             meta_state_dict = sub_module.state_dict()
             new_state_dict = {}
