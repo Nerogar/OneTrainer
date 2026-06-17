@@ -1,5 +1,5 @@
 {
-    "base_model_name": "PixArt-sigma/PixArt-XL-2-1024-MS",
+    "base_model_name": "PixArt-alpha/PixArt-Sigma-XL-2-1024-MS",
     "batch_size": 8,
     "model_type": "PIXART_SIGMA",
     "epochs": 100,

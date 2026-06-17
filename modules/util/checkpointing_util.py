@@ -12,16 +12,11 @@ from torch import nn
 
 from diffusers.models.attention import BasicTransformerBlock, JointTransformerBlock
 from diffusers.models.transformers.sana_transformer import SanaTransformerBlock
-from diffusers.models.transformers.transformer_hidream_image import (
-    HiDreamImageSingleTransformerBlock,
-    HiDreamImageTransformerBlock,
-)
 from diffusers.models.transformers.transformer_hunyuan_video import (
     HunyuanVideoIndividualTokenRefinerBlock,
     HunyuanVideoSingleTransformerBlock,
     HunyuanVideoTransformerBlock,
 )
-from diffusers.models.unets.unet_stable_cascade import SDCascadeAttnBlock, SDCascadeResBlock, SDCascadeTimestepBlock
 from transformers.models.clip.modeling_clip import CLIPEncoderLayer
 from transformers.models.gemma2.modeling_gemma2 import Gemma2DecoderLayer
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
@@ -270,16 +265,6 @@ def enable_checkpointing_for_clip_encoder_layers(
         (CLIPEncoderLayer, []), # No activation offloading for text encoders, because the output might be taken from the middle of the network
     ])
 
-def enable_checkpointing_for_stable_cascade_blocks(
-        model: nn.Module,
-        config: TrainConfig,
-) -> LayerOffloadConductor:
-    return enable_checkpointing(model, config, config.compile, [
-        (SDCascadeResBlock, []),
-        (SDCascadeAttnBlock, []),
-        (SDCascadeTimestepBlock, []),
-    ])
-
 def enable_checkpointing_for_t5_encoder_layers(
         model: nn.Module,
         config: TrainConfig,
@@ -411,8 +396,8 @@ def enable_checkpointing_for_hi_dream_transformer(
         config: TrainConfig,
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, config.compile, [
-        (HiDreamImageTransformerBlock,       ["hidden_states", "encoder_hidden_states"]),
-        (HiDreamImageSingleTransformerBlock, ["hidden_states"                         ]),
+        (model.double_stream_blocks, ["hidden_states", "encoder_hidden_states"]),
+        (model.single_stream_blocks, ["hidden_states"                         ]),
     ])
 
 def enable_checkpointing_for_ernie_transformer(

@@ -20,6 +20,7 @@ from PIL import Image
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.HUNYUAN_VIDEO)
 class HunyuanVideoSampler(BaseModelSampler):
     def __init__(
             self,
@@ -209,5 +210,3 @@ class HunyuanVideoSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, HunyuanVideoSampler, ModelType.HUNYUAN_VIDEO)

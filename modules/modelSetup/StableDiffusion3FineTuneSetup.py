@@ -13,6 +13,8 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_3, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_35, TrainingMethod.FINE_TUNE)
 class StableDiffusion3FineTuneSetup(
     BaseStableDiffusion3Setup,
 ):
@@ -166,6 +168,3 @@ class StableDiffusion3FineTuneSetup(
             if model.embedding_wrapper_3 is not None:
                 model.embedding_wrapper_3.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, StableDiffusion3FineTuneSetup, ModelType.STABLE_DIFFUSION_3, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, StableDiffusion3FineTuneSetup, ModelType.STABLE_DIFFUSION_35, TrainingMethod.FINE_TUNE)

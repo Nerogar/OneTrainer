@@ -30,6 +30,7 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.FLUX_2)
 class Flux2BaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -161,6 +162,3 @@ class Flux2BaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
         )
-
-
-factory.register(BaseDataLoader, Flux2BaseDataLoader, ModelType.FLUX_2)
