@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.CHROMA_1, TrainingMethod.FINE_TUNE)
 class ChromaFineTuneSetup(
     BaseChromaSetup,
 ):
@@ -115,5 +116,3 @@ class ChromaFineTuneSetup(
             if model.embedding_wrapper is not None:
                 model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, ChromaFineTuneSetup, ModelType.CHROMA_1, TrainingMethod.FINE_TUNE)

@@ -12,6 +12,8 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_3, TrainingMethod.EMBEDDING)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_35, TrainingMethod.EMBEDDING)
 class StableDiffusion3EmbeddingSetup(
     BaseStableDiffusion3Setup,
 ):
@@ -127,6 +129,3 @@ class StableDiffusion3EmbeddingSetup(
             if model.embedding_wrapper_3 is not None:
                 model.embedding_wrapper_3.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, StableDiffusion3EmbeddingSetup, ModelType.STABLE_DIFFUSION_3, TrainingMethod.EMBEDDING)
-factory.register(BaseModelSetup, StableDiffusion3EmbeddingSetup, ModelType.STABLE_DIFFUSION_35, TrainingMethod.EMBEDDING)
