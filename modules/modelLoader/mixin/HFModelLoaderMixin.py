@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import re
 from abc import ABCMeta
 from itertools import repeat
 
@@ -14,6 +13,9 @@ from modules.util.quantization_util import (
 
 import torch
 from torch import nn
+
+from transformers.conversion_mapping import get_checkpoint_conversion_mapping
+from transformers.core_model_loading import rename_source_key
 
 import accelerate
 import huggingface_hub
@@ -117,12 +119,17 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         if hasattr(sub_module, '_fix_state_dict_keys_on_load'):
             sub_module._fix_state_dict_keys_on_load(state_dict)
 
-        if hasattr(sub_module, "_checkpoint_conversion_mapping"): #required for loading the text encoder of Qwen
+        #some checkpoints (e.g. Ernie's Mistral3 text encoder, Qwen's Qwen2_5_VL text encoder) were saved with an
+        #older module layout than the one transformers builds from the config in this version. transformers' own
+        #from_pretrained applies the same renaming via its checkpoint conversion registry, so we reuse it here.
+        weight_renamings = get_checkpoint_conversion_mapping(sub_module.config.model_type)
+        if weight_renamings:
+            meta_state_dict = sub_module.state_dict()
             new_state_dict = {}
             for k, v in state_dict.items():
-                new_k = k
-                for pattern, replacement in sub_module._checkpoint_conversion_mapping.items():
-                    new_k = re.sub(pattern, replacement, new_k)
+                new_k, _ = rename_source_key(
+                    k, weight_renamings, [], prefix=sub_module.base_model_prefix, meta_state_dict=meta_state_dict,
+                )
                 new_state_dict[new_k] = v
             state_dict = new_state_dict
 
