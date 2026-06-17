@@ -12,10 +12,6 @@ from torch import nn
 
 from diffusers.models.attention import BasicTransformerBlock, JointTransformerBlock
 from diffusers.models.transformers.sana_transformer import SanaTransformerBlock
-from diffusers.models.transformers.transformer_hidream_image import (
-    HiDreamImageSingleTransformerBlock,
-    HiDreamImageTransformerBlock,
-)
 from diffusers.models.transformers.transformer_hunyuan_video import (
     HunyuanVideoIndividualTokenRefinerBlock,
     HunyuanVideoSingleTransformerBlock,
@@ -400,8 +396,8 @@ def enable_checkpointing_for_hi_dream_transformer(
         config: TrainConfig,
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, config.compile, [
-        (HiDreamImageTransformerBlock,       ["hidden_states", "encoder_hidden_states"]),
-        (HiDreamImageSingleTransformerBlock, ["hidden_states"                         ]),
+        (model.double_stream_blocks, ["hidden_states", "encoder_hidden_states"]),
+        (model.single_stream_blocks, ["hidden_states"                         ]),
     ])
 
 def enable_checkpointing_for_ernie_transformer(
