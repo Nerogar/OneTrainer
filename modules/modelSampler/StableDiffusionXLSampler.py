@@ -21,6 +21,8 @@ from torchvision.transforms import transforms
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_XL_10_BASE)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING)
 class StableDiffusionXLSampler(BaseModelSampler):
     def __init__(
             self,
@@ -501,6 +503,3 @@ class StableDiffusionXLSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, StableDiffusionXLSampler, ModelType.STABLE_DIFFUSION_XL_10_BASE)
-factory.register(BaseModelSampler, StableDiffusionXLSampler, ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING)
