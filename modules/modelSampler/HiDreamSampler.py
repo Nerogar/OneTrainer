@@ -32,7 +32,7 @@ class HiDreamSampler(BaseModelSampler):
 
         self.model = model
         self.model_type = model_type
-        self.pipeline = model.create_pipeline(use_original_modules=False)
+        self.pipeline = model.create_pipeline()
 
     @torch.no_grad()
     def __sample_base(

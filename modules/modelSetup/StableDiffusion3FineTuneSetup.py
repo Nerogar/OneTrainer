@@ -92,9 +92,6 @@ class StableDiffusion3FineTuneSetup(
             if model.text_encoder_3 is not None:
                 model.text_encoder_3.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_1)
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_3)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
