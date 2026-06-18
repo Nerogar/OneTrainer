@@ -177,14 +177,16 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         #source weight that was actually loaded, rather than aliasing the same Parameter object: aliasing would
         #make a later in-place quantization of one side (e.g. quantize_layers() quantizing lm_head) silently
         #corrupt the other (e.g. the embedding table), since both attribute paths would refer to the same object.
-        for target_key, source_key in (getattr(sub_module, '_tied_weights_keys', None) or {}).items():
-            module = sub_module
-            *parents, tensor_name = target_key.split(".")
-            for p in parents:
-                module = getattr(module, p)
-            if module._parameters[tensor_name].is_meta:
-                source = sub_module.get_parameter(source_key)
-                module._parameters[tensor_name] = type(module._parameters[tensor_name])(source)
+        tied_weights_keys = getattr(sub_module, '_tied_weights_keys', None)
+        if tied_weights_keys is not None:
+            for target_key, source_key in tied_weights_keys.items():
+                module = sub_module
+                *parents, tensor_name = target_key.split(".")
+                for p in parents:
+                    module = getattr(module, p)
+                if module._parameters[tensor_name].is_meta:
+                    source = sub_module.get_parameter(source_key)
+                    module._parameters[tensor_name] = type(module._parameters[tensor_name])(source)
 
         return sub_module
 
