@@ -65,6 +65,8 @@ class BaseTrainingTabView(ABC):
             self.__setup_z_image_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_ernie():
             self.__setup_ernie_ui(column_0, column_1, column_2, controller, ui_state)
+        elif model_type.is_ideogram():
+            self.__setup_ideogram_ui(column_0, column_1, column_2, controller, ui_state)
 
     def __setup_stable_diffusion_ui(self, column_0, column_1, column_2, controller, ui_state):
         self.__create_base_frame(column_0, 0, controller, ui_state)
@@ -232,6 +234,20 @@ class BaseTrainingTabView(ABC):
         self.__create_base2_frame(column_1, 0, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=False, supports_force_attention_mask=False)
         self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
+
+        self.__create_masked_frame(column_2, 1, ui_state)
+        self.__create_loss_frame(column_2, 2, controller, ui_state)
+        self.__create_layer_frame(column_2, 3, controller, ui_state)
+
+    def __setup_ideogram_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
+        self.__create_text_encoder_frame(column_0, 1, ui_state, supports_clip_skip=False, supports_training=False,
+                                         supports_dropout=False)
+
+        self.__create_base2_frame(column_1, 0, ui_state)
+        self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=False, supports_force_attention_mask=False)
+        self.__create_unconditional_transformer_frame(column_1, 2, ui_state)
+        self.__create_noise_frame(column_1, 3, ui_state, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state)
@@ -447,7 +463,7 @@ class BaseTrainingTabView(ABC):
         return row
 
     def __create_text_encoder_frame(self, master, row, ui_state, supports_clip_skip=True, supports_training=True,
-                                    supports_sequence_length=False, supports_offloading=True):
+                                    supports_sequence_length=False, supports_offloading=True, supports_dropout=True):
         frame = self.components.section_frame(master, row)
         row = 0
 
@@ -465,11 +481,12 @@ class BaseTrainingTabView(ABC):
                                                supports_checkpointing=supports_training,
                                                supports_layer_offloading=supports_offloading)
 
-        # dropout
-        self.components.label(frame, row, 0, "Caption Dropout Probability",
-                              tooltip="The Probability for dropping the text encoder conditioning")
-        self.components.entry(frame, row, 1, ui_state, "text_encoder.dropout_probability")
-        row += 1
+        if supports_dropout:
+            # dropout
+            self.components.label(frame, row, 0, "Caption Dropout Probability",
+                                  tooltip="The Probability for dropping the text encoder conditioning")
+            self.components.entry(frame, row, 1, ui_state, "text_encoder.dropout_probability")
+            row += 1
 
         if supports_training:
             # train text encoder epochs
@@ -691,6 +708,19 @@ class BaseTrainingTabView(ABC):
             self.components.entry(frame, row, 1, ui_state, "transformer.guidance_scale")
             row += 1
 
+    def __create_unconditional_transformer_frame(self, master, row, ui_state):
+        frame = self.components.section_frame(master, row)
+        row = 0
+
+        # include unconditional transformer
+        self.components.label(frame, row, 0, "Include Unconditional Transformer",
+                              tooltip="Loads the unconditional transformer, needed for CFG values above 1.0 during sampling. "
+                                      "If disabled, only CFG 1.0 sampling is possible, but VRAM and load time are reduced")
+        self.components.switch(frame, row, 1, ui_state, "unconditional_transformer.include")
+        row += 1
+
+        row = self.__create_offloading_widgets(frame, row, ui_state, "unconditional_transformer", supports_checkpointing=False)
+
     def __create_noise_frame(self, master, row, ui_state,
                               supports_generalized_offset_noise: bool = False,
                               supports_dynamic_timestep_shifting: bool = False):
@@ -751,7 +781,7 @@ class BaseTrainingTabView(ABC):
         if supports_dynamic_timestep_shifting:
             # dynamic timestep shifting
             self.components.label(frame, row, 0, "Dynamic Timestep Shifting",
-                                  tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. Note: For Z-Image, the dynamic shifting parameters are likely wrong and unknown. Use with care or set your own, fixed shift.", wide_tooltip=True)
+                                  tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. For Ideogram, the shifting instead follows the model's own resolution-aware sampling schedule. Note: For Z-Image, the dynamic shifting parameters are likely wrong and unknown. Use with care or set your own, fixed shift.", wide_tooltip=True)
             self.components.switch(frame, row, 1, ui_state, "dynamic_timestep_shifting")
             row += 1
 

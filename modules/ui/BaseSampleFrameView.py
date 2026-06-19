@@ -9,14 +9,16 @@ class BaseSampleFrameView:
         is_flow_matching = controller.is_flow_matching()
         is_inpainting_model = controller.is_inpainting_model()
         is_video_model = controller.is_video_model()
+        supports_negative_prompt = controller.supports_negative_prompt()
         if include_prompt:
             # prompt
             self.components.label(top_frame, 0, 0, "prompt:")
             self.components.entry(top_frame, 0, 1, ui_state, "prompt")
 
             # negative prompt
-            self.components.label(top_frame, 1, 0, "negative prompt:")
-            self.components.entry(top_frame, 1, 1, ui_state, "negative_prompt")
+            if supports_negative_prompt:
+                self.components.label(top_frame, 1, 0, "negative prompt:")
+                self.components.entry(top_frame, 1, 1, ui_state, "negative_prompt")
 
         if include_settings:
             # width

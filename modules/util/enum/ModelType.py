@@ -47,6 +47,8 @@ class ModelType(Enum):
 
     LENS = 'LENS'
 
+    IDEOGRAM_4 = 'IDEOGRAM_4'
+
     def __str__(self):
         return self.value
 
@@ -124,6 +126,9 @@ class ModelType(Enum):
     def is_lens(self):
         return self == ModelType.LENS
 
+    def is_ideogram(self):
+        return self == ModelType.IDEOGRAM_4
+
     def has_mask_input(self) -> bool:
         return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \
             or self == ModelType.STABLE_DIFFUSION_20_INPAINTING \
@@ -175,7 +180,8 @@ class ModelType(Enum):
             or self.is_hi_dream() \
             or self.is_z_image() \
             or self.is_ernie() \
-            or self.is_lens()
+            or self.is_lens() \
+            or self.is_ideogram()
 
     def is_video_model(self) -> bool:
         return self.is_hunyuan_video() #incase we add more video models in the future
@@ -196,7 +202,7 @@ class ModelType(Enum):
                 or self.is_hi_dream() \
                 or self.is_chroma():
             return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA, TrainingMethod.EMBEDDING)
-        if self.is_qwen() or self.is_z_image() or self.is_flux_2() or self.is_ernie() or self.is_anima() or self.is_lens():
+        if self.is_qwen() or self.is_z_image() or self.is_flux_2() or self.is_ernie() or self.is_anima() or self.is_lens() or self.is_ideogram():
             return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA)
         raise ValueError(f"No supported training methods defined for model type {self}")
 
@@ -233,6 +239,7 @@ _MODEL_PARTS: dict[ModelType, tuple[str, ...]] = {
     ModelType.Z_IMAGE: ("text_encoder", "transformer", "vae"),
     ModelType.ERNIE: ("text_encoder", "transformer", "vae"),
     ModelType.LENS: ("text_encoder", "transformer", "vae"),
+    ModelType.IDEOGRAM_4: ("text_encoder", "transformer", "unconditional_transformer", "vae"),
 }
 
 

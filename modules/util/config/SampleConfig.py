@@ -143,6 +143,16 @@ def _get_model_defaults(model_type) -> dict:
             "diffusion_steps": 25,
             "cfg_scale": 4.0,
         })
+    elif model_type.is_ideogram():
+        # Ideogram 4 recommends 48 flow-matching steps on a logit-normal schedule with
+        # guidance held at 7.0 for the main steps (dropping to 3.0 for the final polish steps).
+        # Lowered to 25 steps and 3.0 guidance here for faster in-training sampling previews.
+        defaults.update({
+            "width": 1024,
+            "height": 1024,
+            "diffusion_steps": 25,
+            "cfg_scale": 3.0,
+        })
 
     return defaults
 

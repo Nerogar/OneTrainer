@@ -507,6 +507,7 @@ class TrainConfig(BaseConfig):
 
     # transformer
     transformer: TrainModelPartConfig
+    unconditional_transformer: TrainModelPartConfig
     quantization: QuantizationConfig
 
     # text encoder
@@ -908,6 +909,7 @@ class TrainConfig(BaseConfig):
             self.unet.weight_dtype,
             self.prior.weight_dtype,
             self.transformer.weight_dtype,
+            self.unconditional_transformer.weight_dtype,
             self.text_encoder.weight_dtype,
             self.text_encoder_2.weight_dtype,
             self.text_encoder_3.weight_dtype,
@@ -943,6 +945,7 @@ class TrainConfig(BaseConfig):
             text_encoder_2_on_demand=self.text_encoder_2_on_demand(),
             text_encoder_3_on_demand=self.text_encoder_3_on_demand(),
             text_encoder_4_on_demand=self.text_encoder_4_on_demand(),
+            include_unconditional_transformer=self.unconditional_transformer.include,
         )
 
     def train_any_embedding(self) -> bool:
@@ -1186,6 +1189,13 @@ class TrainConfig(BaseConfig):
         transformer.stop_training_after = 0
         transformer.learning_rate = None
         data.append(("transformer", transformer, TrainModelPartConfig, False))
+
+        unconditional_transformer = TrainModelPartConfig.default_values()
+        unconditional_transformer.model_name = ""
+        unconditional_transformer.train = False
+        unconditional_transformer.gradient_checkpointing = False
+        unconditional_transformer.activation_offloading = False
+        data.append(("unconditional_transformer", unconditional_transformer, TrainModelPartConfig, False))
 
         #quantization layer filter
         quantization = QuantizationConfig.default_values()

@@ -464,3 +464,13 @@ def enable_checkpointing_for_gpt_oss_encoder_layers(
     return enable_checkpointing(model, config, part, False, [
         (GptOssDecoderLayer, []),  # No activation offloading: hidden states are taken from intermediate layers by encode_layers()
     ])
+
+
+def enable_checkpointing_for_ideogram_transformer(
+        model: nn.Module,
+        config: TrainConfig,
+        part: TrainModelPartConfig,
+) -> LayerOffloadConductor | None:
+    return enable_checkpointing(model, config, part, config.compile, [
+        (model.layers, ["hidden_states"]),
+    ])
