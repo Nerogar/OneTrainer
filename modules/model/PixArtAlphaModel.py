@@ -42,6 +42,7 @@ class PixArtAlphaModelEmbedding:
 class PixArtAlphaModel(BaseModel):
     # base model data
     tokenizer: T5Tokenizer | None
+    orig_tokenizer: T5Tokenizer | None
     noise_scheduler: DDIMScheduler | None
     text_encoder: T5EncoderModel | None
     vae: AutoencoderKL | None
@@ -74,6 +75,7 @@ class PixArtAlphaModel(BaseModel):
         )
 
         self.tokenizer = None
+        self.orig_tokenizer = None
         self.noise_scheduler = None
         self.text_encoder = None
         self.vae = None
@@ -141,11 +143,12 @@ class PixArtAlphaModel(BaseModel):
         self.text_encoder.eval()
         self.transformer.eval()
 
-    def create_pipeline(self) -> DiffusionPipeline:
+    def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
+        tokenizer = self.orig_tokenizer if use_original_tokenizers else self.tokenizer
         match self.model_type:
             case ModelType.PIXART_ALPHA:
                 return PixArtAlphaPipeline(
-                    tokenizer=self.tokenizer,
+                    tokenizer=tokenizer,
                     text_encoder=self.text_encoder,
                     vae=self.vae,
                     transformer=self.transformer,
@@ -153,7 +156,7 @@ class PixArtAlphaModel(BaseModel):
                 )
             case ModelType.PIXART_SIGMA:
                 return PixArtSigmaPipeline(
-                    tokenizer=self.tokenizer,
+                    tokenizer=tokenizer,
                     text_encoder=self.text_encoder,
                     vae=self.vae,
                     transformer=self.transformer,

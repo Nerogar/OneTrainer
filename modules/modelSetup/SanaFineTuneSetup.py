@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.SANA, TrainingMethod.FINE_TUNE)
 class SanaFineTuneSetup(
     BaseSanaSetup,
 ):
@@ -68,7 +69,6 @@ class SanaFineTuneSetup(
         if config.train_any_embedding():
             model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
@@ -113,5 +113,3 @@ class SanaFineTuneSetup(
             self._normalize_output_embeddings(model.all_text_encoder_embeddings())
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, SanaFineTuneSetup, ModelType.SANA, TrainingMethod.FINE_TUNE)

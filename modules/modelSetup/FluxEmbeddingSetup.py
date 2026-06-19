@@ -12,6 +12,8 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.FLUX_DEV_1, TrainingMethod.EMBEDDING)
+@factory.register(BaseModelSetup, ModelType.FLUX_FILL_DEV_1, TrainingMethod.EMBEDDING)
 class FluxEmbeddingSetup(
     BaseFluxSetup,
 ):
@@ -71,8 +73,6 @@ class FluxEmbeddingSetup(
         if model.text_encoder_2 is not None:
             model.text_encoder_2.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_1)
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
@@ -112,6 +112,3 @@ class FluxEmbeddingSetup(
             if model.embedding_wrapper_2 is not None:
                 model.embedding_wrapper_2.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, FluxEmbeddingSetup, ModelType.FLUX_DEV_1, TrainingMethod.EMBEDDING)
-factory.register(BaseModelSetup, FluxEmbeddingSetup, ModelType.FLUX_FILL_DEV_1, TrainingMethod.EMBEDDING)
