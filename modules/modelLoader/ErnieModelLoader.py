@@ -1,4 +1,3 @@
-import logging
 import os
 import traceback
 
@@ -22,8 +21,7 @@ from diffusers import (
     FlowMatchEulerDiscreteScheduler,
     GGUFQuantizationConfig,
 )
-from transformers import Mistral3Model, MistralConfig, PreTrainedTokenizerFast
-from transformers.models.auto.configuration_auto import CONFIG_MAPPING
+from transformers import AutoTokenizer, Mistral3Model
 
 
 class ErnieModelLoader(
@@ -60,23 +58,6 @@ class ErnieModelLoader(
             vae_model_name: str,
             quantization: QuantizationConfig,
     ):
-        # transformers < 5.x doesn't register "ministral3"; patch it so Mistral3Config can parse its text_config
-        if "ministral3" not in CONFIG_MAPPING:
-            CONFIG_MAPPING.register("ministral3", MistralConfig)
-
-        diffusers_sub = []
-        transformers_sub = ["text_encoder"]
-        if not transformer_model_name:
-            diffusers_sub.append("transformer")
-        if not vae_model_name:
-            diffusers_sub.append("vae")
-
-        self._prepare_sub_modules(
-            base_model_name,
-            diffusers_modules=diffusers_sub,
-            transformers_modules=transformers_sub,
-        )
-
         if transformer_model_name:
             transformer = ErnieImageTransformer2DModel.from_single_file(
                 transformer_model_name,
@@ -98,15 +79,10 @@ class ErnieModelLoader(
                 quantization,
             )
 
-        # TokenizersBackend is the Rust tokenizers library backend, not a transformers class — warning is a false alarm
-        tokenization_logger = logging.getLogger("transformers.tokenization_utils_base")
-        prev_level = tokenization_logger.level
-        tokenization_logger.setLevel(logging.ERROR)
-        tokenizer = PreTrainedTokenizerFast.from_pretrained(
+        tokenizer = AutoTokenizer.from_pretrained(
             base_model_name,
             subfolder="tokenizer",
         )
-        tokenization_logger.setLevel(prev_level)
 
         text_encoder = self._load_transformers_sub_module(
             Mistral3Model,
