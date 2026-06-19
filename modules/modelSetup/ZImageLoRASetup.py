@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.Z_IMAGE, TrainingMethod.LORA)
 class ZImageLoRASetup(
     BaseZImageSetup,
 ):
@@ -98,5 +99,3 @@ class ZImageLoRASetup(
             train_progress: TrainProgress
     ):
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, ZImageLoRASetup, ModelType.Z_IMAGE, TrainingMethod.LORA)

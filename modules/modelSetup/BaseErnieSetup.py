@@ -9,7 +9,10 @@ from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiff
 from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowMatchingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
-from modules.util.checkpointing_util import enable_checkpointing_for_ernie_transformer
+from modules.util.checkpointing_util import (
+    enable_checkpointing_for_ernie_transformer,
+    enable_checkpointing_for_mistral_encoder_layers,
+)
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -45,6 +48,8 @@ class BaseErnieSetup(
         if config.gradient_checkpointing.enabled():
             model.transformer_offload_conductor = \
                 enable_checkpointing_for_ernie_transformer(model.transformer, config)
+            model.text_encoder_offload_conductor = \
+                enable_checkpointing_for_mistral_encoder_layers(model.text_encoder, config)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,

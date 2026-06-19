@@ -14,6 +14,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.SANA, TrainingMethod.LORA)
 class SanaLoRASetup(
     BaseSanaSetup,
 ):
@@ -94,7 +95,6 @@ class SanaLoRASetup(
         model.transformer_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
         model.transformer_lora.hook_to_module()
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
@@ -139,5 +139,3 @@ class SanaLoRASetup(
             self._normalize_output_embeddings(model.all_text_encoder_embeddings())
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, SanaLoRASetup, ModelType.SANA, TrainingMethod.LORA)
