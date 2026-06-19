@@ -1,0 +1,22 @@
+{
+    "epochs": 2,
+    "batch_size": 2,
+    "tensorboard": false,
+    "concepts": [
+        {
+            "path": "resources/icons",
+            "text": {
+                "prompt_source": "concept",
+                "prompt_path": "resources/test/logo.txt"
+            }
+        }
+    ],
+    "samples": [
+        {
+            "prompt": "a mouse eating the OneTrainer logo",
+            "width": 512,
+            "height": 512,
+            "cfg_scale": 3.0
+        }
+    ]
+}

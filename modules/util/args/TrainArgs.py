@@ -5,6 +5,7 @@ from modules.util.args.BaseArgs import BaseArgs
 
 
 class TrainArgs(BaseArgs):
+    preset_path: str
     config_path: str
     secrets_path: str
 
@@ -17,6 +18,7 @@ class TrainArgs(BaseArgs):
 
         # @formatter:off
 
+        parser.add_argument("--preset-path", type=str, required=False, dest="preset_path", help="The path to a built-in preset file, applied before --config-path. When set, config migration is skipped for both files, so both the preset and the config must be in the current format.")
         parser.add_argument("--config-path", type=str, required=True, dest="config_path", help="The path to the config file")
         parser.add_argument("--secrets-path", type=str, required=False, dest="secrets_path", help="The path to the secrets file")
         parser.add_argument("--callback-path", type=str, required=False, dest="callback_path", help="The path to the callback pickle file")
@@ -33,6 +35,7 @@ class TrainArgs(BaseArgs):
         data = []
 
         # name, default value, data type, nullable
+        data.append(("preset_path", None, str, True))
         data.append(("config_path", None, str, True))
         data.append(("secrets_path", None, str, True))
         data.append(("callback_path", None, str, True))

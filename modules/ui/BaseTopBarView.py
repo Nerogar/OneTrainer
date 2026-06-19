@@ -158,10 +158,8 @@ class BaseTopBarView:
             with open(filename, "r") as f:
                 loaded_dict = json.load(f)
                 default_config = TrainConfig.default_values()
-                if is_built_in_preset:
-                    # always assume built-in configs are saved in the most recent version
-                    loaded_dict["__version"] = default_config.config_version
-                loaded_config = default_config.from_dict(loaded_dict).to_unpacked_config()
+                # built-in configs are always saved in the most recent version, so migration can be skipped
+                loaded_config = default_config.from_dict(loaded_dict, migrate=not is_built_in_preset).to_unpacked_config()
 
             with suppress(FileNotFoundError), open("secrets.json", "r") as f:
                 secrets_dict=json.load(f)
