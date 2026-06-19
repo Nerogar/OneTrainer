@@ -90,6 +90,11 @@ class BaseLoraTabView:
                                   tooltip="Applies a scaling factor to the learned weights. This ensures that the effective learning rate remains consistent across different block sizes. Without this, different block sizes require significantly different learning rates.")
             self.components.switch(master, 2, 4, ui_state, "oft_scaled")
 
+            # DoRA-OFT (DOFT)
+            self.components.label(master, 3, 3, "DoRA OFT (DOFT)",
+                                  tooltip="Combines Weight-Decomposed Low-Rank Adaptation (DoRA) with OFT. By decoupling the weight into magnitude and direction components, it achieves the superior training dynamics of DoRA but with the stability and performance of OFT. Because OFT is norm-preserving, it avoids the heavy re-calculations typically found in standard DoRA, resulting in faster training (same speed as standard OFT) and better convergence.")
+            self.components.switch(master, 3, 4, ui_state, "dora_oft")
+
             # CANS OFT
             self.components.label(master, 4, 3, "Accelerated Newton-Schulz",
                                   tooltip="Replaces Cayley-Neumann with Chebyshev-Optimized Newton-Schulz (CANS) to improve orthogonalization stability and reduce error without the high computational cost of the exact solver.")
