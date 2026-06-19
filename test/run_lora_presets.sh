@@ -8,6 +8,7 @@ ERROR_LOG="$LOG_DIR/errors.log"
 > "$ERROR_LOG"
 
 presets=(
+    "training_presets/#anima LoRA.json"
     "training_presets/#chroma LoRA 16GB.json"
     "training_presets/#ernie LoRA 16GB.json"
     "training_presets/#flux2 LoRA 16GB.json"
