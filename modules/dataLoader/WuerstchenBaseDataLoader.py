@@ -86,7 +86,7 @@ class WuerstchenBaseDataLoader(
             text_split_names=text_split_names,
             sort_names=sort_names,
             config=config,
-            text_caching=not config.train_text_encoder_or_embedding(),
+            text_caching=config.text_caching and not config.train_text_encoder_or_embedding(),
             before_cache_image_fun=before_cache_image_fun
         )
 
