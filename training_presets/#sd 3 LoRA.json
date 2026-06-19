@@ -8,7 +8,7 @@
     "output_model_format": "SAFETENSORS",
     "resolution": "1024",
     "transformer": {
-        "train": false,
+        "train": true,
         "weight_dtype": "FLOAT_16"
     },
     "text_encoder": {

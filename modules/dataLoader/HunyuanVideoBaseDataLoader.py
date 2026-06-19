@@ -29,6 +29,7 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.HUNYUAN_VIDEO)
 class HunyuanVideoBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -183,5 +184,3 @@ class HunyuanVideoBaseDataLoader(
             allow_video_files=True,
             vae_frame_dim=True,
         )
-
-factory.register(BaseDataLoader, HunyuanVideoBaseDataLoader, ModelType.HUNYUAN_VIDEO)

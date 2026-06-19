@@ -40,6 +40,7 @@ class ChromaModelEmbedding:
 class ChromaModel(BaseModel):
     # base model data
     tokenizer: T5Tokenizer | None
+    orig_tokenizer: T5Tokenizer | None
     noise_scheduler: FlowMatchEulerDiscreteScheduler | None
     text_encoder: T5EncoderModel | None
     vae: AutoencoderKL | None
@@ -72,6 +73,7 @@ class ChromaModel(BaseModel):
         )
 
         self.tokenizer = None
+        self.orig_tokenizer = None
         self.noise_scheduler = None
         self.text_encoder = None
         self.vae = None
@@ -141,13 +143,13 @@ class ChromaModel(BaseModel):
             self.text_encoder.eval()
         self.transformer.eval()
 
-    def create_pipeline(self) -> DiffusionPipeline:
+    def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
         return ChromaPipeline(
             transformer=self.transformer,
             scheduler=self.noise_scheduler,
             vae=self.vae,
             text_encoder=self.text_encoder,
-            tokenizer=self.tokenizer,
+            tokenizer=self.orig_tokenizer if use_original_tokenizers else self.tokenizer,
         )
 
     def add_text_encoder_embeddings_to_prompt(self, prompt: str) -> str:

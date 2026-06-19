@@ -20,6 +20,7 @@ from PIL import Image
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.HUNYUAN_VIDEO)
 class HunyuanVideoSampler(BaseModelSampler):
     def __init__(
             self,
@@ -32,7 +33,7 @@ class HunyuanVideoSampler(BaseModelSampler):
 
         self.model = model
         self.model_type = model_type
-        self.pipeline = model.create_pipeline(use_original_modules=False)
+        self.pipeline = model.create_pipeline()
 
     @torch.no_grad()
     def __sample_base(
@@ -209,5 +210,3 @@ class HunyuanVideoSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, HunyuanVideoSampler, ModelType.HUNYUAN_VIDEO)
