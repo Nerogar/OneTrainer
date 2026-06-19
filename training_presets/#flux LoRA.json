@@ -25,5 +25,5 @@
     },
     "train_dtype": "BFLOAT_16",
     "timestep_distribution": "LOGIT_NORMAL",
-    "dynamic_timestep_shifting": false
+    "dynamic_timestep_shifting": true
 }

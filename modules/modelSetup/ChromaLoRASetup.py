@@ -14,6 +14,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.CHROMA_1, TrainingMethod.LORA)
 class ChromaLoRASetup(
     BaseChromaSetup,
 ):
@@ -98,7 +99,6 @@ class ChromaLoRASetup(
             if model.text_encoder is not None:
                 model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
@@ -144,5 +144,3 @@ class ChromaLoRASetup(
             if model.embedding_wrapper is not None:
                 model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, ChromaLoRASetup, ModelType.CHROMA_1, TrainingMethod.LORA)

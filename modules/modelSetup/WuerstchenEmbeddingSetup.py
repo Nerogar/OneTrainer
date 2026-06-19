@@ -12,6 +12,8 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.WUERSTCHEN_2, TrainingMethod.EMBEDDING)
+@factory.register(BaseModelSetup, ModelType.STABLE_CASCADE_1, TrainingMethod.EMBEDDING)
 class WuerstchenEmbeddingSetup(
     BaseWuerstchenSetup,
 ):
@@ -62,7 +64,6 @@ class WuerstchenEmbeddingSetup(
     ):
         model.prior_text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        self._remove_added_embeddings_from_tokenizer(model.prior_tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
@@ -105,6 +106,3 @@ class WuerstchenEmbeddingSetup(
             self._normalize_output_embeddings(model.all_prior_text_encoder_embeddings())
             model.prior_embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, WuerstchenEmbeddingSetup, ModelType.WUERSTCHEN_2, TrainingMethod.EMBEDDING)
-factory.register(BaseModelSetup, WuerstchenEmbeddingSetup, ModelType.STABLE_CASCADE_1, TrainingMethod.EMBEDDING)

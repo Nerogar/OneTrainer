@@ -1,6 +1,3 @@
-# Xet is buggy. Disabled by default unless already defined - https://github.com/Nerogar/OneTrainer/issues/949
-if (-not $env:HF_HUB_DISABLE_XET) { $env:HF_HUB_DISABLE_XET = "1" }
-
 . "$PSScriptRoot\scripts\powershell\lib.include.ps1"
 
 if ($args.Length -eq 0) {

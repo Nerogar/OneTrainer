@@ -5,6 +5,7 @@
     "output_model_destination": "models/model.safetensors",
     "output_model_format": "SAFETENSORS",
     "transformer": {
+        "train": true,
         "weight_dtype": "FLOAT_32"
     },
     "resolution": "1024",
