@@ -11,10 +11,7 @@ from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
-from modules.util.checkpointing_util import (
-    enable_checkpointing_for_clip_encoder_layers,
-    enable_checkpointing_for_stable_cascade_blocks,
-)
+from modules.util.checkpointing_util import enable_checkpointing_for_clip_encoder_layers
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import (
@@ -58,12 +55,8 @@ class BaseWuerstchenSetup(
             config: TrainConfig,
     ):
         if config.gradient_checkpointing.enabled():
-            if model.model_type.is_wuerstchen_v2():
-                model.prior_prior.enable_gradient_checkpointing()
-                enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, config)
-            elif model.model_type.is_stable_cascade():
-                enable_checkpointing_for_stable_cascade_blocks(model.prior_prior, config)
-                enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, config)
+            model.prior_prior.enable_gradient_checkpointing()
+            enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, config)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.decoder_vqgan)

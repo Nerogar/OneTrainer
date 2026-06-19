@@ -1,3 +1,4 @@
+import copy
 import json
 import os.path
 import traceback
@@ -192,6 +193,7 @@ class WuerstchenModelLoader(
         model.decoder_vqgan = decoder_vqgan
         model.effnet_encoder = effnet_encoder
         model.prior_tokenizer = prior_tokenizer
+        model.orig_prior_tokenizer = copy.deepcopy(prior_tokenizer)
         model.prior_text_encoder = prior_text_encoder
         model.prior_noise_scheduler = prior_noise_scheduler
         model.prior_prior = prior_prior
