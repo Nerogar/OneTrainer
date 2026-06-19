@@ -8,11 +8,8 @@ if ($LASTEXITCODE -ne 0) { throw "git pull failed with exit code $LASTEXITCODE."
 # reload ps library
 . "$PSScriptRoot\lib.include.ps1"
 
-Prepare-RuntimeEnvironment
+Prepare-RuntimeEnvironment "upgrade"
 
 Write-Host ""
 Write-Host "[OneTrainer] Update completed successfully!"
 Write-Host ""
-
-# launch ui after update
-Invoke-InEnv python "scripts/train_ui.py" @args

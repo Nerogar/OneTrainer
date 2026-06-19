@@ -1,6 +1,6 @@
 . "$PSScriptRoot\lib.include.ps1"
 
-Prepare-RuntimeEnvironment
+Prepare-RuntimeEnvironment "install"
 
 Write-Host ""
 Write-OT "Install completed successfully!"

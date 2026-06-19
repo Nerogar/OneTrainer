@@ -107,9 +107,14 @@ function Get-Platform {
 #region Pixi
 
 function Get-OrUpdatePixi {
+    param([Parameter(Position = 0)][string]$Action)
     if (Test-CommandExists "pixi") {
-        Write-OTDebug "'pixi' found, updating."
-        try { Invoke-Run pixi self-update } catch { Write-OTWarning "'pixi' couldn't be updated, assuming compatibility." }
+        if ($Action -eq "upgrade") {
+            Write-OTDebug "'pixi' found, updating."
+            try { Invoke-Run pixi self-update --no-release-note } catch { Write-OTWarning "'pixi' couldn't be updated, assuming compatibility." }
+        } else {
+            Write-OTDebug "'pixi' found."
+        }
     } else {
         Write-OTDebug "'pixi' not found, attempting installation."
         Write-OT "Installing pixi package manager..."
@@ -141,12 +146,15 @@ function Invoke-InEnv {
 #endregion
 
 function Prepare-RuntimeEnvironment {
-    Get-OrUpdatePixi
+    param([Parameter(Position = 0)][string]$Action)
+    Get-OrUpdatePixi $Action
 
     # Detect the GPU platform and child processes use it.
     $script:OT_PLATFORM = Get-Platform
     $env:OT_PLATFORM = $script:OT_PLATFORM
     Write-OT "Platform: $($script:OT_PLATFORM)"
 
-    Install-Env
+    if ($Action -eq "upgrade" -or $Action -eq "install") {
+        Install-Env
+    }
 }
