@@ -22,7 +22,7 @@ tensorboard==2.20.0
 # diffusion models
 -e git+https://github.com/huggingface/diffusers.git@0f1abc4#egg=diffusers
 gguf==0.17.1
-transformers==5.9.0
+transformers==5.5.4 # pinned below 5.6, see https://github.com/Nerogar/OneTrainer/pull/1506
 sentencepiece==0.2.1 # transitive dependency of transformers for tokenizer loading
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
