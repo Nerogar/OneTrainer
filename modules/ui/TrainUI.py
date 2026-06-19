@@ -132,6 +132,9 @@ class TrainUI(ctk.CTk):
         self.training_callbacks = None
         self.training_commands = None
 
+        self.start_time = None
+        self.start_total_steps = None
+
         self.always_on_tensorboard_subprocess = None
         self.current_workspace_dir = self.train_config.workspace_dir
         self._check_start_always_on_tensorboard()
@@ -452,32 +455,32 @@ class TrainUI(ctk.CTk):
         components.switch(frame, 1, 1, self.ui_state, "rolling_backup")
 
         # rolling backup count
-        components.label(frame, 1, 3, "Rolling Backup Count",
+        components.label(frame, 2, 0, "Rolling Backup Count",
                          tooltip="Defines the number of backups to keep if rolling backups are enabled")
-        components.entry(frame, 1, 4, self.ui_state, "rolling_backup_count")
+        components.entry(frame, 2, 1, self.ui_state, "rolling_backup_count")
 
         # backup before save
-        components.label(frame, 2, 0, "Backup Before Save",
+        components.label(frame, 3, 0, "Backup Before Save",
                          tooltip="Create a full backup before saving the final model")
-        components.switch(frame, 2, 1, self.ui_state, "backup_before_save")
+        components.switch(frame, 3, 1, self.ui_state, "backup_before_save")
 
         # save after
-        components.label(frame, 3, 0, "Save Every",
+        components.label(frame, 4, 0, "Save Every",
                          tooltip="The interval used when automatically saving the model during training")
-        components.time_entry(frame, 3, 1, self.ui_state, "save_every", "save_every_unit")
+        components.time_entry(frame, 4, 1, self.ui_state, "save_every", "save_every_unit")
 
         # save now
-        components.button(frame, 3, 3, "save now", self.save_now)
+        components.button(frame, 4, 3, "save now", self.save_now)
 
         # skip save
-        components.label(frame, 4, 0, "Skip First",
+        components.label(frame, 5, 0, "Skip First",
                          tooltip="Start saving automatically after this interval has elapsed")
-        components.entry(frame, 4, 1, self.ui_state, "save_skip_first", width=50, sticky="nw")
+        components.entry(frame, 5, 1, self.ui_state, "save_skip_first", width=50, sticky="nw")
 
         # save filename prefix
-        components.label(frame, 5, 0, "Save Filename Prefix",
+        components.label(frame, 6, 0, "Save Filename Prefix",
                          tooltip="The prefix for filenames used when saving the model during training")
-        components.entry(frame, 5, 1, self.ui_state, "save_filename_prefix")
+        components.entry(frame, 6, 1, self.ui_state, "save_filename_prefix")
 
         frame.pack(fill="both", expand=1)
         return frame
@@ -606,13 +609,20 @@ class TrainUI(ctk.CTk):
         webbrowser.open("http://localhost:" + str(self.train_config.tensorboard_port), new=0, autoraise=False)
 
     def _calculate_eta_string(self, train_progress: TrainProgress, max_step: int, max_epoch: int) -> str | None:
-        spent_total = time.monotonic() - self.start_time
-        steps_done = train_progress.epoch * max_step + train_progress.epoch_step
-        remaining_steps = (max_epoch - train_progress.epoch - 1) * max_step + (max_step - train_progress.epoch_step)
-        total_eta = spent_total / steps_done * remaining_steps
+        assert self.start_time is not None and self.start_total_steps is not None
 
-        if train_progress.global_step <= 30:
+        spent_total = time.monotonic() - self.start_time
+
+        # calculate steps done in THIS SESSION only
+        current_total_steps = train_progress.epoch * max_step + train_progress.epoch_step
+        steps_done_this_session = current_total_steps - self.start_total_steps
+
+        remaining_steps = (max_epoch - train_progress.epoch - 1) * max_step + (max_step - train_progress.epoch_step)
+
+        if steps_done_this_session <= 30:
             return "Estimating ..."
+
+        total_eta = spent_total / steps_done_this_session * remaining_steps
 
         td = datetime.timedelta(seconds=total_eta)
         days = td.days
@@ -638,6 +648,10 @@ class TrainUI(ctk.CTk):
         self.eta_label.configure(text="")
 
     def on_update_train_progress(self, train_progress: TrainProgress, max_step: int, max_epoch: int):
+        # capture session start on first progress update
+        if self.start_total_steps is None:
+            self.start_total_steps = train_progress.epoch * max_step + train_progress.epoch_step
+
         self.set_step_progress(train_progress.epoch_step, max_step)
         self.set_epoch_progress(train_progress.epoch, max_epoch)
         self.set_eta_label(train_progress, max_step, max_epoch)
@@ -721,6 +735,8 @@ class TrainUI(ctk.CTk):
             if self.train_config.cloud.enabled:
                 self.ui_state.get_var("secrets.cloud").update(self.train_config.secrets.cloud)
 
+            # Reset session tracking - actual values captured on first progress callback
+            self.start_total_steps = None
             self.start_time = time.monotonic()
             trainer.train()
         except Exception:

@@ -20,6 +20,7 @@ import torch
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.QWEN)
 class QwenSampler(BaseModelSampler):
     def __init__(
             self,
@@ -188,5 +189,3 @@ class QwenSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, QwenSampler, ModelType.QWEN)
