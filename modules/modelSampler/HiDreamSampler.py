@@ -19,6 +19,7 @@ import torch
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.HI_DREAM_FULL)
 class HiDreamSampler(BaseModelSampler):
     def __init__(
             self,
@@ -31,7 +32,7 @@ class HiDreamSampler(BaseModelSampler):
 
         self.model = model
         self.model_type = model_type
-        self.pipeline = model.create_pipeline(use_original_modules=False)
+        self.pipeline = model.create_pipeline()
 
     @torch.no_grad()
     def __sample_base(
@@ -192,5 +193,3 @@ class HiDreamSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, HiDreamSampler, ModelType.HI_DREAM_FULL)

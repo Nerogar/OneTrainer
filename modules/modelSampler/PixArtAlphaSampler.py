@@ -18,6 +18,8 @@ import torch
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.PIXART_ALPHA)
+@factory.register(BaseModelSampler, ModelType.PIXART_SIGMA)
 class PixArtAlphaSampler(BaseModelSampler):
     def __init__(
             self,
@@ -191,6 +193,3 @@ class PixArtAlphaSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, PixArtAlphaSampler, ModelType.PIXART_ALPHA)
-factory.register(BaseModelSampler, PixArtAlphaSampler, ModelType.PIXART_SIGMA)
