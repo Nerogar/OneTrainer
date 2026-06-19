@@ -15,6 +15,7 @@ presets=(
     "training_presets/#flux LoRA.json"
     "training_presets/#hidream LoRA.json"
     "training_presets/#hunyuan video LoRA.json"
+    "training_presets/#ideogram LoRA 16GB.json"
     "training_presets/#lens LoRA 16GB.json"
     "training_presets/#pixart sigma 1.0 LoRA.json"
     "training_presets/#qwen LoRA 16GB.json"

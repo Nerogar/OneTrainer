@@ -102,11 +102,12 @@ class IdeogramModel(BaseModel):
             else:
                 self.unconditional_transformer.to(device=device)
 
-    def to(self, device: torch.device):
-        self.vae_to(device)
-        self.text_encoder_to(device)
-        self.transformer_to(device)
-        self.unconditional_transformer_to(device)
+    def release(self):
+        temp_device = torch.device(self.train_config.temp_device)
+        self.vae_to(temp_device)
+        self.text_encoder_to(temp_device)
+        self.transformer_to(temp_device)
+        self.unconditional_transformer_to(temp_device)
 
     def eval(self):
         self.vae.eval()
