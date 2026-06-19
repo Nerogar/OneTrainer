@@ -21,6 +21,14 @@ from torchvision.transforms import transforms
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_15)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_15_INPAINTING)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_20)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_20_BASE)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_20_INPAINTING)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_20_DEPTH)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_21)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_21_BASE)
 class StableDiffusionSampler(BaseModelSampler):
     def __init__(
             self,
@@ -429,12 +437,3 @@ class StableDiffusionSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_15)
-factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_15_INPAINTING)
-factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_20)
-factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_20_BASE)
-factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_20_INPAINTING)
-factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_20_DEPTH)
-factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_21)
-factory.register(BaseModelSampler, StableDiffusionSampler, ModelType.STABLE_DIFFUSION_21_BASE)
