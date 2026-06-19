@@ -30,6 +30,7 @@ class TopBarController:
             ("Flux Dev.1", ModelType.FLUX_DEV_1),
             ("Flux Fill Dev", ModelType.FLUX_FILL_DEV_1),
             ("Flux 2 [Dev, Klein]", ModelType.FLUX_2),
+            ("Lens", ModelType.LENS),
             ("Sana", ModelType.SANA),
             ("Hunyuan Video", ModelType.HUNYUAN_VIDEO),
             ("HiDream Full", ModelType.HI_DREAM_FULL),

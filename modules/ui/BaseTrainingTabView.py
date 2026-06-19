@@ -47,6 +47,8 @@ class BaseTrainingTabView(ABC):
             self.__setup_flux_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_flux_2():
             self.__setup_flux_2_ui(column_0, column_1, column_2, controller, ui_state)
+        elif model_type.is_lens():
+            self.__setup_lens_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_chroma():
             self.__setup_chroma_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_qwen():
@@ -154,6 +156,20 @@ class BaseTrainingTabView(ABC):
 
         self.__create_base2_frame(column_1, 0, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=True, supports_force_attention_mask=False)
+        self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
+
+        self.__create_masked_frame(column_2, 1, ui_state)
+        self.__create_loss_frame(column_2, 2, controller, ui_state)
+        self.__create_layer_frame(column_2, 3, controller, ui_state)
+
+    def __setup_lens_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
+        # the GPT-OSS encoder is always on-demand (MXFP4); layer offloading is incompatible with that, so hide it
+        self.__create_text_encoder_frame(column_0, 1, ui_state, supports_clip_skip=False, supports_training=False,
+                                         supports_sequence_length=False, supports_offloading=False)
+
+        self.__create_base2_frame(column_1, 0, ui_state)
+        self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=False, supports_force_attention_mask=False)
         self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1, ui_state)
@@ -409,17 +425,18 @@ class BaseTrainingTabView(ABC):
             self.components.switch(frame, row, 1, ui_state, "force_circular_padding")
 
     def __create_offloading_widgets(self, frame, row, ui_state, part, supports_checkpointing=True,
-                                    supports_activation_offloading=False):
+                                    supports_activation_offloading=False, supports_layer_offloading=True):
         if supports_checkpointing:
             self.components.label(frame, row, 0, "Gradient Checkpointing",
                                   tooltip="Enables gradient checkpointing for this component. Reduces VRAM usage at the cost of training speed")
             self.components.switch(frame, row, 1, ui_state, f"{part}.gradient_checkpointing")
             row += 1
 
-        self.components.label(frame, row, 0, "Layer Offload Fraction",
-                              tooltip="Fraction of this component's layers to offload to CPU to reduce VRAM usage. Increases training time and RAM usage. 0=disabled, 1=all layers")
-        self.components.entry(frame, row, 1, ui_state, f"{part}.offload_fraction")
-        row += 1
+        if supports_layer_offloading:
+            self.components.label(frame, row, 0, "Layer Offload Fraction",
+                                  tooltip="Fraction of this component's layers to offload to CPU to reduce VRAM usage. Increases training time and RAM usage. 0=disabled, 1=all layers")
+            self.components.entry(frame, row, 1, ui_state, f"{part}.offload_fraction")
+            row += 1
 
         if supports_activation_offloading:
             self.components.label(frame, row, 0, "Offload Activations",
@@ -430,7 +447,7 @@ class BaseTrainingTabView(ABC):
         return row
 
     def __create_text_encoder_frame(self, master, row, ui_state, supports_clip_skip=True, supports_training=True,
-                                    supports_sequence_length=False):
+                                    supports_sequence_length=False, supports_offloading=True):
         frame = self.components.section_frame(master, row)
         row = 0
 
@@ -445,7 +462,8 @@ class BaseTrainingTabView(ABC):
             row += 1
 
         row = self.__create_offloading_widgets(frame, row, ui_state, "text_encoder",
-                                               supports_checkpointing=supports_training)
+                                               supports_checkpointing=supports_training,
+                                               supports_layer_offloading=supports_offloading)
 
         # dropout
         self.components.label(frame, row, 0, "Caption Dropout Probability",

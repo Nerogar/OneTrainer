@@ -79,6 +79,13 @@ def _get_model_defaults(model_type) -> dict:
             "diffusion_steps": 30,
             "cfg_scale": 4.0,
         })
+    elif model_type.is_lens():
+        defaults.update({
+            "width": 1024,
+            "height": 1024,
+            "diffusion_steps": 30,
+            "cfg_scale": 5.0,
+        })
     elif model_type.is_qwen():
         defaults.update({
             "width": 1024,

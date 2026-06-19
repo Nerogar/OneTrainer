@@ -19,6 +19,7 @@ from diffusers.models.transformers.transformer_hunyuan_video import (
 )
 from transformers.models.clip.modeling_clip import CLIPEncoderLayer
 from transformers.models.gemma2.modeling_gemma2 import Gemma2DecoderLayer
+from transformers.models.gpt_oss.modeling_gpt_oss import GptOssDecoderLayer
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from transformers.models.mistral.modeling_mistral import MistralDecoderLayer
 from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import Qwen2_5_VLDecoderLayer
@@ -442,4 +443,24 @@ def enable_checkpointing_for_ernie_transformer(
 ) -> LayerOffloadConductor | None:
     return enable_checkpointing(model, config, part, config.compile, [
         (model.layers, ["x"]),
+    ])
+
+
+def enable_checkpointing_for_lens_transformer(
+        model: nn.Module,
+        config: TrainConfig,
+        part: TrainModelPartConfig,
+) -> LayerOffloadConductor | None:
+    return enable_checkpointing(model, config, part, config.compile, [
+        (model.transformer_blocks, ["hidden_states", "encoder_hidden_states"]),
+    ])
+
+
+def enable_checkpointing_for_gpt_oss_encoder_layers(
+        model: nn.Module,
+        config: TrainConfig,
+        part: TrainModelPartConfig,
+) -> LayerOffloadConductor | None:
+    return enable_checkpointing(model, config, part, False, [
+        (GptOssDecoderLayer, []),  # No activation offloading: hidden states are taken from intermediate layers by encode_layers()
     ])

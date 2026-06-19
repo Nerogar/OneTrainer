@@ -163,7 +163,7 @@ class Flux2Model(BaseModel):
             train_device: torch.device,
             batch_size: int = 1, #TODO unused
             rand: Random | None = None,
-            text: str = None,
+            text: str | list[str] = None,
             tokens: Tensor = None,
             tokens_mask: Tensor = None,
             text_encoder_sequence_length: int | None = None,
