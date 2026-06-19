@@ -28,6 +28,6 @@
         "layer_filter": "layers",
         "layer_filter_preset": "blocks"
     },
-    "dataloader_threads": 1,
+    "caching_threads": 1,
     "timestep_distribution": "LOGIT_NORMAL"
 }
