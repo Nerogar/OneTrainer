@@ -116,22 +116,18 @@ function Get-OrUpdatePixi {
             Write-OTDebug "'pixi' found."
         }
     } else {
-        Write-OTDebug "'pixi' not found, attempting installation."
-        Write-OT "Installing pixi package manager..."
-
-        # Install pixi using the official install script.
-        . "$PSScriptRoot\install-pixi.ps1"
-
-        # current session may not reflect pixi in path, add manually to be sure
         $pixiBinDir = Join-Path $env:USERPROFILE ".pixi\bin"
-        if ((Test-Path $pixiBinDir) -and ($env:Path -notlike "*$pixiBinDir*")) {
+        Write-OTDebug "pixi not found, attempting to find it in $pixiBinDir."
+        if ($env:Path -notlike "*$pixiBinDir*") {
             $env:Path = "$pixiBinDir;$env:Path"
         }
-
-        if (-not (Test-CommandExists "pixi")) {
-            throw "Failed to install pixi. Please mention to the OneTrainer team. You can also try to install it manually: https://pixi.sh"
+        if (Test-CommandExists "pixi") {
+            Write-OTDebug "pixi found in .pixi\bin, using it."
+        } else {
+            Write-OTDebug "pixi not found in .pixi\bin, attempting to install."
+            . "$PSScriptRoot\install-pixi.ps1"
+            Write-OT "pixi installed successfully."
         }
-        Write-OT "pixi installed successfully."
     }
 }
 

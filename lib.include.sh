@@ -176,9 +176,14 @@ function get_or_update_pixi {
             run_cmd pixi self-update --no-release-note || print_warning "pixi couldn't be updated, assuming compatibility."
         fi
     else
-        print_debug "pixi not found, attempting installation."
-        ./install-pixi.sh
+        print_debug "pixi not found, attempting to find it in ${HOME:-/root}/.pixi/bin/pixi."
         export PATH="${HOME:-/root}/.pixi/bin:${PATH}"
+        if can_exec pixi; then
+            print_debug 'pixi found in .pixi/bin, using it.'
+        else
+            print_debug 'pixi not found in .pixi/bin, attempting to install.'
+            ./install-pixi.sh
+        fi
     fi
 }
 
