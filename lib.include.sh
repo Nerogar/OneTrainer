@@ -173,7 +173,7 @@ function get_or_update_pixi {
         print_debug "pixi already available at $(which pixi)."
         if [[ "$1" == "upgrade" ]]; then
             print_debug 'pixi found, updating.'
-            run_cmd pixi self-update --no-release-notes || print_warning "pixi couldn't be updated, assuming compatibility."
+            run_cmd pixi self-update --no-release-note || print_warning "pixi couldn't be updated, assuming compatibility."
         fi
     else
         print_debug "pixi not found, attempting installation."
@@ -190,6 +190,8 @@ function prepare_runtime_environment {
     # Get the right platform
     export OT_PLATFORM="$(get_platform)"
 
-    # Install the environment
-    install_env
+    if [[ "$1" == "install" || "$1" == "upgrade" ]]; then
+        # Install the environment
+        install_env
+    fi
 }
