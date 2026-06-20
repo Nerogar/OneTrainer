@@ -4,16 +4,15 @@
     "learning_rate": 0.0003,
     "model_type": "CHROMA_1",
     "resolution": "512",
-    "gradient_checkpointing": "CPU_OFFLOADED",
-    "layer_offload_fraction": 0.6,
     "dataloader_threads": 1,
     "transformer": {
         "train": true,
-        "weight_dtype": "FLOAT_8"
+        "weight_dtype": "FLOAT_8",
+        "offload_fraction": 0.6
     },
     "text_encoder": {
         "train": false,
-        "weight_dtype": "BFLOAT_16"
+        "weight_dtype": "FLOAT_8"
     },
     "training_method": "LORA",
     "vae": {

@@ -7,11 +7,13 @@
     "compile": true,
     "transformer": {
         "train": true,
-        "weight_dtype": "INT_W8A8"
+        "weight_dtype": "INT_W8A8",
+        "offload_fraction": 0.7
     },
     "text_encoder": {
         "train": false,
-        "weight_dtype": "FLOAT_8"
+        "weight_dtype": "FLOAT_8",
+        "offload_fraction": 0.7
     },
     "training_method": "LORA",
     "vae": {
@@ -27,7 +29,5 @@
     },
     "timestep_distribution": "LOGIT_NORMAL",
     "dynamic_timestep_shifting": true,
-    "dataloader_threads": 1,
-    "gradient_checkpointing": "CPU_OFFLOADED",
-    "layer_offload_fraction": 0.7
+    "dataloader_threads": 1
 }

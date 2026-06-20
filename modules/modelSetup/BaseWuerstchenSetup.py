@@ -54,9 +54,9 @@ class BaseWuerstchenSetup(
             model: WuerstchenModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
+        if config.prior.checkpointing_enabled():
             model.prior_prior.enable_gradient_checkpointing()
-            enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, config)
+        enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, config, config.text_encoder)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.decoder_vqgan)
