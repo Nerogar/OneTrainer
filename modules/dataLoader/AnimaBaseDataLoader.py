@@ -1,5 +1,7 @@
 import os
 
+import torch
+
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
 from modules.model.AnimaModel import PROMPT_MAX_LENGTH, AnimaModel
@@ -28,9 +30,15 @@ class AnimaBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
 ):
+    def __vae_dtype_and_autocast_context(self, model: AnimaModel):
+        vae_dtype = next(model.vae.parameters()).dtype
+        vae_autocast_context = torch.autocast(device_type=self.train_device.type, enabled=False)
+        return vae_dtype, vae_autocast_context
+
     def _preparation_modules(self, config: TrainConfig, model: AnimaModel):
+        vae_dtype, vae_autocast_context = self.__vae_dtype_and_autocast_context(model)
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
-        encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[vae_autocast_context], dtype=vae_dtype)
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
         # Anima has no chat template — tokenize raw prompt with both tokenizers
@@ -113,11 +121,12 @@ class AnimaBaseDataLoader(
 
     def _debug_modules(self, config: TrainConfig, model: AnimaModel): #TODO clean up
         debug_dir = os.path.join(config.debug_dir, "dataloader")
+        vae_dtype, vae_autocast_context = self.__vae_dtype_and_autocast_context(model)
 
         def before_save_fun():
             model.vae_to(self.train_device)
 
-        decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae, autocast_contexts=[vae_autocast_context], dtype=vae_dtype)
         upscale_mask = ScaleImage(in_name='latent_mask', out_name='decoded_mask', factor=8)
         decode_prompt = DecodeTokens(in_name='tokens', out_name='decoded_prompt', tokenizer=model.tokenizer)
 
