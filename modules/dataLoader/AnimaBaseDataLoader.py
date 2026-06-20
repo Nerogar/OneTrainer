@@ -38,8 +38,13 @@ class AnimaBaseDataLoader(
         vae_autocast_context = torch.autocast(device_type=self.train_device.type, enabled=False)
         return vae_dtype, vae_autocast_context
 
+    def __prepare_inline_text_encoder(self, config: TrainConfig, model: AnimaModel):
+        if not config.text_caching and not config.train_text_encoder_or_embedding():
+            model.text_encoder_to(self.train_device)
+
     def _preparation_modules(self, config: TrainConfig, model: AnimaModel):
         vae_dtype, vae_autocast_context = self.__vae_dtype_and_autocast_context(config, model)
+        self.__prepare_inline_text_encoder(config, model)
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[vae_autocast_context], dtype=vae_dtype)
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
