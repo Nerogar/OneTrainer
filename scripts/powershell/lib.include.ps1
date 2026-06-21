@@ -108,26 +108,22 @@ function Get-Platform {
 
 function Get-OrUpdatePixi {
     param([Parameter(Position = 0)][string]$Action)
+    if (-not (Test-CommandExists "pixi")) {
+        Write-OTDebug "pixi not found, attempting prepend to PATH."
+        $pixiBinDir = Join-Path "$env:USERPROFILE" .pixi bin
+        $env:Path = "$pixiBinDir;$env:PATH"
+    }
     if (Test-CommandExists "pixi") {
         if ($Action -eq "upgrade") {
             Write-OTDebug "'pixi' found, updating."
-            try { Invoke-Run pixi self-update --no-release-note } catch { Write-OTWarning "'pixi' couldn't be updated, assuming compatibility." }
+            Invoke-Run pixi self-update --no-release-note
         } else {
             Write-OTDebug "'pixi' found."
         }
     } else {
-        $pixiBinDir = Join-Path $env:USERPROFILE ".pixi\bin"
-        Write-OTDebug "pixi not found, attempting to find it in $pixiBinDir."
-        if ($env:Path -notlike "*$pixiBinDir*") {
-            $env:Path = "$pixiBinDir;$env:Path"
-        }
-        if (Test-CommandExists "pixi") {
-            Write-OTDebug "pixi found in .pixi\bin, using it."
-        } else {
-            Write-OTDebug "pixi not found in .pixi\bin, attempting to install."
-            . "$PSScriptRoot\install-pixi.ps1"
-            Write-OT "pixi installed successfully."
-        }
+        Write-OTDebug "pixi not found, attempting to install."
+        . "$PSScriptRoot\install-pixi.ps1"
+        Write-OT "pixi installed successfully."
     }
 }
 

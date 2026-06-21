@@ -169,21 +169,19 @@ function run_in_env {
 }
 
 function get_or_update_pixi {
+    if ! can_exec pixi; then
+        print_debug 'pixi not found, attempting to prepend to $PATH.'
+        export PATH="${HOME:-/root}/.pixi/bin:$PATH"
+    fi
     if can_exec pixi; then
         print_debug "pixi already available at $(which pixi)."
         if [[ "$1" == "upgrade" ]]; then
             print_debug 'pixi found, updating.'
-            run_cmd pixi self-update --no-release-note || print_warning "pixi couldn't be updated, assuming compatibility."
+            run_cmd pixi self-update --no-release-note
         fi
     else
-        print_debug "pixi not found, attempting to find it in ${HOME:-/root}/.pixi/bin/pixi."
-        export PATH="${HOME:-/root}/.pixi/bin:${PATH}"
-        if can_exec pixi; then
-            print_debug 'pixi found in .pixi/bin, using it.'
-        else
-            print_debug 'pixi not found in .pixi/bin, attempting to install.'
-            ./install-pixi.sh
-        fi
+        print_debug 'pixi not found, attempting to install.'
+        ./install-pixi.sh
     fi
 }
 
