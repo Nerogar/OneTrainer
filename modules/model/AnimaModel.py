@@ -145,9 +145,13 @@ class AnimaModel(BaseModel):
             self.transformer_lora.to(device)
 
     def release(self):
+        train_device = torch.device(self.train_config.train_device)
         temp_device = torch.device(self.train_config.temp_device)
-        self.vae_to(temp_device)
-        self.text_encoder_to(temp_device)
+        vae_device = temp_device if self.train_config.image_caching else train_device
+        text_encoder_device = temp_device if not self.train_config.train_text_encoder_or_embedding() and self.train_config.text_caching else train_device
+
+        self.vae_to(vae_device)
+        self.text_encoder_to(text_encoder_device)
         self.transformer_to(temp_device)
 
     def eval(self):

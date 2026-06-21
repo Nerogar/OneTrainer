@@ -37,6 +37,15 @@ class AnimaSampler(BaseModelSampler):
         self.model_type = model_type
         self.image_processor = VaeImageProcessor(vae_scale_factor=8)
 
+    def __text_encoder_used_by_training(self):
+        return self.model.train_config is not None and (
+            self.model.train_config.train_text_encoder_or_embedding()
+            or not self.model.train_config.text_caching
+        )
+
+    def __vae_used_by_training(self):
+        return self.model.train_config is not None and not self.model.train_config.image_caching
+
     @torch.no_grad()
     def __sample_base(
             self,
@@ -75,7 +84,8 @@ class AnimaSampler(BaseModelSampler):
                 train_device=self.train_device,
             )
 
-            self.model.text_encoder_to(self.temp_device)
+            if not self.__text_encoder_used_by_training():
+                self.model.text_encoder_to(self.temp_device)
             torch_gc()
 
             # prepare latent image
@@ -133,7 +143,8 @@ class AnimaSampler(BaseModelSampler):
             do_denormalize = [True] * image.shape[0]
             image = self.image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
-            self.model.vae_to(self.temp_device)
+            if not self.__vae_used_by_training():
+                self.model.vae_to(self.temp_device)
             torch_gc()
 
             return ModelSamplerOutput(

@@ -25,14 +25,37 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+class _PreparedEncodeVAE(EncodeVAE):
+    def __init__(self, *args, prepare_fun, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.prepare_fun = prepare_fun
+
+    def get_item(self, variation: int, index: int, requested_name: str = None) -> dict:
+        self.prepare_fun()
+        return super().get_item(variation, index, requested_name)
+
+
+class _PreparedEncodeAnimaText(EncodeAnimaText):
+    def __init__(self, *args, prepare_fun, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.prepare_fun = prepare_fun
+
+    def get_item(self, variation: int, index: int, requested_name: str = None) -> dict:
+        self.prepare_fun()
+        return super().get_item(variation, index, requested_name)
+
+
 @factory.register(BaseDataLoader, ModelType.ANIMA)
 class AnimaBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
 ):
-    def __vae_dtype_and_autocast_context(self, config: TrainConfig, model: AnimaModel):
+    def __prepare_inline_vae(self, config: TrainConfig, model: AnimaModel):
         if not config.image_caching:
             model.vae_to(self.train_device)
+
+    def __vae_dtype_and_autocast_context(self, config: TrainConfig, model: AnimaModel):
+        self.__prepare_inline_vae(config, model)
 
         vae_dtype = next(model.vae.parameters()).dtype
         vae_autocast_context = torch.autocast(device_type=self.train_device.type, enabled=False)
@@ -46,19 +69,24 @@ class AnimaBaseDataLoader(
         vae_dtype, vae_autocast_context = self.__vae_dtype_and_autocast_context(config, model)
         self.__prepare_inline_text_encoder(config, model)
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
-        encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[vae_autocast_context], dtype=vae_dtype)
+        encode_image = _PreparedEncodeVAE(
+            in_name='image', out_name='latent_image_distribution',
+            vae=model.vae, autocast_contexts=[vae_autocast_context], dtype=vae_dtype,
+            prepare_fun=lambda: self.__prepare_inline_vae(config, model),
+        )
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
         # Anima has no chat template — tokenize raw prompt with both tokenizers
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=PROMPT_MAX_LENGTH)
         tokenize_t5 = Tokenize(in_name='prompt', tokens_out_name='t5_tokens', mask_out_name='t5_tokens_mask', tokenizer=model.t5_tokenizer, max_token_length=PROMPT_MAX_LENGTH)
         # EncodeAnimaText runs Qwen3 encoder + AnimaTextConditioner; output is fixed (512, 1024)
-        encode_prompt = EncodeAnimaText(
+        encode_prompt = _PreparedEncodeAnimaText(
             tokens_name='tokens', tokens_attention_mask_name='tokens_mask',
             t5_tokens_name='t5_tokens', t5_tokens_attention_mask_name='t5_tokens_mask',
             hidden_state_out_name='text_encoder_hidden_state',
             text_encoder=model.text_encoder, text_conditioner=model.text_conditioner,
             autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(),
+            prepare_fun=lambda: self.__prepare_inline_text_encoder(config, model),
         )
 
         modules = [rescale_image, encode_image, image_sample]
