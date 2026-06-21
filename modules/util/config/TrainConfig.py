@@ -110,14 +110,10 @@ class TrainOptimizerConfig(BaseConfig):
     use_schedulefree: True
     use_orthograd: False
     nnmf_factor: False
-    orthogonal_gradient: False
+    orthogonal_gradient: str
     use_atan2: False
-    use_AdEMAMix: False
-    beta3_ema: float
-    alpha_grad: float
     beta1_warmup: int
     min_beta1: float
-    Simplified_AdEMAMix: False
     kourkoutas_beta: False
     schedulefree_c: float
     ns_steps: int
@@ -136,11 +132,38 @@ class TrainOptimizerConfig(BaseConfig):
     accelerated_ns: False
     cautious_wd: False
     approx_mars: False
-    auto_kappa_p: False
     compile: False
+    spectral_normalization: False
+    stochastic_sign: False
+    centered_wd: float
+    centered_wd_mode: str
+    factored_2nd: False
+    fisher_wd: False
+    state_precision: str
+    orthogonal_sinkhorn: False
+    sinkhorn_iterations: int
+    normed_momentum: False
+    nesterov_coef: float
+    snr_cond: False
+    geometric_wd: False
+    MSign_interval: int
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
+
+    def from_dict(self, data: dict) -> "TrainOptimizerConfig":
+        sp = data.get("state_precision")
+        valid_sp = {"auto", "factored", "fp32", "fp16", "bf16_sr", "int8_sr"}
+        if sp is not None and sp not in valid_sp:
+            print(f"WARN: invalid optimizer state_precision '{sp}' in config, falling back to 'auto'.")
+            data = data.copy()
+            data["state_precision"] = "auto"
+        # orthogonal_gradient was a bool before adv_optm 2.5 made it a mode string
+        og_ortho = data.get("orthogonal_gradient")
+        if isinstance(og_ortho, bool):
+            data = data.copy()
+            data["orthogonal_gradient"] = "flattened" if og_ortho else "disabled"
+        return super().from_dict(data)
 
     @staticmethod
     def default_values():
@@ -223,14 +246,10 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("use_schedulefree", True, bool, True))
         data.append(("use_orthograd", False, bool, False))
         data.append(("nnmf_factor", False, bool, False))
-        data.append(("orthogonal_gradient", False, bool, False))
+        data.append(("orthogonal_gradient", 'disabled', str, False))
         data.append(("use_atan2", False, bool, False))
-        data.append(("use_AdEMAMix", False, bool, False))
-        data.append(("beta3_ema", None, float, True))
-        data.append(("alpha_grad", None, float, True))
         data.append(("beta1_warmup", None, int, True))
         data.append(("min_beta1", None, float, True))
-        data.append(("Simplified_AdEMAMix", False, bool, False))
         data.append(("kourkoutas_beta", False, bool, False))
         data.append(("schedulefree_c", None, float, True))
         data.append(("ns_steps", None, int, True))
@@ -249,8 +268,21 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("accelerated_ns", False, bool, False))
         data.append(("cautious_wd", False, bool, False))
         data.append(("approx_mars", False, bool, False))
-        data.append(("auto_kappa_p", False, bool, False))
         data.append(("compile", False, bool, False))
+        data.append(("spectral_normalization", False, bool, False))
+        data.append(("stochastic_sign", False, bool, False))
+        data.append(("centered_wd", 0.0, float, False))
+        data.append(("centered_wd_mode", "full", str, False))
+        data.append(("factored_2nd", False, bool, False))
+        data.append(("fisher_wd", False, bool, False))
+        data.append(("state_precision", "auto", str, False))
+        data.append(("orthogonal_sinkhorn", False, bool, False))
+        data.append(("sinkhorn_iterations", None, int, True))
+        data.append(("normed_momentum", False, bool, False))
+        data.append(("nesterov_coef", None, float, True))
+        data.append(("snr_cond", False, bool, False))
+        data.append(("geometric_wd", False, bool, False))
+        data.append(("MSign_interval", None, int, True))
 
         return TrainOptimizerConfig(data)
 
