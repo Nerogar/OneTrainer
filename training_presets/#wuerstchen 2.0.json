@@ -45,7 +45,7 @@
             "weight_decay": 0.0
         }
     },
-    "output_model_destination": "models/model",
+    "run_name": "model",
     "output_model_format": "DIFFUSERS",
     "resolution": "1024",
     "training_method": "FINE_TUNE",

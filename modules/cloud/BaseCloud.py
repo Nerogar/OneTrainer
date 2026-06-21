@@ -6,7 +6,10 @@ from modules.util import path_util
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.CloudConfig import CloudConfig
-from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.TrainConfig import (
+    TrainConfig,
+    get_output_model_destination,
+)
 from modules.util.time_util import get_string_timestamp
 
 
@@ -27,11 +30,27 @@ class BaseCloud(metaclass=ABCMeta):
             self._make_tensorboard_tunnel()
 
     def download_output_model(self):
-        local=Path(self.config.local_output_model_destination)
-        remote=Path(self.config.output_model_destination)
-        self.file_sync.sync_down_file(local=local,remote=remote)
-        self.file_sync.sync_down_dir(local=local.with_suffix(local.suffix+"_embeddings"),
-                           remote=remote.with_suffix(remote.suffix+"_embeddings"))
+        local_dir = getattr(self.config, "local_final_output_dir", self.config.final_output_dir)
+        remote = Path(get_output_model_destination(
+            self.config.final_output_dir,
+            self.config.run_name,
+            self.config.output_model_format,
+        ))
+        local = Path(get_output_model_destination(
+            local_dir,
+            self.config.run_name,
+            self.config.output_model_format,
+        ))
+
+        if self.config.output_model_format.is_single_file():
+            self.file_sync.sync_down_file(local=local, remote=remote)
+        else:
+            self.file_sync.sync_down_dir(local=local, remote=remote)
+
+        self.file_sync.sync_down_dir(
+            local=Path(f"{local}_embeddings"),
+            remote=Path(f"{remote}_embeddings"),
+        )
 
     def upload_config(self,commands : TrainCommands=None):
         local_config_path=Path(self.config.local_workspace_dir,f"remote_config-{get_string_timestamp()}.json")

@@ -4,7 +4,7 @@
     "model_type": "PIXART_SIGMA",
     "epochs": 50,
     "learning_rate": 0.00001,
-    "output_model_destination": "models/lora.safetensors",
+    "run_name": "lora",
     "output_model_format": "SAFETENSORS",
     "resolution": "1024",
     "training_method": "LORA",

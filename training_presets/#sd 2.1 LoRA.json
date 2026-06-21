@@ -5,7 +5,7 @@
     "layer_filter_preset": "attn-mlp",
     "learning_rate": 0.0003,
     "model_type": "STABLE_DIFFUSION_21",
-    "output_model_destination": "models/lora.safetensors",
+    "run_name": "lora",
     "output_model_format": "SAFETENSORS",
     "resolution": "512",
     "training_method": "LORA",
