@@ -72,7 +72,7 @@ class ErnieBaseDataLoader(
             text_split_names=text_split_names,
             sort_names=sort_names,
             config=config,
-            text_caching=True,
+            text_caching=config.text_caching,
         )
 
     def _output_modules(self, config: TrainConfig, model: ErnieModel, model_setup: BaseErnieSetup):

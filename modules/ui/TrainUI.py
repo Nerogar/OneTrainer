@@ -361,15 +361,20 @@ class TrainUI(ctk.CTk):
                          tooltip="Aspect ratio bucketing enables training on images with different aspect ratios")
         components.switch(frame, 0, 1, self.ui_state, "aspect_ratio_bucketing")
 
-        # latent caching
-        components.label(frame, 1, 0, "Latent Caching",
-                         tooltip="Caching of intermediate training data that can be re-used between epochs")
-        components.switch(frame, 1, 1, self.ui_state, "latent_caching")
+        # image caching
+        components.label(frame, 1, 0, "Image Caching",
+                         tooltip="Caches image latents (VAE outputs) so they can be re-used between epochs")
+        components.switch(frame, 1, 1, self.ui_state, "image_caching")
+
+        # text caching
+        components.label(frame, 2, 0, "Text Caching",
+                         tooltip="Caches text encoder outputs so they can be re-used between epochs")
+        components.switch(frame, 2, 1, self.ui_state, "text_caching")
 
         # clear cache before training
-        components.label(frame, 2, 0, "Clear cache before training",
+        components.label(frame, 3, 0, "Clear cache before training",
                          tooltip="Clears the cache directory before starting to train. Only disable this if you want to continue using the same cached data. Disabling this can lead to errors, if other settings are changed during a restart")
-        components.switch(frame, 2, 1, self.ui_state, "clear_cache_before_training")
+        components.switch(frame, 3, 1, self.ui_state, "clear_cache_before_training")
 
         frame.pack(fill="both", expand=1)
         return frame
