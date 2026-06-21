@@ -1,8 +1,22 @@
+def _patch_clip_text_model():
+    # transformers 5.x flattened CLIPTextModel: .text_model no longer exists.
+    # Add a property so older code (diffusers 0.38, OneTrainer) can still do
+    # model.text_model.embeddings without breaking.
+    try:
+        from transformers.models.clip.modeling_clip import CLIPTextModel
+        if not hasattr(CLIPTextModel, 'text_model'):
+            CLIPTextModel.text_model = property(lambda self: self)
+    except Exception:
+        pass
+
+
 def script_imports(allow_zluda: bool = True):
     import logging
     import os
     import sys
     from pathlib import Path
+
+    _patch_clip_text_model()
 
     # Filter out the Triton warning on startup.
     # xformers is not installed anymore, but might still exist for some installations.
