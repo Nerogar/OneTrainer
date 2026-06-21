@@ -51,12 +51,8 @@ class BasePixArtAlphaSetup(
             model: PixArtAlphaModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
-            model.vae.enable_gradient_checkpointing()
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_basic_transformer_blocks(model.transformer, config, offload_enabled=True)
-            model.text_encoder_offload_conductor = \
-                enable_checkpointing_for_t5_encoder_layers(model.text_encoder, config)
+        model.transformer_offload_conductor = enable_checkpointing_for_basic_transformer_blocks(model.transformer, config, config.transformer, offload_enabled=True)
+        model.text_encoder_offload_conductor = enable_checkpointing_for_t5_encoder_layers(model.text_encoder, config, config.text_encoder)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
@@ -340,7 +336,7 @@ class BasePixArtAlphaSetup(
         ).mean()
 
     def prepare_text_caching(self, model: PixArtAlphaModel, config: TrainConfig):
-        model.to(self.temp_device)
+        model.release()
 
         if not config.train_text_encoder_or_embedding():
             model.text_encoder_to(self.train_device)

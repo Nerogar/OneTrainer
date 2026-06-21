@@ -45,307 +45,68 @@ class ModelTab:
         base_frame.grid_columnconfigure(3, weight=0)
         base_frame.grid_columnconfigure(4, weight=1)
 
-        if self.train_config.model_type.is_stable_diffusion(): #TODO simplify
-            self.__setup_stable_diffusion_ui(base_frame)
-        if self.train_config.model_type.is_stable_diffusion_3():
-            self.__setup_stable_diffusion_3_ui(base_frame)
-        elif self.train_config.model_type.is_stable_diffusion_xl():
-            self.__setup_stable_diffusion_xl_ui(base_frame)
-        elif self.train_config.model_type.is_wuerstchen():
-            self.__setup_wuerstchen_ui(base_frame)
-        elif self.train_config.model_type.is_pixart():
-            self.__setup_pixart_alpha_ui(base_frame)
-        elif self.train_config.model_type.is_flux_1():
-            self.__setup_flux_ui(base_frame)
-        elif self.train_config.model_type.is_flux_2():
-            self.__setup_flux_2_ui(base_frame)
-        elif self.train_config.model_type.is_z_image():
-            self.__setup_z_image_ui(base_frame)
-        elif self.train_config.model_type.is_chroma():
-            self.__setup_chroma_ui(base_frame)
-        elif self.train_config.model_type.is_qwen():
-            self.__setup_qwen_ui(base_frame)
-        elif self.train_config.model_type.is_sana():
-            self.__setup_sana_ui(base_frame)
-        elif self.train_config.model_type.is_hunyuan_video():
-            self.__setup_hunyuan_video_ui(base_frame)
-        elif self.train_config.model_type.is_hi_dream():
-            self.__setup_hi_dream_ui(base_frame)
-        elif self.train_config.model_type.is_ernie():
-            self.__setup_ernie_ui(base_frame)
+        self.__setup_ui(base_frame)
 
-    def __setup_stable_diffusion_ui(self, frame):
+    def __setup_ui(self, frame):
+        model_type = self.train_config.model_type
+        training_method = self.train_config.training_method
+        parts = model_type.model_parts()
+
+        # The transformer override path exists only for these architectures; SD3, PixArt, Sana
+        # and HiDream have a transformer but expose no override field.
+        allow_override_transformer = (
+            model_type.is_flux()
+            or model_type.is_z_image()
+            or model_type.is_ernie()
+            or model_type.is_chroma()
+            or model_type.is_qwen()
+            or model_type.is_hunyuan_video()
+            or model_type.is_lens()
+        )
+
         row = 0
         row = self.__create_base_dtype_components(frame, row)
         row = self.__create_base_components(
             frame,
             row,
-            has_unet=True,
-            has_text_encoder=True,
-            has_vae=True,
+            has_unet="unet" in parts,
+            has_prior="prior" in parts,
+            allow_override_prior=model_type.is_stable_cascade(),
+            has_transformer="transformer" in parts,
+            allow_override_transformer=allow_override_transformer,
+            # Lens: GPT-OSS dtype is fixed by MXFP4 + checkpoint; not user-configurable.
+            has_text_encoder=not model_type.has_multiple_text_encoders() and not model_type.is_lens(),
+            has_text_encoder_1=model_type.has_multiple_text_encoders(),
+            has_text_encoder_2="text_encoder_2" in parts,
+            has_text_encoder_3="text_encoder_3" in parts,
+            has_text_encoder_4="text_encoder_4" in parts,
+            allow_override_text_encoder_4="text_encoder_4" in parts,
+            has_vae="vae" in parts,
         )
-        row = self.__create_output_components(
-            frame,
-            row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method in [
-                TrainingMethod.FINE_TUNE,
-                TrainingMethod.FINE_TUNE_VAE,
-            ],
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
-        )
+        if "effnet_encoder" in parts:
+            row = self.__create_effnet_encoder_components(frame, row)
+        if "decoder" in parts:
+            row = self.__create_decoder_components(frame, row, "decoder_text_encoder" in parts)
 
-    def __setup_stable_diffusion_3_ui(self, frame):
-        row = 0
-        row = self.__create_base_dtype_components(frame, row)
-        row = self.__create_base_components(
-            frame,
-            row,
-            has_transformer=True,
-            has_text_encoder_1=True,
-            has_text_encoder_2=True,
-            has_text_encoder_3=True,
-            has_vae=True,
-        )
-        row = self.__create_output_components(
-            frame,
-            row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
-        )
+        if model_type.is_sana():
+            allow_safetensors = training_method != TrainingMethod.FINE_TUNE
+        elif model_type.is_wuerstchen():
+            allow_safetensors = training_method != TrainingMethod.FINE_TUNE \
+                                or model_type.is_stable_cascade()
+        else:
+            allow_safetensors = True
 
-    def __setup_flux_ui(self, frame):
-        row = 0
-        row = self.__create_base_dtype_components(frame, row)
-        row = self.__create_base_components(
-            frame,
-            row,
-            has_transformer=True,
-            allow_override_transformer=True,
-            has_text_encoder_1=True,
-            has_text_encoder_2=True,
-            has_vae=True,
-        )
-        row = self.__create_output_components(
-            frame,
-            row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
-        )
+        if model_type.is_stable_diffusion():
+            allow_diffusers = training_method in [TrainingMethod.FINE_TUNE, TrainingMethod.FINE_TUNE_VAE]
+        else:
+            allow_diffusers = training_method == TrainingMethod.FINE_TUNE
 
-    def __setup_flux_2_ui(self, frame):
-        row = 0
-        row = self.__create_base_dtype_components(frame, row)
-        row = self.__create_base_components(
-            frame,
-            row,
-            has_transformer=True,
-            allow_override_transformer=True,
-            has_text_encoder_1=True,
-            has_vae=True,
-        )
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
-        )
-
-    def __setup_z_image_ui(self, frame):
-        row = 0
-        row = self.__create_base_dtype_components(frame, row)
-        row = self.__create_base_components(
-            frame,
-            row,
-            has_transformer=True,
-            allow_override_transformer=True,
-            has_text_encoder_1=True,
-            has_vae=True,
-        )
-        row = self.__create_output_components(
-            frame,
-            row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
-        )
-
-    def __setup_ernie_ui(self, frame):
-        row = 0
-        row = self.__create_base_dtype_components(frame, row)
-        row = self.__create_base_components(
-            frame,
-            row,
-            has_transformer=True,
-            allow_override_transformer=True,
-            has_text_encoder_1=True,
-            has_vae=True,
-        )
-        row = self.__create_output_components(
-            frame,
-            row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
-        )
-
-    def __setup_chroma_ui(self, frame):
-        row = 0
-        row = self.__create_base_dtype_components(frame, row)
-        row = self.__create_base_components(
-            frame,
-            row,
-            has_transformer=True,
-            allow_override_transformer=True,
-            has_text_encoder_1=True,
-            has_vae=True,
-        )
-        row = self.__create_output_components(
-            frame,
-            row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
-        )
-
-    def __setup_qwen_ui(self, frame):
-        row = 0
-        row = self.__create_base_dtype_components(frame, row)
-        row = self.__create_base_components(
-            frame,
-            row,
-            has_transformer=True,
-            allow_override_transformer=True,
-            has_text_encoder_1=True,
-            has_vae=True,
-        )
-        row = self.__create_output_components(
-            frame,
-            row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
-        )
-
-    def __setup_stable_diffusion_xl_ui(self, frame):
-        row = 0
-        row = self.__create_base_dtype_components(frame, row)
-        row = self.__create_base_components(
-            frame,
-            row,
-            has_unet=True,
-            has_text_encoder_1=True,
-            has_text_encoder_2=True,
-            has_vae=True,
-        )
-        row = self.__create_output_components(
-            frame,
-            row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
-        )
-
-    def __setup_wuerstchen_ui(self, frame):
-        row = 0
-        row = self.__create_base_dtype_components(frame, row)
-        row = self.__create_base_components(
-            frame,
-            row,
-            has_prior=True,
-            allow_override_prior=self.train_config.model_type.is_stable_cascade(),
-            has_text_encoder=True,
-        )
-        row = self.__create_effnet_encoder_components(frame, row)
-        row = self.__create_decoder_components(frame, row, self.train_config.model_type.is_wuerstchen_v2())
-        row = self.__create_output_components(
-            frame,
-            row,
-            allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE
-                              or self.train_config.model_type.is_stable_cascade(),
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
-        )
-
-    def __setup_pixart_alpha_ui(self, frame):
-        row = 0
-        row = self.__create_base_dtype_components(frame, row)
-        row = self.__create_base_components(
-            frame,
-            row,
-            has_transformer=True,
-            has_text_encoder=True,
-            has_vae=True,
-        )
-        row = self.__create_output_components(
-            frame,
-            row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
-        )
-
-    def __setup_sana_ui(self, frame):
-        row = 0
-        row = self.__create_base_dtype_components(frame, row)
-        row = self.__create_base_components(
-            frame,
-            row,
-            has_transformer=True,
-            has_text_encoder=True,
-            has_vae=True,
-        )
-        row = self.__create_output_components(
-            frame,
-            row,
-            allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
-        )
-
-    def __setup_hunyuan_video_ui(self, frame):
-        row = 0
-        row = self.__create_base_dtype_components(frame, row)
-        row = self.__create_base_components(
-            frame,
-            row,
-            has_transformer=True,
-            allow_override_transformer=True,
-            has_text_encoder_1=True,
-            has_text_encoder_2=True,
-            has_vae=True,
-        )
-        row = self.__create_output_components(
-            frame,
-            row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
-        )
-
-    def __setup_hi_dream_ui(self, frame):
-        row = 0
-        row = self.__create_base_dtype_components(frame, row)
-        row = self.__create_base_components(
-            frame,
-            row,
-            has_transformer=True,
-            has_text_encoder_1=True,
-            has_text_encoder_2=True,
-            has_text_encoder_3=True,
-            has_text_encoder_4=True,
-            allow_override_text_encoder_4=True,
-            has_vae=True,
-        )
-        row = self.__create_output_components(
-            frame,
-            row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
+            allow_safetensors=allow_safetensors,
+            allow_diffusers=allow_diffusers,
+            allow_legacy_safetensors=training_method == TrainingMethod.LORA,
         )
 
     def __create_dtype_options(self, include_gguf: bool=False, include_a8: bool=False) -> list[tuple[str, DataType]]:

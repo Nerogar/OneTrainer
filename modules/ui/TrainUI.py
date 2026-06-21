@@ -311,6 +311,10 @@ class TrainUI(ctk.CTk):
                          tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\". Must be \"cuda\" for multi-GPU training.")
         components.entry(frame, 11, 1, self.ui_state, "train_device", required=True)
 
+        components.label(frame, 11, 2, "Async Offloading",
+                         tooltip="Overlaps CPU<->GPU transfers with computation using CUDA streams. Applies to every offloaded component")
+        components.switch(frame, 11, 3, self.ui_state, "async_offloading")
+
         components.label(frame, 12, 0, "Multi-GPU",
                          tooltip="Enable multi-GPU training")
         components.switch(frame, 12, 1, self.ui_state, "multi_gpu")

@@ -198,8 +198,7 @@ class Flux2LoRALoader(
         super().__init__()
 
     def _get_convert_key_sets(self, model: BaseModel) -> list[LoraConversionKeySet] | None:
-        return None #TODO
-        #return convert_flux_lora_key_sets()
+        return None
 
     def load(
             self,

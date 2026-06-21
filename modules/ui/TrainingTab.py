@@ -1,4 +1,3 @@
-from modules.ui.OffloadingWindow import OffloadingWindow
 from modules.ui.OptimizerParamsWindow import OptimizerParamsWindow
 from modules.ui.SchedulerParamsWindow import SchedulerParamsWindow
 from modules.ui.TimestepDistributionWindow import TimestepDistributionWindow
@@ -6,13 +5,13 @@ from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
-from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
 from modules.util.enum.LearningRateScaler import LearningRateScaler
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossScaler import LossScaler
 from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TimestepDistribution import TimestepDistribution
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.optimizer_util import change_optimizer
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
@@ -74,6 +73,8 @@ class TrainingTab:
             self.__setup_flux_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_flux_2():
             self.__setup_flux_2_ui(column_0, column_1, column_2)
+        elif self.train_config.model_type.is_lens():
+            self.__setup_lens_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_chroma():
             self.__setup_chroma_ui(column_0, column_1, column_2)
         elif self.train_config.model_type.is_qwen():
@@ -99,6 +100,8 @@ class TrainingTab:
         self.__create_unet_frame(column_1, 1)
         self.__create_noise_frame(column_1, 2, supports_generalized_offset_noise=True)
 
+        if self.train_config.training_method == TrainingMethod.FINE_TUNE_VAE:
+            self.__create_vae_frame(column_2, 0)
         self.__create_masked_frame(column_2, 1)
         self.__create_loss_frame(column_2, 2)
         self.__create_layer_frame(column_2, 3)
@@ -178,6 +181,19 @@ class TrainingTab:
 
         self.__create_base2_frame(column_1, 0)
         self.__create_transformer_frame(column_1, 1, supports_guidance_scale=True, supports_force_attention_mask=False)
+        self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
+
+        self.__create_masked_frame(column_2, 1)
+        self.__create_loss_frame(column_2, 2)
+        self.__create_layer_frame(column_2, 3)
+
+    def __setup_lens_ui(self, column_0, column_1, column_2):
+        self.__create_base_frame(column_0, 0)
+        # the GPT-OSS encoder is always on-demand (MXFP4); layer offloading is incompatible with that, so hide it
+        self.__create_text_encoder_frame(column_0, 1, supports_clip_skip=False, supports_training=False, supports_sequence_length=False, supports_offloading=False)
+
+        self.__create_base2_frame(column_1, 0)
+        self.__create_transformer_frame(column_1, 1, supports_guidance_scale=False, supports_force_attention_mask=False)
         self.__create_noise_frame(column_1, 2, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1)
@@ -375,19 +391,6 @@ class TrainingTab:
         components.entry(frame, row, 1, self.ui_state, "ema_update_step_interval")
         row += 1
 
-        # gradient checkpointing
-        components.label(frame, row, 0, "Gradient checkpointing",
-                         tooltip="Enables gradient checkpointing. This reduces memory usage, but increases training time")
-        components.options_adv(frame, row, 1, [str(x) for x in list(GradientCheckpointingMethod)], self.ui_state,
-                           "gradient_checkpointing", adv_command=self.__open_offloading_window)
-        row += 1
-
-        # gradient checkpointing layer offloading
-        components.label(frame, row, 0, "Layer offload fraction",
-                         tooltip="Enables offloading of individual layers during training to reduce VRAM usage. Increases training time and uses more RAM. Only available if checkpointing is set to CPU_OFFLOADED. values between 0 and 1, 0=disabled")
-        components.entry(frame, row, 1, self.ui_state, "layer_offload_fraction")
-        row += 1
-
         # train dtype
         components.label(frame, row, 0, "Train Data Type",
                          tooltip="The mixed precision data type used for training. This can increase training speed, but reduces precision")
@@ -434,7 +437,29 @@ class TrainingTab:
                              tooltip="Enables circular padding for all conv layers to better train seamless images")
             components.switch(frame, row, 1, self.ui_state, "force_circular_padding")
 
-    def __create_text_encoder_frame(self, master, row, supports_clip_skip=True, supports_training=True, supports_sequence_length=False):
+    def __create_offloading_widgets(self, frame, row, part, supports_checkpointing=True, supports_activation_offloading=False, supports_layer_offloading=True):
+        # per-component offloading / checkpointing controls (bound to the model part config)
+        if supports_checkpointing:
+            components.label(frame, row, 0, "Gradient Checkpointing",
+                             tooltip="Enables gradient checkpointing for this component. Reduces VRAM usage at the cost of training speed")
+            components.switch(frame, row, 1, self.ui_state, f"{part}.gradient_checkpointing")
+            row += 1
+
+        if supports_layer_offloading:
+            components.label(frame, row, 0, "Layer Offload Fraction",
+                             tooltip="Fraction of this component's layers to offload to CPU to reduce VRAM usage. Increases training time and RAM usage. 0=disabled, 1=all layers")
+            components.entry(frame, row, 1, self.ui_state, f"{part}.offload_fraction")
+            row += 1
+
+        if supports_activation_offloading:
+            components.label(frame, row, 0, "Offload Activations",
+                             tooltip="Offloads this component's activations to CPU during training to reduce VRAM usage")
+            components.switch(frame, row, 1, self.ui_state, f"{part}.activation_offloading")
+            row += 1
+
+        return row
+
+    def __create_text_encoder_frame(self, master, row, supports_clip_skip=True, supports_training=True, supports_sequence_length=False, supports_offloading=True):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
@@ -445,6 +470,12 @@ class TrainingTab:
                              tooltip="Enables training the text encoder model")
             components.switch(frame, row, 1, self.ui_state, "text_encoder.train")
             row += 1
+        else:
+            # no Train switch to act as the frame's header, so add an explicit one
+            components.label(frame, row, 0, "Text Encoder")
+            row += 1
+
+        row = self.__create_offloading_widgets(frame, row, "text_encoder", supports_checkpointing=supports_training, supports_layer_offloading=supports_offloading)
 
         # dropout
         components.label(frame, row, 0, "Caption Dropout Probability",
@@ -509,6 +540,8 @@ class TrainingTab:
         components.switch(frame, row, 1, self.ui_state, f"text_encoder{suffix}.train")
         row += 1
 
+        row = self.__create_offloading_widgets(frame, row, f"text_encoder{suffix}")
+
         # train text encoder embedding
         components.label(frame, row, 0, f"Train Text Encoder {i} Embedding",
                          tooltip=f"Enables training embeddings for the text encoder {i} model")
@@ -566,82 +599,119 @@ class TrainingTab:
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
+        row = 0
 
         # train unet
-        components.label(frame, 0, 0, "Train UNet",
+        components.label(frame, row, 0, "Train UNet",
                          tooltip="Enables training the UNet model")
-        components.switch(frame, 0, 1, self.ui_state, "unet.train")
+        components.switch(frame, row, 1, self.ui_state, "unet.train")
+        row += 1
+
+        row = self.__create_offloading_widgets(frame, row, "unet", supports_activation_offloading=True)
 
         # train unet epochs
-        components.label(frame, 1, 0, "Stop Training After",
+        components.label(frame, row, 0, "Stop Training After",
                          tooltip="When to stop training the UNet")
-        components.time_entry(frame, 1, 1, self.ui_state, "unet.stop_training_after", "unet.stop_training_after_unit",
+        components.time_entry(frame, row, 1, self.ui_state, "unet.stop_training_after", "unet.stop_training_after_unit",
                               supports_time_units=False)
+        row += 1
 
         # unet learning rate
-        components.label(frame, 2, 0, "UNet Learning Rate",
+        components.label(frame, row, 0, "UNet Learning Rate",
                          tooltip="The learning rate of the UNet. Overrides the base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "unet.learning_rate")
+        components.entry(frame, row, 1, self.ui_state, "unet.learning_rate")
+        row += 1
 
         # rescale noise scheduler to zero terminal SNR
-        rescale_label = components.label(frame, 3, 0, "Rescale Noise Scheduler + V-pred",
+        rescale_label = components.label(frame, row, 0, "Rescale Noise Scheduler + V-pred",
                          tooltip="Rescales the noise scheduler to a zero terminal signal to noise ratio and switches the model to a v-prediction target")
         rescale_label.configure(wraplength=130, justify="left")
-        components.switch(frame, 3, 1, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
+        components.switch(frame, row, 1, self.ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
+        row += 1
+
+    def __create_vae_frame(self, master, row):
+        frame = ctk.CTkFrame(master=master, corner_radius=5)
+        frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
+        frame.grid_columnconfigure(0, weight=1)
+        row = 0
+
+        components.label(frame, row, 0, "Train VAE",
+                         tooltip="Enables training the VAE model")
+        components.switch(frame, row, 1, self.ui_state, "vae.train")
+        row += 1
+
+        components.label(frame, row, 0, "Gradient Checkpointing",
+                         tooltip="Enables gradient checkpointing for the VAE. Reduces VRAM usage at the cost of training speed")
+        components.switch(frame, row, 1, self.ui_state, "vae.gradient_checkpointing")
+        row += 1
 
     def __create_prior_frame(self, master, row):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
+        row = 0
 
         # train prior
-        components.label(frame, 0, 0, "Train Prior",
+        components.label(frame, row, 0, "Train Prior",
                          tooltip="Enables training the Prior model")
-        components.switch(frame, 0, 1, self.ui_state, "prior.train")
+        components.switch(frame, row, 1, self.ui_state, "prior.train")
+        row += 1
+
+        row = self.__create_offloading_widgets(frame, row, "prior", supports_activation_offloading=True)
 
         # train prior epochs
-        components.label(frame, 1, 0, "Stop Training After",
+        components.label(frame, row, 0, "Stop Training After",
                          tooltip="When to stop training the Prior")
-        components.time_entry(frame, 1, 1, self.ui_state, "prior.stop_training_after", "prior.stop_training_after_unit",
+        components.time_entry(frame, row, 1, self.ui_state, "prior.stop_training_after", "prior.stop_training_after_unit",
                               supports_time_units=False)
+        row += 1
 
         # prior learning rate
-        components.label(frame, 2, 0, "Prior Learning Rate",
+        components.label(frame, row, 0, "Prior Learning Rate",
                          tooltip="The learning rate of the Prior. Overrides the base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "prior.learning_rate")
+        components.entry(frame, row, 1, self.ui_state, "prior.learning_rate")
+        row += 1
 
     def __create_transformer_frame(self, master, row, supports_guidance_scale: bool = False, supports_force_attention_mask: bool = True):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
         frame.grid(row=row, column=0, padx=5, pady=5, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
+        row = 0
 
         # train transformer
-        components.label(frame, 0, 0, "Train Transformer",
+        components.label(frame, row, 0, "Train Transformer",
                          tooltip="Enables training the Transformer model")
-        components.switch(frame, 0, 1, self.ui_state, "transformer.train")
+        components.switch(frame, row, 1, self.ui_state, "transformer.train")
+        row += 1
+
+        row = self.__create_offloading_widgets(frame, row, "transformer", supports_activation_offloading=True)
 
         # train transformer epochs
-        components.label(frame, 1, 0, "Stop Training After",
+        components.label(frame, row, 0, "Stop Training After",
                          tooltip="When to stop training the Transformer")
-        components.time_entry(frame, 1, 1, self.ui_state, "transformer.stop_training_after", "transformer.stop_training_after_unit",
+        components.time_entry(frame, row, 1, self.ui_state, "transformer.stop_training_after", "transformer.stop_training_after_unit",
                               supports_time_units=False)
+        row += 1
 
         # transformer learning rate
-        components.label(frame, 2, 0, "Transformer Learning Rate",
+        components.label(frame, row, 0, "Transformer Learning Rate",
                          tooltip="The learning rate of the Transformer. Overrides the base learning rate")
-        components.entry(frame, 2, 1, self.ui_state, "transformer.learning_rate")
+        components.entry(frame, row, 1, self.ui_state, "transformer.learning_rate")
+        row += 1
 
         if supports_force_attention_mask:
             # transformer learning rate
-            components.label(frame, 3, 0, "Force Attention Mask",
+            components.label(frame, row, 0, "Force Attention Mask",
                              tooltip="Force enables passing of a text embedding attention mask to the transformer. This can improve training on shorter captions.")
-            components.switch(frame, 3, 1, self.ui_state, "transformer.attention_mask")
+            components.switch(frame, row, 1, self.ui_state, "transformer.attention_mask")
+            row += 1
 
         if supports_guidance_scale:
             # guidance scale
-            components.label(frame, 4, 0, "Guidance Scale",
+            components.label(frame, row, 0, "Guidance Scale",
                              tooltip="The guidance scale of guidance distilled models passed to the transformer during training.")
-            components.entry(frame, 4, 1, self.ui_state, "transformer.guidance_scale")
+            components.entry(frame, row, 1, self.ui_state, "transformer.guidance_scale")
+            row += 1
 
     def __create_noise_frame(self, master, row, supports_generalized_offset_noise: bool = False, supports_dynamic_timestep_shifting: bool = False):
         frame = ctk.CTkFrame(master=master, corner_radius=5)
@@ -842,10 +912,6 @@ class TrainingTab:
 
     def __open_timestep_distribution_window(self):
         window = TimestepDistributionWindow(self.master, self.train_config, self.ui_state)
-        self.master.wait_window(window)
-
-    def __open_offloading_window(self):
-        window = OffloadingWindow(self.master, self.train_config, self.ui_state)
         self.master.wait_window(window)
 
     def __restore_optimizer_config(self, *args):

@@ -47,12 +47,9 @@ class BaseZImageSetup(
             model: ZImageModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_z_image_transformer(model.transformer, config)
-            if model.text_encoder is not None:
-                model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_qwen3_encoder_layers(model.text_encoder, config)
+        model.transformer_offload_conductor = enable_checkpointing_for_z_image_transformer(model.transformer, config, config.transformer)
+        if model.text_encoder is not None:
+            model.text_encoder_offload_conductor = enable_checkpointing_for_qwen3_encoder_layers(model.text_encoder, config, config.text_encoder)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
@@ -172,7 +169,7 @@ class BaseZImageSetup(
         ).mean()
 
     def prepare_text_caching(self, model: ZImageModel, config: TrainConfig):
-        model.to(self.temp_device)
+        model.release()
         model.text_encoder_to(self.train_device)
 
         model.eval()

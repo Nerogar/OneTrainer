@@ -2,7 +2,7 @@ import math
 import random
 from typing import Any
 
-from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.TrainConfig import TrainConfig, TrainModelPartConfig
 from modules.util.quantization_util import get_offload_tensor_bytes, offload_quantized
 from modules.util.torch_util import (
     create_stream_context,
@@ -566,6 +566,7 @@ class LayerOffloadConductor:
             self,
             module: nn.Module,
             config: TrainConfig,
+            part: TrainModelPartConfig,
     ):
         super().__init__()
 
@@ -573,16 +574,16 @@ class LayerOffloadConductor:
 
         self.__layers = []
         self.__layer_device_map = []
-        self.__layer_offload_fraction = config.layer_offload_fraction
+        self.__layer_offload_fraction = part.offload_fraction
 
         self.__layer_activations_included_offload_param_indices_map = []
 
         self.__train_device = torch.device(config.train_device)
         self.__temp_device = torch.device(config.temp_device)
 
-        self.__offload_activations = config.gradient_checkpointing.offload() and config.enable_activation_offloading
-        self.__offload_layers = config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0
-        self.__async_transfer = self.__train_device.type == "cuda" and config.enable_async_offloading
+        self.__offload_activations = part.activation_offloading
+        self.__offload_layers = part.offload_fraction > 0
+        self.__async_transfer = self.__train_device.type == "cuda" and config.async_offloading
 
         if self.__async_transfer:
             self.__train_stream = torch.cuda.default_stream(self.__train_device)
