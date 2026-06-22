@@ -24,7 +24,7 @@ COPY --link ./install-pixi.sh ./
 
 RUN ./install-pixi.sh
 
-COPY --link pyproject.toml README.md pixi.lock ./
+COPY --link pyproject.toml pixi.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/rattler/cache <<EOF
 pixi install --locked -v -e ${OT_PLATFORM} --skip OneTrainer
