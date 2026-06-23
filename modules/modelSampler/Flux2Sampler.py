@@ -22,6 +22,7 @@ import numpy as np
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.FLUX_2)
 class Flux2Sampler(BaseModelSampler):
     def __init__(
             self,
@@ -190,5 +191,3 @@ class Flux2Sampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, Flux2Sampler, ModelType.FLUX_2)
