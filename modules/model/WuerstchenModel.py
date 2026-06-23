@@ -163,14 +163,15 @@ class WuerstchenModel(BaseModel):
         if self.prior_prior_lora is not None:
             self.prior_prior_lora.to(device)
 
-    def to(self, device: torch.device):
+    def release(self):
+        temp_device = torch.device(self.train_config.temp_device)
         if self.model_type.is_wuerstchen_v2():
-            self.decoder_text_encoder_to(device)
-        self.decoder_decoder_to(device)
-        self.decoder_vqgan_to(device)
-        self.effnet_encoder_to(device)
-        self.prior_text_encoder_to(device)
-        self.prior_prior_to(device)
+            self.decoder_text_encoder_to(temp_device)
+        self.decoder_decoder_to(temp_device)
+        self.decoder_vqgan_to(temp_device)
+        self.effnet_encoder_to(temp_device)
+        self.prior_text_encoder_to(temp_device)
+        self.prior_prior_to(temp_device)
 
     def eval(self):
         if self.model_type.is_wuerstchen_v2():

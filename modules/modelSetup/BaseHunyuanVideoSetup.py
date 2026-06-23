@@ -49,14 +49,12 @@ class BaseHunyuanVideoSetup(
             model: HunyuanVideoModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_hunyuan_video_transformer(model.transformer, config)
-            if model.text_encoder_1 is not None:
-                model.text_encoder_1_offload_conductor = \
-                    enable_checkpointing_for_llama_encoder_layers(model.text_encoder_1, config)
-            if model.text_encoder_2 is not None:
-                enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config)
+        if config.transformer.checkpointing_or_offloading_enabled():
+            model.transformer_offload_conductor = enable_checkpointing_for_hunyuan_video_transformer(model.transformer, config, config.transformer)
+        if model.text_encoder_1 is not None and config.text_encoder.checkpointing_or_offloading_enabled():
+            model.text_encoder_1_offload_conductor = enable_checkpointing_for_llama_encoder_layers(model.text_encoder_1, config, config.text_encoder)
+        if model.text_encoder_2 is not None and config.text_encoder_2.checkpointing_or_offloading_enabled():
+            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config, config.text_encoder_2)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
@@ -308,7 +306,7 @@ class BaseHunyuanVideoSetup(
         ).mean()
 
     def prepare_text_caching(self, model: HunyuanVideoModel, config: TrainConfig):
-        model.to(self.temp_device)
+        model.release()
 
         if not config.train_text_encoder_or_embedding():
             model.text_encoder_to(self.train_device)

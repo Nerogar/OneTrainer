@@ -159,10 +159,11 @@ class StableDiffusionXLModel(BaseModel):
         if self.unet_lora is not None:
             self.unet_lora.to(device)
 
-    def to(self, device: torch.device):
-        self.vae_to(device)
-        self.text_encoder_to(device)
-        self.unet_to(device)
+    def release(self):
+        temp_device = torch.device(self.train_config.temp_device)
+        self.vae_to(temp_device)
+        self.text_encoder_to(temp_device)
+        self.unet_to(temp_device)
 
     def eval(self):
         self.vae.eval()

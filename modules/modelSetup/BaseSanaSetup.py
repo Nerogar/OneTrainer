@@ -52,12 +52,10 @@ class BaseSanaSetup(
             config: TrainConfig,
     ):
 
-        if config.gradient_checkpointing.enabled():
-            # model.vae.enable_gradient_checkpointing()
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_sana_transformer(model.transformer, config)
-            model.text_encoder_offload_conductor = \
-                enable_checkpointing_for_gemma_layers(model.text_encoder, config)
+        if config.transformer.checkpointing_or_offloading_enabled():
+            model.transformer_offload_conductor = enable_checkpointing_for_sana_transformer(model.transformer, config, config.transformer)
+        if config.text_encoder.checkpointing_or_offloading_enabled():
+            model.text_encoder_offload_conductor = enable_checkpointing_for_gemma_layers(model.text_encoder, config, config.text_encoder)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
@@ -263,7 +261,7 @@ class BaseSanaSetup(
         ).mean()
 
     def prepare_text_caching(self, model: SanaModel, config: TrainConfig):
-        model.to(self.temp_device)
+        model.release()
 
         if not config.train_text_encoder_or_embedding():
             model.text_encoder_to(self.train_device)
