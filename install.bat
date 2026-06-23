@@ -221,7 +221,7 @@ echo.
 echo %CYAN%Managing virtual environment...%RESET%
 if not exist "%VENV_DIR%\\Scripts\\python.exe" (
   echo Creating venv at "%VENV_DIR%"...
-  "!PYTHON!" -m venv "%VENV_DIR%" || call :die "venv creation failed using !PYTHON!"
+  uv venv "%VENV_DIR%" --seed || call :die "venv creation failed using !PYTHON!"
 ) else (
   echo Virtual environment already exists at "%VENV_DIR%"
 )
@@ -250,10 +250,10 @@ echo %GRN%Tkinter is available, proceeding ... %RESET%
 rem 5) Upgrade pip & install
 echo.
 echo %CYAN%Upgrading pip and installing dependencies from requirements.txt...%RESET%
-echo Executing: python -m pip install --upgrade pip
-python -m pip install --upgrade pip || call :die "pip upgrade failed"
-echo Executing: python -m pip install -r requirements.txt
-python -m pip install -r requirements.txt || call :die "Dependencies install failed"
+echo Executing: uv pip install --upgrade pip
+uv pip install --upgrade pip || call :die "pip upgrade failed"
+echo Executing: uv pip install -r requirements.txt
+uv pip install -r requirements.txt --index-strategy unsafe-best-match || call :die "Dependencies install failed"
 
 rem 6) Check CUDA
 echo.
@@ -265,7 +265,7 @@ if errorlevel 1 (
   set /p "ans_amd=AMD GPU? (y/n): "
   if /i "!ans_amd!"=="y" (
     echo Executing: python "%SCRIPT_DIR%\scripts\install_zluda.py"
-    python "%SCRIPT_DIR%\scripts\install_zluda.py" || call :die "ZLUDA install failed"
+    uv run "%SCRIPT_DIR%\scripts\install_zluda.py" || call :die "ZLUDA install failed"
   ) else (
     call :die "CUDA unavailable and not an AMD GPU setup - aborting. Please check PyTorch and NVIDIA driver compatibility."
   )
