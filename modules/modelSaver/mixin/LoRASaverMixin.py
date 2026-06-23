@@ -35,6 +35,15 @@ class LoRASaverMixin(
     ) -> dict[str, Tensor]:
         pass
 
+    def _get_comfy_state_dict(
+            self,
+            state_dict: dict[str, Tensor],
+            model: BaseModel,
+    ) -> dict[str, Tensor]:
+        # Models that support ComfyUI LoRA export override this to return the
+        # converted state dict. Default: unsupported.
+        raise NotImplementedError("ComfyUI LoRA export is not supported for this model type")
+
     def __save_safetensors(
             self,
             model: BaseModel,
@@ -67,6 +76,19 @@ class LoRASaverMixin(
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
         save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
 
+    def __save_comfy(
+            self,
+            model: BaseModel,
+            destination: str,
+            dtype: torch.dtype | None,
+    ):
+        state_dict = self._get_state_dict(model)
+        save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
+        save_state_dict = self._get_comfy_state_dict(save_state_dict, model)
+
+        os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
+        save_file(save_state_dict, destination, self._create_safetensors_header(model, save_state_dict))
+
     def __save_internal(
             self,
             model: BaseModel,
@@ -95,5 +117,7 @@ class LoRASaverMixin(
                     self.__save_legacy_safetensors(model, output_model_destination, dtype)
             case ModelFormat.LEGACY_SAFETENSORS:
                 self.__save_legacy_safetensors(model, output_model_destination, dtype)
+            case ModelFormat.COMFY_LORA:
+                self.__save_comfy(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)
