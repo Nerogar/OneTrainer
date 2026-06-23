@@ -170,14 +170,14 @@ class OFTRotationModule(nn.Module):
                     Q_power = torch.bmm(Q_power, Q_skew)
                     R.add_(Q_power)
         elif oft_cans:
-            G = self.id_mat + Q_skew
+            # Compute G = (I + Q)^2 = I + 2Q + Q^2
+            # Squaring the matrix doubles the rotation range and matches Cayley (I + 2Q).
+            Q_squared = torch.bmm(Q_skew, Q_skew)
+            G = self.id_mat + 2 * Q_skew + Q_squared
             # Empirically, BF16 requires 5 steps to converge to ortho error ~1e-2 (its limit)
             # While FP32 takes 7 steps to converge to ortho error ~1e-6
             steps = 5 if G.dtype == torch.bfloat16 else 7
-            R_half = self._cans_newton_schulz_iteration(G=G, steps=steps)
-            # Squaring the matrix doubles the rotation range from (-90°, 90°) to (-180°, 180°) and
-            # matches Cayley (I + 2Q).
-            R = torch.bmm(R_half, R_half)
+            R = self._cans_newton_schulz_iteration(G=G, steps=steps)
         else:
             R = torch.linalg.solve(self.id_mat + Q_skew, self.id_mat - Q_skew, left=False)
 
