@@ -88,7 +88,11 @@ class StableDiffusionLoRASetup(
 
         if model.lora_state_dict:
             if create_te:
-                model.text_encoder_lora.load_state_dict(model.lora_state_dict)
+                # strict=False: TE LoRA keys may be absent in backups created with
+                # a flat CLIPTextModel (transformers >=5.6) where the key-conversion
+                # table couldn't match the nested path.  Missing keys are left at
+                # their default (zero) initialisation.
+                model.text_encoder_lora.load_state_dict(model.lora_state_dict, strict=False)
             model.unet_lora.load_state_dict(model.lora_state_dict)
             model.lora_state_dict = None
 
