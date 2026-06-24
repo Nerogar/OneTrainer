@@ -21,7 +21,7 @@
     },
     "train_dtype": "BFLOAT_16",
     "output_dtype": "BFLOAT_16",
-    "dataloader_threads": 1,
+    "caching_threads": 1,
     "timestep_distribution": "LOGIT_NORMAL",
     "optimizer": {
         "optimizer": "ADAFACTOR"

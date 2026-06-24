@@ -4,7 +4,7 @@
     "batch_size": 4,
     "gradient_checkpointing": "CPU_OFFLOADED",
     "layer_offload_fraction": 0.5,
-    "dataloader_threads": 1,
+    "caching_threads": 1,
     "learning_rate": 0.0003,
     "model_type": "HI_DREAM_FULL",
     "output_model_destination": "models/lora.safetensors",
