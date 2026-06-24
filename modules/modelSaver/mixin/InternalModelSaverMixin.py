@@ -40,3 +40,12 @@ class InternalModelSaverMixin(metaclass=ABCMeta):
                     'global_step': model.train_progress.global_step,
                 },
             }, meta_file)
+
+        # In-flight grad-accum snapshot; staged by the trainer, skipped on non-training paths.
+        accumulator_state = getattr(model, "accumulator_state", None)
+        if accumulator_state is not None:
+            os.makedirs(os.path.join(destination, "accumulator"), exist_ok=True)
+            torch.save(
+                accumulator_state,
+                os.path.join(destination, "accumulator", "accumulator.pt"),
+            )
