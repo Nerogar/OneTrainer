@@ -1,7 +1,7 @@
 from random import Random
 
 from modules.model.BaseModel import BaseModel, BaseModelEmbedding
-from modules.model.util.clip_util import encode_clip
+from modules.model.util.clip_util import encode_clip, encode_clip_chunked
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import (
@@ -197,18 +197,34 @@ class StableDiffusionModel(BaseModel):
             text_encoder_layer_skip: int = 0,
             text_encoder_dropout_probability: float | None = None,
             text_encoder_output: Tensor | None = None,
+            min_chunks: int = 1,
     ):
+        use_chunking = self.train_config.use_clip_token_chunks if self.train_config else False
+        encode_fn = encode_clip_chunked if use_chunking else encode_clip
+
+        max_chunks = self.train_config.clip_max_chunks if self.train_config else 1
+        chunk_size = self.text_encoder.config.max_position_embeddings - 2
+        max_length = max_chunks * chunk_size + 2
+
         if tokens is None:
             tokenizer_output = self.tokenizer(
                 self.add_text_encoder_embeddings_to_prompt(text),
                 padding='max_length',
                 truncation=True,
-                max_length=self.text_encoder.config.max_position_embeddings,
+                max_length=max(self.tokenizer.model_max_length, max_length) if use_chunking else self.tokenizer.model_max_length,
                 return_tensors="pt",
             )
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
 
-        text_encoder_output, _ = encode_clip(
+        text_encoder_kwargs = {}
+        if use_chunking:
+            text_encoder_kwargs['min_chunks'] = min_chunks
+            text_encoder_kwargs['max_chunks'] = max_chunks
+            text_encoder_kwargs['pooled_output_handling'] = self.train_config.clip_chunk_pooled_output_handling
+            text_encoder_kwargs['split_on_comma'] = self.train_config.clip_chunk_split_on_comma
+            text_encoder_kwargs['tokenizer'] = self.tokenizer
+
+        text_encoder_output, _ = encode_fn(
             text_encoder=self.text_encoder,
             tokens=tokens,
             default_layer=-1,
@@ -217,6 +233,7 @@ class StableDiffusionModel(BaseModel):
             add_pooled_output=False,
             use_attention_mask=False,
             add_layer_norm=True,
+            **text_encoder_kwargs,
         )
 
         text_encoder_output = self._apply_output_embeddings(
@@ -224,6 +241,8 @@ class StableDiffusionModel(BaseModel):
             self.tokenizer,
             tokens,
             text_encoder_output,
+            use_clip_token_chunks=use_chunking,
+            clip_max_chunks=max_chunks,
         )
 
         # apply dropout

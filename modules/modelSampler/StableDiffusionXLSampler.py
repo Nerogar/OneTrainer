@@ -2,6 +2,7 @@ import inspect
 from collections.abc import Callable
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
+from modules.model.util.clip_util import get_max_clip_chunks
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
 from modules.util import create, factory
 from modules.util.config.SampleConfig import SampleConfig
@@ -37,6 +38,60 @@ class StableDiffusionXLSampler(BaseModelSampler):
         self.model_type = model_type
         self.pipeline = model.create_pipeline()
 
+    def __get_min_chunks(self, prompt: str, negative_prompt: str) -> int:
+        use_chunking = self.model.train_config.use_clip_token_chunks if self.model.train_config else False
+        if not use_chunking:
+            return 1
+
+        max_chunks = self.model.train_config.clip_max_chunks if self.model.train_config else 1
+        max_pos_1 = self.model.text_encoder_1.config.max_position_embeddings
+        max_pos_2 = self.model.text_encoder_2.config.max_position_embeddings
+        chunk_size_1 = max_pos_1 - 2
+        chunk_size_2 = max_pos_2 - 2
+        max_length = max(max_pos_1, max_pos_2, max_chunks * chunk_size_1 + 2)
+        split_on_comma = self.model.train_config.clip_chunk_split_on_comma if self.model.train_config else False
+
+        prompt_1_tokens = self.model.tokenizer_1(
+            self.model.add_text_encoder_1_embeddings_to_prompt(prompt),
+            add_special_tokens=True,
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt",
+        ).input_ids
+        negative_prompt_1_tokens = self.model.tokenizer_1(
+            self.model.add_text_encoder_1_embeddings_to_prompt(negative_prompt),
+            add_special_tokens=True,
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt",
+        ).input_ids
+
+        prompt_2_tokens = self.model.tokenizer_2(
+            self.model.add_text_encoder_2_embeddings_to_prompt(prompt),
+            add_special_tokens=True,
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt",
+        ).input_ids
+        negative_prompt_2_tokens = self.model.tokenizer_2(
+            self.model.add_text_encoder_2_embeddings_to_prompt(negative_prompt),
+            add_special_tokens=True,
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt",
+        ).input_ids
+
+        return get_max_clip_chunks(
+            [
+                (prompt_1_tokens, chunk_size_1, self.model.tokenizer_1),
+                (negative_prompt_1_tokens, chunk_size_1, self.model.tokenizer_1),
+                (prompt_2_tokens, chunk_size_2, self.model.tokenizer_2),
+                (negative_prompt_2_tokens, chunk_size_2, self.model.tokenizer_2),
+            ],
+            split_on_comma=split_on_comma,
+            max_chunks=max_chunks,
+        )
+
     @torch.no_grad()
     def __sample_base(
             self,
@@ -71,11 +126,14 @@ class StableDiffusionXLSampler(BaseModelSampler):
             # prepare prompt
             self.model.text_encoder_to(self.train_device)
 
+            min_chunks = self.__get_min_chunks(prompt, negative_prompt)
+
             prompt_embedding, pooled_text_encoder_2_output = self.model.combine_text_encoder_output(*self.model.encode_text(
                 text=prompt,
                 train_device=self.train_device,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
+                min_chunks=min_chunks,
             ))
 
             negative_prompt_embedding, negative_pooled_text_encoder_2_output = self.model.combine_text_encoder_output(*self.model.encode_text(
@@ -83,6 +141,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 train_device=self.train_device,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
+                min_chunks=min_chunks,
             ))
 
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
@@ -309,12 +368,15 @@ class StableDiffusionXLSampler(BaseModelSampler):
             # prepare prompt
             self.model.text_encoder_to(self.train_device)
 
+            min_chunks = self.__get_min_chunks(prompt, negative_prompt)
+
             prompt_embedding, pooled_text_encoder_2_output = self.model.combine_text_encoder_output(
                 *self.model.encode_text(
                     text=prompt,
                     train_device=self.train_device,
                     text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                     text_encoder_2_layer_skip=text_encoder_2_layer_skip,
+                    min_chunks=min_chunks,
                 ))
 
             negative_prompt_embedding, negative_pooled_text_encoder_2_output = self.model.combine_text_encoder_output(
@@ -323,6 +385,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
                     train_device=self.train_device,
                     text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                     text_encoder_2_layer_skip=text_encoder_2_layer_skip,
+                    min_chunks=min_chunks,
                 ))
 
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
