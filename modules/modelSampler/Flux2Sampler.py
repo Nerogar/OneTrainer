@@ -74,7 +74,6 @@ class Flux2Sampler(BaseModelSampler):
             batch_size = 2 if cfg_scale > 1.0 and not transformer.config.guidance_embeds else 1
             prompt_embedding = self.model.encode_text(
                 text=[prompt, negative_prompt] if batch_size == 2 else prompt,
-                train_device=self.train_device,
                 text_encoder_sequence_length=text_encoder_sequence_length,
             )
 

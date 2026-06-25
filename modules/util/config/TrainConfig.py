@@ -461,6 +461,7 @@ class TrainConfig(BaseConfig):
     # text encoder
     text_encoder: TrainModelPartConfig
     text_encoder_layer_skip: int
+    text_encoder_sequence_length: int
 
     # text encoder 2
     text_encoder_2: TrainModelPartConfig
