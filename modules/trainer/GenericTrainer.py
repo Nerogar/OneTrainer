@@ -161,6 +161,18 @@ class GenericTrainer(BaseTrainer):
                 self.model, self.model_setup, self.model.train_progress, is_validation=True
             )
 
+        if self.config.patience and not self.config.validation:
+            print("Warning: Patience enabled without Validation. Auto-enabling Validation.")
+            self.config.validation = True
+            self.validation_data_loader = self.create_data_loader(
+                self.model, self.model_setup, self.model.train_progress, is_validation=True
+            )
+
+        self._patience_counter = 0
+        self._patience_best_loss = float('inf')
+        self._patience_best_step = -1
+        self._patience_best_backup_path: str | None = None
+
     def __save_config_to_workspace(self):
         path = path_util.canonical_join(self.config.workspace_dir, "config")
         os.makedirs(Path(path).absolute(), exist_ok=True)
@@ -404,14 +416,50 @@ class GenericTrainer(BaseTrainer):
                                             average_loss,
                                             train_progress.global_step)
 
-            if len(concept_counts) > 1:
-                total_loss = sum(accumulated_loss_per_concept[key] for key in concept_counts)
-                total_count = sum(concept_counts[key] for key in concept_counts)
-                total_average_loss = total_loss / total_count
+            total_loss = sum(accumulated_loss_per_concept[key] for key in concept_counts)
+            total_count = sum(concept_counts[key] for key in concept_counts)
+            total_average_loss = total_loss / total_count
 
+            if len(concept_counts) > 1:
                 self.tensorboard.add_scalar("loss/validation_step/total_average",
                                             total_average_loss,
                                             train_progress.global_step)
+
+            if self.config.patience:
+                self.__check_patience(total_average_loss, train_progress)
+
+    def __check_patience(self, val_loss: float, train_progress: TrainProgress):
+        is_new_best = val_loss < self._patience_best_loss
+
+        if is_new_best:
+            self._patience_best_backup_path = self.__save_patience_best(train_progress)
+            self._patience_best_step = train_progress.global_step
+            self._patience_best_loss = val_loss
+            self._patience_counter = 0
+        else:
+            self._patience_counter += 1
+
+        self.tensorboard.add_scalar("patience/counter", self._patience_counter, train_progress.global_step)
+        self.tensorboard.add_scalar("patience/best_val_loss", self._patience_best_loss, train_progress.global_step)
+
+        if self._patience_counter >= self.config.patience_epochs:
+            print(f"Patience triggered at step {train_progress.global_step}. "
+                  f"Best checkpoint from step {self._patience_best_step} "
+                  f"(val_loss: {self._patience_best_loss:.6f})")
+            self.commands.stop()
+
+    def __save_patience_best(self, train_progress: TrainProgress) -> str:
+        best_path = os.path.join(self.config.workspace_dir, "backup", "patience-best.pt")
+        os.makedirs(os.path.dirname(best_path), exist_ok=True)
+        try:
+            state = [p.data.clone().cpu() for p in self.parameters]
+            torch.save(state, best_path)
+            print(f"Saved patience best checkpoint (val_loss improved) at step {train_progress.global_step}")
+        except Exception:
+            traceback.print_exc()
+            print("Could not save patience best checkpoint.")
+            return self._patience_best_backup_path or ""
+        return best_path
 
     def __save_backup_config(self, backup_path):
         config_path = os.path.join(backup_path, "onetrainer_config")
@@ -857,6 +905,18 @@ class GenericTrainer(BaseTrainer):
 
                 if self.model.ema:
                     self.model.ema.copy_ema_to(self.parameters, store_temp=False)
+
+                if (self.config.patience
+                        and self._patience_best_backup_path
+                        and os.path.isfile(self._patience_best_backup_path)):
+                    print(f"Restoring patience best checkpoint from step {self._patience_best_step} "
+                          f"(val_loss: {self._patience_best_loss:.6f})")
+                    self.callbacks.on_update_status("Restoring best validation checkpoint")
+                    best_state = torch.load(self._patience_best_backup_path, map_location=self.temp_device)
+                    for param, saved in zip(self.parameters, best_state, strict=True):
+                        param.data.copy_(saved)
+                    del best_state
+
                 if os.path.isdir(self.config.output_model_destination) and self.config.output_model_format.is_single_file():
                     save_path = os.path.join(
                         self.config.output_model_destination,
