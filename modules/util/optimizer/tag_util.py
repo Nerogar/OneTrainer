@@ -29,7 +29,9 @@ def tag_peft_parameters(model: torch.nn.Module | None, config: TrainConfig):
                 n_el = p.shape[-1]
                 b = (1 + math.sqrt(1 + 8 * n_el)) / 2
                 scaling_factor = 2 * math.sqrt(b - 1)
-                p._oft_scale_factor = scaling_factor
+            else:
+                scaling_factor = 2 if config.oft_cans else 1
+            p._oft_scale_factor = scaling_factor
 
     for module in vars(model).values():
         if isinstance(module, LoRAModuleWrapper):

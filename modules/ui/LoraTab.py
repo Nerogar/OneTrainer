@@ -135,8 +135,8 @@ class LoraTab:
             components.switch(master, 2, 4, self.ui_state, "oft_scaled")
 
             # CANS OFT
-            components.label(master, 4, 3, "Accelerated Newton-Schulz",
-                             tooltip="Replaces Cayley-Neumann with Chebyshev-Optimized Newton-Schulz (CANS) to improve orthogonalization stability and reduce error without the high computational cost of the exact solver.")
+            components.label(master, 4, 3, "Matrix Exponential CANS",
+                             tooltip="Replaces Cayley-Neumann with Matrix Exponential with Chebyshev-Optimized Newton-Schulz (CANS) to improve orthogonalization stability.")
             components.switch(master, 4, 4, self.ui_state, "oft_cans")
 
             # Clip OFT max norm

@@ -678,7 +678,7 @@ class OFTModule(PeftBase):
         effective_weight = self.oft_R.weight / scaling_factor
 
         # For Conv2d, we must rotate the weights, not the input, to preserve spatial information.
-        orth_rotate = self.oft_R._cayley_batch(
+        orth_rotate = self.oft_R._compute_orthogonal_matrix(
             effective_weight, self.oft_R.block_size, self.oft_R.use_cayley_neumann, self.oft_R.num_cayley_neumann_terms, self.oft_R.oft_cans
         )
         orth_rotate = self.oft_R.dropout(orth_rotate)
