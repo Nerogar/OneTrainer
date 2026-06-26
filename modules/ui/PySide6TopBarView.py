@@ -6,6 +6,7 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import pyside6_components
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QInputDialog, QWidget
 
 
@@ -32,6 +33,14 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
 
         self.build(self.frame, master, controller, ui_state,
                    change_model_type_callback, change_training_method_callback, load_preset_callback)
+        self._vcenter_frame_widgets()
+
+    def _vcenter_frame_widgets(self):
+        lo = pyside6_components._layout(self.frame)
+        for i in range(lo.count()):
+            item = lo.itemAt(i)
+            if item and item.widget():
+                lo.setAlignment(item.widget(), Qt.AlignVCenter | Qt.AlignLeft)
 
     def _make_config_ui_state(self, master, data):
         from modules.util.ui.PySide6UIState import PySide6UIState
