@@ -79,7 +79,7 @@ class OFTRotationModule(nn.Module):
             self.register_buffer("id_mat", id_mat, persistent=False)
         if oft_clipped_norm == -1:
             if oft_cans:
-                # 0.95 * pi (~3.11) avoids the gradient ambiguity/singularity 
+                # 0.95 * pi (~3.11) avoids the gradient ambiguity/singularity
                 # at exactly 180 degrees (pi).
                 self.oft_clipped_norm = 0.95 * math.pi
             elif use_cayley_neumann:
@@ -116,7 +116,7 @@ class OFTRotationModule(nn.Module):
 
     def _break_inductor_graph(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Acts as an opaque boundary for TorchInductor. Forces materialization 
+        Acts as an opaque boundary for TorchInductor. Forces materialization
         of the tensor to sever deeply nested AST trees in torch.compile.
         """
         return torch.bmm(x, torch.ones_like(x))
@@ -187,11 +187,11 @@ class OFTRotationModule(nn.Module):
 
     def _matrix_exp_cans(self, Q_skew: torch.Tensor) -> torch.Tensor:
         """
-        Approximates the Matrix Exponential using a 4th-order Taylor expansion, 
+        Approximates the Matrix Exponential using a 4th-order Taylor expansion,
         Scaling & Squaring, and Chebyshev-Optimized Newton-Schulz (CANS).
         """
         num_squarings = 2
-        I = self.id_mat
+        id_mat = self.id_mat
 
         # Scaling step
         Q_scaled = Q_skew / (2 ** num_squarings)
@@ -199,8 +199,8 @@ class OFTRotationModule(nn.Module):
 
         # 4th-order Taylor expansion: exp(Q) ≈ I + Q + Q^2/2 + Q^3/6 + Q^4/24
         # Factored to minimize matrix multiplications: (I + Q) + Q^2 * (0.5*I + 1/6*Q + 1/24*Q^2)
-        taylor_higher_order = 0.5 * I + (1.0 / 6.0) * Q_scaled + (1.0 / 24.0) * Q_squared
-        G = torch.baddbmm(I + Q_scaled, Q_squared, taylor_higher_order)
+        taylor_higher_order = 0.5 * id_mat + (1.0 / 6.0) * Q_scaled + (1.0 / 24.0) * Q_squared
+        G = torch.baddbmm(id_mat + Q_scaled, Q_squared, taylor_higher_order)
 
         # Orthogonalize the approximation (CANS)
         # Empirically, CANS requires 3 steps to converge
@@ -212,7 +212,7 @@ class OFTRotationModule(nn.Module):
 
         # Final standard Newton-Schulz step to correct drift caused by squaring in lower precision
         # R_new = R + 0.5 * R * (I - R^T R)
-        residual = torch.baddbmm(I, R.mT, R, beta=1.0, alpha=-1.0)
+        residual = torch.baddbmm(id_mat, R.mT, R, beta=1.0, alpha=-1.0)
         R = torch.baddbmm(R, R, residual, beta=1.0, alpha=0.5)
 
         return R
