@@ -127,15 +127,15 @@ class PySide6ConceptWidgetView(BaseConceptWidgetView, QWidget):
         self.name_label.move(5, 153)
 
         close_btn = QPushButton("X", self)
-        close_btn.setFixedSize(20, 20)
+        close_btn.setFixedSize(24, 24)
         close_btn.setStyleSheet("background-color: #C00000; color: white;")
         close_btn.move(5, 0)
         close_btn.clicked.connect(lambda: remove_command(self.i))
 
         clone_btn = QPushButton("+", self)
-        clone_btn.setFixedSize(20, 20)
+        clone_btn.setFixedSize(24, 24)
         clone_btn.setStyleSheet("background-color: #00C000; color: white;")
-        clone_btn.move(30, 0)
+        clone_btn.move(34, 0)
         clone_btn.clicked.connect(lambda: clone_command(self.i, controller.randomize_seed))
 
         enabled_cb = QCheckBox(self)

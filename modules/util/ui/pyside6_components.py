@@ -1,4 +1,5 @@
 import contextlib
+import html
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
@@ -43,6 +44,13 @@ def _layout(master: QWidget) -> QGridLayout:
         lo.setSpacing(PAD)
         master.setLayout(lo)
     return lo
+
+
+def _set_tooltip(component: QWidget, text: str, wide: bool = False) -> None:
+    # plain QToolTip text is rendered on a single line; wrap it as rich text
+    # with a max-width so it matches Ctk's wraplength of 180/350px
+    width = 350 if wide else 180
+    component.setToolTip(f'<p style="max-width: {width}px;">{html.escape(text)}</p>')
 
 
 def _alignment(sticky: str) -> Qt.AlignmentFlag:
@@ -101,10 +109,15 @@ def scrollable_frame(parent: QWidget) -> tuple[QScrollArea, QWidget]:
 
 def _pack_form(master: QWidget) -> None:
     # Add a stretch row and column after the last content cell so extra space
-    # goes to the empty gutter rather than stretching content widgets.
+    # goes to the empty gutter rather than stretching content widgets. Skip this
+    # if a content row/column already claims stretch (e.g. an entry meant to
+    # grow) - adding another stretchy gutter would only split the extra space
+    # between the two instead of giving it all to the intended one.
     lo = _layout(master)
-    lo.setRowStretch(lo.rowCount(), 1)
-    lo.setColumnStretch(lo.columnCount(), 1)
+    if not any(lo.rowStretch(r) for r in range(lo.rowCount())):
+        lo.setRowStretch(lo.rowCount(), 1)
+    if not any(lo.columnStretch(c) for c in range(lo.columnCount())):
+        lo.setColumnStretch(lo.columnCount(), 1)
 
 
 # ---------------------------------------------------------------------------
@@ -144,18 +157,26 @@ def label(
         underline: bool = False,
 ) -> QLabel:
     component = QLabel(text, master)
+    cell_alignment = Qt.AlignVCenter | Qt.AlignLeft
     if wraplength > 0:
         component.setWordWrap(True)
         component.setMaximumWidth(wraplength)
+        # multi-line labels must not be vertically centered: if a neighboring
+        # widget in the same row ever forces the row shorter than this label's
+        # wrapped text, centering clips the top and bottom lines, leaving only
+        # the middle line visible
+        component.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        component.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        cell_alignment = Qt.AlignTop | Qt.AlignLeft
     if tooltip:
-        component.setToolTip(tooltip)
+        _set_tooltip(component, tooltip, wide_tooltip)
     if underline:
         font = component.font()
         font.setUnderline(True)
         component.setFont(font)
     layout = _layout(master)
     layout.addWidget(component, row, column)
-    layout.setAlignment(component, Qt.AlignVCenter | Qt.AlignLeft)
+    layout.setAlignment(component, cell_alignment)
     return component
 
 
@@ -189,7 +210,7 @@ def entry(
     _add(_layout(master), component, row, column, sticky=sticky)
 
     if tooltip:
-        component.setToolTip(tooltip)
+        _set_tooltip(component, tooltip, wide_tooltip)
 
     if validator_factory is not None:
         validator = validator_factory(
@@ -451,7 +472,7 @@ def button(
     component = QPushButton(text, master)
     component.clicked.connect(command)
     if tooltip:
-        component.setToolTip(tooltip)
+        _set_tooltip(component, tooltip)
     _add(_layout(master), component, row, column, sticky="new", padx=padx, pady=pady)
     return component
 
