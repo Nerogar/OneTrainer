@@ -139,6 +139,11 @@ class LoraTab:
                              tooltip="Replaces Cayley-Neumann with Chebyshev-Optimized Newton-Schulz (CANS) to improve orthogonalization stability and reduce error without the high computational cost of the exact solver.")
             components.switch(master, 4, 4, self.ui_state, "oft_cans")
 
+            # Clip OFT max norm
+            components.label(master, 5, 0, "Spectral Norm Clipping",
+                             tooltip="Strictly clips the spectral norm of the OFT matrix to guarantee convergence of the Cayley parametrization (requires norm <= 1.0). Smaller values constrain the learned rotation to stay near the identity matrix, limiting adaptation. Default: 1.0 (e.g. 0.8 = 80% of maximum expressiveness). Leave empty to disable.")
+            components.entry(master, 5, 1, self.ui_state, "oft_clipped_norm")
+
             # Dropout Percentage
             components.label(master, 2, 0, "Dropout Probability",
                             tooltip="Dropout probability. This percentage of the rotated adapter nodes that will be randomly restored to the base model initial statue. Helps with overfitting. 0 disables, 1 maximum.")

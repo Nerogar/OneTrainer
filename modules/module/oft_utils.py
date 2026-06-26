@@ -49,6 +49,7 @@ class OFTRotationModule(nn.Module):
         num_cayley_neumann_terms=5,
         oft_cans=False,
         dropout_probability=0.0,
+        oft_clipped_norm: float | None = 0.95,
     ):
         super().__init__()
         self.r = r
@@ -76,6 +77,16 @@ class OFTRotationModule(nn.Module):
         if not self.use_cayley_neumann:
             id_mat = (torch.eye(block_size).unsqueeze(0).expand(r, block_size, block_size))
             self.register_buffer("id_mat", id_mat, persistent=False)
+        self.oft_clipped_norm = oft_clipped_norm
+        if oft_clipped_norm is not None:
+            self.register_buffer("clipped_oft", torch.tensor(self.oft_clipped_norm))
+            # Initialize states for Spectral Normalization via Power Iteration
+            u = torch.randn(r, block_size)
+            u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            self.register_buffer("u_state", u, persistent=False)
+            v = torch.randn(r, block_size)
+            v = v / v.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            self.register_buffer("v_state", v, persistent=False)
 
     def _pytorch_skew_symmetric(self, vec, block_size):
         batch_size = vec.shape[0]
@@ -143,6 +154,25 @@ class OFTRotationModule(nn.Module):
 
         return X.to(original_dtype)
 
+    @torch.no_grad()
+    def _spectral_norm(self, Q_skew):
+        u = self.u_state.unsqueeze(-1).to(Q_skew.dtype)
+        v = self.v_state.unsqueeze(-1).to(Q_skew.dtype)
+        # Update v (Right Singular Vector)
+        v_raw = torch.bmm(Q_skew.mT, u)
+        v_norm = torch.linalg.vector_norm(v_raw, dim=1, keepdim=True)
+        candidate_v = v_raw / v_norm.clamp_min(1e-8)
+        next_v = torch.where(v_norm >= 1e-6, candidate_v, v)
+        # Update u (Left Singular Vector)
+        u_raw = torch.bmm(Q_skew, next_v)
+        u_norm = torch.linalg.vector_norm(u_raw, dim=1, keepdim=True)
+        candidate_u = u_raw / u_norm.clamp_min(1e-8)
+        next_u = torch.where(u_norm >= 1e-6, candidate_u, u)
+        if self.training:
+            self.v_state.copy_(next_v.squeeze(-1))
+            self.u_state.copy_(next_u.squeeze(-1))
+        return next_v, next_u
+
     def _cayley_batch(
         self, Q: torch.Tensor, block_size: int, use_cayley_neumann: bool = True, num_neumann_terms: int = 5, oft_cans: bool = False,
     ) -> torch.Tensor:
@@ -153,6 +183,14 @@ class OFTRotationModule(nn.Module):
         previous_dtype = Q.dtype
 
         Q_skew = self._pytorch_skew_symmetric(Q, block_size)
+
+        if self.oft_clipped_norm is not None:
+            v_norm, u_norm = self._spectral_norm(Q_skew)
+            # Estimate sigma (The spectral norm)
+            u_raw_grad = torch.bmm(Q_skew, v_norm)
+            sigma = torch.sum(u_norm * u_raw_grad, dim=1, keepdim=True)
+            max_norm = self.oft_clipped_norm
+            Q_skew = Q_skew * (max_norm / torch.clamp(sigma, min=max_norm))
 
         if use_cayley_neumann:
             R = torch.eye(block_size, device=Q.device, dtype=Q.dtype).repeat(b, 1, 1)
