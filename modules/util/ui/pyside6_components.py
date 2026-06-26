@@ -66,10 +66,13 @@ def _alignment(sticky: str) -> Qt.AlignmentFlag:
     else:
         h = Qt.AlignLeft
 
+    has_v = 'v' in sticky
     if has_n and has_s:
         v = Qt.AlignmentFlag(0)
     elif has_s:
         v = Qt.AlignBottom
+    elif has_v:
+        v = Qt.AlignVCenter
     else:
         v = Qt.AlignTop
 
@@ -467,13 +470,14 @@ def button(
         tooltip: str | None = None,
         padx: int = PAD,
         pady: int = PAD,
+        sticky: str = "new",
         **kwargs,
 ) -> QPushButton:
     component = QPushButton(text, master)
     component.clicked.connect(command)
     if tooltip:
         _set_tooltip(component, tooltip)
-    _add(_layout(master), component, row, column, sticky="new", padx=padx, pady=pady)
+    _add(_layout(master), component, row, column, sticky=sticky, padx=padx, pady=pady)
     return component
 
 
@@ -560,6 +564,7 @@ def options_kv(
         ui_state: BaseUIState,
         var_name: str,
         command: Callable[[Any], None] | None = None,
+        sticky: str = "new",
 ) -> QComboBox:
     var = ui_state.get_var(var_name)
     keys = [key for key, _ in values]
@@ -608,7 +613,7 @@ def options_kv(
     combo.currentTextChanged.connect(on_combo)
     cb_id = var._bind_widget(on_var)
     combo.destroyed.connect(lambda: var._unbind_widget(cb_id))
-    _add(_layout(master), combo, row, column)
+    _add(_layout(master), combo, row, column, sticky=sticky)
 
     # match CTK behavior: fire initial command with the current value
     if command:
@@ -673,6 +678,7 @@ def progress(master: QWidget, row: int, column: int) -> QProgressBar:
     component.setRange(0, 1000)
     component.setValue(0)
     component.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    component.setFixedHeight(12)
     _add(_layout(master), component, row, column, sticky="ew")
     return component
 
@@ -700,6 +706,7 @@ def double_progress(
         p.setRange(0, 1000)
         p.setValue(0)
         p.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        p.setFixedHeight(16)
 
     lo.addWidget(label_1_component,       0, 0)
     lo.addWidget(progress_1_component,    0, 1)
