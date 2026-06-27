@@ -34,32 +34,33 @@ class PySide6TrainingTabView(BaseTrainingTabView, QWidget, metaclass=QtABCMeta):
         scroll = QScrollArea(self)
         scroll.setWidgetResizable(True)
         pyside6_components._layout(self).addWidget(scroll, 0, 0)
+        self.scroll_frame = scroll
 
-        self.scroll_frame = QWidget()
-        scroll.setWidget(self.scroll_frame)
+        frame = QWidget()
+        scroll.setWidget(frame)
 
-        lo = pyside6_components._layout(self.scroll_frame)
+        lo = pyside6_components._layout(frame)
         lo.setContentsMargins(pyside6_components.PAD, pyside6_components.PAD, pyside6_components.PAD, pyside6_components.PAD)
         lo.setColumnStretch(0, 1)
         lo.setColumnStretch(1, 1)
         lo.setColumnStretch(2, 1)
 
-        column_0 = QWidget(self.scroll_frame)
+        column_0 = QWidget(frame)
         column_0.setMinimumWidth(0)
         column_0.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        pyside6_components._layout(self.scroll_frame).addWidget(column_0, 0, 0)
+        pyside6_components._layout(frame).addWidget(column_0, 0, 0)
         pyside6_components._layout(column_0).setColumnStretch(0, 1)
 
-        column_1 = QWidget(self.scroll_frame)
+        column_1 = QWidget(frame)
         column_1.setMinimumWidth(0)
         column_1.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        pyside6_components._layout(self.scroll_frame).addWidget(column_1, 0, 1)
+        pyside6_components._layout(frame).addWidget(column_1, 0, 1)
         pyside6_components._layout(column_1).setColumnStretch(0, 1)
 
-        column_2 = QWidget(self.scroll_frame)
+        column_2 = QWidget(frame)
         column_2.setMinimumWidth(0)
         column_2.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        pyside6_components._layout(self.scroll_frame).addWidget(column_2, 0, 2)
+        pyside6_components._layout(frame).addWidget(column_2, 0, 2)
         pyside6_components._layout(column_2).setColumnStretch(0, 1)
 
         self.build(column_0, column_1, column_2, self.controller, self.ui_state)
