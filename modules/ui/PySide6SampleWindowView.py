@@ -55,13 +55,27 @@ class PySide6SampleWindowView(BaseSampleWindowView, QDialog):
         outer.addWidget(self._progress, 2, 0)
 
         sample_btn = QPushButton("sample", self)
-        # Run in a background thread so the Qt event loop stays responsive during sampling
-        sample_btn.clicked.connect(
-            lambda: threading.Thread(
-                target=lambda: controller.do_sample(self._update_preview, self._update_progress),
-                daemon=True,
-            ).start()
-        )
+        def _on_sample():
+            # With an external model (manual sample during training) do_sample
+            # only enqueues a command for the training thread to execute, so it
+            # returns immediately; queueing several is fine, no thread needed.
+            if controller.use_external_model:
+                controller.do_sample(self._update_preview, self._update_progress)
+                return
+
+            # Standalone sampling runs the model synchronously, so run it in a
+            # background thread to keep the Qt event loop responsive, and disable
+            # the button while a sample is in flight to avoid concurrent runs.
+            sample_btn.setEnabled(False)
+
+            def _run():
+                try:
+                    controller.do_sample(self._update_preview, self._update_progress)
+                finally:
+                    self.schedule_on_main_thread(lambda: sample_btn.setEnabled(True))
+
+            threading.Thread(target=_run, daemon=True).start()
+        sample_btn.clicked.connect(_on_sample)
         outer.addWidget(sample_btn, 3, 0)
 
 
