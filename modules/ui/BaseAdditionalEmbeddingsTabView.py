@@ -2,8 +2,6 @@
 from modules.ui.BaseConfigListView import BaseConfigListView
 from modules.util import path_util
 
-import customtkinter as ctk
-
 
 class BaseAdditionalEmbeddingsTabView(BaseConfigListView):
 
@@ -14,7 +12,7 @@ class BaseAdditionalEmbeddingsTabView(BaseConfigListView):
         self.widgets_initialized = False
         self._create_element_list()
 
-    def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
+    def open_element_window(self, i, ui_state):
         pass
 
 

@@ -96,11 +96,11 @@ class CaptionUIController:
 
     def previous_image(self):
         if len(self.image_rel_paths) > 0 and (self.current_image_index - 1) >= 0:
-            self.view.switch_image(self.current_image_index - 1)
+            self.switch_image(self.current_image_index - 1)
 
     def next_image(self):
         if len(self.image_rel_paths) > 0 and (self.current_image_index + 1) < len(self.image_rel_paths):
-            self.view.switch_image(self.current_image_index + 1)
+            self.switch_image(self.current_image_index + 1)
 
     def load_directory(self, include_subdirectories: bool = False):
         self.scan_directory(include_subdirectories)
