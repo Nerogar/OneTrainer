@@ -205,12 +205,13 @@ def entry(
 ) -> QLineEdit:
     var = ui_state.get_var(var_name)
 
-    if command:
-        ui_state.add_var_trace(var_name, command)
-
     component = QLineEdit(master)
     component.setMinimumWidth(width)
     _add(_layout(master), component, row, column, sticky=sticky)
+
+    if command:
+        trace_id = ui_state.add_var_trace(var_name, command)
+        component.destroyed.connect(lambda: ui_state.remove_var_trace(var_name, trace_id))
 
     if tooltip:
         _set_tooltip(component, tooltip, wide_tooltip)
@@ -641,7 +642,8 @@ def switch(
     component.setChecked(bool(var.get()))
 
     if command:
-        ui_state.add_var_trace(var_name, command)
+        trace_id = ui_state.add_var_trace(var_name, command)
+        component.destroyed.connect(lambda: ui_state.remove_var_trace(var_name, trace_id))
 
     _updating = False
 
