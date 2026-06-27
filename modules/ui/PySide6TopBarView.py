@@ -6,7 +6,7 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import pyside6_components
 
-from PySide6.QtWidgets import QInputDialog, QWidget
+from PySide6.QtWidgets import QInputDialog, QMessageBox, QWidget
 
 
 class PySide6TopBarView(BaseTopBarView, QWidget):
@@ -51,5 +51,11 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
 
     def _show_save_dialog(self, default_value: str, callback):
         text, ok = QInputDialog.getText(self, "name", "Config Name", text=default_value)
-        if ok and not text.startswith("#"):
-            callback(text)
+        if not ok:
+            return
+        if text.startswith("#"):
+            # names starting with '#' are reserved for built-in presets; warn
+            # instead of silently discarding the save, so the user can retry
+            QMessageBox.warning(self, "Invalid name", "Config names starting with '#' are reserved for built-in presets.")
+            return
+        callback(text)
