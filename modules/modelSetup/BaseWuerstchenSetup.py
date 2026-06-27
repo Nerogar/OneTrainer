@@ -239,7 +239,8 @@ class BaseWuerstchenSetup(
                 text_encoder_output=batch[
                     'text_encoder_hidden_state'] if not config.train_text_encoder_or_embedding() else None,
                 pooled_text_encoder_output=batch[
-                    'pooled_text_encoder_output'] if not config.train_text_encoder_or_embedding() else None,
+                    'pooled_text_encoder_output'] if not config.train_text_encoder_or_embedding()
+                    and 'pooled_text_encoder_output' in batch else None,
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
 
