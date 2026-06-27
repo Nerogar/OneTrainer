@@ -110,14 +110,10 @@ class TrainOptimizerConfig(BaseConfig):
     use_schedulefree: True
     use_orthograd: False
     nnmf_factor: False
-    orthogonal_gradient: False
+    orthogonal_gradient: str
     use_atan2: False
-    use_AdEMAMix: False
-    beta3_ema: float
-    alpha_grad: float
     beta1_warmup: int
     min_beta1: float
-    Simplified_AdEMAMix: False
     kourkoutas_beta: False
     schedulefree_c: float
     ns_steps: int
@@ -136,11 +132,45 @@ class TrainOptimizerConfig(BaseConfig):
     accelerated_ns: False
     cautious_wd: False
     approx_mars: False
-    auto_kappa_p: False
     compile: False
+    spectral_normalization: False
+    stochastic_sign: False
+    centered_wd: float
+    centered_wd_mode: str
+    factored_2nd: False
+    fisher_wd: False
+    state_precision: str
+    orthogonal_sinkhorn: False
+    sinkhorn_iterations: int
+    normed_momentum: False
+    nesterov_coef: float
+    snr_cond: False
+    geometric_wd: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super().__init__(data)
+        super().__init__(
+            data,
+            config_version=1,
+            config_migrations={
+                0: self.__migration_0
+            }
+        )
+
+    def __migration_0(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        sp = migrated_data.get("state_precision")
+        valid_sp = {"auto", "factored", "fp32", "fp16", "bf16_sr", "int8_sr"}
+        if sp is not None and sp not in valid_sp:
+            print(f"WARN: invalid optimizer state_precision '{sp}' in config, falling back to 'auto'.")
+            migrated_data["state_precision"] = "auto"
+
+        # orthogonal_gradient was a bool before adv_optm 2.5 made it a mode string
+        og_ortho = migrated_data.get("orthogonal_gradient")
+        if isinstance(og_ortho, bool):
+            migrated_data["orthogonal_gradient"] = "flattened" if og_ortho else "disabled"
+
+        return migrated_data
 
     @staticmethod
     def default_values():
@@ -223,14 +253,10 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("use_schedulefree", True, bool, True))
         data.append(("use_orthograd", False, bool, False))
         data.append(("nnmf_factor", False, bool, False))
-        data.append(("orthogonal_gradient", False, bool, False))
+        data.append(("orthogonal_gradient", 'disabled', str, False))
         data.append(("use_atan2", False, bool, False))
-        data.append(("use_AdEMAMix", False, bool, False))
-        data.append(("beta3_ema", None, float, True))
-        data.append(("alpha_grad", None, float, True))
         data.append(("beta1_warmup", None, int, True))
         data.append(("min_beta1", None, float, True))
-        data.append(("Simplified_AdEMAMix", False, bool, False))
         data.append(("kourkoutas_beta", False, bool, False))
         data.append(("schedulefree_c", None, float, True))
         data.append(("ns_steps", None, int, True))
@@ -249,8 +275,20 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("accelerated_ns", False, bool, False))
         data.append(("cautious_wd", False, bool, False))
         data.append(("approx_mars", False, bool, False))
-        data.append(("auto_kappa_p", False, bool, False))
         data.append(("compile", False, bool, False))
+        data.append(("spectral_normalization", False, bool, False))
+        data.append(("stochastic_sign", False, bool, False))
+        data.append(("centered_wd", 0.0, float, False))
+        data.append(("centered_wd_mode", "full", str, False))
+        data.append(("factored_2nd", False, bool, False))
+        data.append(("fisher_wd", False, bool, False))
+        data.append(("state_precision", "auto", str, False))
+        data.append(("orthogonal_sinkhorn", False, bool, False))
+        data.append(("sinkhorn_iterations", None, int, True))
+        data.append(("normed_momentum", False, bool, False))
+        data.append(("nesterov_coef", None, float, True))
+        data.append(("snr_cond", False, bool, False))
+        data.append(("geometric_wd", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
@@ -522,6 +560,8 @@ class TrainConfig(BaseConfig):
     oft_block_size: int
     oft_block_share: bool
     oft_scaled: bool
+    oft_clipped_norm: float | None
+    oft_cans: bool
 
     # lokr
     lokr_dim: int
@@ -799,6 +839,7 @@ class TrainConfig(BaseConfig):
         migrated_data.pop("weight_dtype")
 
         return migrated_data
+
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
@@ -1161,6 +1202,8 @@ class TrainConfig(BaseConfig):
         data.append(("oft_block_size", 32, int, False))
         data.append(("oft_block_share", False, bool, False))
         data.append(("oft_scaled", False, bool, False))
+        data.append(("oft_clipped_norm", 0.95, float, True))
+        data.append(("oft_cans", False, bool, False))
 
         # lokr
         data.append(("lokr_dim", 16, int, False))
