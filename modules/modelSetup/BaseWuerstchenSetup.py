@@ -358,7 +358,7 @@ class BaseWuerstchenSetup(
         model.to(self.temp_device)
 
         if not config.train_text_encoder_or_embedding():
-            model.text_encoder_to(self.train_device)
+            model.prior_text_encoder_to(self.train_device)
 
         model.eval()
         torch_gc()
