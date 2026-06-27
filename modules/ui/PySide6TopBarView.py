@@ -43,10 +43,11 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
     def _setup_frame_column_weight(self):
         pyside6_components._layout(self.frame).setColumnStretch(5, 1)
 
-    def _forget_dropdown(self):
-        pyside6_components._layout(self.frame).removeWidget(self.configs_dropdown)
-        self.configs_dropdown.hide()
-        self.configs_dropdown.deleteLater()
+    def _forget_dropdown(self, widget):
+        lo = pyside6_components._layout(self.frame)
+        lo.removeWidget(widget)
+        widget.hide()
+        widget.deleteLater()
 
     def _show_save_dialog(self, default_value: str, callback):
         text, ok = QInputDialog.getText(self, "name", "Config Name", text=default_value)

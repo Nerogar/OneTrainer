@@ -369,6 +369,7 @@ def button(master, row, column, text, command, tooltip=None, **kwargs):
     # Pop grid-specific parameters from kwargs, using PAD as the default if not provided.
     padx = kwargs.pop('padx', PAD)
     pady = kwargs.pop('pady', PAD)
+    kwargs.pop('sticky', None)
 
     component = ctk.CTkButton(master, text=text, command=command, **kwargs)
     component.grid(row=row, column=column, padx=padx, pady=pady, sticky="new")
@@ -430,7 +431,7 @@ def options_adv(master, row, column, values, ui_state: CtkUIState, var_name: str
 
 
 def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: CtkUIState, var_name: str,
-               command: Callable[[Any], None] | None = None):
+               command: Callable[[Any], None] | None = None, sticky=None):
     var = ui_state.get_var(var_name)
     keys = [key for key, value in values]
 
