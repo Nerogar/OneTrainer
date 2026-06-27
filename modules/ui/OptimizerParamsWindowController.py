@@ -35,7 +35,7 @@ class OptimizerParamsWindowController:
         else:
             defaults = OPTIMIZER_DEFAULT_PARAMETERS[Optimizer.ADAMW_ADV]
 
-        if current_state is None:
+        if not current_state:
             adam_config.from_dict(defaults)
             if current_optimizer != Optimizer.MUON:
                 adam_config.optimizer = Optimizer.ADAMW_ADV
