@@ -3,11 +3,13 @@ import random
 import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import suppress
 from queue import Empty, Full, Queue
 from tkinter import filedialog, messagebox
 
 from modules.util import path_util
 from modules.util.dpo_curation_util import (
+    align_pool_by_similarity,
     export_single_pair,
     finalize_export,
     find_exported_file,
@@ -73,7 +75,15 @@ class DPOCurationWindow(ctk.CTkToplevel):
         self.selection_phase = "best"  # "best" or "worst"
         self.selected_best: str | None = None
 
-        self.mode = "selection"  # "swiss" or "selection"
+        # Triage state
+        self._triage_verdicts: dict[str, str] = {}
+        self._triage_pairs: list[tuple[str, str]] = []
+        self._triage_good_pool: list[str] = []
+        self._triage_bad_pool: list[str] = []
+        self._triage_thumb_cache: dict[str, tuple] = {}
+        self._triage_phase = "voting"  # "voting" or "pairing"
+
+        self.mode = "selection"  # "swiss", "selection" or "triage"
         self.pairs_per_group_var = ctk.StringVar(value="1")
 
         # Review mode state
@@ -154,6 +164,9 @@ class DPOCurationWindow(ctk.CTkToplevel):
             side="left", padx=10
         )
         ctk.CTkButton(btn_frame, text="Start (Selection)", width=250, command=lambda: self._start("selection")).pack(
+            side="left", padx=10
+        )
+        ctk.CTkButton(btn_frame, text="Start (Triage)", width=250, command=lambda: self._start("triage")).pack(
             side="left", padx=10
         )
 
@@ -433,6 +446,8 @@ class DPOCurationWindow(ctk.CTkToplevel):
 
             if self.mode == "swiss":
                 self._start_swiss_round()
+            elif self.mode == "triage":
+                self._start_triage_round()
             else:
                 self._start_selection_round()
             return
@@ -825,6 +840,320 @@ class DPOCurationWindow(ctk.CTkToplevel):
                 self._register_pair(self.selected_best, path, continue_scoring=result)
             else:
                 self._register_pair(self.selected_best, path)
+
+    # ---- Triage Mode ----
+
+    _VERDICT_BORDER = {"good": "#2FA572", "bad": "#C84B4B", "skip": "gray50"}
+
+    def _start_triage_round(self):
+        if len(self.current_remaining_images) < 2:
+            self._advance_group()
+            return
+        self._triage_verdicts = {}
+        self._triage_pairs = []
+        self._triage_good_pool = []
+        self._triage_bad_pool = []
+        self._triage_thumb_cache = {}
+        self._triage_phase = "voting"
+        self._build_triage_voting_ui()
+
+    def _triage_counts(self) -> tuple[int, int, int, int]:
+        good = bad = skip = 0
+        for path in self.current_remaining_images:
+            verdict = self._triage_verdicts.get(path)
+            if verdict == "good":
+                good += 1
+            elif verdict == "bad":
+                bad += 1
+            elif verdict == "skip":
+                skip += 1
+        unscored = len(self.current_remaining_images) - good - bad - skip
+        return good, bad, skip, unscored
+
+    def _triage_thumbnail(self, master, path: str, size: int):
+        """Cached thumbnail label (own cache so it never collides with the swiss
+        ranked-review thumbnails, which key by path at a different size)."""
+        cached = self._triage_thumb_cache.get((path, size))
+        if cached is None:
+            try:
+                with Image.open(path) as _raw:
+                    pil_img = self._fit_image(_raw, size, size).copy()
+                cached = (ctk.CTkImage(light_image=pil_img, size=pil_img.size), pil_img)
+            except Exception:
+                cached = (None, None)
+            self._triage_thumb_cache[(path, size)] = cached
+        ctk_img, pil_img = cached
+        if ctk_img is None:
+            return ctk.CTkLabel(master, text=os.path.basename(path))
+        label = ctk.CTkLabel(master, text="", image=ctk_img)
+        label.image = ctk_img  # prevent GC
+        label.pil_image = pil_img  # prevent GC - CTkImage needs the PIL data alive for DPI re-rendering
+        return label
+
+    def _build_triage_voting_ui(self):
+        for widget in self.winfo_children():
+            widget.destroy()
+        group = self._current_group
+        self._build_prompt_expander(self, group["prompt"])
+
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=10, pady=5)
+        ctk.CTkLabel(header, text=f"AR: {group['aspectratio']}", font=("", 12)).pack(side="left", padx=15)
+        ctk.CTkLabel(header, text=f"Group {self._groups_shown} / {self._groups_queued}", font=("", 12)).pack(
+            side="left", padx=15
+        )
+        ctk.CTkLabel(header, text="Triage: mark each image Good or Bad, then Build Pairs.", font=("", 13, "bold")).pack(
+            side="left", padx=15
+        )
+        ctk.CTkButton(header, text="Skip Group", width=120, fg_color="#8B4513", command=self._skip_group).pack(
+            side="right", padx=10
+        )
+        self._triage_counts_label = ctk.CTkLabel(header, text="", font=("", 12))
+        self._triage_counts_label.pack(side="right", padx=15)
+
+        grid_frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        grid_frame.pack(expand=True, fill="both", padx=10, pady=5)
+        cols = max(1, min(5, int(self.winfo_width() / 300) or 4))
+        self._triage_tiles = {}
+        for index, path in enumerate(self.current_remaining_images):
+            row, col = divmod(index, cols)
+            grid_frame.grid_columnconfigure(col, weight=1)
+            self._build_triage_tile(grid_frame, path, row, col)
+
+        footer = ctk.CTkFrame(self, fg_color="transparent")
+        footer.pack(fill="x", padx=10, pady=10)
+        ctk.CTkLabel(
+            footer,
+            text="Left-click image = Good · Right-click = Bad · buttons for Skip / preview",
+            text_color="gray",
+        ).pack(side="left", padx=15)
+        self._triage_build_btn = ctk.CTkButton(
+            footer, text="Build Pairs →", width=200, command=self._triage_build_pairs
+        )
+        self._triage_build_btn.pack(side="right", padx=10)
+        self._update_triage_counts()
+
+    def _build_triage_tile(self, master, path: str, row: int, col: int):
+        verdict = self._triage_verdicts.get(path)
+        tile = ctk.CTkFrame(master, border_width=3, border_color=self._VERDICT_BORDER.get(verdict, "gray30"))
+        tile.grid(row=row, column=col, padx=5, pady=5)
+        self._triage_tiles[path] = tile
+
+        thumb = self._triage_thumbnail(tile, path, 230)
+        thumb.pack(padx=3, pady=3)
+        thumb.bind("<Button-1>", lambda e, p=path: self._triage_vote(p, "good"))
+        thumb.bind("<Button-3>", lambda e, p=path: self._triage_vote(p, "bad"))
+
+        btns = ctk.CTkFrame(tile, fg_color="transparent")
+        btns.pack(pady=(0, 4))
+        ctk.CTkButton(
+            btns,
+            text="Good",
+            width=52,
+            height=24,
+            fg_color="#2FA572",
+            command=lambda p=path: self._triage_vote(p, "good"),
+        ).pack(side="left", padx=2)
+        ctk.CTkButton(
+            btns,
+            text="Bad",
+            width=46,
+            height=24,
+            fg_color="#C84B4B",
+            command=lambda p=path: self._triage_vote(p, "bad"),
+        ).pack(side="left", padx=2)
+        ctk.CTkButton(
+            btns,
+            text="Skip",
+            width=46,
+            height=24,
+            fg_color="gray40",
+            command=lambda p=path: self._triage_vote(p, "skip"),
+        ).pack(side="left", padx=2)
+        ctk.CTkButton(
+            btns,
+            text="\U0001f50d",
+            width=30,
+            height=24,
+            fg_color="gray30",
+            command=lambda p=path: self._selection_preview(p, pick=False),
+        ).pack(side="left", padx=2)
+
+    def _triage_vote(self, path: str, verdict: str):
+        # Clicking the current verdict again clears it (toggle back to unscored).
+        if self._triage_verdicts.get(path) == verdict:
+            self._triage_verdicts.pop(path, None)
+        else:
+            self._triage_verdicts[path] = verdict
+        tile = getattr(self, "_triage_tiles", {}).get(path)
+        if tile is not None:
+            tile.configure(border_color=self._VERDICT_BORDER.get(self._triage_verdicts.get(path), "gray30"))
+        self._update_triage_counts()
+
+    def _update_triage_counts(self):
+        good, bad, skip, unscored = self._triage_counts()
+        label = getattr(self, "_triage_counts_label", None)
+        if label is not None:
+            label.configure(text=f"Good {good} · Bad {bad} · Skip {skip} · Left {unscored}")
+        button = getattr(self, "_triage_build_btn", None)
+        if button is not None:
+            button.configure(state="normal" if good >= 1 and bad >= 1 else "disabled")
+
+    def _triage_build_pairs(self):
+        good = [p for p in self.current_remaining_images if self._triage_verdicts.get(p) == "good"]
+        bad = [p for p in self.current_remaining_images if self._triage_verdicts.get(p) == "bad"]
+        n = min(len(good), len(bad))
+        # Order-based by default; the user can Auto-align for similarity pairing.
+        self._triage_pairs = list(zip(good[:n], bad[:n], strict=False))
+        self._triage_good_pool = good[n:]
+        self._triage_bad_pool = bad[n:]
+        self._triage_phase = "pairing"
+        self._build_triage_pairing_ui()
+
+    def _build_triage_pairing_ui(self):
+        for widget in self.winfo_children():
+            widget.destroy()
+        group = self._current_group
+        self._build_prompt_expander(self, group["prompt"])
+
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=10, pady=5)
+        ctk.CTkLabel(header, text=f"AR: {group['aspectratio']}", font=("", 12)).pack(side="left", padx=15)
+        ctk.CTkLabel(header, text=f"Group {self._groups_shown} / {self._groups_queued}", font=("", 12)).pack(
+            side="left", padx=15
+        )
+        ctk.CTkLabel(header, text=f"{len(self._triage_pairs)} pair(s) ready", font=("", 13, "bold")).pack(
+            side="left", padx=15
+        )
+
+        body = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        body.pack(expand=True, fill="both", padx=10, pady=5)
+
+        col_hdr = ctk.CTkFrame(body, fg_color="transparent")
+        col_hdr.pack(fill="x")
+        ctk.CTkLabel(col_hdr, text="Chosen (Good)", font=("", 12, "bold"), text_color="#2FA572").pack(
+            side="left", expand=True
+        )
+        ctk.CTkLabel(col_hdr, text="Rejected (Bad)", font=("", 12, "bold"), text_color="#C84B4B").pack(
+            side="right", expand=True
+        )
+
+        if not self._triage_pairs:
+            ctk.CTkLabel(
+                body, text="No pairs — go back and mark at least one Good and one Bad.", text_color="gray"
+            ).pack(pady=20)
+        for chosen, rejected in self._triage_pairs:
+            pair_row = ctk.CTkFrame(body, fg_color="transparent")
+            pair_row.pack(fill="x", pady=4)
+            pair_row.grid_columnconfigure(0, weight=1)
+            pair_row.grid_columnconfigure(2, weight=1)
+            self._triage_thumbnail(pair_row, chosen, 200).grid(row=0, column=0, sticky="e", padx=8)
+            ctk.CTkLabel(pair_row, text="—", font=("", 18, "bold"), text_color="#1F6AA5").grid(row=0, column=1)
+            self._triage_thumbnail(pair_row, rejected, 200).grid(row=0, column=2, sticky="w", padx=8)
+
+        self._triage_pool_row(body, self._triage_good_pool, "Unpaired Good", "#2FA572")
+        self._triage_pool_row(body, self._triage_bad_pool, "Unpaired Bad", "#C84B4B")
+
+        footer = ctk.CTkFrame(self, fg_color="transparent")
+        footer.pack(fill="x", padx=10, pady=10)
+        ctk.CTkButton(
+            footer, text="← Back to Voting", width=150, fg_color="gray40", command=self._build_triage_voting_ui
+        ).pack(side="left", padx=10)
+        ctk.CTkButton(footer, text="✨ Auto-align by Similarity", width=230, command=self._triage_auto_align).pack(
+            side="left", padx=10
+        )
+        ctk.CTkButton(footer, text="Skip Group", width=120, fg_color="#8B4513", command=self._skip_group).pack(
+            side="right", padx=10
+        )
+        ctk.CTkButton(
+            footer,
+            text=f"Confirm {len(self._triage_pairs)} Pair{'' if len(self._triage_pairs) == 1 else 's'}",
+            width=180,
+            command=self._triage_confirm,
+            state="normal" if self._triage_pairs else "disabled",
+        ).pack(side="right", padx=10)
+
+    def _triage_pool_row(self, body, pool: list[str], title: str, color: str):
+        if not pool:
+            return
+        ctk.CTkLabel(body, text=f"{title} ({len(pool)})", text_color=color, font=("", 12, "bold")).pack(
+            anchor="w", pady=(12, 2)
+        )
+        strip = ctk.CTkFrame(body, fg_color="transparent")
+        strip.pack(fill="x")
+        for index, path in enumerate(pool):
+            self._triage_thumbnail(strip, path, 130).grid(row=0, column=index, padx=4, pady=4)
+
+    def _triage_auto_align(self):
+        good = [chosen for chosen, _ in self._triage_pairs] + list(self._triage_good_pool)
+        bad = [rejected for _, rejected in self._triage_pairs] + list(self._triage_bad_pool)
+        if not good or not bad:
+            return
+
+        # DINOv2 inference is slow, so run it on a worker thread behind an
+        # indeterminate progress dialog rather than freezing the Tk main loop.
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Auto-align")
+        dialog.transient(self)
+        dialog.resizable(False, False)
+        ctk.CTkLabel(dialog, text="Pairing by similarity (DINOv2)…", font=("", 13)).pack(padx=24, pady=(20, 10))
+        bar = ctk.CTkProgressBar(dialog, width=300, mode="indeterminate")
+        bar.pack(padx=24, pady=(0, 20))
+        bar.start()
+        dialog.after(200, lambda: set_window_icon(dialog))
+        with suppress(Exception):
+            dialog.grab_set()
+
+        holder: dict = {}
+
+        def _worker():
+            try:
+                holder["result"] = align_pool_by_similarity(good, bad)
+            except Exception as ex:  # surfaced on the UI thread by _poll
+                holder["error"] = str(ex)
+
+        thread = threading.Thread(target=_worker, daemon=True)
+        thread.start()
+
+        def _poll():
+            if thread.is_alive():
+                self.after(150, _poll)
+                return
+            bar.stop()
+            with suppress(Exception):
+                dialog.grab_release()
+            dialog.destroy()
+            self._safe_grab()
+            if "error" in holder:
+                messagebox.showerror("Auto-align Failed", f"Could not align by similarity:\n{holder['error']}")
+                return
+            result = holder.get("result")
+            if result is not None:
+                self._triage_pairs = list(result["pairs"])
+                self._triage_good_pool = list(result["chosen_pool"])
+                self._triage_bad_pool = list(result["rejected_pool"])
+                self._build_triage_pairing_ui()
+
+        self.after(150, _poll)
+
+    def _triage_confirm(self):
+        if not self._triage_pairs:
+            return
+        group = self._current_group
+        used: set[str] = set()
+        for chosen, rejected in self._triage_pairs:
+            export_single_pair(
+                self.output_dir,
+                self.manifest,
+                chosen,
+                rejected,
+                group["prompt"],
+                group["aspectratio"],
+            )
+            used |= {chosen, rejected}
+        self.current_remaining_images = [image for image in self.current_remaining_images if image not in used]
+        self.pairs_created_in_group += len(self._triage_pairs)
+        self._advance_group()
 
     # ---- Common ----
 

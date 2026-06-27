@@ -9,6 +9,7 @@ from modules.util.dpo_curation_util import (
     find_caption_mismatches,
     fix_multiline_captions,
     remove_finalized_pair,
+    repair_rejected_pairs,
 )
 from modules.util.dpo_pattern_util import dpo_concept_pattern_dirs
 from modules.util.enum.DPOObjective import DPOObjective
@@ -205,6 +206,16 @@ class RLHFTab:
         components.button(
             self.scroll_frame,
             7,
+            2,
+            "Re-pair by Similarity",
+            command=self._repair_rejected,
+            tooltip="Within each caption group, rename rejected images so each is paired with the chosen image it most "
+            "resembles (DINOv2 structural similarity). Sharpens the DPO signal by holding composition constant so the "
+            "gradient keys on the quality difference. Renames rejected files in place — back up first.",
+        )
+        components.button(
+            self.scroll_frame,
+            7,
             3,
             "DPO Bucket Analysis",
             command=self._bucket_analysis,
@@ -383,6 +394,69 @@ class RLHFTab:
         from modules.ui.DPOBucketAnalysisWindow import DPOBucketAnalysisWindow
 
         DPOBucketAnalysisWindow(self.master.winfo_toplevel(), self.train_config)
+
+    def _repair_rejected(self):
+        try:
+            concept_pairs = self._load_concept_pairs()
+        except Exception as ex:
+            messagebox.showerror("Re-pair Error", str(ex))
+            return
+
+        proceed = messagebox.askyesno(
+            "Re-pair Rejected Images?",
+            "This renames rejected image files in place so each is paired with the most visually similar chosen image "
+            "in its caption group (computed with DINOv2). A quality floor (0.85) keeps any pair from being pushed "
+            "below 0.85 cosine or below where it started, so re-pairing only helps. Single-pair captions are left "
+            "untouched and no pairs are lost.\n\nThe first run downloads ~330MB of model weights. Back up your "
+            "dataset before continuing.\n\nProceed?",
+        )
+        if not proceed:
+            return
+
+        # DINOv2 inference can take a while, so run it on a worker thread with an
+        # indeterminate progress dialog rather than freezing the Tk main loop.
+        parent = self.master.winfo_toplevel()
+        dialog = ctk.CTkToplevel(parent)
+        dialog.title("Re-pairing")
+        dialog.transient(parent)
+        dialog.resizable(False, False)
+        ctk.CTkLabel(dialog, text="Computing embeddings and re-pairing rejected images...").pack(padx=20, pady=(20, 10))
+        progress = ctk.CTkProgressBar(dialog, width=320, mode="indeterminate")
+        progress.pack(padx=20, pady=(0, 20))
+        progress.start()
+
+        result: dict = {}
+
+        def _worker():
+            try:
+                result["summary"] = repair_rejected_pairs(concept_pairs)
+            except Exception as ex:  # surfaced on the UI thread by _poll
+                result["error"] = str(ex)
+
+        import threading
+
+        thread = threading.Thread(target=_worker, daemon=True)
+        thread.start()
+
+        def _poll():
+            if thread.is_alive():
+                dialog.after(150, _poll)
+                return
+            progress.stop()
+            dialog.destroy()
+            if "error" in result:
+                messagebox.showerror("Re-pair Error", f"Error re-pairing: {result['error']}")
+                return
+            summary = result.get("summary", {})
+            messagebox.showinfo(
+                "Re-pair Complete",
+                f"Re-paired {summary.get('pairs_repaired', 0)} rejected image(s) across "
+                f"{summary.get('groups_processed', 0)} multi-pair caption group(s).\n"
+                f"Single-pair groups skipped: {summary.get('groups_skipped_single', 0)}\n"
+                f"Total matched pairs considered: {summary.get('pairs_total', 0)}",
+            )
+
+        dialog.after(150, _poll)
 
     def _load_concept_pairs(self):
         concept_pairs = dpo_concept_pattern_dirs(self._load_concepts())

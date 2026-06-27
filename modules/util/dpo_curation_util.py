@@ -311,6 +311,16 @@ class DpoScanCache:
             return None
         return tuple(value)
 
+    def get_embedding(self, path: str, compute) -> list[float] | None:
+        """Cached perceptual embedding (a plain ``list[float]``) for ``path``.
+        ``compute(path)`` must return a sequence of floats. Additive field — it
+        coexists with the hash/group_key fields without invalidating them, so a
+        re-pair run does not blow away an existing curation scan cache."""
+        value = self._get_field(path, "embedding", lambda p: [float(x) for x in compute(p)])
+        if value is None:
+            return None
+        return list(value)
+
     def save(self) -> None:
         """Persist to disk (atomic replace). Entries whose file no longer exists
         are pruned so renames/finalize moves don't grow the cache forever. No-op
@@ -935,3 +945,360 @@ def remove_finalized_pair(chosen_path: str | None, rejected_path: str | None):
             txt = os.path.splitext(path)[0] + ".txt"
             if os.path.isfile(txt):
                 os.remove(txt)
+
+
+# --------------------------------------------------------------------------- #
+# Re-pair rejected images by visual similarity
+#
+# Within a caption group with multiple pairs, DPO's signal is cleanest when each
+# rejected image differs from its chosen partner only in quality — not in
+# composition/pose/framing. We re-assign each rejected image to the structurally
+# most-similar chosen image in its group (a min-cost bipartite matching over
+# DINOv2 embeddings) and rename the rejected file to that chosen's stem. The
+# caption lives only on the chosen side, so the new rejected partner inherits the
+# chosen caption automatically and no preference label can be inverted.
+# --------------------------------------------------------------------------- #
+
+_DINO_MODEL_NAME = "facebook/dinov2-base"
+
+
+def assign_rejected_to_chosen(
+    stems: list[str],
+    chosen_vecs,
+    rejected_vecs,
+    quality_floor: float = 1.0,
+) -> dict[str, str]:
+    """Pure min-cost assignment of rejected images to chosen images within one
+    caption group, with a per-pair quality guard.
+
+    ``stems[k]`` is the shared stem of pair ``k``; ``chosen_vecs[k]`` /
+    ``rejected_vecs[k]`` are that pair's chosen/rejected embedding vectors. The
+    assignment maximizes total cosine similarity (Hungarian), but a reassignment
+    that would land chosen ``k`` below ``min(baseline_k, quality_floor)`` is
+    forbidden, where ``baseline_k`` is chosen ``k``'s current pair similarity.
+    Identity is always permitted, so the assignment is always feasible.
+
+    The single ``quality_floor`` knob spans both extremes:
+
+    * ``1.0`` — strict no-regression: no pair may end up less similar than it
+      began (the global optimum is only taken where it harms nobody).
+    * ``0.0`` — pure global optimum: any regression is allowed to maximize the
+      total (individual pairs may end up worse-matched than they started).
+    * e.g. ``0.85`` — middle ground: a pair may be reassigned to a less-similar
+      rejected only if it still lands at/above ``0.85`` cosine, capturing big
+      wins elsewhere while refusing to push an already-decent pair into a bad
+      match.
+
+    Returns ``{old_stem: new_stem}`` for the rejected files that must move; stems
+    that stay put are omitted. The matching never touches a model — callers feed
+    precomputed vectors — so this is unit-testable with hand-built fakes.
+    """
+    import numpy as np
+    from scipy.optimize import linear_sum_assignment
+
+    n = len(stems)
+    if n < 2:
+        return {}
+
+    chosen = np.asarray(chosen_vecs, dtype=np.float64)
+    rejected = np.asarray(rejected_vecs, dtype=np.float64)
+    # Row-normalize so a dot product is the cosine similarity. Zero vectors get a
+    # tiny epsilon to avoid division by zero (they then match nothing well).
+    chosen = chosen / np.clip(np.linalg.norm(chosen, axis=1, keepdims=True), 1e-12, None)
+    rejected = rejected / np.clip(np.linalg.norm(rejected, axis=1, keepdims=True), 1e-12, None)
+
+    # similarity[k, i] = cosine(rejected k, chosen i). Each chosen i's current
+    # pair similarity is the diagonal baseline[i].
+    similarity = rejected @ chosen.T
+    baseline = np.diag(similarity).copy()
+
+    # Forbid (BIG cost) any off-diagonal cell that would push chosen i below its
+    # quality threshold. Identity (k == i) is always allowed, so the diagonal
+    # assignment stays feasible and the optimum never has to pick a BIG cell.
+    BIG = 1e6
+    cost = 1.0 - similarity
+    threshold = np.minimum(baseline, quality_floor)
+    forbidden = similarity < (threshold[np.newaxis, :] - 1e-9)
+    np.fill_diagonal(forbidden, False)
+    cost[forbidden] = BIG
+
+    row_ind, col_ind = linear_sum_assignment(cost)
+
+    # perm[k] = chosen index assigned to rejected k. Defensive: if a BIG cell was
+    # somehow selected (shouldn't happen — identity is always feasible), drop the
+    # whole group to identity rather than emit a quality-violating move.
+    perm = list(range(n))
+    for k, i in zip(row_ind, col_ind, strict=True):
+        if forbidden[k, i]:
+            return {}
+        perm[k] = int(i)
+
+    return {stems[k]: stems[perm[k]] for k in range(n) if perm[k] != k}
+
+
+def align_pool_by_similarity(
+    chosen_paths: list[str],
+    rejected_paths: list[str],
+    *,
+    embed_fn=None,
+    similarity_floor: float = 0.0,
+) -> dict:
+    """Chosen-anchored pairing of a triage pool: give each chosen image its most
+    structurally-similar rejected image (a rectangular min-cost assignment over
+    DINOv2 embeddings), so each formed pair is a near minimal-pair.
+
+    Anchored on the chosen set because it is the smaller, higher-confidence pile
+    (you curated it) — every chosen claims a distinct rejected partner, and any
+    surplus rejected images (the interchangeable discards) fall into the pool.
+    When rejected images are the limiter instead, the unmatched chosen images
+    fall into the pool. ``similarity_floor`` (default 0) optionally refuses to
+    form a pair below that cosine, leaving both images pooled for manual handling.
+
+    ``embed_fn`` defaults to :func:`embed_images_dino`; tests inject a fake. The
+    assignment math is deterministic and never touches a model directly.
+
+    Returns ``{"pairs": [(chosen, rejected), ...], "chosen_pool": [...],
+    "rejected_pool": [...]}``, with ``pairs`` ordered by the input chosen order.
+    """
+    if not chosen_paths or not rejected_paths:
+        return {"pairs": [], "chosen_pool": list(chosen_paths), "rejected_pool": list(rejected_paths)}
+
+    import numpy as np
+    from scipy.optimize import linear_sum_assignment
+
+    if embed_fn is None:
+        embed_fn = embed_images_dino
+    vectors = embed_fn(list(chosen_paths) + list(rejected_paths))
+
+    chosen = np.asarray([vectors[p] for p in chosen_paths], dtype=np.float64)
+    rejected = np.asarray([vectors[p] for p in rejected_paths], dtype=np.float64)
+    chosen = chosen / np.clip(np.linalg.norm(chosen, axis=1, keepdims=True), 1e-12, None)
+    rejected = rejected / np.clip(np.linalg.norm(rejected, axis=1, keepdims=True), 1e-12, None)
+
+    # similarity[i, j] = cosine(chosen i, rejected j). Rectangular assignment
+    # matches min(n_chosen, n_rejected) of them, maximizing total similarity.
+    similarity = chosen @ rejected.T
+    row_ind, col_ind = linear_sum_assignment(1.0 - similarity)
+
+    pairs: list[tuple[str, str]] = []
+    used_chosen: set[int] = set()
+    used_rejected: set[int] = set()
+    for i, j in sorted(zip(row_ind, col_ind, strict=True), key=lambda rc: rc[0]):
+        if similarity[i, j] < similarity_floor:
+            continue
+        pairs.append((chosen_paths[i], rejected_paths[j]))
+        used_chosen.add(int(i))
+        used_rejected.add(int(j))
+
+    chosen_pool = [p for i, p in enumerate(chosen_paths) if i not in used_chosen]
+    rejected_pool = [p for j, p in enumerate(rejected_paths) if j not in used_rejected]
+    return {"pairs": pairs, "chosen_pool": chosen_pool, "rejected_pool": rejected_pool}
+
+
+def load_dino_model():
+    """Lazy-load the DINOv2 image encoder (model, processor) onto the default
+    device, mirroring ``validation_checker_util.load_clip_components``. Returns
+    ``(None, None)`` when transformers/torch or the weights are unavailable so
+    callers can degrade gracefully instead of crashing."""
+    try:
+        import importlib
+
+        transformers = importlib.import_module("transformers")
+        importlib.import_module("torch")
+    except ImportError:
+        return None, None
+
+    try:
+        from modules.util.torch_util import default_device
+
+        model = transformers.AutoModel.from_pretrained(_DINO_MODEL_NAME)
+        processor = transformers.AutoImageProcessor.from_pretrained(_DINO_MODEL_NAME)
+        model.eval().to(default_device)
+        return model, processor
+    except Exception:
+        return None, None
+
+
+def embed_images_dino(
+    paths: list[str],
+    *,
+    loader=load_dino_model,
+    cache: "DpoScanCache | None" = None,
+    batch_size: int = 16,
+    progress=None,
+) -> dict[str, list[float]]:
+    """Compute L2-normalized DINOv2 embeddings for ``paths``, returning
+    ``{path: vector}``. Files already in ``cache`` (validated by size+mtime) are
+    served without a model call; only the misses are batched through DINOv2. The
+    model is loaded once and only if there is at least one cache miss. Raises
+    ``RuntimeError`` when the model is needed but unavailable."""
+    from modules.util.image_util import load_image
+    from modules.util.torch_util import default_device, torch_gc
+
+    import torch
+
+    embeddings: dict[str, list[float]] = {}
+    misses = list(paths)
+
+    # Reserve a slot for the real-compute closure so the cache can call it lazily.
+    state: dict = {"model": None, "processor": None}
+
+    def _compute_single(path: str) -> list[float]:
+        if state["model"] is None:
+            model, processor = loader()
+            if model is None or processor is None:
+                raise RuntimeError(
+                    "Re-pair by similarity requires transformers, torch, and the "
+                    f"'{_DINO_MODEL_NAME}' weights (downloaded on first use)."
+                )
+            state["model"], state["processor"] = model, processor
+        model, processor = state["model"], state["processor"]
+        image = load_image(path)
+        inputs = processor(images=image, return_tensors="pt").to(default_device)
+        with torch.no_grad():
+            output = model(**inputs)
+        # DINOv2 CLS token (pooler_output) is the global structural descriptor.
+        feat = output.pooler_output[0]
+        feat = feat / feat.norm().clamp_min(1e-12)
+        return feat.float().cpu().tolist()
+
+    try:
+        for done, path in enumerate(misses, start=1):
+            vec = cache.get_embedding(path, _compute_single) if cache is not None else _compute_single(path)
+            if vec is not None:
+                embeddings[path] = vec
+            if progress is not None:
+                progress(done, len(misses))
+    finally:
+        state["model"] = None
+        state["processor"] = None
+        torch_gc()
+
+    return embeddings
+
+
+def _rejected_target_path(rejected_dir: str, new_stem: str, ext: str) -> str:
+    """Absolute path a rejected file should take to adopt ``new_stem`` (a
+    forward-slash relative stem from :func:`dpo_pair_key`), preserving its own
+    extension."""
+    rel = new_stem.replace("/", os.sep)
+    return os.path.join(rejected_dir, rel + ext)
+
+
+def _apply_rejected_renames(rejected_dir: str, stem_to_path: dict[str, str], mapping: dict[str, str]) -> int:
+    """Rename rejected IMAGE files per ``mapping`` ``{old_stem: new_stem}`` using a
+    two-phase temp rename so cycles/swaps never collide. Returns the number moved.
+
+    Caption sidecars are deliberately NOT moved. Captions are authoritative on the
+    chosen side, and every stem's caption already matches its chosen partner, so
+    leaving the rejected ``.txt`` pinned to its stem keeps it aligned with the
+    chosen caption there. Re-pairing therefore never rewrites a caption, never
+    drags an original prompt onto a stem whose chosen caption the user has edited,
+    and never writes anything under the chosen folder — only rejected images
+    move."""
+    if not mapping:
+        return 0
+
+    moves = []  # (current_image_path, temp_path, final_path)
+    for index, (old_stem, new_stem) in enumerate(mapping.items()):
+        src = stem_to_path[old_stem]
+        ext = os.path.splitext(src)[1]
+        final = _rejected_target_path(rejected_dir, new_stem, ext)
+        temp = f"{final}.__repair_tmp_{index}__"
+        moves.append((src, temp, final))
+
+    # Phase A: every moving image to a unique temp name (frees the destinations).
+    for src, temp, _final in moves:
+        os.makedirs(os.path.dirname(temp), exist_ok=True)
+        os.replace(src, temp)
+
+    # Phase B: temp names to their final destination.
+    for _src, temp, final in moves:
+        os.makedirs(os.path.dirname(final), exist_ok=True)
+        os.replace(temp, final)
+
+    return len(moves)
+
+
+def repair_rejected_pairs(
+    concept_pairs: list[tuple[str, str]],
+    *,
+    embed_fn=None,
+    quality_floor: float = 0.85,
+    progress=None,
+) -> dict:
+    """Re-pair rejected images to their most structurally-similar chosen image
+    within each caption group, renaming rejected files in place.
+
+    Each ``(chosen_dir, rejected_dir)`` concept is processed independently so
+    renames never cross concept folders. Within a concept, matched (non-orphan)
+    pairs are grouped by their chosen caption; groups with more than one pair are
+    re-assigned via :func:`assign_rejected_to_chosen` over embeddings, with
+    ``quality_floor`` guarding individual pairs (1.0 = strict no-regression, 0.0 =
+    pure global optimum, 0.85 = recommended middle ground). By default embeddings
+    come from DINOv2 (:func:`embed_images_dino`) backed by a per-concept
+    ``.dpo_repair_cache.json`` so re-runs are cheap; tests pass an explicit
+    ``embed_fn`` (``paths -> {path: vector}``) to avoid loading a model. The
+    operation always keeps a strict bijection, so it never creates orphans/strays.
+
+    Returns a summary: ``groups_processed`` (multi-pair groups re-assigned),
+    ``groups_skipped_single``, ``pairs_repaired`` (rejected files moved), and
+    ``pairs_total`` (matched pairs considered).
+    """
+    summary = {
+        "groups_processed": 0,
+        "groups_skipped_single": 0,
+        "pairs_repaired": 0,
+        "pairs_total": 0,
+    }
+
+    for chosen_dir, rejected_dir in concept_pairs:
+        pairs = scan_finalized_pairs([(chosen_dir, rejected_dir)])
+        matched = [p for p in pairs if not p["is_orphan"]]
+        summary["pairs_total"] += len(matched)
+
+        # Default embedder: cached DINOv2 keyed at the concept root (the parent of
+        # the chosen folder) so chosen+rejected embeddings survive across re-runs.
+        cache = None
+        if embed_fn is None:
+            import functools
+
+            concept_root = os.path.dirname(os.path.normpath(chosen_dir))
+            cache = DpoScanCache(os.path.join(concept_root, ".dpo_repair_cache.json"))
+            concept_embed = functools.partial(embed_images_dino, cache=cache)
+        else:
+            concept_embed = embed_fn
+
+        # Group matched pairs by chosen caption text.
+        groups: dict[str, list[dict]] = {}
+        for pair in matched:
+            _txt, caption = _read_caption(pair["chosen_path"])
+            groups.setdefault(caption.rstrip("\n"), []).append(pair)
+
+        for group in groups.values():
+            if len(group) < 2:
+                summary["groups_skipped_single"] += 1
+                continue
+            summary["groups_processed"] += 1
+
+            stems = [p["key"] for p in group]
+            stem_to_rejected = {p["key"]: p["rejected_path"] for p in group}
+            all_paths = [p["chosen_path"] for p in group] + [p["rejected_path"] for p in group]
+            vectors = concept_embed(all_paths)
+
+            try:
+                chosen_vecs = [vectors[p["chosen_path"]] for p in group]
+                rejected_vecs = [vectors[p["rejected_path"]] for p in group]
+            except KeyError:
+                # An image failed to embed; leave this group untouched.
+                continue
+
+            mapping = assign_rejected_to_chosen(stems, chosen_vecs, rejected_vecs, quality_floor)
+            summary["pairs_repaired"] += _apply_rejected_renames(rejected_dir, stem_to_rejected, mapping)
+
+        if cache is not None:
+            cache.save()
+        if progress is not None:
+            progress(summary)
+
+    return summary
