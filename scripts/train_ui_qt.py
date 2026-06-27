@@ -1,3 +1,4 @@
+import signal
 import sys
 
 # Force pydantic internals into sys.modules before PySide6/shiboken installs its
@@ -16,6 +17,12 @@ from PySide6.QtWidgets import QApplication
 
 
 def main():
+    # Restore the OS default SIGINT handler so Ctrl+C terminates the process
+    # directly at the C level. Qt's event loop blocks inside C++, so Python's
+    # own SIGINT handler would never get a chance to run while app.exec() is
+    # active and Ctrl+C would be ignored.
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+
     app = QApplication(sys.argv)
     app.styleHints().setColorScheme(Qt.ColorScheme.Light)
 

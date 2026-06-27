@@ -96,6 +96,14 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         )
 
     def closeEvent(self, event):
+        if self.controller.training_thread is not None and self.controller.training_thread.is_alive():
+            QMessageBox.warning(
+                self,
+                "Training in progress",
+                "A training is currently running. Stop the training before closing the window.",
+            )
+            event.ignore()
+            return
         self.top_bar_component.save_default()
         self.controller._stop_always_on_tensorboard()
         self.ui_state.remove_var_trace("workspace_dir", self.workspace_dir_trace_id)
