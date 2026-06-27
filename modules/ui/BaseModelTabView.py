@@ -15,7 +15,8 @@ class BaseModelTabView(ABC):
 
     @abstractmethod
     def _make_svd_frames(self, parent, row: int):
-        """Create and place SVDQuant label+entry subframes; return (label_frame, entry_frame)."""
+        # Create and place SVDQuant label+entry subframes; return (label_frame, entry_frame).
+        pass
 
     def build_content(self, frame, controller, ui_state):
         if controller.train_config.model_type.is_stable_diffusion():  # TODO simplify
