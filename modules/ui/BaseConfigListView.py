@@ -6,8 +6,6 @@ from abc import ABC, abstractmethod
 from modules.util import path_util
 from modules.util.path_util import write_json_atomic
 
-import customtkinter as ctk
-
 
 class BaseConfigListView(ABC):
 
@@ -19,7 +17,7 @@ class BaseConfigListView(ABC):
         pass
 
     @abstractmethod
-    def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
+    def open_element_window(self, i, ui_state):
         pass
 
     @abstractmethod
