@@ -56,6 +56,7 @@ class PySide6ConceptTabView(PySide6ConfigListView, BaseConceptTabView):
             self.search_var.set(text)
             self._update_filters()
         search_entry.textChanged.connect(_on_search)
+        self.search_var._bind_widget(lambda v: search_entry.setText(v))
 
         self.filter_var = QtVar("ALL")
         filter_combo = QComboBox(toolbar)
@@ -68,6 +69,7 @@ class PySide6ConceptTabView(PySide6ConfigListView, BaseConceptTabView):
             self.filter_var.set(text)
             self._update_filters()
         filter_combo.currentTextChanged.connect(_on_filter)
+        self.filter_var._bind_widget(lambda v: filter_combo.setCurrentText(v))
 
         self.show_disabled_var = QtVar(True)
         show_disabled_cb = QCheckBox("Show Disabled", toolbar)
@@ -78,6 +80,7 @@ class PySide6ConceptTabView(PySide6ConfigListView, BaseConceptTabView):
             self.show_disabled_var.set(bool(state))
             self._update_filters()
         show_disabled_cb.stateChanged.connect(_on_show_disabled)
+        self.show_disabled_var._bind_widget(lambda v: show_disabled_cb.setChecked(bool(v)))
 
         clear_btn = QPushButton("Clear", toolbar)
         clear_btn.setFixedWidth(50)
