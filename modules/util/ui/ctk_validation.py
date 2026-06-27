@@ -18,7 +18,7 @@ from modules.util.ui.validation import (
 )
 
 if TYPE_CHECKING:
-    from modules.util.ui.UIState import UIState
+    from modules.util.ui.CtkUIState import CtkUIState
 
     import customtkinter as ctk
 
@@ -54,7 +54,7 @@ class FieldValidator(BaseFieldValidator):
         self,
         component: ctk.CTkEntry,
         var: tk.Variable,
-        ui_state: UIState,
+        ui_state: CtkUIState,
         var_name: str,
         max_undo: int = DEFAULT_MAX_UNDO,
         extra_validate: Callable[[str], str | None] | None = None,
@@ -258,7 +258,7 @@ class PathValidator(FieldValidator):
         self,
         component: ctk.CTkEntry,
         var: tk.Variable,
-        ui_state: UIState,
+        ui_state: CtkUIState,
         var_name: str,
         io_type: PathIOType = PathIOType.INPUT,
         max_undo: int = DEFAULT_MAX_UNDO,
