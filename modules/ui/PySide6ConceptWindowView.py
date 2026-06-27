@@ -200,8 +200,19 @@ class PySide6ConceptWindowView(BaseConceptWindowView, QDialog):
         self._filename_label.setText(filename_preview)
         self._caption_box.setPlainText(caption_preview)
 
-    def _ok(self):
+    def _cleanup(self):
+        # stop the background scan thread (reuses the Abort Scan mechanism) so it
+        # stops touching this window's widgets, and release the matplotlib figure
+        self.controller.cancel_scan_flag.set()
         if self.bucket_fig is not None:
             plt.close(self.bucket_fig)
             self.bucket_fig = None
+
+    def closeEvent(self, event):
+        # also reached when the window is closed via the OS X button
+        self._cleanup()
+        super().closeEvent(event)
+
+    def _ok(self):
+        self._cleanup()
         self.accept()
