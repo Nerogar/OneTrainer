@@ -34,6 +34,7 @@ from modules.util.optimizer.adafactor_extensions import patch_adafactor
 from modules.util.optimizer.adam_extensions import patch_adam
 from modules.util.optimizer.adamw_extensions import patch_adamw
 from modules.util.optimizer.muon_util import split_parameters_for_muon
+from modules.util.optimizer.tag_util import tag_peft_parameters
 from modules.util.TrainProgress import TrainProgress
 from modules.zluda import ZLUDA
 
@@ -125,7 +126,7 @@ def create_optimizer(
         parameter_group_collection: NamedParameterGroupCollection,
         state_dict: dict | None,
         config: TrainConfig,
-        layer_key_fn: dict[int, str] | None = None,
+        model: BaseModel | None = None,
 ) -> torch.optim.Optimizer | None:
     optimizer = None
     optimizer_config = config.optimizer
@@ -139,6 +140,10 @@ def create_optimizer(
             raise RuntimeError('layer offloading can only be used for fine tuning when using an optimizer that supports "fused_back_pass"')
 
     parameters = parameter_group_collection.parameters_for_optimizer(config)
+
+    if config.optimizer.optimizer.is_adv:
+        # Tag PEFT parameters based on parameter names.
+        tag_peft_parameters(model, config)
 
     match config.optimizer.optimizer:
 
@@ -662,6 +667,32 @@ def create_optimizer(
                 quant_block_size=optimizer_config.quant_block_size if optimizer_config.quant_block_size is not None else 2048
             )
 
+        # SINKSGD_ADV Optimizer
+        case Optimizer.SINKSGD_ADV:
+            from adv_optm import SinkSGD_adv
+            optimizer = SinkSGD_adv(
+                params=parameters,
+                lr=config.learning_rate,
+                normed_momentum=optimizer_config.normed_momentum if optimizer_config.normed_momentum is not None else False,
+                momentum=optimizer_config.momentum if optimizer_config.momentum is not None else 0,
+                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
+                nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
+                nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
+                cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
+                stochastic_rounding=optimizer_config.stochastic_rounding,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
+                compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                orthogonal_sinkhorn=optimizer_config.orthogonal_sinkhorn if optimizer_config.orthogonal_sinkhorn is not None else False,
+                sinkhorn_iterations=optimizer_config.sinkhorn_iterations if optimizer_config.sinkhorn_iterations is not None else 5,
+                spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
+                centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
+                centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
+                state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
+                snr_cond=optimizer_config.snr_cond if optimizer_config.snr_cond is not None else False,
+                geometric_wd=optimizer_config.geometric_wd if optimizer_config.geometric_wd is not None else False,
+            )
+
         # ADAMW_ADV Optimizer
         case Optimizer.ADAMW_ADV:
             from adv_optm import AdamW_adv
@@ -670,19 +701,24 @@ def create_optimizer(
                 lr=config.learning_rate,
                 betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0,
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
-                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else None,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
-                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
+                factored_2nd=optimizer_config.factored_2nd if optimizer_config.factored_2nd is not None else False,
+                fisher_wd=optimizer_config.fisher_wd if optimizer_config.fisher_wd is not None else False,
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
-                use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
-                beta3_ema=optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999,
-                alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
                 k_warmup_steps=(config.learning_rate_warmup_steps / config.gradient_accumulation_steps),
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
+                centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
+                centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
+                state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
+                nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
+                nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
             )
 
         # ADOPT_ADV Optimizer
@@ -693,21 +729,24 @@ def create_optimizer(
                 lr=config.learning_rate,
                 betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0,
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.9999),
-                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-6,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else None,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
-                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
+                factored_2nd=optimizer_config.factored_2nd if optimizer_config.factored_2nd is not None else False,
+                fisher_wd=optimizer_config.fisher_wd if optimizer_config.fisher_wd is not None else False,
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
-                use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
-                beta3_ema=optimizer_config.beta3 if optimizer_config.beta3 is not None else 0.9999,
-                alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
-                Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
-                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
                 k_warmup_steps=(config.learning_rate_warmup_steps / config.gradient_accumulation_steps),
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
+                centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
+                centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
+                state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
+                nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
+                nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
             )
 
         # PRODIGY_ADV Optimizer
@@ -719,10 +758,12 @@ def create_optimizer(
                 betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0,
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
                 beta3=optimizer_config.beta3 if optimizer_config.beta3 is not None else None,
-                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
+                eps=optimizer_config.eps if optimizer_config.eps is not None else None,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
-                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
+                factored_2nd=optimizer_config.factored_2nd if optimizer_config.factored_2nd is not None else False,
+                fisher_wd=optimizer_config.fisher_wd if optimizer_config.fisher_wd is not None else False,
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 d0=optimizer_config.d0 if optimizer_config.d0 is not None else 1e-6,
                 d_coef=optimizer_config.d_coef if optimizer_config.d_coef is not None else 1.0,
@@ -731,15 +772,15 @@ def create_optimizer(
                 prodigy_steps=optimizer_config.prodigy_steps if optimizer_config.prodigy_steps is not None else 0,
                 d_limiter=optimizer_config.d_limiter if optimizer_config.d_limiter is not None else False,
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
-                use_AdEMAMix=optimizer_config.use_AdEMAMix if optimizer_config.use_AdEMAMix is not None else False,
-                beta3_ema=optimizer_config.beta3_ema if optimizer_config.beta3_ema is not None else 0.9999,
-                alpha=optimizer_config.alpha if optimizer_config.alpha is not None else 5,
-                Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
-                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
                 kourkoutas_beta=optimizer_config.kourkoutas_beta if optimizer_config.kourkoutas_beta is not None else False,
                 k_warmup_steps=(config.learning_rate_warmup_steps / config.gradient_accumulation_steps),
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
+                centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
+                centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
+                nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
+                nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
             )
 
         # SignSGD_ADV Optimizer
@@ -748,15 +789,23 @@ def create_optimizer(
             optimizer = SignSGD_adv(
                 params=parameters,
                 lr=config.learning_rate,
+                stochastic_sign=optimizer_config.stochastic_sign if optimizer_config.stochastic_sign is not None else False,
+                normed_momentum=optimizer_config.normed_momentum if optimizer_config.normed_momentum is not None else False,
                 momentum=optimizer_config.momentum if optimizer_config.momentum is not None else 0,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
-                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
-                Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
-                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+                spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
+                centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
+                centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
+                state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
+                nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
+                nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
+                snr_cond=optimizer_config.snr_cond if optimizer_config.snr_cond is not None else False,
+                geometric_wd=optimizer_config.geometric_wd if optimizer_config.geometric_wd is not None else False,
             )
 
         # LION_ADV Optimizer
@@ -768,13 +817,16 @@ def create_optimizer(
                 betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.99),
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
-                clip_threshold=optimizer_config.clip_threshold if optimizer_config.clip_threshold is not None else 0.0,
                 nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
-                auto_kappa_p=optimizer_config.auto_kappa_p if optimizer_config.auto_kappa_p is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                stochastic_sign=optimizer_config.stochastic_sign if optimizer_config.stochastic_sign is not None else False,
+                spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
+                centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
+                centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
             )
 
         # MUON_ADV Optimizer
@@ -783,7 +835,8 @@ def create_optimizer(
 
             from adv_optm import Muon_adv
 
-            params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(parameters, layer_key_fn, config)
+            params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(model, parameters, config)
+
 
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}
@@ -811,20 +864,23 @@ def create_optimizer(
                 ns_steps=optimizer_config.ns_steps if optimizer_config.ns_steps is not None else 5,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
                 rms_rescaling=optimizer_config.rms_rescaling if optimizer_config.rms_rescaling is not None else True,
-                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
+                nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
                 normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
                 beta2_normuon=optimizer_config.beta2_normuon if optimizer_config.beta2_normuon is not None else 0.95,
                 low_rank_ortho=optimizer_config.low_rank_ortho if optimizer_config.low_rank_ortho is not None else False,
                 ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
                 accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
                 approx_mars=optimizer_config.approx_mars if optimizer_config.approx_mars is not None else False,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
-                Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
-                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
+                spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
+                centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
+                centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
+                state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
                 **adam_kwargs
             )
 
@@ -834,7 +890,8 @@ def create_optimizer(
 
             from adv_optm import AdaMuon_adv
 
-            params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(parameters, layer_key_fn, config)
+            params_for_optimizer, MuonWithAuxAdam = split_parameters_for_muon(model, parameters, config)
+
 
             # Prepare Adam-specific keyword arguments from the config
             adam_kwargs = {}
@@ -865,20 +922,23 @@ def create_optimizer(
                 ns_steps=optimizer_config.ns_steps if optimizer_config.ns_steps is not None else 5,
                 rms_rescaling=optimizer_config.rms_rescaling if optimizer_config.rms_rescaling is not None else True,
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0.0,
-                nnmf_factor=optimizer_config.nnmf_factor if optimizer_config.nnmf_factor is not None else False,
                 cautious_wd=optimizer_config.cautious_wd if optimizer_config.cautious_wd is not None else False,
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
                 stochastic_rounding=optimizer_config.stochastic_rounding,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else True,
+                nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
                 use_atan2=optimizer_config.use_atan2 if optimizer_config.use_atan2 is not None else False,
-                Simplified_AdEMAMix=optimizer_config.Simplified_AdEMAMix if optimizer_config.Simplified_AdEMAMix is not None else False,
-                alpha_grad=optimizer_config.alpha_grad if optimizer_config.alpha_grad is not None else 100,
                 low_rank_ortho=optimizer_config.low_rank_ortho if optimizer_config.low_rank_ortho is not None else False,
                 ortho_rank=optimizer_config.ortho_rank if optimizer_config.ortho_rank is not None else 128,
                 normuon_variant=optimizer_config.normuon_variant if optimizer_config.normuon_variant is not None else False,
                 accelerated_ns=optimizer_config.accelerated_ns if optimizer_config.accelerated_ns is not None else False,
-                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else False,
+                orthogonal_gradient=optimizer_config.orthogonal_gradient if optimizer_config.orthogonal_gradient is not None else 'disabled',
                 approx_mars=optimizer_config.approx_mars if optimizer_config.approx_mars is not None else False,
                 compiled_optimizer=optimizer_config.compile if optimizer_config.compile is not None else False,
+                spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
+                centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
+                centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
+                state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
                 **adam_kwargs
             )
 
@@ -887,7 +947,7 @@ def create_optimizer(
 
             from muon import MuonWithAuxAdam, SingleDeviceMuonWithAuxAdam
 
-            params_for_optimizer, ___ = split_parameters_for_muon(parameters, layer_key_fn, config)
+            params_for_optimizer, ___ = split_parameters_for_muon(model, parameters, config)
 
             final_param_groups  = []
             for group in params_for_optimizer:
