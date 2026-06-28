@@ -46,7 +46,8 @@ class BaseSSHFileSync(BaseFileSync):
         self.upload_file(local_file=local,remote_file=remote)
 
 
-    def sync_up_dir(self,local : Path,remote: Path,recursive: bool,sync_info=None):
+    def sync_up_dir(self,local : Path,remote: Path,recursive: bool,sync_info=None,
+                    skip_hidden: bool=False, allowed_extensions: set[str] | None=None):
         if sync_info is None:
             sync_info=self.__get_sync_info(remote)
         self.sync_connection.open()
@@ -54,11 +55,17 @@ class BaseSSHFileSync(BaseFileSync):
         files=[]
         for local_entry in local.iterdir():
             if local_entry.is_file():
+                if allowed_extensions is not None and local_entry.suffix.lower() not in allowed_extensions:
+                    continue
                 remote_entry=remote/local_entry.name
                 if self.__needs_upload(local=local_entry,remote=remote_entry,sync_info=sync_info):
                     files.append(local_entry)
             elif recursive and local_entry.is_dir():
-                self.sync_up_dir(local=local_entry,remote=remote/local_entry.name,recursive=True,sync_info=sync_info)
+                if skip_hidden and local_entry.name.startswith('.'):
+                    continue
+                self.sync_up_dir(local=local_entry,remote=remote/local_entry.name,recursive=True,
+                                 sync_info=sync_info,skip_hidden=skip_hidden,
+                                 allowed_extensions=allowed_extensions)
 
         self.upload_files(local_files=files,remote_dir=remote)
 

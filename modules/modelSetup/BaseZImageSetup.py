@@ -54,13 +54,6 @@ class BaseZImageSetup(
                 model.text_encoder_offload_conductor = \
                     enable_checkpointing_for_qwen3_encoder_layers(model.text_encoder, config)
 
-        if config.force_circular_padding:
-            raise NotImplementedError #TODO applies to Z-Image?
-#            apply_circular_padding_to_conv2d(model.vae)
-#            apply_circular_padding_to_conv2d(model.transformer)
-#            if model.transformer_lora is not None:
-#                apply_circular_padding_to_conv2d(model.transformer_lora)
-
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
             config.weight_dtypes().text_encoder,
@@ -107,7 +100,7 @@ class BaseZImageSetup(
                 tokens=batch.get("tokens"),
                 tokens_mask=batch.get("tokens_mask"),
                 text_encoder_output=batch.get('text_encoder_hidden_state'),
-                text_encoder_dropout_probability=config.text_encoder.dropout_probability,
+                text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
             scaled_latent_image = model.scale_latents(batch['latent_image'])
 
