@@ -163,7 +163,7 @@ class TrainUIController:
             )
             window = view_cls(parent, controller)
             parent.show_window(window)
-            torch_gc()
+            parent.connect_window_closed(window, torch_gc)
 
     def open_manual_sample_window(self, parent, view_cls):
         training_callbacks = self.training_callbacks
