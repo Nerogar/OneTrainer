@@ -144,24 +144,27 @@ section-order = [
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
-platforms = ["osx-arm64", "linux-64", "win-64"]
-requires-pixi = ">=0.69.0"
+platforms = [
+    { name = "linux-cuda", platform = "linux-64", glibc = "2.28", cuda = "13.0" },
+    { name = "linux-generic", platform = "linux-64", glibc = "2.28" },
+    { name = "win-cuda", platform = "win-64", cuda = "13.0" },
+    { name = "win-generic", platform = "win-64" },
+    { name = "macos-apple-silicon", platform = "osx-arm64", macos = "15.0" },
+]
+requires-pixi = ">=0.71.2"
 
 [tool.pixi.tasks]
 train = { cmd = "python scripts/train.py", cwd = "." }
 ui = { cmd = "python scripts/train_ui.py", cwd = "." }
 
 [tool.pixi.feature.cuda]
-platforms = ["linux-64", "win-64"]
+platforms = ["linux-cuda", "win-cuda"]
 
 [tool.pixi.feature.cuda.pypi-options]
 extra-index-urls = ["https://download.pytorch.org/whl/cu130"]
 
-[tool.pixi.feature.cuda.system-requirements]
-cuda = "13.0"
-
 [tool.pixi.feature.rocm]
-platforms = ["linux-64"]
+platforms = ["linux-generic"]
 
 [tool.pixi.feature.rocm.pypi-options]
 extra-index-urls = ["https://download.pytorch.org/whl/rocm7.2"]
@@ -177,11 +180,6 @@ compilers = "*"
 tk = { version = "*", build = "xft_*" }
 libgl = "*"
 libglib = "*"
-
-[tool.pixi.system-requirements]
-linux = "5.17"
-libc = { family="glibc", version="2.28" }
-macos  = "15.0"
 
 [tool.pixi.pypi-options]
 index-strategy = "unsafe-best-match"
