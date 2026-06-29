@@ -26,8 +26,7 @@ dependencies = [
 
     # pytorch
     "accelerate==1.12.0",
-    # RC Required for the `diffusers` commit we use, update when released
-    "safetensors==0.8.0rc0",
+    "safetensors==0.8.0",
     "tensorboard==2.20.0",
 
     # diffusion models
