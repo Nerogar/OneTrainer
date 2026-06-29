@@ -144,6 +144,7 @@ section-order = [
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
+# Order here matters, first match wins
 platforms = [
     { name = "linux-cuda13", platform = "linux-64", glibc = "2.28", cuda = "13.0" },
     { name = "linux-cuda12", platform = "linux-64", glibc = "2.28", cuda = "12.6" },
