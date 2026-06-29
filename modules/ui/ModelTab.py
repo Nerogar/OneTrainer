@@ -87,12 +87,6 @@ class ModelTab:
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method in [
-                TrainingMethod.FINE_TUNE,
-                TrainingMethod.FINE_TUNE_VAE,
-            ],
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_stable_diffusion_3_ui(self, frame):
@@ -110,9 +104,6 @@ class ModelTab:
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_flux_ui(self, frame):
@@ -130,9 +121,6 @@ class ModelTab:
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_flux_2_ui(self, frame):
@@ -149,9 +137,6 @@ class ModelTab:
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_z_image_ui(self, frame):
@@ -168,9 +153,6 @@ class ModelTab:
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_ernie_ui(self, frame):
@@ -187,9 +169,6 @@ class ModelTab:
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_chroma_ui(self, frame):
@@ -206,9 +185,6 @@ class ModelTab:
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_qwen_ui(self, frame):
@@ -225,9 +201,6 @@ class ModelTab:
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_stable_diffusion_xl_ui(self, frame):
@@ -244,9 +217,6 @@ class ModelTab:
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_wuerstchen_ui(self, frame):
@@ -264,10 +234,6 @@ class ModelTab:
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE
-                              or self.train_config.model_type.is_stable_cascade(),
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_pixart_alpha_ui(self, frame):
@@ -283,9 +249,6 @@ class ModelTab:
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_sana_ui(self, frame):
@@ -301,9 +264,6 @@ class ModelTab:
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=self.train_config.training_method != TrainingMethod.FINE_TUNE,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_hunyuan_video_ui(self, frame):
@@ -321,9 +281,6 @@ class ModelTab:
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_hi_dream_ui(self, frame):
@@ -343,9 +300,6 @@ class ModelTab:
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __create_dtype_options(self, include_gguf: bool=False, include_a8: bool=False) -> list[tuple[str, DataType]]:
@@ -629,10 +583,6 @@ class ModelTab:
             self,
             frame,
             row: int,
-            allow_safetensors: bool = False,
-            allow_diffusers: bool = False,
-            allow_legacy_safetensors: bool = False,
-            allow_comfy: bool = False,
     ) -> int:
         # output model destination
         components.label(frame, row, 0, "Model Output Destination",
@@ -657,15 +607,31 @@ class ModelTab:
         row += 1
 
         # output format
-        formats = []
-        if allow_safetensors:
-            formats.append(("Safetensors", ModelFormat.SAFETENSORS))
-        if allow_diffusers:
-            formats.append(("Diffusers", ModelFormat.DIFFUSERS))
-        # if allow_legacy_safetensors:
-        #     formats.append(("Legacy Safetensors", ModelFormat.LEGACY_SAFETENSORS))
-        if allow_comfy:
-            formats.append(("Comfy LoRA", ModelFormat.COMFY_LORA))
+        if self.train_config.training_method == TrainingMethod.EMBEDDING:
+            # embedding: a plain safetensors file of the learned vectors
+            formats = [("Safetensors", ModelFormat.SAFETENSORS)]
+        elif self.train_config.training_method == TrainingMethod.LORA:
+            # LoRA output formats supported by this model (model_type.supported_lora_formats drops the
+            # ones this model can't produce, e.g. LEGACY for HiDream/Sana/Wuerstchen v2).
+            labels = {
+                ModelFormat.DIFFUSERS_LORA: "Diffusers",
+                ModelFormat.KOHYA_LORA: "Kohya",
+                ModelFormat.ORIGINAL_LORA: "Original",
+                ModelFormat.COMFY_LORA: "Comfy",
+                ModelFormat.LEGACY_LORA: "Legacy",
+            }
+            formats = [(labels[fmt], fmt) for fmt in self.train_config.model_type.supported_lora_formats()]
+        else:
+            # full model output formats supported by this model (model_type.supported_full_model_formats drops the
+            # ones it can't produce, e.g. no single-file for Sana / Wuerstchen v2, COMFY only for Z-Image).
+            labels = {
+                ModelFormat.DIFFUSERS: "Diffusers",
+                ModelFormat.ORIGINAL_SINGLE_FILE: "Original (single file)",
+                ModelFormat.ORIGINAL_TRANSFORMER: "Original (transformer only)",
+                ModelFormat.COMFY_TRANSFORMER: "Comfy (transformer only)",
+                ModelFormat.LEGACY_SAFETENSORS: "Legacy",
+            }
+            formats = [(labels[fmt], fmt) for fmt in self.train_config.model_type.supported_full_model_formats()]
 
         components.label(frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")

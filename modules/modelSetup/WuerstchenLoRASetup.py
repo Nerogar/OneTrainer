@@ -75,13 +75,13 @@ class WuerstchenLoRASetup(
         if config.train_any_embedding():
             model.prior_text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_prior_te")
+        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
         model.prior_text_encoder_lora = LoRAModuleWrapper(
-            model.prior_text_encoder, "lora_prior_te", config
+            model.prior_text_encoder, "text_encoder", config
         ) if create_te else None
 
         model.prior_prior_lora = LoRAModuleWrapper(
-            model.prior_prior, "lora_prior_unet", config, config.layer_filter.split(",")
+            model.prior_prior, "prior", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:
