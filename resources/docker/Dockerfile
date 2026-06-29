@@ -10,6 +10,7 @@ ENV OT_SCRIPT_DEBUG=true
 ENV PATH=/root/.pixi/bin:${PATH}
 ENV TZ=Etc/UTC
 ENV OT_SCRIPT_DEBUG=true
+ENV CONDA_OVERRIDE_CUDA=13.0
 
 WORKDIR /
 RUN apt-get update && \
