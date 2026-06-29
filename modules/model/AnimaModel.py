@@ -4,6 +4,7 @@ from random import Random
 
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util.convert_util import add_prefix
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
@@ -21,46 +22,6 @@ from diffusers import (
 from transformers import Qwen2Tokenizer, Qwen3Model, T5TokenizerFast
 
 PROMPT_MAX_LENGTH = 512
-
-
-# Maps the diffusers CosmosTransformer3DModel state dict back to the original Anima checkpoint keys.
-# This is the exact inverse of the forward conversion in diffusers' scripts/convert_anima_to_diffusers.py
-# (which delegates the transformer to convert_cosmos_to_diffusers.convert_transformer with
-# TRANSFORMER_KEYS_RENAME_DICT_COSMOS_2_0).
-# The original keys carry a "net." prefix; the conversion is a flat 1:1 rename, no tensor fusion.
-def diffusers_to_original():
-    return [
-        ("patch_embed.proj",   "net.x_embedder.proj.1"),
-        ("time_embed.t_embedder", "net.t_embedder.1"),
-        ("time_embed.norm",    "net.t_embedding_norm"),
-        ("norm_out.linear_1",  "net.final_layer.adaln_modulation.1"),
-        ("norm_out.linear_2",  "net.final_layer.adaln_modulation.2"),
-        ("proj_out",           "net.final_layer.linear"),
-        ("transformer_blocks.{i}", "net.blocks.{i}", [
-            ("norm1.linear_1", "adaln_modulation_self_attn.1"),
-            ("norm1.linear_2", "adaln_modulation_self_attn.2"),
-            ("attn1.norm_q",   "self_attn.q_norm"),
-            ("attn1.norm_k",   "self_attn.k_norm"),
-            ("attn1.to_q",     "self_attn.q_proj"),
-            ("attn1.to_k",     "self_attn.k_proj"),
-            ("attn1.to_v",     "self_attn.v_proj"),
-            ("attn1.to_out.0", "self_attn.output_proj"),
-            ("norm2.linear_1", "adaln_modulation_cross_attn.1"),
-            ("norm2.linear_2", "adaln_modulation_cross_attn.2"),
-            ("attn2.norm_q",   "cross_attn.q_norm"),
-            ("attn2.norm_k",   "cross_attn.k_norm"),
-            ("attn2.to_q",     "cross_attn.q_proj"),
-            ("attn2.to_k",     "cross_attn.k_proj"),
-            ("attn2.to_v",     "cross_attn.v_proj"),
-            ("attn2.to_out.0", "cross_attn.output_proj"),
-            ("norm3.linear_1", "adaln_modulation_mlp.1"),
-            ("norm3.linear_2", "adaln_modulation_mlp.2"),
-            ("ff.net.0.proj",  "mlp.layer1"),
-            ("ff.net.2",       "mlp.layer2"),
-        ]),
-    ]
-
-diffusers_checkpoint_to_original = diffusers_to_original()
 
 
 class AnimaModel(BaseModel):
@@ -118,6 +79,59 @@ class AnimaModel(BaseModel):
             self.text_encoder_lora,
             self.transformer_lora,
         ] if a is not None]
+
+    def _diffusers_to_dit(self) -> list:
+        # the netless diffusers CosmosTransformer3DModel -> Anima DiT rename (the inverse of diffusers'
+        # scripts/convert_anima_to_diffusers.py transformer rename). These are the bare module names kohya-ss
+        # and ComfyUI load the DiT under (sd-scripts anima_utils rename_hook / Comfy unet_prefix_from_state_dict
+        # both strip the checkpoint's "net." wrapper), so the COMFY and KOHYA LoRA formats target them directly.
+        # Anima keeps split q/k/v (no qkv fusion), so fusion_groups stays None.
+        return [
+            ("patch_embed.proj",   "x_embedder.proj.1"),
+            ("time_embed.t_embedder", "t_embedder.1"),
+            ("time_embed.norm",    "t_embedding_norm"),
+            ("norm_out.linear_1",  "final_layer.adaln_modulation.1"),
+            ("norm_out.linear_2",  "final_layer.adaln_modulation.2"),
+            ("proj_out",           "final_layer.linear"),
+            ("transformer_blocks.{i}", "blocks.{i}", [
+                ("norm1.linear_1", "adaln_modulation_self_attn.1"),
+                ("norm1.linear_2", "adaln_modulation_self_attn.2"),
+                ("attn1.norm_q",   "self_attn.q_norm"),
+                ("attn1.norm_k",   "self_attn.k_norm"),
+                ("attn1.to_q",     "self_attn.q_proj"),
+                ("attn1.to_k",     "self_attn.k_proj"),
+                ("attn1.to_v",     "self_attn.v_proj"),
+                ("attn1.to_out.0", "self_attn.output_proj"),
+                ("norm2.linear_1", "adaln_modulation_cross_attn.1"),
+                ("norm2.linear_2", "adaln_modulation_cross_attn.2"),
+                ("attn2.norm_q",   "cross_attn.q_norm"),
+                ("attn2.norm_k",   "cross_attn.k_norm"),
+                ("attn2.to_q",     "cross_attn.q_proj"),
+                ("attn2.to_k",     "cross_attn.k_proj"),
+                ("attn2.to_v",     "cross_attn.v_proj"),
+                ("attn2.to_out.0", "cross_attn.output_proj"),
+                ("norm3.linear_1", "adaln_modulation_mlp.1"),
+                ("norm3.linear_2", "adaln_modulation_mlp.2"),
+                ("ff.net.0.proj",  "mlp.layer1"),
+                ("ff.net.2",       "mlp.layer2"),
+            ]),
+        ]
+
+    def diffusers_to_original(self) -> list | None:
+        # the shared body: ORIGINAL LoRA and the full checkpoint nest the denoising DiT under net. (the original
+        # model wraps it next to the sibling net.llm_adapter). A two-pass body -- rename to the netless DiT
+        # names, then add the net. wrapper. COMFY and KOHYA override back to the netless _diffusers_to_dit(). No
+        # qkv fusion, so the BaseModel checkpoint default (body alone, no fusion pre-stage) is exactly
+        # net.<DiT> -- no checkpoint override needed.
+        return [self._diffusers_to_dit(), add_prefix("net")]
+
+    def lora_diffusers_to_comfy(self) -> list | None:
+        # ComfyUI loads the DiT with the net. wrapper stripped -> the netless body.
+        return self._diffusers_to_dit()
+
+    def lora_diffusers_to_kohya(self) -> list | None:
+        # kohya-ss loads the DiT with the net. wrapper stripped -> the netless body.
+        return self._diffusers_to_dit()
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)

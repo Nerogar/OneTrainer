@@ -2,13 +2,11 @@ import os
 import traceback
 
 from modules.model.AnimaModel import AnimaModel
-from modules.model.BaseModel import BaseModel
 from modules.modelLoader.GenericFineTuneModelLoader import make_fine_tune_model_loader
 from modules.modelLoader.GenericLoRAModelLoader import make_lora_model_loader
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.modelLoader.mixin.LoRALoaderMixin import LoRALoaderMixin
 from modules.util.config.TrainConfig import QuantizationConfig
-from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -172,8 +170,10 @@ class AnimaLoRALoader(
     def __init__(self):
         super().__init__()
 
-    def _get_convert_key_sets(self, model: BaseModel) -> list[LoraConversionKeySet] | None:
-        return None
+    # ORIGINAL Anima LoRAs carry the original checkpoint's net. wrapper on the denoising keys (net.x_embedder...).
+    # No loader override is needed: the net. wrapper lives in the denoising body (AnimaModel.diffusers_to_original
+    # adds it), so the generic reverse re-applies the transformer. component prefix and inverts the body --
+    # including the net. pass -- back to canonical. KOHYA/COMFY/DIFFUSERS carry no net. and use the netless body.
 
     def load(
             self,

@@ -3,6 +3,7 @@
     "batch_size": 2,
     "learning_rate": 1e-6,
     "model_type": "ANIMA",
+    "output_model_format": "ORIGINAL_TRANSFORMER",
     "resolution": "512",
     "compile": true,
     "dataloader_threads": 1,

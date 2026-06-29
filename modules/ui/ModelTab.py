@@ -219,9 +219,6 @@ class ModelTab:
         row = self.__create_output_components(
             frame,
             row,
-            allow_safetensors=True,
-            allow_diffusers=self.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=self.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_stable_diffusion_xl_ui(self, frame):

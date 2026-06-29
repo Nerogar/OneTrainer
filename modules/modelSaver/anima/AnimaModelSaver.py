@@ -2,7 +2,7 @@ import copy
 import os.path
 from pathlib import Path
 
-from modules.model.AnimaModel import AnimaModel, diffusers_checkpoint_to_original
+from modules.model.AnimaModel import AnimaModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
 from modules.util.convert_util import convert
 from modules.util.enum.ModelFormat import ModelFormat
@@ -54,7 +54,7 @@ class AnimaModelSaver(
             dtype: torch.dtype | None,
     ):
         # convert the diffusers transformer keys back to the original Anima format (net.*)
-        state_dict = convert(model.transformer.state_dict(), diffusers_checkpoint_to_original)
+        state_dict = convert(model.transformer.state_dict(), model.checkpoint_diffusers_to_original())
         # the original checkpoint bundles the text conditioner under net.llm_adapter.*; its keys are
         # identical to the diffusers module, so only a prefix is needed.
         for key, value in model.text_conditioner.state_dict().items():
@@ -84,7 +84,9 @@ class AnimaModelSaver(
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 self.__save_diffusers(model, output_model_destination, dtype)
-            case ModelFormat.SAFETENSORS:
+            case ModelFormat.ORIGINAL_TRANSFORMER:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)
+            case _:
+                raise NotImplementedError(f"Unsupported output format: {output_model_format}")

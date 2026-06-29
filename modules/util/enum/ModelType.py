@@ -185,14 +185,15 @@ class ModelType(Enum):
         # LoRA output formats this model can produce, in UI display order. Every model supports the four
         # clean target namespaces; LEGACY (the per-model historical output) is unavailable for models whose
         # only historical LoRA output was a never-loadable format -- HiDream (OMI), Sana / Wuerstchen v2
-        # (verbatim dotted). Kept in sync with the per-model LoRASaver._convert_legacy raises.
+        # (verbatim dotted) -- and for Anima, which never had a historical output. Kept in sync with the
+        # per-model LoRASaver._convert_legacy raises.
         formats = [
             ModelFormat.DIFFUSERS_LORA,
             ModelFormat.KOHYA_LORA,
             ModelFormat.ORIGINAL_LORA,
             ModelFormat.COMFY_LORA,
         ]
-        if not (self.is_hi_dream() or self.is_sana() or self.is_wuerstchen_v2()):
+        if not (self.is_hi_dream() or self.is_sana() or self.is_wuerstchen_v2() or self.is_anima()):
             formats.append(ModelFormat.LEGACY_LORA)
         return formats
 
@@ -206,7 +207,7 @@ class ModelType(Enum):
             formats.append(ModelFormat.ORIGINAL_TRANSFORMER)
         if self.is_z_image():
             formats.append(ModelFormat.COMFY_TRANSFORMER)
-        if not (self.is_sana() or self.is_wuerstchen_v2()):
+        if not (self.is_sana() or self.is_wuerstchen_v2() or self.is_anima()):
             formats.append(ModelFormat.LEGACY_SAFETENSORS)
         return formats
 
@@ -236,6 +237,7 @@ _MODEL_PARTS: dict[ModelType, tuple[str, ...]] = {
     ModelType.FLUX_DEV_1: ("transformer", "text_encoder", "text_encoder_2", "vae"),
     ModelType.FLUX_FILL_DEV_1: ("transformer", "text_encoder", "text_encoder_2", "vae"),
     ModelType.FLUX_2: ("transformer", "text_encoder", "vae"),
+    ModelType.ANIMA: ("transformer", "text_encoder", "vae"),
     ModelType.SANA: ("transformer", "text_encoder", "vae"),
     ModelType.HUNYUAN_VIDEO: ("transformer", "text_encoder", "text_encoder_2", "vae"),
     ModelType.HI_DREAM_FULL: ("transformer", "text_encoder", "text_encoder_2", "text_encoder_3", "text_encoder_4", "vae"),
