@@ -569,7 +569,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=10,
+            config_version=11,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -581,6 +581,7 @@ class TrainConfig(BaseConfig):
                 7: self.__migration_7,
                 8: self.__migration_8,
                 9: self.__migration_9,
+                10: self.__migration_10,
             }
         )
 
@@ -797,6 +798,23 @@ class TrainConfig(BaseConfig):
         replace_dtype("decoder_text_encoder")
         replace_dtype("decoder_vqgan")
         migrated_data.pop("weight_dtype")
+
+        return migrated_data
+
+    def __migration_10(self, data: dict) -> dict:
+        # ModelFormat enum cleanup. The overloaded SAFETENSORS value reproduced whatever OneTrainer
+        # wrote before this change, dispatched per-model inside each saver. It splits by save type into
+        # the frozen "legacy" formats: LEGACY_SAFETENSORS (full model) and LEGACY_LORA (LoRA).
+        # Embedding keeps SAFETENSORS (the learned-vectors file). Only SAFETENSORS was ever
+        # UI-selectable, so it is the only released value that needs migrating.
+        migrated_data = data.copy()
+
+        if migrated_data.get("output_model_format") == "SAFETENSORS":
+            training_method = migrated_data.get("training_method")
+            if training_method == "LORA":
+                migrated_data["output_model_format"] = "LEGACY_LORA"
+            elif training_method != "EMBEDDING":
+                migrated_data["output_model_format"] = "LEGACY_SAFETENSORS"
 
         return migrated_data
 

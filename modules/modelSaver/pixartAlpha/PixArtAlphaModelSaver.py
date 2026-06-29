@@ -56,6 +56,7 @@ class PixArtAlphaModelSaver(
         state_dict = convert_pixart_diffusers_to_ckpt(
             model.model_type,
             model.transformer.state_dict(),
+            model.checkpoint_diffusers_to_original(),
         )
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
         self._convert_state_dict_to_contiguous(save_state_dict)
@@ -81,7 +82,9 @@ class PixArtAlphaModelSaver(
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 self.__save_diffusers(model, output_model_destination, dtype)
-            case ModelFormat.SAFETENSORS:
+            case ModelFormat.LEGACY_SAFETENSORS | ModelFormat.ORIGINAL_TRANSFORMER:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)
+            case _:
+                raise NotImplementedError(f"Unsupported output format: {output_model_format}")

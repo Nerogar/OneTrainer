@@ -1,7 +1,5 @@
-from modules.model.BaseModel import BaseModel
 from modules.model.SanaModel import SanaModel
 from modules.modelLoader.mixin.LoRALoaderMixin import LoRALoaderMixin
-from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.ModelNames import ModelNames
 
 
@@ -11,8 +9,10 @@ class SanaLoRALoader(
     def __init__(self):
         super().__init__()
 
-    def _get_convert_key_sets(self, model: BaseModel) -> list[LoraConversionKeySet] | None:
-        return None  # TODO: not yet implemented
+
+    def _legacy_conversion(self, model: SanaModel) -> list | None:
+        # Sana dropped LEGACY: its only output was a never-loadable dotted format (see the saver).
+        return None
 
     def load(
             self,

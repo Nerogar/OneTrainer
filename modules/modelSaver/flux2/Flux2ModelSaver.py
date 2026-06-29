@@ -2,7 +2,7 @@ import copy
 import os.path
 from pathlib import Path
 
-from modules.model.Flux2Model import Flux2Model, diffusers_checkpoint_to_original
+from modules.model.Flux2Model import Flux2Model
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
 from modules.util.convert_util import convert
 from modules.util.enum.ModelFormat import ModelFormat
@@ -53,7 +53,7 @@ class Flux2ModelSaver(
             dtype: torch.dtype | None,
     ):
         state_dict = model.transformer.state_dict()
-        state_dict = convert(state_dict, diffusers_checkpoint_to_original)
+        state_dict = convert(state_dict, model.checkpoint_diffusers_to_original())
 
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
         self._convert_state_dict_to_contiguous(save_state_dict)
@@ -79,7 +79,9 @@ class Flux2ModelSaver(
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 self.__save_diffusers(model, output_model_destination, dtype)
-            case ModelFormat.SAFETENSORS:
+            case ModelFormat.LEGACY_SAFETENSORS | ModelFormat.ORIGINAL_TRANSFORMER:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)
+            case _:
+                raise NotImplementedError(f"Unsupported output format: {output_model_format}")
