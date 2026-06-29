@@ -147,10 +147,8 @@ channels = ["conda-forge"]
 # Order here matters, first match wins
 platforms = [
     { name = "linux-cuda13", platform = "linux-64", glibc = "2.28", cuda = "13.0" },
-    { name = "linux-cuda12", platform = "linux-64", glibc = "2.28", cuda = "12.6" },
     { name = "linux-generic", platform = "linux-64", glibc = "2.28" },
     { name = "win-cuda13", platform = "win-64", cuda = "13.0" },
-    { name = "win-cuda12", platform = "win-64", cuda = "12.6" },
     { name = "win-generic", platform = "win-64" },
     { name = "macos-generic", platform = "osx-arm64", macos = "15.0" },
 ]
@@ -161,13 +159,10 @@ train = { cmd = "python scripts/train.py", cwd = "." }
 ui = { cmd = "python scripts/train_ui.py", cwd = "." }
 
 [tool.pixi.feature.cuda]
-platforms = ["linux-cuda13", "win-cuda13", "linux-cuda12", "win-cuda12"]
+platforms = ["linux-cuda13", "win-cuda13"]
 
-[target."*-cuda13".pypi-options]
+[tool.pixi.feature.cuda.pypi-options]
 extra-index-urls = ["https://download.pytorch.org/whl/cu130"]
-
-[target."*-cuda12".pypi-options]
-extra-index-urls = ["https://download.pytorch.org/whl/cu126"]
 
 [tool.pixi.feature.rocm]
 platforms = ["linux-generic"]
