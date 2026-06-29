@@ -201,7 +201,8 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
         window.focus_set()
 
     def connect_window_closed(self, window, callback):
-        window.bind("<Destroy>", lambda _: callback())
+        # <Destroy> fires for the toplevel and every descendant widget; only react to the window itself
+        window.bind("<Destroy>", lambda e: callback() if e.widget is window else None)
 
     # --- CTK layout and frame builders ---
 
