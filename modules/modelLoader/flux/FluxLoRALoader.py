@@ -1,8 +1,5 @@
-from modules.model.BaseModel import BaseModel
 from modules.model.FluxModel import FluxModel
 from modules.modelLoader.mixin.LoRALoaderMixin import LoRALoaderMixin
-from modules.util.convert.lora.convert_flux_lora import convert_flux_lora_key_sets
-from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.ModelNames import ModelNames
 
 
@@ -12,8 +9,6 @@ class FluxLoRALoader(
     def __init__(self):
         super().__init__()
 
-    def _get_convert_key_sets(self, model: BaseModel) -> list[LoraConversionKeySet] | None:
-        return convert_flux_lora_key_sets()
 
     def load(
             self,

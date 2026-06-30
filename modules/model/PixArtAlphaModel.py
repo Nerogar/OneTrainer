@@ -6,6 +6,7 @@ from modules.model.util.t5_util import encode_t5
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.DataType import DataType
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
@@ -101,6 +102,53 @@ class PixArtAlphaModel(BaseModel):
             self.text_encoder_lora,
             self.transformer_lora,
         ] if a is not None]
+
+    def fusion_groups(self) -> list | None:
+        # PixArt fuses TWO attentions differently: self-attention fuses q/k/v (3 leaves), while cross-attention
+        # fuses ONLY k/v (2 leaves) into kv_linear; fuse_split is arity-agnostic so both groups just work.
+        return [
+            ("transformer_blocks.{i}", ["attn1.to_q", "attn1.to_k", "attn1.to_v"], "attn1.qkv", "attn.qkv"),
+            ("transformer_blocks.{i}", ["attn2.to_k", "attn2.to_v"], "attn2.kv", "cross_attn.kv_linear"),
+        ]
+
+    def diffusers_to_original(self) -> list | None:
+        # PixArt has NO adaLN chunk swap: its adaLN-single is a scale_shift_table (nn.Parameter, not Linear);
+        # those rules are present for the full-model path and inert for LoRA. pos_embed is GENERATED (not
+        # key-mapped), so convert_pixart_diffusers_to_ckpt adds it after this body runs.
+        return [
+            ("adaln_single.emb.aspect_ratio_embedder.linear_1", "ar_embedder.mlp.0"),
+            ("adaln_single.emb.aspect_ratio_embedder.linear_2", "ar_embedder.mlp.2"),
+            ("adaln_single.emb.resolution_embedder.linear_1",   "csize_embedder.mlp.0"),
+            ("adaln_single.emb.resolution_embedder.linear_2",   "csize_embedder.mlp.2"),
+            ("caption_projection.linear_1", "y_embedder.y_proj.fc1"),
+            ("caption_projection.linear_2", "y_embedder.y_proj.fc2"),
+            ("pos_embed.proj", "x_embedder.proj"),
+            ("adaln_single.emb.timestep_embedder.linear_1", "t_embedder.mlp.0"),
+            ("adaln_single.emb.timestep_embedder.linear_2", "t_embedder.mlp.2"),
+            ("adaln_single.linear", "t_block.1"),
+            ("proj_out", "final_layer.linear"),
+            ("scale_shift_table", "final_layer.scale_shift_table"),
+            ("transformer_blocks.{i}", "blocks.{i}", [
+                ("attn1.qkv",       "attn.qkv"),
+                ("attn2.kv",        "cross_attn.kv_linear"),
+                ("attn1.to_out.0",  "attn.proj"),
+                ("attn2.to_q",      "cross_attn.q_linear"),
+                ("attn2.to_out.0",  "cross_attn.proj"),
+                ("ff.net.0.proj",   "mlp.fc1"),
+                ("ff.net.2",        "mlp.fc2"),
+                ("scale_shift_table", "scale_shift_table"),
+            ]),
+        ]
+
+    def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
+        # Single T5 text encoder (Comfy's PixArt TE is a single t5xxl).
+        return [
+            (self.text_encoder, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder",
+                ModelFormat.KOHYA_LORA: "lora_te1",
+                ModelFormat.COMFY_LORA: "text_encoders.t5xxl.transformer",
+            }),
+        ]
 
     def all_embeddings(self) -> list[PixArtAlphaModelEmbedding]:
         return self.additional_embeddings \

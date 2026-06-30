@@ -5,6 +5,7 @@ from random import Random
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.DataType import DataType
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
@@ -75,6 +76,16 @@ class QwenModel(BaseModel):
             self.text_encoder_lora,
             self.transformer_lora,
         ] if a is not None]
+
+    def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
+        # Single Qwen2.5-VL TE (Comfy's QwenImageTEModel is a single qwen25_7b).
+        return [
+            (self.text_encoder, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder",
+                ModelFormat.KOHYA_LORA: "lora_te",
+                ModelFormat.COMFY_LORA: "text_encoders.qwen25_7b.transformer",
+            }),
+        ]
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)

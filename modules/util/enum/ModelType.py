@@ -1,5 +1,6 @@
 from enum import Enum
 
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
 
 
@@ -193,6 +194,48 @@ class ModelType(Enum):
         if self.is_qwen() or self.is_z_image() or self.is_flux_2() or self.is_ernie() or self.is_ideogram():
             return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA)
         raise ValueError(f"No supported training methods defined for model type {self}")
+
+    def denoising_model_part(self) -> str:
+        # the denoising model component (unet / transformer / prior), always listed first in model_parts().
+        return _MODEL_PARTS[self][0]
+
+    def supported_lora_formats(self) -> list[ModelFormat]:
+        # LoRA output formats this model can produce, in UI display order. Every model supports the four
+        # clean target namespaces; LEGACY (the per-model historical output) is offered only by the models that
+        # actually shipped one, the stable set listed here. HiDream (OMI), Sana and Wuerstchen v2 are excluded
+        # because their only historical output was a never-loadable format, and any model added after the clean
+        # formats never had a legacy output at all. Kept in sync with the per-model LoRASaver._convert_legacy.
+        formats = [
+            ModelFormat.DIFFUSERS_LORA,
+            ModelFormat.KOHYA_LORA,
+            ModelFormat.ORIGINAL_LORA,
+            ModelFormat.COMFY_LORA,
+        ]
+        if (self.is_stable_diffusion() or self.is_stable_diffusion_xl() or self.is_stable_diffusion_3()
+                or self.is_flux() or self.is_chroma() or self.is_pixart() or self.is_qwen()
+                or self.is_z_image() or self.is_ernie() or self.is_hunyuan_video() or self.is_stable_cascade()):
+            formats.append(ModelFormat.LEGACY_LORA)
+        return formats
+
+    def supported_full_model_formats(self) -> list[ModelFormat]:
+        # Full-model output formats this model can produce, in UI display order. Z-Image additionally offers
+        # COMFY_TRANSFORMER (ORIGINAL_TRANSFORMER + Comfy key quirks, ComfyUI #12303).
+        formats = [ModelFormat.DIFFUSERS]
+        if self.is_stable_diffusion() or self.is_stable_diffusion_xl() or self.is_stable_diffusion_3():
+            formats.append(ModelFormat.ORIGINAL_SINGLE_FILE)
+        elif not (self.is_sana() or self.is_wuerstchen()):
+            formats.append(ModelFormat.ORIGINAL_TRANSFORMER)
+        if self.is_z_image():
+            formats.append(ModelFormat.COMFY_TRANSFORMER)
+        # LEGACY (the historical full-model safetensors layout) is offered only by the models that shipped one,
+        # the stable set listed here. Sana and Wuerstchen v2 never had a loadable one, and any model added after
+        # the clean formats never had a legacy output at all.
+        if (self.is_stable_diffusion() or self.is_stable_diffusion_xl() or self.is_stable_diffusion_3()
+                or self.is_flux() or self.is_chroma() or self.is_ernie() or self.is_hi_dream()
+                or self.is_hunyuan_video() or self.is_pixart() or self.is_qwen() or self.is_z_image()
+                or self.is_stable_cascade()):
+            formats.append(ModelFormat.LEGACY_SAFETENSORS)
+        return formats
 
 
 # The components each model type has, keyed by TrainConfig field names, as the single source of truth.

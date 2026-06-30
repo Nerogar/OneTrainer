@@ -5,7 +5,7 @@
     "learning_rate": 0.0003,
     "model_type": "STABLE_DIFFUSION_3",
     "output_model_destination": "models/lora.safetensors",
-    "output_model_format": "SAFETENSORS",
+    "output_model_format": "DIFFUSERS_LORA",
     "resolution": "1024",
     "transformer": {
         "train": true,

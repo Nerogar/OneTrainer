@@ -6,7 +6,9 @@ from modules.model.util.clip_util import encode_clip
 from modules.model.util.llama_util import encode_llama
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util.convert_util import chunk_swap
 from modules.util.enum.DataType import DataType
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
@@ -135,6 +137,83 @@ class HunyuanVideoModel(BaseModel):
             self.text_encoder_2_lora,
             self.transformer_lora,
         ] if a is not None]
+
+    def fusion_groups(self) -> list | None:
+        # HunyuanVideo fuses qkv in three places: the context-embedder token-refiner blocks, the double
+        # blocks (img + txt), and the single blocks (qkv+mlp).
+        return [
+            ("context_embedder.token_refiner.refiner_blocks.{i}", ["attn.to_q", "attn.to_k", "attn.to_v"], "attn.qkv", "self_attn_qkv"),
+            ("transformer_blocks.{i}", ["attn.to_q", "attn.to_k", "attn.to_v"], "attn.qkv", "img_attn_qkv"),
+            ("transformer_blocks.{i}", ["attn.add_q_proj", "attn.add_k_proj", "attn.add_v_proj"], "attn.added_qkv", "txt_attn_qkv"),
+            ("single_transformer_blocks.{i}", ["attn.to_q", "attn.to_k", "attn.to_v", "proj_mlp"], "qkv_mlp", "linear1"),
+        ]
+
+    def diffusers_to_original(self) -> list | None:
+        # The token refiner has its own (non-swapped) adaLN_modulation.1; only the transformer-level
+        # final_layer is chunk-swapped.
+        return [
+            ("context_embedder.time_text_embed.text_embedder.linear_1",   "txt_in.c_embedder.linear_1"),
+            ("context_embedder.time_text_embed.text_embedder.linear_2",   "txt_in.c_embedder.linear_2"),
+            ("context_embedder.time_text_embed.timestep_embedder.linear_1", "txt_in.t_embedder.mlp.0"),
+            ("context_embedder.time_text_embed.timestep_embedder.linear_2", "txt_in.t_embedder.mlp.2"),
+            ("context_embedder.proj_in", "txt_in.input_embedder"),
+            *chunk_swap("norm_out.linear", "final_layer.adaLN_modulation.1"),
+            ("proj_out", "final_layer.linear"),
+            ("time_text_embed.guidance_embedder.linear_1", "guidance_in.mlp.0"),
+            ("time_text_embed.guidance_embedder.linear_2", "guidance_in.mlp.2"),
+            ("time_text_embed.text_embedder.linear_1",     "vector_in.in_layer"),
+            ("time_text_embed.text_embedder.linear_2",     "vector_in.out_layer"),
+            ("time_text_embed.timestep_embedder.linear_1", "time_in.mlp.0"),
+            ("time_text_embed.timestep_embedder.linear_2", "time_in.mlp.2"),
+            ("x_embedder.proj", "img_in.proj"),
+            ("context_embedder.token_refiner.refiner_blocks.{i}", "txt_in.individual_token_refiner.blocks.{i}", [
+                ("attn.qkv",        "self_attn_qkv"),
+                ("attn.to_out.0",   "self_attn_proj"),
+                ("ff.net.0.proj",   "mlp.fc1"),
+                ("ff.net.2",        "mlp.fc2"),
+                ("norm_out.linear", "adaLN_modulation.1"),
+                ("norm1",           "norm1"),
+                ("norm2",           "norm2"),
+            ]),
+            ("transformer_blocks.{i}", "double_blocks.{i}", [
+                ("attn.qkv",                 "img_attn_qkv"),
+                ("attn.added_qkv",           "txt_attn_qkv"),
+                ("attn.norm_k.weight",       "img_attn_k_norm.weight"),
+                ("attn.norm_q.weight",       "img_attn_q_norm.weight"),
+                ("attn.to_out.0",            "img_attn_proj"),
+                ("ff.net.0.proj",            "img_mlp.fc1"),
+                ("ff.net.2",                 "img_mlp.fc2"),
+                ("norm1.linear",             "img_mod.linear"),
+                ("attn.norm_added_k.weight", "txt_attn_k_norm.weight"),
+                ("attn.norm_added_q.weight", "txt_attn_q_norm.weight"),
+                ("attn.to_add_out",          "txt_attn_proj"),
+                ("ff_context.net.0.proj",    "txt_mlp.fc1"),
+                ("ff_context.net.2",         "txt_mlp.fc2"),
+                ("norm1_context.linear",     "txt_mod.linear"),
+            ]),
+            ("single_transformer_blocks.{i}", "single_blocks.{i}", [
+                ("qkv_mlp",            "linear1"),
+                ("attn.norm_k.weight", "k_norm.weight"),
+                ("attn.norm_q.weight", "q_norm.weight"),
+                ("proj_out",           "linear2"),
+                ("norm.linear",        "modulation.linear"),
+            ]),
+        ]
+
+    def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
+        # HunyuanVideo's two TEs: llama (text_encoder_1) + clip_l (text_encoder_2) (Comfy's HunyuanVideoClipModel).
+        return [
+            (self.text_encoder_1, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder",
+                ModelFormat.KOHYA_LORA: "lora_te1",
+                ModelFormat.COMFY_LORA: "text_encoders.llama.transformer",
+            }),
+            (self.text_encoder_2, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder_2",
+                ModelFormat.KOHYA_LORA: "lora_te2",
+                ModelFormat.COMFY_LORA: "text_encoders.clip_l.transformer",
+            }),
+        ]
 
     def all_embeddings(self) -> list[HunyuanVideoModelEmbedding]:
         return self.additional_embeddings \
