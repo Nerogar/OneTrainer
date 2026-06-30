@@ -88,7 +88,7 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         self.change_training_method(self.controller.train_config.training_method)
 
         self._profiling_controller = ProfilingWindowController()
-        self.profiling_window = PySide6ProfilingWindowView(self, self._profiling_controller)
+        self.profiling_window = self._profiling_controller.create_window(self, PySide6ProfilingWindowView)
 
         self.controller._check_start_always_on_tensorboard()
         self.workspace_dir_trace_id = self.ui_state.add_var_trace(
