@@ -195,37 +195,39 @@ class ModelType(Enum):
         raise ValueError(f"No supported training methods defined for model type {self}")
 
 
-# The first text encoder is always "text_encoder" here (matching the config field), even for
-# multi-encoder models that refer to it as "text_encoder_1" elsewhere in the code.
+# The components each model type has, keyed by TrainConfig field names, as the single source of truth.
+# The diffusion model (unet / transformer / prior) is always listed first; the first text encoder is
+# "text_encoder" (matching the config field), even for multi-encoder models that refer to it as
+# "text_encoder_1" elsewhere in the code.
 _MODEL_PARTS: dict[ModelType, tuple[str, ...]] = {
-    ModelType.STABLE_DIFFUSION_15: ("text_encoder", "unet", "vae"),
-    ModelType.STABLE_DIFFUSION_15_INPAINTING: ("text_encoder", "unet", "vae"),
-    ModelType.STABLE_DIFFUSION_20: ("text_encoder", "unet", "vae"),
-    ModelType.STABLE_DIFFUSION_20_BASE: ("text_encoder", "unet", "vae"),
-    ModelType.STABLE_DIFFUSION_20_INPAINTING: ("text_encoder", "unet", "vae"),
-    ModelType.STABLE_DIFFUSION_20_DEPTH: ("text_encoder", "unet", "vae"),
-    ModelType.STABLE_DIFFUSION_21: ("text_encoder", "unet", "vae"),
-    ModelType.STABLE_DIFFUSION_21_BASE: ("text_encoder", "unet", "vae"),
-    ModelType.STABLE_DIFFUSION_3: ("text_encoder", "text_encoder_2", "text_encoder_3", "transformer", "vae"),
-    ModelType.STABLE_DIFFUSION_35: ("text_encoder", "text_encoder_2", "text_encoder_3", "transformer", "vae"),
-    ModelType.STABLE_DIFFUSION_XL_10_BASE: ("text_encoder", "text_encoder_2", "unet", "vae"),
-    ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING: ("text_encoder", "text_encoder_2", "unet", "vae"),
+    ModelType.STABLE_DIFFUSION_15: ("unet", "text_encoder", "vae"),
+    ModelType.STABLE_DIFFUSION_15_INPAINTING: ("unet", "text_encoder", "vae"),
+    ModelType.STABLE_DIFFUSION_20: ("unet", "text_encoder", "vae"),
+    ModelType.STABLE_DIFFUSION_20_BASE: ("unet", "text_encoder", "vae"),
+    ModelType.STABLE_DIFFUSION_20_INPAINTING: ("unet", "text_encoder", "vae"),
+    ModelType.STABLE_DIFFUSION_20_DEPTH: ("unet", "text_encoder", "vae"),
+    ModelType.STABLE_DIFFUSION_21: ("unet", "text_encoder", "vae"),
+    ModelType.STABLE_DIFFUSION_21_BASE: ("unet", "text_encoder", "vae"),
+    ModelType.STABLE_DIFFUSION_3: ("transformer", "text_encoder", "text_encoder_2", "text_encoder_3", "vae"),
+    ModelType.STABLE_DIFFUSION_35: ("transformer", "text_encoder", "text_encoder_2", "text_encoder_3", "vae"),
+    ModelType.STABLE_DIFFUSION_XL_10_BASE: ("unet", "text_encoder", "text_encoder_2", "vae"),
+    ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING: ("unet", "text_encoder", "text_encoder_2", "vae"),
     # Only Würstchen v2's decoder has its own text encoder; Stable Cascade's decoder does not.
-    ModelType.WUERSTCHEN_2: ("text_encoder", "prior", "effnet_encoder", "decoder", "decoder_text_encoder", "decoder_vqgan"),
-    ModelType.STABLE_CASCADE_1: ("text_encoder", "prior", "effnet_encoder", "decoder", "decoder_vqgan"),
-    ModelType.PIXART_ALPHA: ("text_encoder", "transformer", "vae"),
-    ModelType.PIXART_SIGMA: ("text_encoder", "transformer", "vae"),
-    ModelType.FLUX_DEV_1: ("text_encoder", "text_encoder_2", "transformer", "vae"),
-    ModelType.FLUX_FILL_DEV_1: ("text_encoder", "text_encoder_2", "transformer", "vae"),
-    ModelType.FLUX_2: ("text_encoder", "transformer", "vae"),
-    ModelType.SANA: ("text_encoder", "transformer", "vae"),
-    ModelType.HUNYUAN_VIDEO: ("text_encoder", "text_encoder_2", "transformer", "vae"),
-    ModelType.HI_DREAM_FULL: ("text_encoder", "text_encoder_2", "text_encoder_3", "text_encoder_4", "transformer", "vae"),
-    ModelType.CHROMA_1: ("text_encoder", "transformer", "vae"),
-    ModelType.QWEN: ("text_encoder", "transformer", "vae"),
-    ModelType.Z_IMAGE: ("text_encoder", "transformer", "vae"),
-    ModelType.ERNIE: ("text_encoder", "transformer", "vae"),
-    ModelType.IDEOGRAM_4: ("text_encoder", "transformer", "unconditional_transformer", "vae"),
+    ModelType.WUERSTCHEN_2: ("prior", "text_encoder", "effnet_encoder", "decoder", "decoder_text_encoder", "decoder_vqgan"),
+    ModelType.STABLE_CASCADE_1: ("prior", "text_encoder", "effnet_encoder", "decoder", "decoder_vqgan"),
+    ModelType.PIXART_ALPHA: ("transformer", "text_encoder", "vae"),
+    ModelType.PIXART_SIGMA: ("transformer", "text_encoder", "vae"),
+    ModelType.FLUX_DEV_1: ("transformer", "text_encoder", "text_encoder_2", "vae"),
+    ModelType.FLUX_FILL_DEV_1: ("transformer", "text_encoder", "text_encoder_2", "vae"),
+    ModelType.FLUX_2: ("transformer", "text_encoder", "vae"),
+    ModelType.SANA: ("transformer", "text_encoder", "vae"),
+    ModelType.HUNYUAN_VIDEO: ("transformer", "text_encoder", "text_encoder_2", "vae"),
+    ModelType.HI_DREAM_FULL: ("transformer", "text_encoder", "text_encoder_2", "text_encoder_3", "text_encoder_4", "vae"),
+    ModelType.CHROMA_1: ("transformer", "text_encoder", "vae"),
+    ModelType.QWEN: ("transformer", "text_encoder", "vae"),
+    ModelType.Z_IMAGE: ("transformer", "text_encoder", "vae"),
+    ModelType.ERNIE: ("transformer", "text_encoder", "vae"),
+    ModelType.IDEOGRAM_4: ("transformer", "text_encoder", "unconditional_transformer", "vae"),
 }
 
 
