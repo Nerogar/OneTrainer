@@ -23,7 +23,7 @@ class PySide6FieldValidator(BaseFieldValidator):
         var: QtVar,
         ui_state: BaseUIState,
         var_name: str,
-        max_undo: int = DEFAULT_MAX_UNDO,
+        max_undo: int = DEFAULT_MAX_UNDO,  # unused: QLineEdit has native undo/redo, unlike tk.Entry
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
     ):
@@ -157,4 +157,5 @@ class PySide6PathValidator(PySide6FieldValidator):
         return _validate_path_field(self.ui_state, self.io_type, value)
 
     def revalidate(self) -> None:
-        self._validate_and_style(self.component.text())
+        if self._bound:
+            self._validate_and_style(self.component.text())

@@ -43,7 +43,8 @@ class PySide6OptimizerParamsWindowView(BaseOptimizerParamsWindowView, QDialog):
 
     def _rebuild_dynamic_ui(self):
         if self._dynamic_frame is not None:
-            self._dynamic_frame.setParent(None)
+            self._dynamic_frame.hide()
+            self._dynamic_frame.deleteLater()
 
         self._dynamic_frame = QWidget(self._frame)
         pyside6_components._layout(self._frame).addWidget(self._dynamic_frame, 1, 0, 1, 5)
