@@ -73,6 +73,24 @@ class IdeogramModel(BaseModel):
             self.transformer_lora,
         ] if a is not None]
 
+    def fusion_groups(self) -> list | None:
+        # Ideogram4 fuses q/k/v into one qkv Linear per block; everything else in the transformer -- including
+        # the output projection (to_out.0 -> o, see diffusers_to_original) -- already matches the original
+        # checkpoint's naming.
+        return [
+            ("layers.{i}", ["attention.to_q", "attention.to_k", "attention.to_v"], "attention.qkv", "attention.qkv"),
+        ]
+
+    def diffusers_to_original(self) -> list | None:
+        # Ideogram4's native (ComfyUI/original) checkpoint is identical to diffusers except for one rename:
+        # to_out.0 -> o on the (already fused, see fusion_groups above) attention module. Everything else --
+        # feed_forward, norms, adaln_modulation, final_layer, t_embedding, etc. -- keeps its diffusers name, so
+        # a single catch-all identity pattern covers the rest.
+        return [
+            ("layers.{i}.attention.to_out.0", "layers.{i}.attention.o"),
+            ("{path}", "{path}"),
+        ]
+
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
 
