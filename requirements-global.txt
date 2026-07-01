@@ -20,7 +20,7 @@ safetensors==0.8.0rc0
 tensorboard==2.20.0
 
 # diffusion models
--e git+https://github.com/huggingface/diffusers.git@b003a47#egg=diffusers
+-e git+https://github.com/huggingface/diffusers.git@6d71b76ac#egg=diffusers
 gguf==0.17.1
 transformers==5.5.4 # pinned below 5.6, see https://github.com/Nerogar/OneTrainer/pull/1506
 sentencepiece==0.2.1 # transitive dependency of transformers for tokenizer loading

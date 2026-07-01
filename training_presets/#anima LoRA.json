@@ -3,7 +3,7 @@
     "batch_size": 2,
     "learning_rate": 3e-05,
     "model_type": "ANIMA",
-    "output_model_format": "DIFFUSERS_LORA",
+    "output_model_format": "KOHYA_LORA",
     "resolution": "512",
     "compile": true,
     "dataloader_threads": 1,
