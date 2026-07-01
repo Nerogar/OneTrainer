@@ -28,7 +28,7 @@ class StableDiffusion3ModelSaver(
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
         pipeline = model.create_pipeline()
         pipeline.to("cpu")
-        save_pipeline = self._copy_pipeline_to_dtype(pipeline, dtype, tokenizer_attrs=("tokenizer_3",))
+        save_pipeline = self._copy_pipeline_to_dtype(pipeline, dtype, pipeline.tokenizer_3)
 
         text_encoder_3 = save_pipeline.text_encoder_3
         if text_encoder_3 is not None:

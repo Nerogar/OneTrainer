@@ -28,7 +28,7 @@ class HunyuanVideoModelSaver(
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
         pipeline = model.create_pipeline(use_original_modules=True)
         pipeline.to("cpu")
-        save_pipeline = self._copy_pipeline_to_dtype(pipeline, dtype)
+        save_pipeline = self._copy_pipeline_to_dtype(pipeline, dtype, pipeline.tokenizer)
 
         text_encoder_1 = save_pipeline.text_encoder
         if text_encoder_1 is not None:

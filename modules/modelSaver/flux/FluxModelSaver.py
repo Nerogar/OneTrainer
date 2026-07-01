@@ -28,7 +28,7 @@ class FluxModelSaver(
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
         pipeline = model.create_pipeline()
         pipeline.to("cpu")
-        save_pipeline = self._copy_pipeline_to_dtype(pipeline, dtype, tokenizer_attrs=("tokenizer_2",))
+        save_pipeline = self._copy_pipeline_to_dtype(pipeline, dtype, pipeline.tokenizer_2)
 
         text_encoder_2 = save_pipeline.text_encoder_2
         if text_encoder_2 is not None:
