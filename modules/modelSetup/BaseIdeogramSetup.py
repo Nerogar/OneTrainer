@@ -76,6 +76,10 @@ class BaseIdeogramSetup(
         quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
         quantize_layers(model.unconditional_transformer, self.train_device, model.train_dtype, config)
 
+        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=False)
+        if model.unconditional_transformer is not None:
+            self._set_attention_backend(model.unconditional_transformer, config.attention_mechanism, mask=False)
+
     def predict(
             self,
             model: IdeogramModel,
