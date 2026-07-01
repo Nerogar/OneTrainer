@@ -69,15 +69,16 @@ class ChromaLoRASetup(
             model: ChromaModel,
             config: TrainConfig,
     ):
-        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te")
+        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
 
         if model.text_encoder is not None:
             model.text_encoder_lora = LoRAModuleWrapper(
-                model.text_encoder, "lora_te", config
+                model.text_encoder, "text_encoder", config
             ) if create_te else None
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "lora_transformer", config, config.layer_filter.split(",")
+            model.transformer, "transformer", config, config.layer_filter.split(","),
+            fusion_spec=model.fusion_groups(), fuse=config.output_model_format.needs_qkv_fusion(),
         )
 
         if model.lora_state_dict:

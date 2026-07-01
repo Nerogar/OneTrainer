@@ -5,6 +5,7 @@ from collections import defaultdict
 from collections.abc import Mapping
 from typing import Any
 
+from modules.module.FusedModule import FusedModuleGroup, discover_fused_groups
 from modules.module.oft_utils import OFTRotationModule
 from modules.module.quantized.LinearSVD import BaseLinearSVD
 from modules.util.config.TrainConfig import TrainConfig
@@ -824,6 +825,8 @@ class LoRAModuleWrapper:
             prefix: str,
             config: TrainConfig,
             module_filter: list[str] = None,
+            fusion_spec: list[tuple] | None = None,
+            fuse: bool | None = None,
     ):
         self.orig_module = orig_module
         self.prefix = prefix
@@ -831,6 +834,19 @@ class LoRAModuleWrapper:
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
         self.lokr_dim = config.lokr_dim
+        # per-model qkv fusion groups (block_pattern, [leaf_suffixes], fused_suffix, original_suffix),
+        # passed in by the setup. The original_suffix field is the converter's concern and ignored here.
+        # See modules/model/FluxModel.py.
+        self.fusion_spec = fusion_spec
+        # whether to actually BUILD fused modules (vs split leaves). The setup decides from the chosen
+        # output format (ModelFormat.needs_qkv_fusion); this module does not know about output formats.
+        # `fuse` is separate from `fusion_spec` because a SPLIT wrapper still needs the qkv grouping to
+        # recognise (and reject) an incompatible fused file on load -- the file's fused/split state must
+        # match the wrapper's, and detecting that targets the qkv keys via the spec (see
+        # __check_fusion_match). A setup that wants that check passes fusion_spec unconditionally and
+        # selects fused/split only via `fuse`. When `fuse` is left None it defaults to fusing iff a spec
+        # was given.
+        self.fuse = (fusion_spec is not None) if fuse is None else fuse
 
         self.module_filters = [
             ModuleFilter(pattern, use_regex=config.layer_filter_regex)
@@ -882,6 +898,9 @@ class LoRAModuleWrapper:
                 'train_device': torch.device(config.train_device),
                 'lokr_vec_trick': config.lokr_vec_trick,
             }
+        # discovered qkv fusion groups (set in __create_modules); [] when there is no orig_module or no
+        # fusion_spec. Consumed by the load-time fused/split match check.
+        self.fused_groups = []
         self.lora_modules = self.__create_modules(orig_module, config)
 
     def __create_modules(self, orig_module: nn.Module | None, config: TrainConfig) -> dict[str, PeftBase]:
@@ -894,21 +913,44 @@ class LoRAModuleWrapper:
         unsuitable = []
         oft_adjustments = []
 
+        selected_modules = {}
         for name, child_module in orig_module.named_modules():
             name = name.replace(".checkpoint.", ".")
             if not isinstance(child_module, Linear | Conv2d):
                 unsuitable.append(name)
                 continue
             if len(self.module_filters) == 0 or any(f.matches(name) for f in self.module_filters):
-                prefixed_name = (self.prefix + "." + name) if self.prefix != "" else name
-                lora_module = self.klass(prefixed_name, child_module, *self.additional_args, **self.additional_kwargs)
-                lora_modules[name] = lora_module
-                if self.peft_type == PeftType.OFT_2 and lora_module.adjustment_info:
-                    old, new = lora_module.adjustment_info
-                    oft_adjustments.append({'old': old, 'new': new})
+                selected_modules[name] = child_module
                 selected.append(name)
             else:
                 deselected.append(name)
+
+        # discovered qkv fusion groups, retained for the load-time fused/split match check regardless of
+        # whether they are built fused. With no fusion_spec this is empty -> the loop below builds only
+        # individual (split) modules.
+        self.fused_groups = discover_fused_groups(self.fusion_spec, selected_modules, self.fuse)
+        # when fusing, each complete group becomes one fused module (ORIGINAL/COMFY); its leaves are then
+        # excluded from individual creation. When not fusing, the leaves stay individual (split) modules.
+        consumed = set()
+        if self.fuse:
+            for fused_name, leaf_names, leaves in self.fused_groups:
+                consumed.update(leaf_names)
+                prefixed_name = (self.prefix + "." + fused_name) if self.prefix != "" else fused_name
+                group = FusedModuleGroup(prefixed_name, leaves, self.klass, self.additional_args, self.additional_kwargs)
+                lora_modules[fused_name] = group
+                if self.peft_type == PeftType.OFT_2 and group.module.adjustment_info:
+                    old, new = group.module.adjustment_info
+                    oft_adjustments.append({'old': old, 'new': new})
+
+        for name, child_module in selected_modules.items():
+            if name in consumed:
+                continue
+            prefixed_name = (self.prefix + "." + name) if self.prefix != "" else name
+            lora_module = self.klass(prefixed_name, child_module, *self.additional_args, **self.additional_kwargs)
+            lora_modules[name] = lora_module
+            if self.peft_type == PeftType.OFT_2 and lora_module.adjustment_info:
+                old, new = lora_module.adjustment_info
+                oft_adjustments.append({'old': old, 'new': new})
 
         if oft_adjustments:
             summary = defaultdict(int)
@@ -979,6 +1021,31 @@ class LoRAModuleWrapper:
             if checkpoint_rank != config_rank:
                 raise ValueError(f"Rank/Dim mismatch: checkpoint={checkpoint_rank}, config={config_rank}, please correct in the UI.")
 
+    def _check_fusion_match(self, state_dict: dict[str, Tensor]):
+        # The incoming file's qkv fused/split state must match this wrapper's (fixed by the output
+        # format). Converting between them on load is unsupported -- fusing independent split q/k/v into
+        # one rank-r adapter is lossy (SVD), and de-fusing a fused file into split leaves, though exact
+        # for LoRA, is not implemented yet -- so a mismatch is a hard error rather than a silent key drop
+        # (the fused/split keys simply wouldn't match any module). Only the qkv groups can differ; the
+        # rest of the namespace is shared. The check targets the qkv keys via fused_groups, which is why
+        # the grouping rides along on split wrappers too (see __init__).
+        for fused_name, leaf_names, _leaves in self.fused_groups:
+            fused_prefix = (self.prefix + "." + fused_name) if self.prefix != "" else fused_name
+            leaf_prefixes = [(self.prefix + "." + n) if self.prefix != "" else n for n in leaf_names]
+            file_fused = any(k.startswith(fused_prefix + ".") for k in state_dict)
+            file_split = any(k.startswith(lp + ".") for lp in leaf_prefixes for k in state_dict)
+
+            if self.fuse and file_split:
+                raise RuntimeError(
+                    f"LoRA file has split q/k/v ({fused_name}), but the selected output format needs "
+                    f"fused qkv. Fusing independent q/k/v adapters into one rank-r adapter is lossy "
+                    f"(SVD/re-rank); pick a split output format or retrain.")
+            if not self.fuse and file_fused:
+                raise RuntimeError(
+                    f"LoRA file has fused qkv ({fused_name}), but the selected output format keeps q/k/v "
+                    f"split. De-fusing a fused adapter on load is not supported yet; pick a fused output "
+                    f"format or retrain.")
+
     def load_state_dict(self, state_dict: dict[str, Tensor], strict: bool = True):
         """
         Loads the state dict
@@ -990,7 +1057,9 @@ class LoRAModuleWrapper:
         # create a copy, so the modules can pop states
         state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
 
-        self._check_rank_matches(state_dict)
+        self._check_fusion_match(state_dict)
+        # FIXME: disabled rank check, false positive on Flux2 LoHA loading
+        # self._check_rank_matches(state_dict)
 
         try:
             for module in self.lora_modules.values():

@@ -1,14 +1,12 @@
 import os
 import traceback
 
-from modules.model.BaseModel import BaseModel
 from modules.model.Flux2Model import Flux2Model
 from modules.modelLoader.GenericFineTuneModelLoader import make_fine_tune_model_loader
 from modules.modelLoader.GenericLoRAModelLoader import make_lora_model_loader
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.modelLoader.mixin.LoRALoaderMixin import LoRALoaderMixin
 from modules.util.config.TrainConfig import QuantizationConfig
-from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -197,9 +195,6 @@ class Flux2LoRALoader(
     def __init__(self):
         super().__init__()
 
-    def _get_convert_key_sets(self, model: BaseModel) -> list[LoraConversionKeySet] | None:
-        return None #TODO
-        #return convert_flux_lora_key_sets()
 
     def load(
             self,

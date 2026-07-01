@@ -78,19 +78,19 @@ class StableDiffusionXLLoRASetup(
             model: StableDiffusionXLModel,
             config: TrainConfig,
     ):
-        create_te1 = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te1")
-        create_te2 = config.text_encoder_2.train or state_dict_has_prefix(model.lora_state_dict, "lora_te2")
+        create_te1 = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
+        create_te2 = config.text_encoder_2.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder_2")
 
         model.text_encoder_1_lora = LoRAModuleWrapper(
-            model.text_encoder_1, "lora_te1", config
+            model.text_encoder_1, "text_encoder", config
         ) if create_te1 else None
 
         model.text_encoder_2_lora = LoRAModuleWrapper(
-            model.text_encoder_2, "lora_te2", config
+            model.text_encoder_2, "text_encoder_2", config
         ) if create_te2 else None
 
         model.unet_lora = LoRAModuleWrapper(
-            model.unet, "lora_unet", config, config.layer_filter.split(",")
+            model.unet, "unet", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:

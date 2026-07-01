@@ -38,7 +38,7 @@ class BaseHunyuanVideoSetup(
     metaclass=ABCMeta
 ):
     LAYER_PRESETS = {
-        "attn-mlp": ["attn", "ff.net"],
+        "attn-mlp": ["attn", "ff.net", "proj_mlp"],
         "attn-only": ["attn"],
         "blocks": ["transformer_block"],
         "full": [],

@@ -3,6 +3,7 @@
     "batch_size": 2,
     "learning_rate": 1e-5,
     "model_type": "Z_IMAGE",
+    "output_model_format": "ORIGINAL_TRANSFORMER",
     "resolution": "512",
     "compile": true,
     "transformer": {

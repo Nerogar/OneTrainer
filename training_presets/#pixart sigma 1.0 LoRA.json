@@ -3,13 +3,13 @@
     "batch_size": 4,
     "model_type": "PIXART_SIGMA",
     "epochs": 50,
-    "learning_rate": 0.00001,
+    "learning_rate": 1e-05,
     "output_model_destination": "models/lora.safetensors",
-    "output_model_format": "SAFETENSORS",
+    "output_model_format": "DIFFUSERS_LORA",
     "resolution": "1024",
     "training_method": "LORA",
     "lora_rank": 16,
-	"lora_alpha": 1.0,
+    "lora_alpha": 1.0,
     "transformer": {
         "weight_dtype": "BFLOAT_16"
     },

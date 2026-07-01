@@ -1,9 +1,10 @@
 {
     "base_model_name": "black-forest-labs/FLUX.2-klein-base-9B",
     "batch_size": 2,
-    "learning_rate": 3e-5,
+    "learning_rate": 3e-05,
     "model_type": "FLUX_2",
     "resolution": "512",
+    "output_model_format": "DIFFUSERS_LORA",
     "compile": true,
     "transformer": {
         "train": true,
