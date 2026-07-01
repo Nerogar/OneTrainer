@@ -1,124 +1,67 @@
-from modules.ui.ConfigList import ConfigList
-from modules.ui.SampleParamsWindow import SampleParamsWindow
-from modules.util.config.SampleConfig import SampleConfig
-from modules.util.config.TrainConfig import TrainConfig
-from modules.util.ui import components
-from modules.util.ui.UIState import UIState
+from abc import ABC, abstractmethod
 
-import customtkinter as ctk
+from modules.ui.BaseConfigListView import BaseConfigListView
 
 
-class SamplingTab(ConfigList):
-
-    def __init__(self, master, train_config: TrainConfig, ui_state: UIState):
-        super().__init__(
-            master,
-            train_config,
-            ui_state,
-            from_external_file=True,
-            attr_name="sample_definition_file_name",
-            config_dir="training_samples",
-            default_config_name="samples.json",
-            add_button_text="Add Sample",
-            add_button_tooltip="Add a new sample configuration.",
-            is_full_width=True,
-            show_toggle_button=True
-        )
-
-    def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        return SampleWidget(master, element, i, open_command, remove_command, clone_command, save_command)
-
-    def create_new_element(self) -> dict:
-        return SampleConfig.default_values(self.train_config.model_type)
-
-    def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
-        return SampleParamsWindow(self.master, self.current_config[i], ui_state, model_type=self.train_config.model_type)
+class BaseSamplingTabView(BaseConfigListView):
+    pass
 
 
-class SampleWidget(ctk.CTkFrame):
-    def __init__(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        super().__init__(
-            master=master, corner_radius=10, bg_color="transparent"
-        )
+class BaseSampleWidgetView(ABC):
+    def __init__(self, components):
+        self.components = components
 
+    def build_content(self, frame, element, ui_state, i, open_command, remove_command, clone_command, save_command):
         self.element = element
-        self.ui_state = UIState(self, element)
         self.i = i
         self.save_command = save_command
 
-        self.grid_columnconfigure(10, weight=1)
-
         # close button
-        close_button = ctk.CTkButton(
-            master=self,
-            width=20,
-            height=20,
-            text="X",
-            corner_radius=2,
-            fg_color="#C00000",
-            command=lambda: remove_command(self.i),
-        )
-        close_button.grid(row=0, column=0)
+        self.components.colored_icon_button(frame, 0, 0, "X", "#C00000", lambda: remove_command(self.i))
 
         # clone button
-        clone_button = ctk.CTkButton(
-            master=self,
-            width=20,
-            height=20,
-            text="+",
-            corner_radius=2,
-            fg_color="#00C000",
-            command=lambda: clone_command(self.i),
-        )
-        clone_button.grid(row=0, column=1, padx=5)
+        self.components.colored_icon_button(frame, 0, 1, "+", "#00C000", lambda: clone_command(self.i), padx=5)
 
         # enabled
-        self.enabled_switch = components.switch(self, 0, 2, self.ui_state, "enabled", self.__switch_enabled)
-        self.enabled_switch.configure(width=40)
+        self.enabled_switch = self.components.switch(frame, 0, 2, ui_state, "enabled", self._switch_enabled, width=40)
 
         # width
-        components.label(self, 0, 3, "width:")
-        self.width_entry = components.entry(self, 0, 4, self.ui_state, "width")
-        self.width_entry.bind('<FocusOut>', lambda _: save_command())
-        self.width_entry.configure(width=50)
+        self.components.label(frame, 0, 3, "width:")
+        self.width_entry = self.components.entry(frame, 0, 4, ui_state, "width", width=50)
 
         # height
-        components.label(self, 0, 5, "height:")
-        self.height_entry = components.entry(self, 0, 6, self.ui_state, "height")
-        self.height_entry.bind('<FocusOut>', lambda _: save_command())
-        self.height_entry.configure(width=50)
+        self.components.label(frame, 0, 5, "height:")
+        self.height_entry = self.components.entry(frame, 0, 6, ui_state, "height", width=50)
 
         # seed
-        components.label(self, 0, 7, "seed:")
-        self.seed_entry = components.entry(self, 0, 8, self.ui_state, "seed")
-        self.seed_entry.bind('<FocusOut>', lambda _: save_command())
-        self.seed_entry.configure(width=80)
+        self.components.label(frame, 0, 7, "seed:")
+        self.seed_entry = self.components.entry(frame, 0, 8, ui_state, "seed", width=80)
 
         # prompt
-        components.label(self, 0, 9, "prompt:")
-        self.prompt_entry = components.entry(self, 0, 10, self.ui_state, "prompt")
-        self.prompt_entry.bind('<FocusOut>', lambda _: save_command())
+        self.components.label(frame, 0, 9, "prompt:")
+        self.prompt_entry = self.components.entry(frame, 0, 10, ui_state, "prompt")
 
         # button
-        self.button = components.icon_button(self, 0, 11, "...", lambda: open_command(self.i, self.ui_state))
-        self.button.configure(width=40)
+        self.button = self.components.icon_button(frame, 0, 11, "...", lambda: open_command(self.i, ui_state))
 
-        self.__set_enabled()
+        self._bind_save(save_command)
+        self._set_enabled()
 
-    def __switch_enabled(self):
+    @abstractmethod
+    def _bind_save(self, save_command): pass
+
+    # BaseConfigListView calls configure_element() on all widget types generically;
+    # sampling widgets have no post-window logic, so this is an intentional no-op.
+    def configure_element(self): pass  # noqa: B027
+
+    def _switch_enabled(self):
         self.save_command()
-        self.__set_enabled()
+        self._set_enabled()
 
-    def __set_enabled(self):
+    def _set_enabled(self):
         enabled = self.element.enabled
         self.width_entry.configure(state="normal" if enabled else "disabled")
         self.height_entry.configure(state="normal" if enabled else "disabled")
         self.prompt_entry.configure(state="normal" if enabled else "disabled")
         self.seed_entry.configure(state="normal" if enabled else "disabled")
         self.button.configure(state="normal" if enabled else "disabled")
-
-    def configure_element(self):
-        pass
-
-    def place_in_list(self):
-        self.grid(row=self.i, column=0, pady=5, padx=5, sticky="new")
