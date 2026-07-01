@@ -1,4 +1,4 @@
-import tkinter as tk
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
@@ -8,13 +8,12 @@ from modules.util.config.BaseConfig import BaseConfig
 from modules.util.type_util import issubclass_safe
 
 
-class UIState:
+class BaseUIState(ABC):
     __vars: dict[str, Any]
     __var_traces: dict[str, dict[int, Callable[[], None]]]
     __latest_var_trace_id: int
 
-    def __init__(self, master, obj):
-        self.master = master
+    def __init__(self, obj):
         self.obj = obj
 
         self.__var_types: dict[str, type] = {}
@@ -25,13 +24,24 @@ class UIState:
         self.__var_traces = {name: {} for name in self.__vars}
         self.__latest_var_trace_id = 0
 
+    @abstractmethod
+    def _make_str_var(self, initial_value: Any):
+        pass
+
+    @abstractmethod
+    def _make_bool_var(self, initial_value: Any):
+        pass
+
+    @abstractmethod
+    def _make_nested_state(self, obj: Any) -> "BaseUIState":
+        pass
+
     def update(self, obj):
         self.obj = obj
         self.__set_vars(obj)
 
     def get_var(self, name):
         split_name = name.split('.')
-
         if len(split_name) == 1:
             return self.__vars[split_name[0]]
         else:
@@ -72,7 +82,6 @@ class UIState:
                 else:
                     setattr(obj, name, string_var)
                 self.__call_var_traces(name)
-
         return update
 
     def __set_enum_var(self, obj, is_dict, name, var, var_type, nullable):
@@ -92,7 +101,6 @@ class UIState:
                 else:
                     setattr(obj, name, var_type[string_var])
                 self.__call_var_traces(name)
-
         return update
 
     def __set_bool_var(self, obj, is_dict, name, var):
@@ -104,7 +112,6 @@ class UIState:
             def update(_0, _1, _2):
                 setattr(obj, name, var.get())
                 self.__call_var_traces(name)
-
         return update
 
     def __set_int_var(self, obj, is_dict, name, var, nullable):
@@ -138,7 +145,6 @@ class UIState:
                     except ValueError:
                         setattr(obj, name, None)
                 self.__call_var_traces(name)
-
         return update
 
     def __set_float_var(self, obj, is_dict, name, var, nullable):
@@ -172,12 +178,10 @@ class UIState:
                     except ValueError:
                         setattr(obj, name, None)
                 self.__call_var_traces(name)
-
         return update
 
     def __create_vars(self, obj):
         new_vars = {}
-
         is_dict = isinstance(obj, dict)
         is_config = isinstance(obj, BaseConfig)
 
@@ -190,61 +194,48 @@ class UIState:
 
                 obj_var = getattr(obj, name)
                 if issubclass_safe(var_type, BaseConfig):
-                    var = UIState(self.master, obj_var)
-                    new_vars[name] = var
+                    new_vars[name] = self._make_nested_state(obj_var)
                 elif var_type is str:
-                    var = tk.StringVar(master=self.master)
-                    var.set("" if obj_var is None else obj_var)
+                    var = self._make_str_var("" if obj_var is None else obj_var)
                     var.trace_add("write", self.__set_str_var(obj, is_dict, name, var, obj.nullables[name]))
                     new_vars[name] = var
                 elif issubclass_safe(var_type, Enum):
-                    var = tk.StringVar(master=self.master)
-                    var.set("" if obj_var is None else str(obj_var))
+                    var = self._make_str_var("" if obj_var is None else str(obj_var))
                     var.trace_add("write", self.__set_enum_var(obj, is_dict, name, var, var_type, obj.nullables[name]))
                     new_vars[name] = var
                 elif var_type is bool:
-                    var = tk.BooleanVar(master=self.master)
-                    var.set(obj_var or False)
+                    var = self._make_bool_var(obj_var or False)
                     var.trace_add("write", self.__set_bool_var(obj, is_dict, name, var))
                     new_vars[name] = var
                 elif var_type is int:
-                    var = tk.StringVar(master=self.master)
-                    var.set("" if obj_var is None else str(obj_var))
+                    var = self._make_str_var("" if obj_var is None else str(obj_var))
                     var.trace_add("write", self.__set_int_var(obj, is_dict, name, var, obj.nullables[name]))
                     new_vars[name] = var
                 elif var_type is float:
-                    var = tk.StringVar(master=self.master)
-                    var.set("" if obj_var is None else str(obj_var))
+                    var = self._make_str_var("" if obj_var is None else str(obj_var))
                     var.trace_add("write", self.__set_float_var(obj, is_dict, name, var, obj.nullables[name]))
                     new_vars[name] = var
         else:
             iterable = obj.items() if is_dict else vars(obj).items()
-
             for name, obj_var in iterable:
-
                 if isinstance(obj_var, str):
-                    var = tk.StringVar(master=self.master)
-                    var.set(obj_var)
+                    var = self._make_str_var(obj_var)
                     var.trace_add("write", self.__set_str_var(obj, is_dict, name, var, False))
                     new_vars[name] = var
                 elif isinstance(obj_var, Enum):
-                    var = tk.StringVar(master=self.master)
-                    var.set(str(obj_var))
+                    var = self._make_str_var(str(obj_var))
                     var.trace_add("write", self.__set_enum_var(obj, is_dict, name, var, type(obj_var), False))
                     new_vars[name] = var
                 elif isinstance(obj_var, bool):
-                    var = tk.BooleanVar(master=self.master)
-                    var.set(obj_var)
+                    var = self._make_bool_var(obj_var)
                     var.trace_add("write", self.__set_bool_var(obj, is_dict, name, var))
                     new_vars[name] = var
                 elif isinstance(obj_var, int):
-                    var = tk.StringVar(master=self.master)
-                    var.set(str(obj_var))
+                    var = self._make_str_var(str(obj_var))
                     var.trace_add("write", self.__set_int_var(obj, is_dict, name, var, False))
                     new_vars[name] = var
                 elif isinstance(obj_var, float):
-                    var = tk.StringVar(master=self.master)
-                    var.set(str(obj_var))
+                    var = self._make_str_var(str(obj_var))
                     var.trace_add("write", self.__set_float_var(obj, is_dict, name, var, False))
                     new_vars[name] = var
 
@@ -253,7 +244,6 @@ class UIState:
     def __set_vars(self, obj):
         is_dict = isinstance(obj, dict)
         is_config = isinstance(obj, BaseConfig)
-        iterable = obj.items() if is_dict else vars(obj).items()
 
         if is_config:
             for name, var_type in obj.types.items():
@@ -274,6 +264,7 @@ class UIState:
                     var = self.__vars[name]
                     var.set("" if obj_var is None else str(obj_var))
         else:
+            iterable = obj.items() if is_dict else vars(obj).items()
             for name, obj_var in iterable:
                 if isinstance(obj_var, str):
                     var = self.__vars[name]
@@ -288,27 +279,26 @@ class UIState:
                     var = self.__vars[name]
                     var.set(str(obj_var))
 
-    # metadata api
-    def _resolve_state_and_leaf(self, name: str):
-        parts = name.split('.')
-        state: UIState = self
-        for part in parts[:-1]:
-            state = state.get_var(part)
-            if not isinstance(state, UIState):
-                return None, None
-        return state, parts[-1]
-
     @dataclass(frozen=True)
     class VarMeta:
         type: type | None
         nullable: bool
         default: Any
 
-    def get_field_metadata(self, name: str) -> "UIState.VarMeta":
+    def _resolve_state_and_leaf(self, name: str):
+        parts = name.split('.')
+        state: BaseUIState = self
+        for part in parts[:-1]:
+            state = state.get_var(part)
+            if not isinstance(state, BaseUIState):
+                return None, None
+        return state, parts[-1]
+
+    def get_field_metadata(self, name: str) -> "BaseUIState.VarMeta":
         state, leaf = self._resolve_state_and_leaf(name)
         if state is None:
-            return UIState.VarMeta(None, False, None)
-        return UIState.VarMeta(
+            return BaseUIState.VarMeta(None, False, None)
+        return BaseUIState.VarMeta(
             state.__var_types.get(leaf),
             state.__var_nullables.get(leaf, False),
             state.__var_defaults.get(leaf, None),
