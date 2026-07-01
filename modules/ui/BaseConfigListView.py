@@ -149,7 +149,7 @@ class BaseConfigListView(ABC):
 
     def __create_configs_dropdown(self):
         if self.configs_dropdown is not None:
-            self.configs_dropdown.destroy()
+            self._destroy_widget(self.configs_dropdown)
 
         self.configs_dropdown = self.components.options_kv(
             self.top_frame, 0, 0, self.configs, self.ui_state, self.attr_name, self.__load_current_config

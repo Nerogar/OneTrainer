@@ -1,84 +1,48 @@
-
 from modules.ui.BaseTimestepDistributionWindowView import BaseTimestepDistributionWindowView
 from modules.ui.TimestepDistributionWindowController import TimestepDistributionWindowController
-from modules.util.ui import ctk_components
-from modules.util.ui.ui_utils import set_window_icon
+from modules.util.ui import pyside6_components
 
-import customtkinter as ctk
-from customtkinter import AppearanceModeTracker, ThemeManager
 from matplotlib import pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from PySide6.QtWidgets import QDialog, QGridLayout, QPushButton
 
 
-class CtkTimestepDistributionWindowView(BaseTimestepDistributionWindowView, ctk.CTkToplevel):
-    def __init__(
-            self,
-            parent,
-            controller: TimestepDistributionWindowController,
-            ui_state,
-            *args, **kwargs,
-    ):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
-        BaseTimestepDistributionWindowView.__init__(self, ctk_components)
+class PySide6TimestepDistributionWindowView(BaseTimestepDistributionWindowView, QDialog):
+    def __init__(self, parent, controller: TimestepDistributionWindowController, ui_state):
+        QDialog.__init__(self, parent)
+        BaseTimestepDistributionWindowView.__init__(self, pyside6_components)
 
-        self.title("Timestep Distribution")
-        self.geometry("900x600")
-        self.resizable(True, True)
+        self.setWindowTitle("Timestep Distribution")
+        self.resize(900, 600)
+        self._controller = controller
 
-        self.controller = controller
-        self.ax = None
-        self.canvas = None
+        outer = QGridLayout(self)
+        outer.setRowStretch(0, 1)
 
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=1)
-
-        frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        frame.grid_columnconfigure(0, weight=0)
-        frame.grid_columnconfigure(1, weight=0)
-        frame.grid_columnconfigure(2, weight=0)
-        frame.grid_columnconfigure(3, weight=1)
-        frame.grid_rowconfigure(7, weight=1)
+        scroll, frame = pyside6_components.scrollable_frame(self)
+        lo = pyside6_components._layout(frame)
+        lo.setColumnStretch(3, 1)
 
         self.build_content(frame, controller, ui_state)
+        lo.setRowStretch(7, 1)
 
-        # matplotlib chart (CTK-only: needs winfo_rgb from the toplevel)
-        appearance_mode = AppearanceModeTracker.get_mode()
-        background_color = self.winfo_rgb(ThemeManager.theme["CTkToplevel"]["fg_color"][appearance_mode])
-        text_color = self.winfo_rgb(ThemeManager.theme["CTkLabel"]["text_color"][appearance_mode])
-        background_color = f"#{int(background_color[0]/256):x}{int(background_color[1]/256):x}{int(background_color[2]/256):x}"
-        text_color = f"#{int(text_color[0]/256):x}{int(text_color[1]/256):x}{int(text_color[2]/256):x}"
+        fig, self._ax = plt.subplots()
+        self._canvas = FigureCanvasQTAgg(fig)
+        lo.addWidget(self._canvas, 0, 3, 8, 1)
+        self._update_preview()
 
-        fig, ax = plt.subplots()
-        self.ax = ax
-        self.canvas = FigureCanvasTkAgg(fig, master=frame)
-        self.canvas.get_tk_widget().grid(row=0, column=3, rowspan=8)
+        update_btn = QPushButton("Update Preview", frame)
+        update_btn.clicked.connect(self._update_preview)
+        lo.addWidget(update_btn, 8, 3)
 
-        fig.set_facecolor(background_color)
-        ax.set_facecolor(background_color)
-        ax.spines['bottom'].set_color(text_color)
-        ax.spines['left'].set_color(text_color)
-        ax.spines['top'].set_color(text_color)
-        ax.spines['right'].set_color(text_color)
-        ax.tick_params(axis='x', colors=text_color, which="both")
-        ax.tick_params(axis='y', colors=text_color, which="both")
-        ax.xaxis.label.set_color(text_color)
-        ax.yaxis.label.set_color(text_color)
+        outer.addWidget(scroll, 0, 0)
 
-        self.__update_preview()
+        ok = QPushButton("ok", self)
+        ok.clicked.connect(self.accept)
+        outer.addWidget(ok, 1, 0)
 
-        # update button
-        ctk_components.button(frame, 8, 3, "Update Preview", command=self.__update_preview)
 
-        frame.pack(fill="both", expand=1)
-        frame.grid(row=0, column=0, sticky='nsew')
-        ctk_components.button(self, 1, 0, "ok", self.destroy)
-
-        self.wait_visibility()
-        self.after(200, lambda: set_window_icon(self))
-        self.grab_set()
-        self.focus_set()
-
-    def __update_preview(self):
-        self.ax.cla()
-        self.ax.hist(self.controller.generate_preview_data(), bins=1000, range=(0, 999))
-        self.canvas.draw()
+    def _update_preview(self):
+        self._ax.cla()
+        self._ax.hist(self._controller.generate_preview_data(), bins=1000, range=(0, 999))
+        self._canvas.draw()

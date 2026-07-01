@@ -36,8 +36,8 @@ class CtkTopBarView(BaseTopBarView):
     def _setup_frame_column_weight(self):
         self.frame.grid_columnconfigure(5, weight=1)
 
-    def _forget_dropdown(self):
-        self.configs_dropdown.grid_forget()
+    def _forget_dropdown(self, widget):
+        widget.destroy()
 
     def _show_save_dialog(self, default_value: str, callback):
         dialogs.StringInputDialog(

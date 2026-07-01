@@ -1,16 +1,17 @@
 from modules.ui.BaseSamplingTabView import BaseSampleWidgetView, BaseSamplingTabView
-from modules.ui.CtkConfigListView import CtkConfigListView
-from modules.ui.CtkSampleParamsWindowView import CtkSampleParamsWindowView
+from modules.ui.PySide6ConfigListView import PySide6ConfigListView
+from modules.ui.PySide6SampleParamsWindowView import PySide6SampleParamsWindowView
 from modules.ui.SamplingTabController import SamplingTabController
-from modules.util.ui import ctk_components
-from modules.util.ui.CtkUIState import CtkUIState
+from modules.util.ui import pyside6_components
+from modules.util.ui.pyside6_util import QtABCMeta
 
-import customtkinter as ctk
+from PySide6.QtWidgets import QWidget
 
 
-class CtkSamplingTabView(CtkConfigListView, BaseSamplingTabView):
+class PySide6SamplingTabView(PySide6ConfigListView, BaseSamplingTabView):
+
     def __init__(self, master, controller: SamplingTabController, ui_state):
-        CtkConfigListView.__init__(
+        PySide6ConfigListView.__init__(
             self, master, controller, ui_state,
             from_external_file=True,
             attr_name="sample_definition_file_name",
@@ -22,29 +23,44 @@ class CtkSamplingTabView(CtkConfigListView, BaseSamplingTabView):
             show_toggle_button=True,
         )
 
-    def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
-        return self.controller.open_element_window(self.master, self.current_config[i], ui_state, CtkSampleParamsWindowView)
+    def open_element_window(self, i, ui_state):
+        return self.controller.open_element_window(self.master, self.current_config[i], ui_state, PySide6SampleParamsWindowView)
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        return CtkSampleWidgetView(master, element, i, open_command, remove_command, clone_command, save_command)
+        return PySide6SampleWidgetView(master, element, i, open_command, remove_command, clone_command, save_command)
 
 
-class CtkSampleWidgetView(BaseSampleWidgetView, ctk.CTkFrame):
+class PySide6SampleWidgetView(BaseSampleWidgetView, QWidget, metaclass=QtABCMeta):
+
     def __init__(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        ctk.CTkFrame.__init__(self, master=master, corner_radius=10, bg_color="transparent")
-        BaseSampleWidgetView.__init__(self, ctk_components)
+        QWidget.__init__(self, master)
+        BaseSampleWidgetView.__init__(self, pyside6_components)
 
-        self.ui_state = CtkUIState(self, element)
+        from modules.util.ui.PySide6UIState import PySide6UIState
+        self.element = element
+        self.ui_state = PySide6UIState(element)
 
-        self.grid_columnconfigure(10, weight=1)
+        pyside6_components._layout(self).setColumnStretch(10, 1)
 
         self.build_content(self, element, self.ui_state, i, open_command, remove_command, clone_command, save_command)
 
     def _bind_save(self, save_command):
-        self.width_entry.bind('<FocusOut>', lambda _: save_command())
-        self.height_entry.bind('<FocusOut>', lambda _: save_command())
-        self.seed_entry.bind('<FocusOut>', lambda _: save_command())
-        self.prompt_entry.bind('<FocusOut>', lambda _: save_command())
+        self.width_entry.editingFinished.connect(save_command)
+        self.height_entry.editingFinished.connect(save_command)
+        self.seed_entry.editingFinished.connect(save_command)
+        self.prompt_entry.editingFinished.connect(save_command)
+
+    def _set_enabled(self):
+        enabled = self.element.enabled
+        self.width_entry.setEnabled(enabled)
+        self.height_entry.setEnabled(enabled)
+        self.prompt_entry.setEnabled(enabled)
+        self.seed_entry.setEnabled(enabled)
+        self.button.setEnabled(enabled)
 
     def place_in_list(self):
-        self.grid(row=self.i, column=0, pady=5, padx=5, sticky="new")
+        pyside6_components._layout(self.parent()).addWidget(self, getattr(self, 'visible_index', self.i), 0)
+        self.show()
+
+    def destroy(self):
+        self.deleteLater()

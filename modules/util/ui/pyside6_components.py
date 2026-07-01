@@ -1,117 +1,244 @@
 import contextlib
-import tkinter as tk
+import html
 from collections.abc import Callable
 from pathlib import Path
-from tkinter import filedialog
 from typing import Any, Literal
 
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions, supported_video_extensions
-from modules.util.ui.ctk_validation import DEFAULT_MAX_UNDO, FieldValidator, PathValidator
-from modules.util.ui.CtkUIState import CtkUIState
-from modules.util.ui.ToolTip import ToolTip
+from modules.util.ui.pyside6_validation import PySide6FieldValidator, PySide6PathValidator
+from modules.util.ui.UIState import BaseUIState
 
-import customtkinter as ctk
-from customtkinter.windows.widgets.scaling import CTkScalingBaseClass
-from PIL import Image
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFrame,
+    QGridLayout,
+    QLabel,
+    QLineEdit,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 PAD = 10
 
 
-def app_title(master, row, column):
-    frame = ctk.CTkFrame(master)
-    frame.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
+# ---------------------------------------------------------------------------
+# PySide6-only helpers
+# ---------------------------------------------------------------------------
 
-    image_component = ctk.CTkImage(
-        Image.open("resources/icons/icon.png").resize((40, 40), Image.Resampling.LANCZOS),
-        size=(40, 40)
+def _layout(master: QWidget) -> QGridLayout:
+    lo = master.layout()
+    if lo is None:
+        lo = QGridLayout(master)
+        lo.setContentsMargins(0, 0, 0, 0)
+        lo.setSpacing(PAD)
+        master.setLayout(lo)
+    return lo
+
+
+def _set_tooltip(component: QWidget, text: str, wide: bool = False) -> None:
+    # plain QToolTip text is rendered on a single line; wrap it as rich text
+    # with a max-width so it matches Ctk's wraplength of 180/350px
+    width = 350 if wide else 180
+    component.setToolTip(f'<p style="max-width: {width}px;">{html.escape(text)}</p>')
+
+
+def _alignment(sticky: str) -> Qt.AlignmentFlag:
+    has_e = 'e' in sticky
+    has_w = 'w' in sticky
+    has_n = 'n' in sticky
+    has_s = 's' in sticky
+
+    if has_e and has_w:
+        h = Qt.AlignmentFlag(0)
+    elif has_e:
+        h = Qt.AlignRight
+    else:
+        h = Qt.AlignLeft
+
+    has_v = 'v' in sticky
+    if has_n and has_s:
+        v = Qt.AlignmentFlag(0)
+    elif has_s:
+        v = Qt.AlignBottom
+    elif has_v:
+        v = Qt.AlignVCenter
+    else:
+        v = Qt.AlignTop
+
+    return h | v
+
+
+def _add(
+        layout: QGridLayout,
+        widget: QWidget,
+        row: int,
+        col: int,
+        sticky: str = "new",
+        padx: int = PAD,
+        pady: int = PAD,
+        rowspan: int = 1,
+        colspan: int = 1,
+):
+    layout.addWidget(widget, row, col, rowspan, colspan)
+    align = _alignment(sticky)
+    if align:
+        layout.setAlignment(widget, align)
+
+
+def scrollable_frame(parent: QWidget) -> tuple[QScrollArea, QWidget]:
+    scroll = QScrollArea(parent)
+    scroll.setWidgetResizable(True)
+    container = QWidget()
+    container_layout = QVBoxLayout(container)
+    container_layout.setContentsMargins(PAD, PAD, PAD, PAD)
+    container_layout.setSpacing(0)
+    frame = QWidget(container)
+    container_layout.addWidget(frame)
+    container_layout.addStretch(1)
+    scroll.setWidget(container)
+    return scroll, frame
+
+
+def _pack_form(master: QWidget) -> None:
+    # Add a stretch row and column after the last content cell so extra space
+    # goes to the empty gutter rather than stretching content widgets. Skip this
+    # if a content row/column already claims stretch (e.g. an entry meant to
+    # grow) - adding another stretchy gutter would only split the extra space
+    # between the two instead of giving it all to the intended one.
+    lo = _layout(master)
+    if not any(lo.rowStretch(r) for r in range(lo.rowCount())):
+        lo.setRowStretch(lo.rowCount(), 1)
+    if not any(lo.columnStretch(c) for c in range(lo.columnCount())):
+        lo.setColumnStretch(lo.columnCount(), 1)
+
+
+# ---------------------------------------------------------------------------
+# Stateless widgets
+# ---------------------------------------------------------------------------
+
+def app_title(master: QWidget, row: int, column: int):
+    frame = QFrame(master)
+    layout = QGridLayout(frame)
+    layout.setContentsMargins(5, 5, 5, 5)
+    _layout(master).addWidget(frame, row, column)
+
+    pixmap = QPixmap("resources/icons/icon.png").scaled(
+        40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation
     )
-    image_label_component = ctk.CTkLabel(frame, image=image_component, text="")
-    image_label_component.grid(row=0, column=0, padx=PAD, pady=PAD)
+    icon_label = QLabel(frame)
+    icon_label.setPixmap(pixmap)
+    layout.addWidget(icon_label, 0, 0)
 
-    label_component = ctk.CTkLabel(frame, text="OneTrainer", font=ctk.CTkFont(size=20, weight="bold"))
-    label_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD)
+    text_label = QLabel("OneTrainer", frame)
+    font = text_label.font()
+    font.setPointSize(14)
+    font.setBold(True)
+    text_label.setFont(font)
+    layout.addWidget(text_label, 0, 1)
 
 
-def label(master, row, column, text, pad=PAD, tooltip=None, wide_tooltip=False, wraplength=0, underline=False):
-    component = ctk.CTkLabel(master, text=text, wraplength=wraplength)
-    component.grid(row=row, column=column, padx=pad, pady=pad, sticky="nw")
+def label(
+        master: QWidget,
+        row: int,
+        column: int,
+        text: str,
+        pad: int = PAD,
+        tooltip: str | None = None,
+        wide_tooltip: bool = False,
+        wraplength: int = 0,
+        underline: bool = False,
+) -> QLabel:
+    component = QLabel(text, master)
+    cell_alignment = Qt.AlignVCenter | Qt.AlignLeft
+    if wraplength > 0:
+        component.setWordWrap(True)
+        component.setMaximumWidth(wraplength)
+        # multi-line labels must not be vertically centered: if a neighboring
+        # widget in the same row ever forces the row shorter than this label's
+        # wrapped text, centering clips the top and bottom lines, leaving only
+        # the middle line visible
+        component.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        component.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        cell_alignment = Qt.AlignTop | Qt.AlignLeft
     if tooltip:
-        ToolTip(component, tooltip, wide=wide_tooltip)
+        _set_tooltip(component, tooltip, wide_tooltip)
     if underline:
-        component.configure(font=ctk.CTkFont(underline=True))
+        font = component.font()
+        font.setUnderline(True)
+        component.setFont(font)
+    layout = _layout(master)
+    layout.addWidget(component, row, column)
+    layout.setAlignment(component, cell_alignment)
     return component
 
 
+# ---------------------------------------------------------------------------
+# Compound widgets
+# ---------------------------------------------------------------------------
+
 def entry(
-        master,
-        row,
-        column,
-        ui_state: CtkUIState,
+        master: QWidget,
+        row: int,
+        column: int,
+        ui_state: BaseUIState,
         var_name: str,
         command: Callable[[], None] | None = None,
         tooltip: str = "",
         wide_tooltip: bool = False,
         width: int = 140,
         sticky: str = "new",
-        max_undo: int | None = None,
-        validator_factory: Callable[..., FieldValidator] | None = None,
+        max_undo: int | None = None,  # unused: kept for signature parity with ctk_components.entry()
+        validator_factory: Callable[..., PySide6FieldValidator] | None = None,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
-):
+) -> QLineEdit:
     var = ui_state.get_var(var_name)
-    trace_id = None
+
+    component = QLineEdit(master)
+    component.setMinimumWidth(width)
+    _add(_layout(master), component, row, column, sticky=sticky)
+
     if command:
         trace_id = ui_state.add_var_trace(var_name, command)
+        component.destroyed.connect(lambda: ui_state.remove_var_trace(var_name, trace_id))
 
-    component = ctk.CTkEntry(master, textvariable=var, width=width)
-    component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky=sticky)
+    if tooltip:
+        _set_tooltip(component, tooltip, wide_tooltip)
 
     if validator_factory is not None:
         validator = validator_factory(
             component, var, ui_state, var_name,
-            max_undo=max_undo or DEFAULT_MAX_UNDO,
             extra_validate=extra_validate,
             required=required,
         )
     else:
-        validator = FieldValidator(
+        validator = PySide6FieldValidator(
             component, var, ui_state, var_name,
-            max_undo=max_undo or DEFAULT_MAX_UNDO,
             extra_validate=extra_validate,
             required=required,
         )
     validator.attach()
     component._validator = validator  # type: ignore[attr-defined]
 
-    original_destroy = component.destroy
-
-    def new_destroy():
-        validator.detach()
-
-        # 'temporary' fix until https://github.com/TomSchimansky/CustomTkinter/pull/2077 is merged
-        # unfortunately Tom has admitted to forgetting about how to maintain CTK so this likely will never be merged
-        if component._textvariable_callback_name:
-            with contextlib.suppress(tk.TclError):
-                component._textvariable.trace_remove("write", component._textvariable_callback_name)  # type: ignore[union-attr]
-            component._textvariable_callback_name = ""
-
-        if command is not None and trace_id is not None:
-            ui_state.remove_var_trace(var_name, trace_id)
-
-        original_destroy()
-
-    component.destroy = new_destroy  # type: ignore[assignment]
-
-    if tooltip:
-        ToolTip(component, tooltip, wide=wide_tooltip)
-
     return component
 
 
 def path_entry(
-        master, row, column, ui_state: CtkUIState, var_name: str,
+        master: QWidget,
+        row: int,
+        column: int,
+        ui_state: BaseUIState,
+        var_name: str,
         *,
         mode: Literal["file", "dir"] = "file",
         io_type: PathIOType = PathIOType.INPUT,
@@ -123,183 +250,156 @@ def path_entry(
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
         columnspan: int = 1,
-):
-    frame = ctk.CTkFrame(master, fg_color="transparent")
-    frame.grid(row=row, column=column, padx=0, pady=0, sticky="new", columnspan=columnspan)
-
-    frame.grid_columnconfigure(0, weight=1)
+) -> QWidget:
+    frame = QWidget(master)
+    frame_lo = QGridLayout(frame)
+    frame_lo.setContentsMargins(0, 0, 0, 0)
+    frame_lo.setSpacing(0)
+    frame_lo.setColumnStretch(0, 1)
+    _add(_layout(master), frame, row, column, sticky="new", padx=0, pady=0, colspan=columnspan)
 
     def _path_validator_factory(comp, var, state, name, **kw):
-        return PathValidator(comp, var, state, name, io_type=io_type, **kw)
+        return PySide6PathValidator(comp, var, state, name, io_type=io_type, **kw)
 
     entry_component = entry(
-        frame, row=0, column=0, ui_state=ui_state, var_name=var_name,
+        frame, 0, 0, ui_state, var_name,
         validator_factory=_path_validator_factory,
         extra_validate=extra_validate,
         required=required,
     )
 
-    trace_ids = []
+    dep_trace_ids: list[tuple] = []
     if io_type in (PathIOType.OUTPUT, PathIOType.MODEL):
         validator = getattr(entry_component, '_validator', None)
         if validator is not None:
             for dep_var_name in ("prevent_overwrites", "output_model_format"):
                 with contextlib.suppress(KeyError, AttributeError):
                     dep_var = ui_state.get_var(dep_var_name)
-                    tid = dep_var.trace_add("write", lambda *_a: validator.revalidate())
-                    trace_ids.append((dep_var, tid))
+                    tid = dep_var.trace_add("write", lambda _0, _1, _2: validator.revalidate())
+                    dep_trace_ids.append((dep_var, tid))
+
+    if dep_trace_ids:
+        def _cleanup_dep_traces():
+            for dv, tid in dep_trace_ids:
+                dv.trace_remove("write", tid)
+        frame.destroyed.connect(_cleanup_dep_traces)
 
     use_save_dialog = io_type in (PathIOType.OUTPUT, PathIOType.MODEL)
 
-    def __open_dialog():
-        # Determine currently selected filename and/or directory
-        current_dir, current_filename = None, None
+    def _open_dialog():
         current_path_str = ui_state.get_var(var_name).get() or None
+        current_dir = ""
+        current_filename = ""
 
-        if current_path_str is not None:
+        if current_path_str:
             current_path = Path(current_path_str)
             if mode == "file":
                 current_dir = str(current_path.parent)
                 current_filename = str(current_path.name)
             elif mode == "dir":
                 current_dir = str(current_path.parent)
-                current_filename = None
 
         if mode == "dir":
-            chosen = filedialog.askdirectory(initialdir=current_dir)
+            chosen = QFileDialog.getExistingDirectory(frame, "", current_dir, QFileDialog.Option.ShowDirsOnly)
         else:
-            filetypes = [
-                ("All Files", "*.*"),
-            ]
-
+            filters = ["All Files (*.*)"]
             if allow_model_files:
-                filetypes.extend([
-                    ("Diffusers", "model_index.json"),
-                    ("Checkpoint", "*.ckpt *.pt *.bin"),
-                    ("Safetensors", "*.safetensors"),
-                ])
+                filters += [
+                    "Diffusers (model_index.json)",
+                    "Checkpoint (*.ckpt *.pt *.bin)",
+                    "Safetensors (*.safetensors)",
+                ]
             if allow_image_files:
-                filetypes.extend([
-                    ("Image", ' '.join([f"*.{x}" for x in supported_image_extensions()])),
-                ])
+                exts = " ".join(f"*.{x}" for x in supported_image_extensions())
+                filters.append(f"Image ({exts})")
             if allow_video_files:
-                filetypes.extend([
-                    ("Video", ' '.join(f"*{e}" for e in supported_video_extensions())),
-                ])
+                exts = " ".join(f"*{e}" for e in supported_video_extensions())
+                filters.append(f"Video ({exts})")
+            filter_str = ";;".join(filters)
+            init_path = str(Path(current_dir) / current_filename) if current_filename else current_dir
 
             if use_save_dialog:
-                chosen = filedialog.asksaveasfilename(filetypes=filetypes, initialdir=current_dir,
-                                                      initialfile=current_filename)
+                chosen, _ = QFileDialog.getSaveFileName(frame, "", init_path, filter_str)
             else:
-                chosen = filedialog.askopenfilename(filetypes=filetypes, initialdir=current_dir,
-                                                    initialfile=current_filename)
+                chosen, _ = QFileDialog.getOpenFileName(frame, "", init_path, filter_str)
 
         if chosen:
             if path_modifier:
                 chosen = path_modifier(chosen)
-
             chosen_str = str(chosen)
             ui_state.get_var(var_name).set(chosen_str)
-
             if command:
                 command(chosen_str)
 
-    button_component = ctk.CTkButton(frame, text="...", width=40, command=__open_dialog)
-    button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
-
-    if trace_ids:
-        original_frame_destroy = frame.destroy
-        def _frame_destroy():
-            for dep_var, tid in trace_ids:
-                with contextlib.suppress(tk.TclError, ValueError):
-                    dep_var.trace_remove("write", tid)
-            original_frame_destroy()
-        frame.destroy = _frame_destroy  # type: ignore[assignment]
+    btn = QPushButton("...", frame)
+    btn.setFixedWidth(40)
+    btn.clicked.connect(_open_dialog)
+    frame_lo.addWidget(btn, 0, 1)
 
     return frame
 
 
-def time_entry(master, row, column, ui_state: CtkUIState, var_name: str, unit_var_name, supports_time_units: bool = True):
-    frame = ctk.CTkFrame(master, fg_color="transparent")
-    frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
+def time_entry(
+        master: QWidget,
+        row: int,
+        column: int,
+        ui_state: BaseUIState,
+        var_name: str,
+        unit_var_name: str,
+        supports_time_units: bool = True,
+) -> QWidget:
+    frame = QWidget(master)
+    _add(_layout(master), frame, row, column, sticky="new", padx=0, pady=0)
 
-    frame.grid_columnconfigure(0, weight=0)
-    frame.grid_columnconfigure(1, weight=1)
-
-    entry(frame, row=0, column=0, ui_state=ui_state, var_name=var_name, width=50)
+    entry(frame, 0, 0, ui_state, var_name, width=50)
 
     values = [str(x) for x in list(TimeUnit)]
     if not supports_time_units:
         values = [str(x) for x in list(TimeUnit) if not x.is_time_unit()]
 
-    unit_component = ctk.CTkOptionMenu(
-        frame,
-        values=values,
-        variable=ui_state.get_var(unit_var_name),
-        width=100,
-    )
-    unit_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="new")
+    options(frame, 0, 1, values, ui_state, unit_var_name)
 
     return frame
 
-def layer_filter_entry(master, row, column, ui_state: CtkUIState, preset_var_name: str, preset_label: str, preset_tooltip: str, presets, entry_var_name, entry_tooltip: str, regex_var_name, regex_tooltip: str, frame_color=None):
-    frame = ctk.CTkFrame(master=master, corner_radius=5, fg_color=frame_color)
-    frame.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
-    frame.grid_columnconfigure(0, weight=1)
 
-    layer_entry = entry(
-        frame, 1, 0, ui_state, entry_var_name,
-        tooltip=entry_tooltip
-    )
-    layer_entry_fg_color = layer_entry.cget("fg_color")
-    layer_entry_text_color = layer_entry.cget("text_color")
+def layer_filter_entry(
+        master: QWidget,
+        row: int,
+        column: int,
+        ui_state: BaseUIState,
+        preset_var_name: str,
+        preset_label: str,
+        preset_tooltip: str,
+        presets,
+        entry_var_name: str,
+        entry_tooltip: str,
+        regex_var_name: str,
+        regex_tooltip: str,
+        frame_color=None,
+) -> QWidget:
+    frame = QWidget(master)
+    _layout(master).addWidget(frame, row, column)
 
-    regex_label = label(
-        frame, 2, 0, "Use Regex",
-        tooltip=regex_tooltip,
-    )
-    regex_switch = switch(
-        frame, 2, 1, ui_state, regex_var_name
-    )
+    label(frame, 0, 0, preset_label, tooltip=preset_tooltip)
 
-    # Let the user set their own layer filter
-    # TODO
-    #if self.train_config.layer_filter and self.train_config.layer_filter_preset == "custom":
-    #    self.prior_custom = self.train_config.layer_filter
-    #else:
-    #    self.prior_custom = ""
+    layer_entry = entry(frame, 1, 0, ui_state, entry_var_name, tooltip=entry_tooltip)
+    _layout(frame).addWidget(layer_entry, 1, 0, 1, 2)  # span 2 columns
 
-    layer_entry.grid_configure(columnspan=2, sticky="ew")
+    regex_label = label(frame, 2, 0, "Use Regex", tooltip=regex_tooltip)
+    regex_switch = switch(frame, 2, 1, ui_state, regex_var_name)
 
     presets_list = list(presets.keys()) + ["custom"]
-
-
-    def hide_layer_entry():
-        if layer_entry and layer_entry.winfo_manager():
-            layer_entry.grid_remove()
-
-    def show_layer_entry():
-        if layer_entry and not layer_entry.winfo_manager():
-            layer_entry.grid()
-
 
     def preset_set_layer_choice(selected: str):
         if not selected or selected not in presets_list:
             selected = presets_list[0]
 
         if selected == "custom":
-            # Allow editing + regex toggle
-            show_layer_entry()
-            layer_entry.configure(state="normal", fg_color=layer_entry_fg_color, text_color=layer_entry_text_color)
-            #layer_entry.cget('textvariable').set("")
-            regex_label.grid()
-            regex_switch.grid()
+            layer_entry.setVisible(True)
+            layer_entry.setEnabled(True)
+            regex_label.setVisible(True)
+            regex_switch.setVisible(True)
         else:
-            # Preserve custom text before overwriting
-            #if self.prior_selected == "custom":
-            #    self.prior_custom = self.layer_entry.get()
-
-            # Resolve preset definition (list[str] OR {'patterns': [...], 'regex': bool})
             preset_def = presets.get(selected, [])
             if isinstance(preset_def, dict):
                 patterns = preset_def.get("patterns", [])
@@ -308,286 +408,358 @@ def layer_filter_entry(master, row, column, ui_state: CtkUIState, preset_var_nam
                 patterns = preset_def
                 preset_uses_regex = False
 
-            disabled_color = ("gray85", "gray17")
-            disabled_text_color = ("gray30", "gray70")
-            layer_entry.configure(state="disabled", fg_color=disabled_color, text_color=disabled_text_color)
-            layer_entry.cget('textvariable').set(",".join(patterns))
-
+            layer_entry.setEnabled(False)
             ui_state.get_var(entry_var_name).set(",".join(patterns))
             ui_state.get_var(regex_var_name).set(preset_uses_regex)
 
-            regex_label.grid_remove()
-            regex_switch.grid_remove()
+            regex_label.setVisible(False)
+            regex_switch.setVisible(False)
 
-            if selected == "full" and not patterns:
-                hide_layer_entry()
-            else:
-                show_layer_entry()
-
-#        self.prior_selected = selected
-
-    label(frame, 0, 0, preset_label,
-                     tooltip=preset_tooltip)
-
+            layer_entry.setVisible(selected != "full" or bool(patterns))
 
     ui_state.remove_all_var_traces(preset_var_name)
 
     layer_selector = options(
         frame, 0, 1, presets_list, ui_state, preset_var_name,
-        command=preset_set_layer_choice
+        command=preset_set_layer_choice,
     )
 
-    def on_layer_filter_preset_change():
-        if not layer_selector:
-            return
-        selected = ui_state.get_var(preset_var_name).get()
-        preset_set_layer_choice(selected)
+    ui_state.add_var_trace(preset_var_name, lambda: preset_set_layer_choice(
+        ui_state.get_var(preset_var_name).get()
+    ))
 
-    ui_state.add_var_trace(
-        preset_var_name,
-        on_layer_filter_preset_change,
-    )
+    preset_set_layer_choice(layer_selector.currentText())
 
-    preset_set_layer_choice(layer_selector.get())
+    return frame
 
-def icon_button(master, row, column, text, command):
-    component = ctk.CTkButton(master, text=text, width=40, command=command)
-    component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="new")
+
+def icon_button(master: QWidget, row: int, column: int, text: str, command: Callable[[], None]) -> QPushButton:
+    component = QPushButton(text, master)
+    component.setFixedWidth(40)
+    component.clicked.connect(command)
+    _add(_layout(master), component, row, column, sticky="new")
     return component
 
 
-def colored_icon_button(master, row, column, text, fg_color, command, padx=0):
-    component = ctk.CTkButton(
-        master=master, width=20, height=20, text=text,
-        corner_radius=2, fg_color=fg_color, command=command,
-    )
-    component.grid(row=row, column=column, padx=padx)
+def colored_icon_button(
+        master: QWidget,
+        row: int,
+        column: int,
+        text: str,
+        fg_color,
+        command: Callable[[], None],
+        padx: int = 0,
+) -> QPushButton:
+    color = fg_color[0] if isinstance(fg_color, (tuple, list)) else fg_color
+    component = QPushButton(text, master)
+    component.setFixedSize(20, 20)
+    component.setStyleSheet(f"QPushButton {{ background-color: {color}; border-radius: 2px; }}")
+    component.clicked.connect(command)
+    _add(_layout(master), component, row, column, sticky="new", padx=padx, pady=0)
     return component
 
 
-def button(master, row, column, text, command, tooltip=None, **kwargs):
-    # Pop grid-specific parameters from kwargs, using PAD as the default if not provided.
-    padx = kwargs.pop('padx', PAD)
-    pady = kwargs.pop('pady', PAD)
-
-    component = ctk.CTkButton(master, text=text, command=command, **kwargs)
-    component.grid(row=row, column=column, padx=padx, pady=pady, sticky="new")
+def button(
+        master: QWidget,
+        row: int,
+        column: int,
+        text: str,
+        command: Callable[[], None],
+        tooltip: str | None = None,
+        padx: int = PAD,
+        pady: int = PAD,
+        sticky: str = "new",
+        width: int | None = None,
+) -> QPushButton:
+    component = QPushButton(text, master)
+    component.clicked.connect(command)
+    if width is not None:
+        # ctk's width is a floor, not a cap: CTkButton never disables grid propagation,
+        # so it grows past `width` to fit its label. Match that with setMinimumWidth.
+        component.setMinimumWidth(width)
     if tooltip:
-        ToolTip(component, tooltip, x_position=25)
+        _set_tooltip(component, tooltip)
+    _add(_layout(master), component, row, column, sticky=sticky, padx=padx, pady=pady)
     return component
 
 
-def options(master, row, column, values, ui_state: CtkUIState, var_name: str, command: Callable[[str], None] | None = None):
-    component = ctk.CTkOptionMenu(master, values=values, variable=ui_state.get_var(var_name), command=command)
-    component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
+# ---------------------------------------------------------------------------
+# Bound widgets
+# ---------------------------------------------------------------------------
 
-    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2246 is merged
-    def create_destroy(component):
-        orig_destroy = component.destroy
+def options(
+        master: QWidget,
+        row: int,
+        column: int,
+        values: list[str],
+        ui_state: BaseUIState,
+        var_name: str,
+        command: Callable[[str], None] | None = None,
+) -> QComboBox:
+    var = ui_state.get_var(var_name)
+    combo = QComboBox(master)
+    combo.addItems(values)
+    combo.setCurrentText(str(var.get()))
 
-        def destroy(self):
-            orig_destroy()
-            CTkScalingBaseClass.destroy(self)
+    _updating = False
 
-        return destroy
+    def on_combo(text: str):
+        nonlocal _updating
+        if _updating:
+            return
+        _updating = True
+        var.set(text)
+        _updating = False
+        if command:
+            command(text)
 
-    destroy = create_destroy(component._dropdown_menu)
-    component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)  # type: ignore[assignment]
+    def on_var(value):
+        nonlocal _updating
+        if _updating:
+            return
+        _updating = True
+        combo.setCurrentText(str(value))
+        _updating = False
 
-    return component
+    combo.currentTextChanged.connect(on_combo)
+    cb_id = var._bind_widget(on_var)
+    combo.destroyed.connect(lambda: var._unbind_widget(cb_id))
+    _add(_layout(master), combo, row, column)
+    return combo
 
 
-def options_adv(master, row, column, values, ui_state: CtkUIState, var_name: str,
-                command: Callable[[str], None] | None = None, adv_command: Callable[[], None] | None = None):
-    frame = ctk.CTkFrame(master, fg_color="transparent")
-    frame.grid(row=row, column=column, padx=0, pady=0, sticky="new")
+def options_adv(
+        master: QWidget,
+        row: int,
+        column: int,
+        values: list[str],
+        ui_state: BaseUIState,
+        var_name: str,
+        command: Callable[[str], None] | None = None,
+        adv_command: Callable[[], None] | None = None,
+) -> tuple[QWidget, dict]:
+    frame = QWidget(master)
+    frame_lo = QGridLayout(frame)
+    frame_lo.setContentsMargins(0, 0, 0, 0)
+    frame_lo.setColumnStretch(0, 1)
+    _add(_layout(master), frame, row, column, sticky="new", padx=0, pady=0)
 
-    frame.grid_columnconfigure(0, weight=1)
+    combo = options(frame, 0, 0, values, ui_state, var_name, command=command)
 
-    component = ctk.CTkOptionMenu(frame, values=values, variable=ui_state.get_var(var_name), command=command)
-    component.grid(row=0, column=0, padx=PAD, pady=(PAD, PAD), sticky="new")
-
-    button_component = ctk.CTkButton(frame, text="…", width=20, command=adv_command)
-    button_component.grid(row=0, column=1, padx=(0, PAD), pady=PAD, sticky="nsew")
+    adv_btn = QPushButton("…", frame)
+    adv_btn.setFixedWidth(20)
+    if adv_command:
+        adv_btn.clicked.connect(adv_command)
+    _add(frame_lo, adv_btn, 0, 1, sticky="nsew", padx=(0, PAD), pady=PAD)
 
     if command:
-        command(ui_state.get_var(var_name).get())  # call command once to set the initial value
+        command(ui_state.get_var(var_name).get())
 
-    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2246 is merged
-    def create_destroy(component):
-        orig_destroy = component.destroy
-
-        def destroy(self):
-            orig_destroy()
-            CTkScalingBaseClass.destroy(self)
-
-        return destroy
-
-    destroy = create_destroy(component._dropdown_menu)
-    component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)  # type: ignore[assignment]
-
-    return frame, {'component': component, 'button_component': button_component}
+    return frame, {'component': combo, 'button_component': adv_btn}
 
 
-def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: CtkUIState, var_name: str,
-               command: Callable[[Any], None] | None = None):
+def options_kv(
+        master: QWidget,
+        row: int,
+        column: int,
+        values: list[tuple[str, Any]],
+        ui_state: BaseUIState,
+        var_name: str,
+        command: Callable[[Any], None] | None = None,
+        sticky: str = "new",
+) -> QComboBox:
     var = ui_state.get_var(var_name)
-    keys = [key for key, value in values]
+    keys = [key for key, _ in values]
+    str_values = [str(v) for _, v in values]
 
-    # if the current value is not valid, select the first option
-    if var.get() not in [str(value) for key, value in values] and len(keys) > 0:
-        var.set(values[0][1])
+    if var.get() not in str_values and keys:
+        # store the str repr — UIState's enum trace looks up var_type[string]
+        var.set(str(values[0][1]))
 
-    deactivate_update_var = False
+    _updating = False
 
-    def update_component(text):
-        for key, value in values:
-            if text == key:
-                nonlocal deactivate_update_var
-                deactivate_update_var = True
-                var.set(value)
+    def on_combo(key: str):
+        nonlocal _updating
+        if _updating:
+            return
+        _updating = True
+        for k, v in values:
+            if key == k:
+                var.set(str(v))
                 if command:
-                    command(value)
-                deactivate_update_var = False
+                    command(v)
+                break
+        _updating = False
+
+    def on_var(value):
+        nonlocal _updating
+        if _updating:
+            return
+        _updating = True
+        for k, v in values:
+            if str(value) == str(v):
+                combo.setCurrentText(k)
+                if command:
+                    command(v)
+                break
+        _updating = False
+
+    combo = QComboBox(master)
+    combo.addItems(keys)
+    # set initial display from current var value
+    for k, v in values:
+        if str(var.get()) == str(v):
+            combo.setCurrentText(k)
+            break
+
+    combo.currentTextChanged.connect(on_combo)
+    cb_id = var._bind_widget(on_var)
+    combo.destroyed.connect(lambda: var._unbind_widget(cb_id))
+    _add(_layout(master), combo, row, column, sticky=sticky)
+
+    # match CTK behavior: fire initial command with the current value
+    if command:
+        current = var.get()
+        for _, v in values:
+            if str(current) == str(v):
+                command(v)
                 break
 
-    component = ctk.CTkOptionMenu(master, values=keys, command=update_component)
-    component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
-
-    def update_var():
-        if not deactivate_update_var:
-            for key, value in values:
-                if var.get() == str(value):
-                    if component.winfo_exists():  # the component could already be destroyed
-                        component.set(key)
-                        if command:
-                            command(value)
-                        break
-
-    var.trace_add("write", lambda _0, _1, _2: update_var())
-    update_var()  # call update_var once to set the initial value
-
-    # temporary fix until https://github.com/TomSchimansky/CustomTkinter/pull/2246 is merged
-    def create_destroy(component):
-        orig_destroy = component.destroy
-
-        def destroy(self):
-            orig_destroy()
-            CTkScalingBaseClass.destroy(self)
-
-        return destroy
-
-    destroy = create_destroy(component._dropdown_menu)
-    component._dropdown_menu.destroy = lambda: destroy(component._dropdown_menu)  # type: ignore[assignment]
-
-    return component
+    return combo
 
 
 def switch(
-        master,
-        row,
-        column,
-        ui_state: CtkUIState,
+        master: QWidget,
+        row: int,
+        column: int,
+        ui_state: BaseUIState,
         var_name: str,
         command: Callable[[], None] | None = None,
         text: str = "",
         width: int | None = None,
-):
+) -> QCheckBox:
     var = ui_state.get_var(var_name)
+    component = QCheckBox(text, master)
+    component.setChecked(bool(var.get()))
+
     if command:
         trace_id = ui_state.add_var_trace(var_name, command)
+        component.destroyed.connect(lambda: ui_state.remove_var_trace(var_name, trace_id))
 
-    component = ctk.CTkSwitch(master, variable=var, text=text, command=command)
+    _updating = False
+
+    def on_toggle(checked: bool):
+        nonlocal _updating
+        if _updating:
+            return
+        _updating = True
+        var.set(checked)
+        _updating = False
+
+    def on_var(value):
+        nonlocal _updating
+        if _updating:
+            return
+        _updating = True
+        component.setChecked(bool(value))
+        _updating = False
+
+    component.toggled.connect(on_toggle)
+    cb_id = var._bind_widget(on_var)
+    component.destroyed.connect(lambda: var._unbind_widget(cb_id))
+
     if width is not None:
-        component.configure(width=width)
-    component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")
-
-    def create_destroy(component):
-        orig_destroy = component.destroy
-
-        def destroy(self):
-            if command is not None:
-                ui_state.remove_var_trace(var_name, trace_id)
-
-            orig_destroy()
-
-        return destroy
-
-    destroy = create_destroy(component)
-    component.destroy = lambda: destroy(component)  # type: ignore[assignment]
-
+        component.setFixedWidth(width)
+    lo = _layout(master)
+    lo.addWidget(component, row, column)
+    lo.setAlignment(component, Qt.AlignVCenter | Qt.AlignLeft)
     return component
 
 
-def progress(master, row, column):
-    component = ctk.CTkProgressBar(master)
-    component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="ew")
+def progress(master: QWidget, row: int, column: int) -> QProgressBar:
+    component = QProgressBar(master)
+    component.setRange(0, 1000)
+    component.setValue(0)
+    component.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    component.setFixedHeight(12)
+    _add(_layout(master), component, row, column, sticky="ew")
     return component
 
 
-def double_progress(master, row, column, label_1, label_2):
-    frame = ctk.CTkFrame(master, fg_color="transparent")
-    frame.grid(row=row, column=column, padx=0, pady=0, sticky="nsew")
+def double_progress(
+        master: QWidget,
+        row: int,
+        column: int,
+        label_1: str,
+        label_2: str,
+) -> tuple[Callable, Callable]:
+    frame = QWidget(master)
+    lo = QGridLayout(frame)
+    lo.setContentsMargins(0, 0, 0, 0)
+    lo.setColumnStretch(1, 1)
 
-    frame.grid_rowconfigure(0, weight=1)
-    frame.grid_rowconfigure(1, weight=1)
-    frame.grid_columnconfigure(0, weight=1)
+    label_1_component = QLabel(label_1, frame)
+    label_2_component = QLabel(label_2, frame)
+    progress_1_component = QProgressBar(frame)
+    progress_2_component = QProgressBar(frame)
+    description_1_component = QLabel("", frame)
+    description_2_component = QLabel("", frame)
 
-    label_1_component = ctk.CTkLabel(frame, text=label_1)
-    label_1_component.grid(row=0, column=0, padx=(PAD, PAD), pady=(0, 0), sticky="new")
+    for p in (progress_1_component, progress_2_component):
+        p.setRange(0, 1000)
+        p.setValue(0)
+        p.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        p.setFixedHeight(16)
 
-    label_2_component = ctk.CTkLabel(frame, text=label_2)
-    label_2_component.grid(row=1, column=0, padx=(PAD, PAD), pady=(0, 0), sticky="sew")
+    lo.addWidget(label_1_component,       0, 0)
+    lo.addWidget(progress_1_component,    0, 1)
+    lo.addWidget(description_1_component, 0, 2)
+    lo.addWidget(label_2_component,       1, 0)
+    lo.addWidget(progress_2_component,    1, 1)
+    lo.addWidget(description_2_component, 1, 2)
 
-    progress_1_component = ctk.CTkProgressBar(frame)
-    progress_1_component.grid(row=0, column=1, padx=(PAD, PAD), pady=(PAD, 0), sticky="new")
+    _add(_layout(master), frame, row, column, sticky="nsew")
 
-    progress_2_component = ctk.CTkProgressBar(frame)
-    progress_2_component.grid(row=1, column=1, padx=(PAD, PAD), pady=(0, PAD), sticky="sew")
+    def set_1(value: int | float, max_value: int | float):
+        progress_1_component.setValue(int(value / max_value * 1000))
+        description_1_component.setText(f"{value}/{max_value}")
 
-    description_1_component = ctk.CTkLabel(frame, text="")
-    description_1_component.grid(row=0, column=2, padx=(PAD, PAD), pady=(0, 0), sticky="new")
-
-    description_2_component = ctk.CTkLabel(frame, text="")
-    description_2_component.grid(row=1, column=2, padx=(PAD, PAD), pady=(0, 0), sticky="sew")
-
-    def set_1(value, max_value):
-        progress_1_component.set(value / max_value)
-        description_1_component.configure(text=f"{value}/{max_value}")
-
-    def set_2(value, max_value):
-        progress_2_component.set(value / max_value)
-        description_2_component.configure(text=f"{value}/{max_value}")
+    def set_2(value: int | float, max_value: int | float):
+        progress_2_component.setValue(int(value / max_value * 1000))
+        description_2_component.setText(f"{value}/{max_value}")
 
     return set_1, set_2
 
 
-def section_frame(master, row: int, col: int = 0):
-    frame = ctk.CTkFrame(master=master, corner_radius=5)
-    frame.grid(row=row, column=col, padx=PAD // 2, pady=PAD // 2, sticky="nsew")
-    frame.grid_columnconfigure(0, weight=1)
+def section_frame(parent: QWidget, row: int, col: int = 0, colspan: int = 1) -> "QFrame":
+    from PySide6.QtWidgets import QFrame
+    frame = QFrame(parent)
+    frame.setFrameShape(QFrame.Shape.StyledPanel)
+    _layout(parent).addWidget(frame, row, col, 1, colspan)
+    frame_lo = _layout(frame)
+    frame_lo.setColumnStretch(0, 1)
+    frame_lo.setContentsMargins(PAD, PAD, PAD, PAD)
     return frame
 
 
-def inline_frame(master, row: int, col: int, columnspan: int = 1):
-    frame = ctk.CTkFrame(master, fg_color="transparent")
-    frame.grid(row=row, column=col, columnspan=columnspan, sticky="ew", padx=0, pady=0)
+def inline_frame(parent: QWidget, row: int, col: int, columnspan: int = 1) -> QWidget:
+    frame = QWidget(parent)
+    _layout(frame)
+    _layout(parent).addWidget(frame, row, col, 1, columnspan)
     return frame
 
 
-def set_widget_enabled(widget, enabled: bool) -> None:
-    state = "normal" if enabled else "disabled"
-    if isinstance(widget, ctk.CTkFrame):
-        for child in widget.children.values():
-            with contextlib.suppress(Exception):
-                child.configure(state=state)
-    else:
-        widget.configure(state=state)
+# ---------------------------------------------------------------------------
+# Pure helper (toolkit-neutral)
+# ---------------------------------------------------------------------------
+
+def set_widget_enabled(widget: QWidget, enabled: bool) -> None:
+    widget.setEnabled(enabled)
 
 
-def set_label_text(label, text: str) -> None:
-    label.configure(text=str(text))
+def set_label_text(label: QLabel, text: str) -> None:
+    label.setText(str(text))
 
 
-def call_after(widget, delay_ms: int, func) -> None:
-    widget.after(delay_ms, func)
+def call_after(widget: QWidget, delay_ms: int, func) -> None:
+    QTimer.singleShot(delay_ms, widget, func)

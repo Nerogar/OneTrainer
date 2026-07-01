@@ -1,26 +1,26 @@
-from tkinter import BooleanVar, StringVar
-
 from modules.ui.BaseConceptTabView import BaseConceptTabView, BaseConceptWidgetView
 from modules.ui.ConceptTabController import ConceptTabController
-from modules.ui.CtkConceptWindowView import CtkConceptWindowView
-from modules.ui.CtkConfigListView import CtkConfigListView
-from modules.util.ui import ctk_components
-from modules.util.ui.ctk_validation import DebounceTimer
-from modules.util.ui.CtkUIState import CtkUIState
+from modules.ui.PySide6ConceptWindowView import PySide6ConceptWindowView
+from modules.ui.PySide6ConfigListView import PySide6ConfigListView
+from modules.util.ui import pyside6_components
+from modules.util.ui.PySide6UIState import PySide6UIState
+from modules.util.ui.QtVar import QtVar
 
-import customtkinter as ctk
+from PIL.ImageQt import ImageQt
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QWidget
 
 
-class CtkConceptTabView(CtkConfigListView, BaseConceptTabView):
+class PySide6ConceptTabView(PySide6ConfigListView, BaseConceptTabView):
 
     def __init__(self, master, controller: ConceptTabController, ui_state):
-        # Pre-initialize before CtkConfigListView.__init__ because _reset_filters is
-        # called during build() via options_kv's immediate update_var() call.
-        self.search_var = StringVar()
-        self.filter_var = StringVar(value="ALL")
-        self.show_disabled_var = BooleanVar(value=True)
+        # Pre-initialize before PySide6ConfigListView.__init__ because _reset_filters is
+        # called during build() via options_kv's initial command fire.
+        self.search_var = QtVar("")
+        self.filter_var = QtVar("ALL")
+        self.show_disabled_var = QtVar(True)
 
-        CtkConfigListView.__init__(
+        PySide6ConfigListView.__init__(
             self, master, controller, ui_state,
             from_external_file=True,
             attr_name="concept_file_name",
@@ -31,150 +31,148 @@ class CtkConceptTabView(CtkConfigListView, BaseConceptTabView):
             is_full_width=False,
             show_toggle_button=True,
         )
-        self._toolbar = None
-        self._toolbar_is_wrapped = False
         self._add_search_bar()
-        self.top_frame.bind('<Configure>', lambda e: self._maybe_reposition_toolbar(e.width))
 
-    def open_element_window(self, i, ui_state) -> ctk.CTkToplevel:
-        return self.controller.open_element_window(self.master, self.current_config[i], ui_state[0], ui_state[1], ui_state[2], CtkConceptWindowView)
+    def open_element_window(self, i, ui_state):
+        return self.controller.open_element_window(self.master, self.current_config[i], ui_state[0], ui_state[1], ui_state[2], PySide6ConceptWindowView)
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        return CtkConceptWidgetView(master, element, i, open_command, remove_command, clone_command, save_command, self.controller)
+        return PySide6ConceptWidgetView(master, element, i, open_command, remove_command, clone_command, save_command, self.controller)
 
     def _add_search_bar(self):
-        toolbar = ctk.CTkFrame(self.top_frame, fg_color="transparent")
-        toolbar.grid(row=0, column=4, columnspan=2, padx=10, sticky="ew")
-        toolbar.grid_columnconfigure(2, weight=1)
-        self._toolbar = toolbar
+        toolbar = QWidget(self.top_frame)
+        row_lo = QHBoxLayout(toolbar)
+        row_lo.setContentsMargins(0, 0, 0, 0)
+        pyside6_components._layout(self.top_frame).addWidget(toolbar, 0, 4)
 
-        ctk.CTkLabel(toolbar, text="Search:").grid(row=0, column=0, padx=(0, 5))
-        self.search_var = StringVar()
-        self.search_entry = ctk.CTkEntry(toolbar, textvariable=self.search_var,
-                                         placeholder_text="Filter...", width=200)
-        self.search_entry.grid(row=0, column=1)
-        self._search_debouncer = DebounceTimer(self.search_entry, 300, lambda: self._update_filters())
-        self.search_var.trace_add("write", lambda *_: self._search_debouncer.call())
+        self.search_var = QtVar("")
+        search_entry = QLineEdit(toolbar)
+        search_entry.setPlaceholderText("Filter...")
+        search_entry.setFixedWidth(200)
+        row_lo.addWidget(QLabel("Search:", toolbar))
+        row_lo.addWidget(search_entry)
 
-        ctk.CTkLabel(toolbar, text="").grid(row=0, column=2, padx=5)
+        def _on_search(text):
+            self.search_var.set(text)
+            self._update_filters()
+        search_entry.textChanged.connect(_on_search)
+        self.search_var._bind_widget(lambda v: search_entry.setText(v))
 
-        ctk.CTkLabel(toolbar, text="Type:").grid(row=0, column=3, padx=(0, 5))
-        self.filter_var = StringVar(value="ALL")
-        ctk.CTkOptionMenu(toolbar, values=self._FILTER_TYPES,
-                          variable=self.filter_var, command=lambda x: self._update_filters(),
-                          width=150).grid(row=0, column=4)
+        self.filter_var = QtVar("ALL")
+        filter_combo = QComboBox(toolbar)
+        filter_combo.addItems(self._FILTER_TYPES)
+        filter_combo.setFixedWidth(150)
+        row_lo.addWidget(QLabel("Type:", toolbar))
+        row_lo.addWidget(filter_combo)
 
-        self.show_disabled_var = BooleanVar(value=True)
-        self.show_disabled_checkbox = ctk.CTkCheckBox(toolbar, text="Show Disabled", variable=self.show_disabled_var,
-                                                      command=self._update_filters, width=100)
-        self.show_disabled_checkbox.grid(row=0, column=5, padx=(10, 0))
-        self._refresh_show_disabled_text()
+        def _on_filter(text):
+            self.filter_var.set(text)
+            self._update_filters()
+        filter_combo.currentTextChanged.connect(_on_filter)
+        self.filter_var._bind_widget(lambda v: filter_combo.setCurrentText(v))
 
-        ctk.CTkButton(toolbar, text="Clear", width=50,
-                      command=self._reset_filters).grid(row=0, column=6, padx=(10, 0))
+        self.show_disabled_var = QtVar(True)
+        show_disabled_cb = QCheckBox("Show Disabled", toolbar)
+        show_disabled_cb.setChecked(True)
+        row_lo.addWidget(show_disabled_cb)
 
-    def _maybe_reposition_toolbar(self, width):
-        if not self._toolbar:
-            return
-        threshold = 1070
-        want_wrapped = width < threshold
-        if want_wrapped == self._toolbar_is_wrapped:
-            return
-        self._toolbar_is_wrapped = want_wrapped
-        if want_wrapped:
-            self._toolbar.grid_configure(row=1, column=0, columnspan=8, sticky="ew", padx=10)
-        else:
-            self._toolbar.grid_configure(row=0, column=4, columnspan=2, sticky="ew", padx=10)
+        def _on_show_disabled(state):
+            self.show_disabled_var.set(bool(state))
+            self._update_filters()
+        show_disabled_cb.stateChanged.connect(_on_show_disabled)
+        self.show_disabled_var._bind_widget(lambda v: show_disabled_cb.setChecked(bool(v)))
+
+        clear_btn = QPushButton("Clear", toolbar)
+        clear_btn.setFixedWidth(50)
+        clear_btn.clicked.connect(self._reset_filters)
+        row_lo.addWidget(clear_btn)
 
     def _update_filters(self):
         self._create_element_list(search=self.search_var.get(),
                                   type=self.filter_var.get(),
                                   show_disabled=self.show_disabled_var.get())
-        self._refresh_show_disabled_text()
 
     def _reset_filters(self):
-        self.search_var.set("")
-        self.filter_var.set("ALL")
-        self.show_disabled_var.set(True)
+        if self.search_var is not None:
+            self.search_var.set("")
+        if self.filter_var is not None:
+            self.filter_var.set("ALL")
+        if self.show_disabled_var is not None:
+            self.show_disabled_var.set(True)
         self._update_filters()
 
-    def _refresh_show_disabled_text(self):
-        try:
-            disabled_count = sum(1 for c in getattr(self, 'current_config', []) if getattr(c, 'enabled', True) is False)
-        except (AttributeError, TypeError):
-            disabled_count = 0
-        text = f"Show Disabled ({disabled_count})" if disabled_count > 0 else "Show Disabled"
-        try:
-            if getattr(self, 'show_disabled_checkbox', None):
-                self.show_disabled_checkbox.configure(text=text)
-        except (AttributeError, RuntimeError):
-            pass
 
-
-class CtkConceptWidgetView(BaseConceptWidgetView, ctk.CTkFrame):
+class PySide6ConceptWidgetView(BaseConceptWidgetView, QWidget):
 
     def __init__(self, master, concept, i, open_command, remove_command, clone_command, save_command, controller):
-        ctk.CTkFrame.__init__(self, master=master, width=150, height=170, corner_radius=10, bg_color="transparent")
-        BaseConceptWidgetView.__init__(self, ctk_components, concept)
-        self.ui_state = CtkUIState(self, concept)
-        self.image_ui_state = CtkUIState(self, concept.image)
-        self.text_ui_state = CtkUIState(self, concept.text)
+        QWidget.__init__(self, master)
+        BaseConceptWidgetView.__init__(self, pyside6_components, concept)
+        self.ui_state = PySide6UIState(concept)
+        self.image_ui_state = PySide6UIState(concept.image)
+        self.text_ui_state = PySide6UIState(concept.text)
         self.i = i
 
-        self.grid_rowconfigure(1, weight=1)
+        self.setFixedSize(160, 180)
 
-        self.image = ctk.CTkImage(
-            light_image=self._get_preview_image(),
-            size=(150, 150)
+        image = self._get_preview_image()
+        pixmap = QPixmap.fromImage(ImageQt(image.convert("RGBA")))
+        self.image_label = QLabel(self)
+        self.image_label.setPixmap(pixmap)
+        self.image_label.setFixedSize(150, 150)
+        self.image_label.move(5, 0)
+        self.image_label.mousePressEvent = lambda _: open_command(
+            self.i, (self.ui_state, self.image_ui_state, self.text_ui_state)
         )
-        image_label = ctk.CTkLabel(master=self, text="", image=self.image, height=150, width=150)
-        image_label.grid(row=0, column=0)
 
-        self.name_label = self.components.label(self, 1, 0, self._get_display_name(), pad=5, wraplength=140)
+        self.name_label = QLabel(self._get_display_name(), self)
+        self.name_label.setWordWrap(True)
+        self.name_label.setFixedWidth(140)
+        self.name_label.move(5, 153)
 
-        close_button = ctk.CTkButton(
-            master=self,
-            width=20,
-            height=20,
-            text="X",
-            corner_radius=2,
-            fg_color="#C00000",
-            command=lambda: remove_command(self.i),
-        )
-        close_button.place(x=0, y=0)
+        close_btn = QPushButton("X", self)
+        close_btn.setFixedSize(24, 24)
+        close_btn.setStyleSheet("background-color: #C00000; color: white;")
+        close_btn.move(5, 0)
+        close_btn.clicked.connect(lambda: remove_command(self.i))
 
-        clone_button = ctk.CTkButton(
-            master=self,
-            width=20,
-            height=20,
-            text="+",
-            corner_radius=2,
-            fg_color="#00C000",
-            command=lambda: clone_command(self.i, controller.randomize_seed),
-        )
-        clone_button.place(x=25, y=0)
+        clone_btn = QPushButton("+", self)
+        clone_btn.setFixedSize(24, 24)
+        clone_btn.setStyleSheet("background-color: #00C000; color: white;")
+        clone_btn.move(34, 0)
+        clone_btn.clicked.connect(lambda: clone_command(self.i, controller.randomize_seed))
 
-        enabled_switch = ctk.CTkSwitch(
-            master=self,
-            width=40,
-            variable=self.ui_state.get_var("enabled"),
-            text="",
-            command=save_command,
-        )
-        enabled_switch.place(x=110, y=0)
-
-        image_label.bind(
-            "<Button-1>",
-            lambda event: open_command(self.i, (self.ui_state, self.image_ui_state, self.text_ui_state))
+        enabled_cb = QCheckBox(self)
+        enabled_cb.setChecked(concept.enabled)
+        enabled_cb.setFixedSize(20, 20)
+        enabled_cb.setStyleSheet("QCheckBox::indicator { width: 20px; height: 20px; }")
+        enabled_cb.move(135, 0)
+        enabled_cb.stateChanged.connect(lambda state: (
+            setattr(concept, 'enabled', bool(state)),
+            save_command(),
+        ))
+        self.ui_state.get_var("enabled")._bind_widget(
+            lambda v: enabled_cb.setChecked(bool(v))
         )
 
     def configure_element(self):
-        self.name_label.configure(text=self._get_display_name())
-        self.image.configure(light_image=self._get_preview_image())
-        self._clear_search_cache()
+        self.name_label.setText(self._get_display_name())
+        image = self._get_preview_image()
+        pixmap = QPixmap.fromImage(ImageQt(image.convert("RGBA")))
+        self.image_label.setPixmap(pixmap)
+        try:
+            if hasattr(self.concept, '_search_cache'):
+                delattr(self.concept, '_search_cache')
+        except AttributeError:
+            pass
 
     def place_in_list(self):
         index = getattr(self, 'visible_index', self.i)
         x = index % 6
         y = index // 6
-        self.grid(row=y, column=x, pady=5, padx=5)
+        lo = pyside6_components._layout(self.parent())
+        lo.addWidget(self, y, x)
+        lo.setColumnStretch(6, 1)
+        self.show()
+
+    def destroy(self):
+        self.deleteLater()

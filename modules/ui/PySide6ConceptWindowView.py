@@ -2,16 +2,27 @@ import threading
 
 from modules.ui.BaseConceptWindowView import BaseConceptWindowView
 from modules.ui.ConceptWindowController import ConceptWindowController
-from modules.util.ui import ctk_components
-from modules.util.ui.ui_utils import set_window_icon
+from modules.util.ui import pyside6_components
 
-import customtkinter as ctk
-from customtkinter import AppearanceModeTracker, ThemeManager
 from matplotlib import pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from PIL.ImageQt import ImageQt
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QGridLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QTabWidget,
+    QTextEdit,
+    QWidget,
+)
 
 
-class CtkConceptWindowView(BaseConceptWindowView, ctk.CTkToplevel):
+class PySide6ConceptWindowView(BaseConceptWindowView, QDialog):
     def __init__(
             self,
             parent,
@@ -19,108 +30,130 @@ class CtkConceptWindowView(BaseConceptWindowView, ctk.CTkToplevel):
             ui_state,
             image_ui_state,
             text_ui_state,
-            *args, **kwargs,
     ):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
-        BaseConceptWindowView.__init__(self, ctk_components)
+        QDialog.__init__(self, parent)
+        BaseConceptWindowView.__init__(self, pyside6_components)
 
         self.controller = controller
         self.image_preview_file_index = 0
-        self.preview_augmentations = ctk.BooleanVar(self, True)
+        self._preview_augmentations = True
         self.bucket_fig = None
 
-        self.title("Concept")
-        self.geometry("800x700")
-        self.resizable(True, True)
+        self.setWindowTitle("Concept")
+        self.resize(800, 700)
 
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=1)
+        outer = QGridLayout(self)
+        outer.setRowStretch(0, 1)
 
-        tabview = ctk.CTkTabview(self)
-        tabview.grid(row=0, column=0, sticky="nsew")
+        tabs = QTabWidget(self)
+        outer.addWidget(tabs, 0, 0)
 
-        # general tab
-        general_frame = ctk.CTkScrollableFrame(tabview.add("general"), fg_color="transparent")
-        general_frame.grid_columnconfigure(1, weight=1)
-        general_frame.grid_columnconfigure(2, weight=1)
-        self.build_general_tab(general_frame, controller, ui_state, text_ui_state)
-        general_frame.pack(fill="both", expand=1)
+        _pad = pyside6_components.PAD
 
-        # image augmentation tab
-        image_aug_master = tabview.add("image augmentation")
-        image_aug_frame = ctk.CTkScrollableFrame(image_aug_master, fg_color="transparent")
-        image_aug_frame.grid_columnconfigure(0, weight=0)
-        image_aug_frame.grid_columnconfigure(1, weight=0)
-        image_aug_frame.grid_columnconfigure(2, weight=0)
-        image_aug_frame.grid_columnconfigure(3, weight=1)
-        self.build_image_augmentation_tab(image_aug_frame, controller, image_ui_state)
+        # --- general tab ---
+        gen_scroll = QScrollArea()
+        gen_scroll.setWidgetResizable(True)
+        gen_frame = QWidget()
+        gen_scroll.setWidget(gen_frame)
+        pyside6_components._layout(gen_frame).setContentsMargins(_pad, _pad, _pad, _pad)
+        pyside6_components._layout(gen_frame).setColumnStretch(1, 1)
+        pyside6_components._layout(gen_frame).setColumnStretch(2, 1)
+        self.build_general_tab(gen_frame, controller, ui_state, text_ui_state)
+        pyside6_components._pack_form(gen_frame)
+        tabs.addTab(gen_scroll, "general")
 
-        # image
-        image_preview, filename_preview, caption_preview = controller.get_preview_image(self.image_preview_file_index, self.preview_augmentations.get())
-        self.image = ctk.CTkImage(
-            light_image=image_preview,
-            size=image_preview.size,
+        # --- image augmentation tab ---
+        img_scroll = QScrollArea()
+        img_scroll.setWidgetResizable(True)
+        img_outer = QWidget()
+        img_scroll.setWidget(img_outer)
+        lo_img_outer = pyside6_components._layout(img_outer)
+        lo_img_outer.setContentsMargins(_pad, _pad, _pad, _pad)
+        lo_img_outer.setColumnStretch(0, 1)
+
+        # form in its own widget so the preview panel can't affect row heights
+        img_form = QWidget(img_outer)
+        img_form_lo = pyside6_components._layout(img_form)
+        img_form_lo.setColumnStretch(3, 1)
+        self.build_image_augmentation_tab(img_form, controller, image_ui_state)
+        pyside6_components._pack_form(img_form)
+        lo_img_outer.addWidget(img_form, 0, 0, Qt.AlignTop)
+
+        # preview panel alongside the form
+        image_preview, filename_preview, caption_preview = controller.get_preview_image(
+            self.image_preview_file_index, self._preview_augmentations
         )
-        image_label = ctk.CTkLabel(master=image_aug_frame, text="", image=self.image, height=300, width=300)
-        image_label.grid(row=0, column=4, rowspan=6)
+        preview_panel = QWidget(img_outer)
+        pb_lo = QGridLayout(preview_panel)
 
-        # refresh preview
-        update_button_frame = ctk.CTkFrame(master=image_aug_frame, corner_radius=0, fg_color="transparent")
-        update_button_frame.grid(row=6, column=4, rowspan=6, sticky="nsew")
-        update_button_frame.grid_columnconfigure(1, weight=1)
+        self._image_label = QLabel(preview_panel)
+        self._image_label.setFixedSize(300, 300)
+        self._image_label.setPixmap(QPixmap.fromImage(ImageQt(image_preview.convert("RGBA"))).scaled(300, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        pb_lo.addWidget(self._image_label, 0, 0, 1, 3)
 
-        prev_preview_button = self.components.button(update_button_frame, 0, 0, "<", command=self._prev_image_preview)
-        self.components.button(update_button_frame, 0, 1, "Update Preview", command=self._update_image_preview)
-        next_preview_button = self.components.button(update_button_frame, 0, 2, ">", command=self._next_image_preview)
-        preview_augmentations_switch = ctk.CTkSwitch(update_button_frame, text="Show Augmentations", variable=self.preview_augmentations, command=self._update_image_preview)
-        preview_augmentations_switch.grid(row=1, column=0, columnspan=3, padx=5, pady=5)
+        prev_btn = QPushButton("<", preview_panel)
+        prev_btn.setFixedWidth(40)
+        prev_btn.clicked.connect(self._prev_image_preview)
+        update_btn = QPushButton("Update Preview", preview_panel)
+        update_btn.clicked.connect(self._update_image_preview)
+        next_btn = QPushButton(">", preview_panel)
+        next_btn.setFixedWidth(40)
+        next_btn.clicked.connect(self._next_image_preview)
+        self._aug_checkbox = QCheckBox("Show Augmentations", preview_panel)
+        self._aug_checkbox.setChecked(True)
+        self._aug_checkbox.toggled.connect(lambda checked: self._on_aug_toggle(checked))
+        pb_lo.addWidget(prev_btn, 1, 0)
+        pb_lo.addWidget(update_btn, 1, 1)
+        pb_lo.addWidget(next_btn, 1, 2)
+        pb_lo.addWidget(self._aug_checkbox, 2, 0, 1, 3)
 
-        prev_preview_button.configure(width=40)
-        next_preview_button.configure(width=40)
+        self._filename_label = QLabel(filename_preview, preview_panel)
+        self._filename_label.setWordWrap(True)
+        self._filename_label.setFixedWidth(300)
+        pb_lo.addWidget(self._filename_label, 3, 0, 1, 3)
 
-        #caption and filename preview
-        self.filename_preview = ctk.CTkLabel(master=update_button_frame, text=filename_preview, width=300, anchor="nw", justify="left", padx=10, wraplength=280)
-        self.filename_preview.grid(row=2, column=0, columnspan=3)
-        self.caption_preview = ctk.CTkTextbox(master=update_button_frame, width = 300, height = 150, wrap="word", border_width=2)
-        self.caption_preview.insert(index="1.0", text=caption_preview)
-        self.caption_preview.configure(state="disabled")
-        self.caption_preview.grid(row=3, column=0, columnspan=3, rowspan=3)
+        self._caption_box = QTextEdit(preview_panel)
+        self._caption_box.setReadOnly(True)
+        self._caption_box.setPlainText(caption_preview)
+        self._caption_box.setFixedSize(300, 150)
+        pb_lo.addWidget(self._caption_box, 4, 0, 1, 3)
 
-        image_aug_frame.pack(fill="both", expand=1)
+        lo_img_outer.addWidget(preview_panel, 0, 1, Qt.AlignTop)
+        tabs.addTab(img_scroll, "image augmentation")
 
-        # text augmentation tab
-        text_aug_frame = ctk.CTkScrollableFrame(tabview.add("text augmentation"), fg_color="transparent")
-        text_aug_frame.grid_columnconfigure(0, weight=0)
-        text_aug_frame.grid_columnconfigure(1, weight=0)
-        text_aug_frame.grid_columnconfigure(2, weight=0)
-        text_aug_frame.grid_columnconfigure(3, weight=1)
-        self.build_text_augmentation_tab(text_aug_frame, controller, text_ui_state)
-        text_aug_frame.pack(fill="both", expand=1)
+        # --- text augmentation tab ---
+        text_scroll = QScrollArea()
+        text_scroll.setWidgetResizable(True)
+        text_frame = QWidget()
+        text_scroll.setWidget(text_frame)
+        pyside6_components._layout(text_frame).setContentsMargins(_pad, _pad, _pad, _pad)
+        pyside6_components._layout(text_frame).setColumnStretch(3, 1)
+        self.build_text_augmentation_tab(text_frame, controller, text_ui_state)
+        pyside6_components._pack_form(text_frame)
+        tabs.addTab(text_scroll, "text augmentation")
 
-        # statistics tab
-        stats_frame = ctk.CTkScrollableFrame(tabview.add("statistics"), fg_color="transparent")
-        stats_frame.grid_columnconfigure(0, weight=0, minsize=150)
-        stats_frame.grid_columnconfigure(1, weight=0, minsize=150)
-        stats_frame.grid_columnconfigure(2, weight=0, minsize=150)
-        stats_frame.grid_columnconfigure(3, weight=0, minsize=150)
+        # --- statistics tab ---
+        stats_scroll = QScrollArea()
+        stats_scroll.setWidgetResizable(True)
+        stats_frame = QWidget()
+        stats_scroll.setWidget(stats_frame)
+        stats_lo = pyside6_components._layout(stats_frame)
+        stats_lo.setContentsMargins(_pad, _pad, _pad, _pad)
+        stats_lo.setColumnMinimumWidth(0, 150)
+        stats_lo.setColumnMinimumWidth(1, 150)
+        stats_lo.setColumnMinimumWidth(2, 150)
+        stats_lo.setColumnMinimumWidth(3, 150)
         self.build_concept_stats_tab(stats_frame, controller)
 
-        #aspect bucketing plot, mostly copied from timestep preview graph
-        appearance_mode = AppearanceModeTracker.get_mode()
-        background_color = self.winfo_rgb(ThemeManager.theme["CTkToplevel"]["fg_color"][appearance_mode])
-        text_color = self.winfo_rgb(ThemeManager.theme["CTkLabel"]["text_color"][appearance_mode])
-        background_color = f"#{int(background_color[0]/256):x}{int(background_color[1]/256):x}{int(background_color[2]/256):x}"
-        self.text_color = f"#{int(text_color[0]/256):x}{int(text_color[1]/256):x}{int(text_color[2]/256):x}"
-
-        plt.set_loglevel('WARNING')     #suppress errors about data type in bar chart
-
-        assert self.bucket_fig is None
-        self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7,3))
-        self.canvas = FigureCanvasTkAgg(self.bucket_fig, master=stats_frame)
-        self.canvas.get_tk_widget().grid(row=19, column=0, columnspan=4, rowspan=2)
+        plt.set_loglevel('WARNING')
+        self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7, 3))
+        self.canvas = FigureCanvasQTAgg(self.bucket_fig)
         self.bucket_fig.tight_layout()
         self.bucket_fig.subplots_adjust(bottom=0.15)
 
+        palette = self.palette()
+        self.text_color = palette.text().color().name()
+        background_color = palette.window().color().name()
         self.bucket_fig.set_facecolor(background_color)
         self.bucket_ax.set_facecolor(background_color)
         self.bucket_ax.spines['bottom'].set_color(self.text_color)
@@ -132,18 +165,22 @@ class CtkConceptWindowView(BaseConceptWindowView, ctk.CTkToplevel):
         self.bucket_ax.xaxis.label.set_color(self.text_color)
         self.bucket_ax.yaxis.label.set_color(self.text_color)
 
-        stats_frame.pack(fill="both", expand=1)
+        stats_lo.addWidget(self.canvas, 19, 0, 2, 4)
+
+        tabs.addTab(stats_scroll, "statistics")
+
+        ok = QPushButton("ok", self)
+        ok.clicked.connect(self._ok)
+        outer.addWidget(ok, 1, 0)
 
         #automatic concept scan
         self.scan_thread = threading.Thread(target=controller.auto_update_concept_stats, args=[self], daemon=True)
         self.scan_thread.start()
 
-        self.components.button(self, 1, 0, "ok", self._ok)
 
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
-        self.after(200, lambda: set_window_icon(self))
+    def _on_aug_toggle(self, checked: bool):
+        self._preview_augmentations = checked
+        self._update_image_preview()
 
     def _prev_image_preview(self):
         self.image_preview_file_index = max(self.image_preview_file_index - 1, 0)
@@ -154,20 +191,28 @@ class CtkConceptWindowView(BaseConceptWindowView, ctk.CTkToplevel):
         self._update_image_preview()
 
     def _update_image_preview(self):
-        image_preview, filename_preview, caption_preview = self.controller.get_preview_image(self.image_preview_file_index, self.preview_augmentations.get())
-        self.image.configure(light_image=image_preview, size=image_preview.size)
-        self.filename_preview.configure(text=filename_preview)
-        self.caption_preview.configure(state="normal")
-        self.caption_preview.delete(index1="1.0", index2="end")
-        self.caption_preview.insert(index="1.0", text=caption_preview)
-        self.caption_preview.configure(state="disabled")
+        image_preview, filename_preview, caption_preview = self.controller.get_preview_image(
+            self.image_preview_file_index, self._preview_augmentations
+        )
+        self._image_label.setPixmap(
+            QPixmap.fromImage(ImageQt(image_preview.convert("RGBA"))).scaled(300, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        )
+        self._filename_label.setText(filename_preview)
+        self._caption_box.setPlainText(caption_preview)
 
-    def destroy(self):
+    def _cleanup(self):
+        # stop the background scan thread (reuses the Abort Scan mechanism) so it
+        # stops touching this window's widgets, and release the matplotlib figure
+        self.controller.cancel_scan_flag.set()
         if self.bucket_fig is not None:
             plt.close(self.bucket_fig)
             self.bucket_fig = None
 
-        super().destroy()
+    def closeEvent(self, event):
+        # also reached when the window is closed via the OS X button
+        self._cleanup()
+        super().closeEvent(event)
 
     def _ok(self):
-        self.destroy()
+        self._cleanup()
+        self.accept()

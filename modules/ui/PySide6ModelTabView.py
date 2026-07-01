@@ -1,48 +1,41 @@
-
-
 from modules.ui.BaseModelTabView import BaseModelTabView
 from modules.ui.ModelTabController import ModelTabController
-from modules.util.ui import ctk_components
+from modules.util.ui import pyside6_components
+from modules.util.ui.pyside6_util import QtABCMeta
 
-import customtkinter as ctk
+from PySide6.QtWidgets import QWidget
 
 
-class CtkModelTabView(BaseModelTabView):
+class PySide6ModelTabView(BaseModelTabView, QWidget, metaclass=QtABCMeta):
+
     def __init__(self, master, controller: ModelTabController, ui_state):
-        BaseModelTabView.__init__(self, ctk_components)
+        QWidget.__init__(self, master)
+        BaseModelTabView.__init__(self, pyside6_components)
+
         self.master = master
         self.controller = controller
         self.ui_state = ui_state
-
-        master.grid_rowconfigure(0, weight=1)
-        master.grid_columnconfigure(0, weight=1)
-
         self.scroll_frame = None
-
         self.refresh_ui()
 
     def _make_svd_frames(self, parent, row: int):
-        svd_label_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        svd_label_frame.grid(row=row, column=3, sticky="nsew")
-        svd_entry_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        svd_entry_frame.grid(row=row, column=4, sticky="nsew")
+        svd_label_frame = QWidget(parent)
+        pyside6_components._layout(parent).addWidget(svd_label_frame, row, 3)
+        svd_entry_frame = QWidget(parent)
+        pyside6_components._layout(parent).addWidget(svd_entry_frame, row, 4)
         return svd_label_frame, svd_entry_frame
 
     def refresh_ui(self):
-        if self.scroll_frame:
-            self.scroll_frame.destroy()
+        if self.scroll_frame is not None:
+            self.scroll_frame.hide()
+            self.scroll_frame.deleteLater()
 
-        self.scroll_frame = ctk.CTkScrollableFrame(self.master, fg_color="transparent")
-        self.scroll_frame.grid(row=0, column=0, sticky="nsew")
-        self.scroll_frame.grid_columnconfigure(0, weight=1)
+        scroll, frame = pyside6_components.scrollable_frame(self)
+        pyside6_components._layout(self).addWidget(scroll, 0, 0)
+        self.scroll_frame = scroll
 
-        base_frame = ctk.CTkFrame(master=self.scroll_frame, corner_radius=5)
-        base_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
+        frame_lo = pyside6_components._layout(frame)
+        frame_lo.setColumnStretch(1, 10)
+        frame_lo.setColumnStretch(4, 1)
 
-        base_frame.grid_columnconfigure(0, weight=0)
-        base_frame.grid_columnconfigure(1, weight=10)  # , minsize=500)
-        base_frame.grid_columnconfigure(2, minsize=50)
-        base_frame.grid_columnconfigure(3, weight=0)
-        base_frame.grid_columnconfigure(4, weight=1)
-
-        self.build_content(base_frame, self.controller, self.ui_state)
+        self.build_content(frame, self.controller, self.ui_state)

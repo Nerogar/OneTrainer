@@ -1,34 +1,32 @@
 from modules.ui.BaseConvertModelUIView import BaseConvertModelUIView
 from modules.ui.ConvertModelUIController import ConvertModelUIController
-from modules.util.ui import ctk_components
-from modules.util.ui.CtkUIState import CtkUIState
-from modules.util.ui.ui_utils import set_window_icon
+from modules.util.ui import pyside6_components
+from modules.util.ui.PySide6UIState import PySide6UIState
 
-import customtkinter as ctk
+from PySide6.QtWidgets import QDialog, QGridLayout, QWidget
 
 
-class CtkConvertModelUIView(BaseConvertModelUIView, ctk.CTkToplevel):
-    def __init__(self, parent, controller: ConvertModelUIController, *args, **kwargs):
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
-        BaseConvertModelUIView.__init__(self, ctk_components)
+class PySide6ConvertModelUIView(BaseConvertModelUIView, QDialog):
+    def __init__(self, parent, controller: ConvertModelUIController):
+        QDialog.__init__(self, parent)
+        BaseConvertModelUIView.__init__(self, pyside6_components)
 
-        ui_state = CtkUIState(self, controller.convert_model_args)
+        ui_state = PySide6UIState(controller.convert_model_args)
 
-        self.title("Convert models")
-        self.geometry("550x350")
-        self.resizable(True, True)
+        self.setWindowTitle("Convert models")
+        self.resize(600, 380)
 
-        self.frame = ctk.CTkFrame(self, width=600, height=300)
-        self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
-        self.frame.grid_columnconfigure(0, weight=0)
-        self.frame.grid_columnconfigure(1, weight=1)
+        _pad = pyside6_components.PAD
+        outer = QGridLayout(self)
+        outer.setContentsMargins(_pad, _pad, _pad, _pad)
 
-        self.build_content(self.frame, controller, ui_state)
-        self.frame.pack(fill="both", expand=True)
+        frame = QWidget(self)
+        lo = pyside6_components._layout(frame)
+        lo.setColumnStretch(1, 1)
+        outer.addWidget(frame, 0, 0)
 
-        self.wait_visibility()
-        self.focus_set()
-        self.after(200, lambda: set_window_icon(self))
+        self.build_content(frame, controller, ui_state)
+        lo.setRowStretch(lo.rowCount(), 1)
 
     def set_converting(self, active):
-        self.button.configure(state="disabled" if active else "normal")
+        self.button.setEnabled(not active)

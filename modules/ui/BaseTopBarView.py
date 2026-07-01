@@ -30,7 +30,7 @@ class BaseTopBarView:
         pass
 
     @abstractmethod
-    def _forget_dropdown(self):
+    def _forget_dropdown(self, widget):
         pass
 
     @abstractmethod
@@ -80,11 +80,11 @@ class BaseTopBarView:
         # self.components.icon_button(self.frame, 0, 2, "-", self.__remove_config)
 
         # Wiki button
-        self.components.button(self.frame, 0, 4, "Wiki", self.open_wiki, width=50)
+        self.components.button(self.frame, 0, 4, "Wiki", self.open_wiki, width=50, sticky="vew")
 
         # save button
         self.components.button(self.frame, 0, 3, "Save config", self.__save_config,
-                               tooltip="Save the current configuration in a custom preset", width=90)
+                               tooltip="Save the current configuration in a custom preset", width=90, sticky="vew")
 
         # padding
         self._setup_frame_column_weight()
@@ -98,11 +98,12 @@ class BaseTopBarView:
             ui_state=ui_state,
             var_name="model_type",
             command=self.__change_model_type,
+            sticky="vew",
         )
 
     def __create_training_method(self):
         if self.training_method:
-            self.training_method.destroy()
+            self._forget_dropdown(self.training_method)
 
         values = self.controller.get_training_methods(self.controller.train_config.model_type)
 
@@ -114,6 +115,7 @@ class BaseTopBarView:
             ui_state=self.ui_state,
             var_name="training_method",
             command=self.change_training_method_callback,
+            sticky="vew",
         )
 
     def __change_model_type(self, model_type: ModelType):
@@ -122,10 +124,11 @@ class BaseTopBarView:
 
     def __create_configs_dropdown(self):
         if self.configs_dropdown is not None:
-            self._forget_dropdown()
+            self._forget_dropdown(self.configs_dropdown)
 
         self.configs_dropdown = self.components.options_kv(
-            self.frame, 0, 1, self.configs, self.config_ui_state, "config_name", self.__load_current_config
+            self.frame, 0, 1, self.configs, self.config_ui_state, "config_name", self.__load_current_config,
+            sticky="vew",
         )
 
     def __save_config(self):

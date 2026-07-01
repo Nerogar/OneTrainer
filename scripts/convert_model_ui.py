@@ -1,21 +1,17 @@
+import pydantic._internal._validators  # noqa: F401
 from util.import_util import script_imports
 
 script_imports()
 
 from modules.ui.ConvertModelUIController import ConvertModelUIController
-from modules.ui.CtkConvertModelUIView import CtkConvertModelUIView
-
-import customtkinter as ctk
+from modules.ui.PySide6ConvertModelUIView import PySide6ConvertModelUIView
+from modules.util.ui.pyside6_util import create_application
 
 
 def main():
-    # CtkConvertModelUIView is a CTkToplevel, so it needs a CTk root. Hide the root and run the
-    # toplevel as a standalone window, tearing the root down once the window is closed.
-    root = ctk.CTk()
-    root.withdraw()
-    ui = ConvertModelUIController().create_window(root, CtkConvertModelUIView)
-    root.wait_window(ui)
-    root.destroy()
+    _app = create_application()
+    ui = ConvertModelUIController().create_window(None, PySide6ConvertModelUIView)
+    ui.exec()
 
 
 if __name__ == '__main__':
