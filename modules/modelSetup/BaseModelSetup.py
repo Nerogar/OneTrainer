@@ -238,13 +238,15 @@ class BaseModelSetup(
                     param.requires_grad_(False)
 
     @staticmethod
-    def _set_attention_backend(component, attn: AttentionMechanism, mask: bool=False, varlen: bool=False):
+    def _set_attention_backend(component, attn: AttentionMechanism, mask: bool):
         match attn:
             case AttentionMechanism.SDP:
                 component.set_attention_backend("native")
             case AttentionMechanism.FLASH:
-                if mask or varlen:
+                if mask:
                     print("Warning: FLASH attention might fail for this model, depending on other configuration (batch size > 1, etc.)")
                 component.set_attention_backend("flash")
+            case AttentionMechanism.CUDNN:
+                component.set_attention_backend("_native_cudnn")
             case _:
                 raise NotImplementedError(f"attention mechanism {str(attn)} not implemented")
