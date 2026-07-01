@@ -106,6 +106,7 @@ class BaseWuerstchenSetup(
         quantize_layers(model.effnet_encoder, self.train_device, model.effnet_encoder_train_dtype, config)
         quantize_layers(model.prior_text_encoder, self.train_device, model.train_dtype, config)
         quantize_layers(model.prior_prior, self.train_device, model.prior_train_dtype, config)
+        self._set_attention_backend(model.prior_prior, config.attention_mechanism, mask=False)
 
     def _setup_embeddings(
             self,
