@@ -46,14 +46,13 @@ class DtypeModelSaverMixin:
             self,
             pipeline,
             dtype: torch.dtype | None,
-            tokenizer_attrs: tuple[str, ...] = ("tokenizer",),
+            *tokenizers,
     ):
         if dtype is None:
             return pipeline
 
         # replace the tokenizers' __deepcopy__ before calling deepcopy, to prevent a copy being made.
         # the tokenizers try to reload from the file system otherwise
-        tokenizers = [getattr(pipeline, attr) for attr in tokenizer_attrs]
         for tokenizer in tokenizers:
             tokenizer.__deepcopy__ = lambda memo, tokenizer=tokenizer: tokenizer
 

@@ -25,7 +25,7 @@ class HiDreamModelSaver(
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
         pipeline = model.create_pipeline(use_original_tokenizers=True)
         pipeline.to("cpu")
-        save_pipeline = self._copy_pipeline_to_dtype(pipeline, dtype, tokenizer_attrs=("tokenizer_3", "tokenizer_4"))
+        save_pipeline = self._copy_pipeline_to_dtype(pipeline, dtype, pipeline.tokenizer_3, pipeline.tokenizer_4)
 
         os.makedirs(Path(destination).absolute(), exist_ok=True)
         save_pipeline.save_pretrained(destination)
