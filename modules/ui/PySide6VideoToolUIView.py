@@ -2,7 +2,7 @@ from modules.ui.BaseVideoToolUIView import BaseVideoToolUIView
 from modules.ui.VideoToolUIController import VideoToolUIController
 from modules.util.image_util import load_image
 from modules.util.ui import pyside6_components
-from modules.util.ui.pyside6_abc import QtABCMeta
+from modules.util.ui.pyside6_util import QtABCMeta
 from modules.util.ui.PySide6UIState import PySide6UIState
 
 from PIL.ImageQt import ImageQt

@@ -1,5 +1,3 @@
-import sys
-
 import pydantic._internal._validators  # noqa: F401
 from util.import_util import script_imports
 
@@ -7,12 +5,11 @@ script_imports()
 
 from modules.ui.ConvertModelUIController import ConvertModelUIController
 from modules.ui.PySide6ConvertModelUIView import PySide6ConvertModelUIView
-
-from PySide6.QtWidgets import QApplication
+from modules.util.ui.pyside6_util import create_application
 
 
 def main():
-    _app = QApplication(sys.argv)
+    _app = create_application()
     ui = ConvertModelUIController().create_window(None, PySide6ConvertModelUIView)
     ui.exec()
 

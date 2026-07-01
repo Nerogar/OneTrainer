@@ -29,7 +29,7 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import pyside6_components
-from modules.util.ui.pyside6_abc import QtABCMeta
+from modules.util.ui.pyside6_util import QtABCMeta
 from modules.util.ui.PySide6UIState import PySide6UIState
 
 from PySide6.QtCore import QTimer

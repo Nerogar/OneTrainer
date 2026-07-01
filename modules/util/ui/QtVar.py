@@ -3,7 +3,7 @@ from typing import Any
 
 
 class QtVar:
-    """Toolkit-neutral observable variable. Drop-in for tk.StringVar / tk.BooleanVar."""
+    # Toolkit-neutral observable variable. Drop-in for tk.StringVar / tk.BooleanVar.
 
     def __init__(self, value: Any = ""):
         self._value = value
@@ -31,7 +31,7 @@ class QtVar:
         self._traces.pop(name, None)
 
     def _bind_widget(self, push_to_widget: Callable[[Any], None]) -> int:
-        """Register a one-way push from var → widget. Returns an ID for _unbind_widget."""
+        # Register a one-way push from var → widget. Returns an ID for _unbind_widget.
         id_ = self._next_id
         self._widget_callbacks[id_] = push_to_widget
         self._next_id += 1

@@ -365,11 +365,10 @@ def colored_icon_button(master, row, column, text, fg_color, command, padx=0):
     return component
 
 
-def button(master, row, column, text, command, tooltip=None, **kwargs):
-    # Pop grid-specific parameters from kwargs, using PAD as the default if not provided.
-    padx = kwargs.pop('padx', PAD)
-    pady = kwargs.pop('pady', PAD)
-    kwargs.pop('sticky', None)
+def button(master, row, column, text, command, tooltip=None, padx=PAD, pady=PAD, sticky=None, width=None):
+    kwargs = {}
+    if width is not None:
+        kwargs['width'] = width
 
     component = ctk.CTkButton(master, text=text, command=command, **kwargs)
     component.grid(row=row, column=column, padx=padx, pady=pady, sticky="new")

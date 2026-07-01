@@ -1,7 +1,7 @@
 from modules.ui.BaseModelTabView import BaseModelTabView
 from modules.ui.ModelTabController import ModelTabController
 from modules.util.ui import pyside6_components
-from modules.util.ui.pyside6_abc import QtABCMeta
+from modules.util.ui.pyside6_util import QtABCMeta
 
 from PySide6.QtWidgets import QWidget
 

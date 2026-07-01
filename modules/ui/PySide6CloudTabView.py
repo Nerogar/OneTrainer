@@ -1,7 +1,7 @@
 from modules.ui.BaseCloudTabView import BaseCloudTabView
 from modules.ui.CloudTabController import CloudTabController
 from modules.util.ui import pyside6_components
-from modules.util.ui.pyside6_abc import QtABCMeta
+from modules.util.ui.pyside6_util import QtABCMeta
 
 from PySide6.QtWidgets import QWidget
 

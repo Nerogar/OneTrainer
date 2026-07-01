@@ -3,7 +3,7 @@ from modules.ui.PySide6ConfigListView import PySide6ConfigListView
 from modules.ui.PySide6SampleParamsWindowView import PySide6SampleParamsWindowView
 from modules.ui.SamplingTabController import SamplingTabController
 from modules.util.ui import pyside6_components
-from modules.util.ui.pyside6_abc import QtABCMeta
+from modules.util.ui.pyside6_util import QtABCMeta
 
 from PySide6.QtWidgets import QWidget
 

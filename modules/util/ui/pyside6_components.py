@@ -9,7 +9,6 @@ from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions, supported_video_extensions
 from modules.util.ui.pyside6_validation import PySide6FieldValidator, PySide6PathValidator
 from modules.util.ui.UIState import BaseUIState
-from modules.util.ui.validation import DEFAULT_MAX_UNDO
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPixmap
@@ -198,7 +197,7 @@ def entry(
         wide_tooltip: bool = False,
         width: int = 140,
         sticky: str = "new",
-        max_undo: int | None = None,
+        max_undo: int | None = None,  # unused: kept for signature parity with ctk_components.entry()
         validator_factory: Callable[..., PySide6FieldValidator] | None = None,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
@@ -219,14 +218,12 @@ def entry(
     if validator_factory is not None:
         validator = validator_factory(
             component, var, ui_state, var_name,
-            max_undo=max_undo or DEFAULT_MAX_UNDO,
             extra_validate=extra_validate,
             required=required,
         )
     else:
         validator = PySide6FieldValidator(
             component, var, ui_state, var_name,
-            max_undo=max_undo or DEFAULT_MAX_UNDO,
             extra_validate=extra_validate,
             required=required,
         )
@@ -472,10 +469,14 @@ def button(
         padx: int = PAD,
         pady: int = PAD,
         sticky: str = "new",
-        **kwargs,
+        width: int | None = None,
 ) -> QPushButton:
     component = QPushButton(text, master)
     component.clicked.connect(command)
+    if width is not None:
+        # ctk's width is a floor, not a cap: CTkButton never disables grid propagation,
+        # so it grows past `width` to fit its label. Match that with setMinimumWidth.
+        component.setMinimumWidth(width)
     if tooltip:
         _set_tooltip(component, tooltip)
     _add(_layout(master), component, row, column, sticky=sticky, padx=padx, pady=pady)

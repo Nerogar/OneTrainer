@@ -5,7 +5,6 @@ from modules.util.ui.QtVar import QtVar
 from modules.util.ui.UIState import BaseUIState
 from modules.util.ui.validation import (
     DEBOUNCE_TYPING_MS,
-    DEFAULT_MAX_UNDO,
     ERROR_BORDER_COLOR,
     BaseFieldValidator,
     _active_validators,
@@ -23,7 +22,7 @@ class PySide6FieldValidator(BaseFieldValidator):
         var: QtVar,
         ui_state: BaseUIState,
         var_name: str,
-        max_undo: int = DEFAULT_MAX_UNDO,  # unused: QLineEdit has native undo/redo, unlike tk.Entry
+        # no max_undo param: QLineEdit has native undo/redo, unlike tk.Entry
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
     ):
@@ -140,11 +139,10 @@ class PySide6PathValidator(PySide6FieldValidator):
         ui_state: BaseUIState,
         var_name: str,
         io_type: PathIOType = PathIOType.INPUT,
-        max_undo: int = DEFAULT_MAX_UNDO,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
     ):
-        super().__init__(component, var, ui_state, var_name, max_undo=max_undo,
+        super().__init__(component, var, ui_state, var_name,
                          extra_validate=extra_validate, required=required)
         self.io_type = io_type
 

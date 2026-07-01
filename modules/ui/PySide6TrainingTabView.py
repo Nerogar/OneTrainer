@@ -9,7 +9,7 @@ from modules.ui.SchedulerParamsWindowController import SchedulerParamsWindowCont
 from modules.ui.TimestepDistributionWindowController import TimestepDistributionWindowController
 from modules.ui.TrainingTabController import TrainingTabController
 from modules.util.ui import pyside6_components
-from modules.util.ui.pyside6_abc import QtABCMeta
+from modules.util.ui.pyside6_util import QtABCMeta
 
 from PySide6.QtWidgets import QScrollArea, QSizePolicy, QWidget
 
