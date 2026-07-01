@@ -1,15 +1,13 @@
 {
     "base_model_name": "baidu/ERNIE-Image",
     "batch_size": 2,
-    "learning_rate": 0.0003,
+    "learning_rate": 3e-4,
     "model_type": "ERNIE",
-    "output_model_format": "DIFFUSERS_LORA",
     "resolution": "512",
     "compile": true,
     "transformer": {
         "train": true,
-        "weight_dtype": "INT_W8A8",
-        "offload_fraction": 0.7
+        "weight_dtype": "INT_W8A8"
     },
     "text_encoder": {
         "train": false,
@@ -28,5 +26,7 @@
         "layer_filter_preset": "blocks"
     },
     "timestep_distribution": "LOGIT_NORMAL",
-    "dataloader_threads": 1
+    "dataloader_threads": 1,
+    "gradient_checkpointing": "CPU_OFFLOADED",
+    "layer_offload_fraction": 0.7
 }
