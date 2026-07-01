@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
@@ -328,6 +329,13 @@ class BaseTrainingTabView(ABC):
                               supports_circular_padding: bool = False):
         frame = self.components.section_frame(master, row)
         row = 0
+
+        # attention mechanism
+        self.components.label(frame, row, 0, "Attention",
+                              tooltip="The attention mechanism used during training. Use `SDP` on linux. On windows, `FLASH` can be faster but you have to install it, and it does not support all models.")
+        self.components.options(frame, row, 1, [str(x) for x in list(AttentionMechanism)], ui_state,
+                                "attention_mechanism")
+        row += 1
 
         # ema
         self.components.label(frame, row, 0, "EMA",
