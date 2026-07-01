@@ -27,7 +27,7 @@ class PixArtAlphaModelSaver(
         pipeline = model.create_pipeline(use_original_tokenizers=True)
         pipeline.to("cpu")
 
-        save_pipeline = self._copy_pipeline_to_dtype(pipeline, dtype)
+        save_pipeline = self._copy_pipeline_to_dtype(pipeline, dtype, pipeline.tokenizer)
 
         os.makedirs(Path(destination).absolute(), exist_ok=True)
         save_pipeline.save_pretrained(destination)
