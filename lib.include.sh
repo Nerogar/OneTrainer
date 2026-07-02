@@ -146,7 +146,17 @@ function get_platform {
             #  "nvcc": CUDA SDK compiler. Not included in the drivers.
             #  "/usr/lib/wsl/lib/nvidia-smi": WSL's NVIDIA path (isn't in $PATH).
             # SEE: https://docs.nvidia.com/cuda/wsl-user-guide/
-            platform="cuda"
+            local smi="nvidia-smi"
+            if ! can_exec "${smi}"; then
+                smi="/usr/lib/wsl/lib/nvidia-smi"
+            fi
+            local driver_cuda="$("${smi}" 2>/dev/null | grep -oE 'CUDA Version: [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+' | head -n1)"
+            if awk "BEGIN{exit !(${driver_cuda} >= 13.0)}"; then
+                platform="cuda13"
+            else
+                print_warning "Detected CUDA version ${driver_cuda}, Updating to a driver that supports CUDA 13 is recommended."
+                platform="cuda12"
+            fi
         elif [[ -e "/dev/kfd" ]]; then
             # AMD graphics.
             platform="rocm"

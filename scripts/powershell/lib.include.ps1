@@ -94,7 +94,16 @@ function Get-Platform {
     # check if nvidia
     if (Test-CommandExists "nvidia-smi") {
         Write-OTDebug "NVIDIA GPU detected via nvidia-smi."
-        return "cuda"
+        $smiOutput = (& nvidia-smi 2>$null) -join "`n"
+        $driverCuda = $null
+        if ($smiOutput -match 'CUDA Version:\s*([0-9]+\.[0-9]+)') {
+            $driverCuda = [double]$Matches[1]
+        }
+        if ($driverCuda -ge 13.0) {
+            return "cuda13"
+        }
+        Write-OTWarning "Detected CUDA version $driverCuda, Updating to a driver that supports CUDA 13 is recommended."
+        return "cuda12"
     }
 
     # fallback to cpu, rocm not supported officially.

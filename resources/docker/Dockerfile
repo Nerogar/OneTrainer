@@ -5,12 +5,7 @@
 
 FROM ubuntu:latest
 
-ENV OT_PLATFORM=cuda
-ENV OT_SCRIPT_DEBUG=true
-ENV PATH=/root/.pixi/bin:${PATH}
-ENV TZ=Etc/UTC
-ENV OT_SCRIPT_DEBUG=true
-ENV CONDA_OVERRIDE_CUDA=13.0
+ARG OT_PLATFORM
 
 WORKDIR /
 RUN apt-get update && \
@@ -26,6 +21,12 @@ COPY --link ./install-pixi.sh ./
 RUN ./install-pixi.sh
 
 COPY --link pyproject.toml pixi.lock ./
+
+ENV OT_PLATFORM="${OT_PLATFORM}"
+ENV OT_SCRIPT_DEBUG="true"
+ENV PATH="/root/.pixi/bin:${PATH}"
+ENV TZ="Etc/UTC"
+ENV OT_SCRIPT_DEBUG="true"
 
 RUN --mount=type=cache,target=/root/.cache/rattler/cache <<EOF
 pixi install --locked -v -e ${OT_PLATFORM} --skip OneTrainer
