@@ -321,6 +321,52 @@ function run_pip_in_active_env {
     fi
 }
 
+# Chooses between the CUDA 13 (default) and CUDA 12.6 (legacy) requirements.
+# CUDA 13 needs a recent driver AND a Turing-or-newer GPU: it dropped support
+# for Maxwell/Pascal/Volta (compute capability < 7.5), so those cards get no
+# usable kernels from the cu130 wheels. We fall back to the cu126 "legacy"
+# wheels if the driver can't do CUDA 13, or if any installed GPU is pre-Turing.
+# NOTE: If nvidia-smi tells us nothing (missing/too old to support these
+# queries), we keep the CUDA 13 default; the old-driver case is still caught
+# by the CUDA-version check below when the header is present.
+function get_cuda_requirements_path {
+    local default_reqs="requirements-cuda.txt"
+    local legacy_reqs="requirements-cuda-legacy.txt"
+
+    # Locate nvidia-smi, including WSL's out-of-PATH copy.
+    local smi="nvidia-smi"
+    if ! can_exec "${smi}"; then
+        smi="/usr/lib/wsl/lib/nvidia-smi"
+        can_exec "${smi}" || { echo "${default_reqs}"; return; }
+    fi
+
+    # Max CUDA version the driver supports, parsed from the nvidia-smi header
+    # (e.g. "CUDA Version: 13.0"). Below 13.0 means the driver is too old.
+    local driver_cuda="$("${smi}" 2>/dev/null | grep -oE 'CUDA Version: [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+' | head -n1)"
+    if [[ -n "${driver_cuda}" ]] && awk "BEGIN{exit !(${driver_cuda} < 13.0)}"; then
+        # NOTE: print_warning writes to stderr, so it won't pollute the captured
+        # filename on stdout; the same applies to print_debug below.
+        print_warning "Your NVIDIA driver only supports up to CUDA ${driver_cuda}, so OneTrainer will install the legacy CUDA 12.6 build of PyTorch. Updating your NVIDIA driver is recommended to use the faster CUDA 13 build."
+        echo "${legacy_reqs}"
+        return
+    fi
+
+    # Any pre-Turing GPU (compute capability < 7.5) forces the CUDA 12.6 build.
+    # NOTE: No driver-update suggestion here; a pre-Turing GPU can never run the
+    # CUDA 13 wheels regardless of driver version.
+    local cap
+    while IFS= read -r cap; do
+        [[ -n "${cap}" ]] || continue
+        if awk "BEGIN{exit !(${cap} < 7.5)}"; then
+            print_debug "GPU compute capability ${cap} < 7.5 (pre-Turing); using legacy CUDA 12.6 requirements." >&2
+            echo "${legacy_reqs}"
+            return
+        fi
+    done < <("${smi}" --query-gpu=compute_cap --format=csv,noheader 2>/dev/null)
+
+    echo "${default_reqs}"
+}
+
 # Determines which requirements.txt file we need to install.
 function get_platform_requirements_path {
     # NOTE: The user can override our platform detection via the environment.
@@ -336,7 +382,7 @@ function get_platform_requirements_path {
             #  "nvcc": CUDA SDK compiler. Not included in the drivers.
             #  "/usr/lib/wsl/lib/nvidia-smi": WSL's NVIDIA path (isn't in $PATH).
             # SEE: https://docs.nvidia.com/cuda/wsl-user-guide/
-            platform_reqs="requirements-cuda.txt"
+            platform_reqs="$(get_cuda_requirements_path)"
         elif [[ -e "/dev/kfd" ]]; then
             # AMD graphics.
             platform_reqs="requirements-rocm.txt"
