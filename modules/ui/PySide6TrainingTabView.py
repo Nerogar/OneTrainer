@@ -1,7 +1,5 @@
 from modules.ui.BaseTrainingTabView import BaseTrainingTabView
-from modules.ui.OffloadingWindowController import OffloadingWindowController
 from modules.ui.OptimizerParamsWindowController import OptimizerParamsWindowController
-from modules.ui.PySide6OffloadingWindowView import PySide6OffloadingWindowView
 from modules.ui.PySide6OptimizerParamsWindowView import PySide6OptimizerParamsWindowView
 from modules.ui.PySide6SchedulerParamsWindowView import PySide6SchedulerParamsWindowView
 from modules.ui.PySide6TimestepDistributionWindowView import PySide6TimestepDistributionWindowView
@@ -82,9 +80,6 @@ class PySide6TrainingTabView(BaseTrainingTabView, QWidget, metaclass=QtABCMeta):
 
     def open_scheduler_params(self):
         PySide6SchedulerParamsWindowView(self, SchedulerParamsWindowController(self.controller.config), self.ui_state).exec()
-
-    def open_offloading(self):
-        PySide6OffloadingWindowView(self, OffloadingWindowController(self.controller.config), self.ui_state).exec()
 
     def open_timestep_distribution(self):
         PySide6TimestepDistributionWindowView(self, TimestepDistributionWindowController(self.controller.config), self.ui_state).exec()
