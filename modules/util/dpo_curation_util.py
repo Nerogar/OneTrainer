@@ -464,6 +464,10 @@ def export_single_pair(
 
     pair_id = _next_pair_id(manifest)
     safe_name = f"pair_{pair_id:04d}"
+    # UNCONDITIONAL is an internal grouping sentinel, not a real caption — leave
+    # the promptless side without a .txt sidecar so the trainer treats it as
+    # genuinely unconditional rather than captioning it with the literal word.
+    is_unconditional = prompt == UNCONDITIONAL_PROMPT
     caption = strip_angle_bracket_segments(prompt)
 
     chosen_ext = os.path.splitext(chosen_path)[1].lower()
@@ -485,8 +489,9 @@ def export_single_pair(
     _copy_image(chosen_path, os.path.join(chosen_dir, safe_name + chosen_ext))
     _copy_image(rejected_path, os.path.join(rejected_dir, safe_name + rejected_ext))
     # Single-concept pattern pairing reads the caption from the chosen side only.
-    with open(os.path.join(chosen_dir, safe_name + ".txt"), "w", encoding="utf-8") as f:
-        f.write(caption)
+    if not is_unconditional:
+        with open(os.path.join(chosen_dir, safe_name + ".txt"), "w", encoding="utf-8") as f:
+            f.write(caption)
 
     manifest.setdefault("pairs", []).append(
         {
@@ -663,6 +668,10 @@ def export_curated_pairs(
 
     for group_idx, pairs in results.items():
         group = groups[group_idx]
+        # UNCONDITIONAL is an internal grouping sentinel, not a real caption —
+        # skip the .txt sidecar entirely so these pairs train unconditionally
+        # instead of being captioned with the literal word.
+        is_unconditional = group["prompt"] == UNCONDITIONAL_PROMPT
         caption = strip_angle_bracket_segments(group["prompt"])
         is_val = group_idx in val_groups
 
@@ -677,8 +686,9 @@ def export_curated_pairs(
             rejected_ext = os.path.splitext(pair["rejected"])[1].lower()
             _copy_image(pair["chosen"], os.path.join(chosen_dir, safe_name + chosen_ext))
             _copy_image(pair["rejected"], os.path.join(rejected_dir, safe_name + rejected_ext))
-            with open(os.path.join(chosen_dir, safe_name + ".txt"), "w", encoding="utf-8") as f:
-                f.write(caption)
+            if not is_unconditional:
+                with open(os.path.join(chosen_dir, safe_name + ".txt"), "w", encoding="utf-8") as f:
+                    f.write(caption)
 
         if is_val:
             val_count += len(pairs)
@@ -824,6 +834,9 @@ def find_caption_mismatches(concept_pairs: list[tuple[str, str]]) -> list[dict]:
     Compares with .rstrip('\\n') on both sides so a trailing-newline difference
     does not register as a mismatch (use fix_multiline_captions for that).
     A missing sidecar on one side counts as a mismatch with caption == ''.
+    A pair with no sidecar on either side is a genuinely unconditional pair and
+    does NOT register as a mismatch — otherwise "correct to chosen" would write
+    empty .txt files back onto pairs the exporter intentionally left uncaptioned.
     """
     exts = supported_image_extensions()
     mismatches: list[dict] = []
@@ -853,7 +866,8 @@ def find_caption_mismatches(concept_pairs: list[tuple[str, str]]) -> list[dict]:
             rejected_txt, rejected_caption = _read_caption(rejected_image)
             captions_match = chosen_caption.rstrip("\n") == rejected_caption.rstrip("\n")
             both_present = chosen_txt is not None and rejected_txt is not None
-            if captions_match and both_present:
+            both_absent = chosen_txt is None and rejected_txt is None
+            if captions_match and (both_present or both_absent):
                 continue
             mismatches.append(
                 {
