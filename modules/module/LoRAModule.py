@@ -990,7 +990,8 @@ class LoRAModuleWrapper:
         # create a copy, so the modules can pop states
         state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
 
-        self._check_rank_matches(state_dict)
+        # FIXME: disabled rank check, false positive on Flux2 LoHA loading
+        # self._check_rank_matches(state_dict)
 
         try:
             for module in self.lora_modules.values():

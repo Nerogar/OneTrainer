@@ -24,6 +24,7 @@
         "layer_filter_preset": "blocks"
     },
     "timestep_distribution": "LOGIT_NORMAL",
+    "dynamic_timestep_shifting": true,
     "dataloader_threads": 1,
     "gradient_checkpointing": "CPU_OFFLOADED",
     "layer_offload_fraction": 0.6,

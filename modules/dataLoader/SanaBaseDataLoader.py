@@ -23,6 +23,7 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.SANA)
 class SanaBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -164,5 +165,3 @@ class SanaBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=32,
         )
-
-factory.register(BaseDataLoader, SanaBaseDataLoader, ModelType.SANA)

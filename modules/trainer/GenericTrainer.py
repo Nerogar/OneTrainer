@@ -120,10 +120,7 @@ class GenericTrainer(BaseTrainer):
         if self.config.secrets.huggingface_token != "":
             self.callbacks.on_update_status("logging into Hugging Face")
             with contextlib.suppress(ConnectionError):
-                huggingface_hub.login(
-                    token = self.config.secrets.huggingface_token,
-                    new_session = False,
-                )
+                huggingface_hub.login(token=self.config.secrets.huggingface_token)
 
         self.callbacks.on_update_status("loading the model")
 
@@ -682,6 +679,7 @@ class GenericTrainer(BaseTrainer):
                             tensor.grad = None
 
                     def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
+                        init_compile()  # workaround for https://github.com/pytorch/pytorch/issues/186537
                         if self.__is_update_step(self.model.train_progress):
                             if fused_reduce:
                                 multi.reduce_grads_mean(
