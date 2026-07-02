@@ -1,4 +1,3 @@
-import functools
 from collections.abc import Mapping
 from typing import Any
 
@@ -79,29 +78,62 @@ class FusedModuleGroup:
         self.module.is_applied = True
         self.prefix = self.module.prefix
 
+        # cumulative offsets: leaf i's share of the fused module's output ends at slices[i] and starts
+        # at slices[i-1] (or 0 for leaf 0).
         offsets = []
-        start = 0
+        total = 0
         for leaf in leaves:
-            offsets.append((start, start + leaf.out_features))
-            start += leaf.out_features
+            total += leaf.out_features
+            offsets.append(total)
         self.slices = offsets
 
         self.is_applied = False
 
-    def _leaf_forward(self, leaf_index: int, x, *args, **kwargs):
-        # Each split leaf returns its slice of the single fused module's output. This is stateless on
-        # purpose: an earlier version cached the fused forward across the group's leaves, but mutating
-        # instance state inside the forward breaks under torch.compile + activation checkpointing
-        # ("HOP: Unsafe side effect"). The fused forward (split base + one adapter) is therefore
-        # recomputed once per leaf -- correct and compile-safe, at the cost of recomputing the qkv base
-        # projection per leaf (only on the ORIGINAL/COMFY fused path; the split formats are unaffected).
-        start, end = self.slices[leaf_index]
-        return self.module.forward(x)[..., start:end]
+    # self.module.forward(x) recomputes the full fused base (all N leaves) on every one of the N leaf
+    # calls -- N times, so N^2 real base compute for a group of N. When the peft type exposes
+    # delta_forward (its own contribution only, without touching the base -- see PeftBase.delta_forward),
+    # add it to this leaf's real, unfused base instead, restoring N real base computes. Peft types that
+    # recompose the base weight itself (delta_forward returns None) keep going through the slower,
+    # generic self.module.forward(x) path.
+    def _leaf_output(self, leaf_index: int, start: int, end: int, x, *args, **kwargs):
+        delta = self.module.delta_forward(x, *args, **kwargs)
+        if delta is None:
+            return self.module.forward(x)[..., start:end]
+        return self.synthetic._leaf_forwards[leaf_index](x) + delta[..., start:end]
+
+    # One fixed method per leaf slot (not a functools.partial built at hook time) so leaf.forward is
+    # always the same function object -- torch.compile guards on that identity and would otherwise
+    # recompile on every hook/unhook cycle. Capped at 4 leaves (Flux/Chroma/HunyuanVideo qkv+mlp).
+    # Stateless on purpose: caching across leaves broke torch.compile + activation checkpointing.
+    def _leaf_forward_0(self, x, *args, **kwargs):
+        return self._leaf_output(0, 0, self.slices[0], x, *args, **kwargs)
+
+    def _leaf_forward_1(self, x, *args, **kwargs):
+        return self._leaf_output(1, self.slices[0], self.slices[1], x, *args, **kwargs)
+
+    def _leaf_forward_2(self, x, *args, **kwargs):
+        return self._leaf_output(2, self.slices[1], self.slices[2], x, *args, **kwargs)
+
+    def _leaf_forward_3(self, x, *args, **kwargs):
+        return self._leaf_output(3, self.slices[2], self.slices[3], x, *args, **kwargs)
+
+    def _leaf_forward_for_index(self, leaf_index: int):
+        match leaf_index:
+            case 0:
+                return self._leaf_forward_0
+            case 1:
+                return self._leaf_forward_1
+            case 2:
+                return self._leaf_forward_2
+            case 3:
+                return self._leaf_forward_3
+            case _:
+                raise ValueError(f"FusedModuleGroup supports at most 4 leaves, got leaf_index {leaf_index}")
 
     def hook_to_module(self):
         if not self.is_applied:
             for leaf_index, leaf in enumerate(self.leaves):
-                leaf.forward = functools.partial(self._leaf_forward, leaf_index)
+                leaf.forward = self._leaf_forward_for_index(leaf_index)
             self.is_applied = True
 
     def remove_hook_from_module(self):
