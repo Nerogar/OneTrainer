@@ -38,7 +38,7 @@ class BaseFluxSetup(
     metaclass=ABCMeta
 ):
     LAYER_PRESETS = {
-        "attn-mlp": ["attn", "ff.net"],
+        "attn-mlp": ["attn", "ff.net", "proj_mlp"],
         "attn-only": ["attn"],
         "blocks": ["transformer_block"],
         "full": [],
@@ -49,14 +49,11 @@ class BaseFluxSetup(
             model: FluxModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_flux_transformer(model.transformer, config)
-            if model.text_encoder_1 is not None:
-                enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config)
-            if model.text_encoder_2 is not None:
-                model.text_encoder_2_offload_conductor = \
-                    enable_checkpointing_for_t5_encoder_layers(model.text_encoder_2, config)
+        model.transformer_offload_conductor = enable_checkpointing_for_flux_transformer(model.transformer, config, config.transformer)
+        if model.text_encoder_1 is not None:
+            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config, config.text_encoder)
+        if model.text_encoder_2 is not None:
+            model.text_encoder_2_offload_conductor = enable_checkpointing_for_t5_encoder_layers(model.text_encoder_2, config, config.text_encoder_2)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,

@@ -15,8 +15,9 @@ class BaseSampleFrameView:
             self.components.entry(top_frame, 0, 1, ui_state, "prompt")
 
             # negative prompt
-            self.components.label(top_frame, 1, 0, "negative prompt:")
-            self.components.entry(top_frame, 1, 1, ui_state, "negative_prompt")
+            if controller.supports_negative_prompt():
+                self.components.label(top_frame, 1, 0, "negative prompt:")
+                self.components.entry(top_frame, 1, 1, ui_state, "negative_prompt")
 
         if include_settings:
             # width
