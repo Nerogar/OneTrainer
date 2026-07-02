@@ -4,6 +4,7 @@
     "learning_rate": 1e-6,
     "model_type": "FLUX_2",
     "resolution": "512",
+    "output_model_format": "ORIGINAL_TRANSFORMER",
     "compile": true,
     "transformer": {
         "train": true,

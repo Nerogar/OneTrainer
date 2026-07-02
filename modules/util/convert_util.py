@@ -80,13 +80,15 @@ def _convert_item(in_key: str, input: dict, conversions: list[ConversionPattern]
     return [in_key], None
 
 def _is_conversion_pattern_list(conversions: list):
-    return all(isinstance(entry, ConversionPattern) for entry in conversions)
+    return isinstance(conversions, list) and all(isinstance(entry, ConversionPattern) for entry in conversions)
 
 def _is_tuple_list(input: list):
     return isinstance(input, list) and all(isinstance(entry, tuple) for entry in input)
 
 def _create_conversions_list(conversion_input: list):
-    if _is_tuple_list(conversion_input):
+    # a single conversion is a flat list of tuples OR of ConversionPatterns; both are wrapped into the
+    # one-pass form. A list of such lists is the multi-pass (chained) form and is left as-is.
+    if _is_tuple_list(conversion_input) or _is_conversion_pattern_list(conversion_input):
         conversion_input = [conversion_input]
     output = []
     for entry in conversion_input:
@@ -103,13 +105,19 @@ def convert(input_orig: dict, conversion_input: list[ConversionPattern] | list, 
     conversions_list = _create_conversions_list(conversion_input)
 
     input = input_orig.copy()
-    for conversions in conversions_list:
+    for pass_index, conversions in enumerate(conversions_list):
+        # strict completeness is enforced on the final pass only. Intermediate passes of a multi-pass
+        # chain are partial by design (they transform a subset and pass everything else through to the
+        # next pass), so they cannot match every key. A key an early pass forgot to handle still reaches
+        # the final pass, which has no rule for it and raises -- the "forgot a key" guarantee is preserved,
+        # just deferred to the end of the chain. Single-pass conversions are unaffected (pass is the last).
+        pass_strict = strict and pass_index == len(conversions_list) - 1
         output = {}
         while len(input) > 0:
             in_key = next(iter(input))
             input_keys, output_items = _convert_item(in_key, input, conversions, in_separator=in_separator, out_separator=out_separator)
             if output_items is None:
-                if strict:
+                if pass_strict:
                     raise RuntimeError("No conversion found for key " + in_key)
                 if in_key in output and not output[in_key].equal(input[in_key]):
                     raise RuntimeError(f"key {in_key} was generated twice during conversion and is not equal")
@@ -141,8 +149,49 @@ def reverse_conversion_pattern(input: ConversionPattern):
         children=reverse_conversion(input.children),
     )
 
-def reverse_conversion(input: list[ConversionPattern]):
+def reverse_conversion(input: list[ConversionPattern] | list[tuple] | None):
+    # accept the tuple-list form the savers hold (e.g. [("unet", "unet", body)]) as well as a
+    # ConversionPattern list, so a forward save conversion can be reversed for the load side directly.
+    # children is None for a leaf pattern (no nested body) -- pass it through unchanged.
+    if input is None:
+        return None
+    if input and all(isinstance(entry, list) for entry in input):
+        # multi-pass form (a list of passes): reverse the pass order and reverse each pass, so a chained
+        # forward "do A then B" inverts to "undo B then undo A". The forward direction is already run pass
+        # by pass by convert(); this is its mirror.
+        return [reverse_conversion(pass_) for pass_ in reversed(input)]
+    if _is_tuple_list(input):
+        input = _create_conversion_from_tuple_list(input)
     return [reverse_conversion_pattern(entry) for entry in input]
+
+
+def _split_body_passes(body: list | None) -> list:
+    # normalize a conversion body to a list of single passes: None/empty -> [], a flat tuple-list -> one
+    # pass, an already multi-pass list-of-lists -> itself.
+    if not body:
+        return []
+    if all(isinstance(entry, tuple) for entry in body):
+        return [body]
+    return list(body)
+
+
+def component_body_conversion(component: str, top: str, body: list | None, extra: list | tuple = ()):
+    # Build a conversion that renames the `component.` prefix to `top.` while applying `body` (the
+    # canonical->native rename) to the component-relative names, plus `extra` sibling rules (text-encoder
+    # prefix renames, bundle_emb passthrough). Used forward by the savers and, reversed, by the loaders.
+    #
+    # A single-pass (or empty) body is one nested rule (component, top, body) alongside `extra` -- the
+    # long-standing form, returned unchanged. A MULTI-pass body cannot be a single nested child (convert
+    # children are single-pass only), so it is emitted as chained passes: each intermediate pass applies one
+    # sub-pass under the unchanged component prefix while the extra/sibling keys pass through, and the final
+    # pass applies the last sub-pass under `top` and carries `extra`.
+    extra = list(extra)
+    passes = _split_body_passes(body)
+    if len(passes) <= 1:
+        head = (component, top, passes[0]) if passes else (component, top)
+        return [head, *extra]
+    intermediate = [[(component, component, p)] for p in passes[:-1]]
+    return [*intermediate, [(component, top, passes[-1]), *extra]]
 
 def _create_pattern_list(input: str | list[str]):
     pattern = input
@@ -187,8 +236,28 @@ def _create_conversion_from_tuple_list(input: list):
 def fuse_qkv(q, k, v):
     return torch.cat([q, k, v], dim=0)
 
+def fuse_kv(k, v):
+    return torch.cat([k, v], dim=0)
+
 def fuse_qkv_mlp(q, k, v, mlp):
     return torch.cat([q, k, v, mlp], dim=0)
+
+def fuse_split(*tensors):
+    # concatenate N split projections along the output dim into one fused tensor -- the generic, arity-
+    # agnostic form of fuse_qkv / fuse_kv / fuse_qkv_mlp, used by the full-model fusion pre-stage (forward
+    # only, so no reverse is needed).
+    return torch.cat(tensors, dim=0)
+
+def qkv_fusion(fusion_groups: list) -> list:
+    # Full-model checkpoint pre-stage, identical across every fusing model: fuse each group's split leaves
+    # into its fused diffusers name in the diffusers namespace, so the shared diffusers->original body can
+    # then rename that fused name. Groups are bucketed by block pattern, since a model may fuse in more than
+    # one block type (e.g. Flux's double + single blocks). The original suffix is unused here -- the body
+    # owns the rename; this stage only collapses the split leaves into the fused name.
+    by_block = {}
+    for block, leaves, fused, _original in fusion_groups:
+        by_block.setdefault(block, []).append((list(leaves), fused, fuse_split))
+    return [(block, block, rules) for block, rules in by_block.items()]
 
 
 def remove_prefix(prefix: str | None = None, separator: str='.'):
@@ -198,6 +267,30 @@ def remove_prefix(prefix: str | None = None, separator: str='.'):
 
 def add_prefix(prefix: str, separator: str='.'):
     return [("{}", prefix + separator + "{}")]
+
+def lora_fold_alpha(b, alpha):
+    # Fold the alpha/rank scale into lora_B and drop the alpha. b is [out, rank].
+    return b * (alpha / b.shape[1])
+
+def dora_scale_to_peft_magnitude(dora_scale):
+    # OneTrainer's per-output dora_scale -> peft's lora_magnitude_vector.weight layout: a 1-D [out]
+    # vector for Linear ([out, 1] -> [out]), and [1, out, 1, 1] for Conv2d ([out, 1, 1, 1] -> [1, out, 1, 1]).
+    # Only the per-output magnitude (dora_on_output=True) is peft-compatible; the per-input default is
+    # the wrong axis/shape and is filtered out by the caller before this conversion runs.
+    out_channels = dora_scale.shape[0]
+    if dora_scale.dim() == 2:
+        return dora_scale.reshape(out_channels)
+    return dora_scale.reshape(1, out_channels, *([1] * (dora_scale.dim() - 2)))
+
+def peft_magnitude_to_dora_scale(magnitude):
+    # Inverse of dora_scale_to_peft_magnitude: peft's per-output lora_magnitude_vector.weight ->
+    # OneTrainer's per-output dora_scale. Linear [out] -> [out, 1]; Conv2d [1, out, 1, 1] -> [out, 1, 1, 1].
+    # peft DoRA is always per-output, so the loaded value lands in OneTrainer's per-output layout (a model
+    # configured for that axis, dora_on_output=True, then loads it without a shape mismatch).
+    if magnitude.dim() == 1:
+        return magnitude.reshape(magnitude.shape[0], 1)
+    out_channels = magnitude.shape[1]
+    return magnitude.reshape(out_channels, *([1] * (magnitude.dim() - 1)))
 
 def lora_fuse_qkv(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha):
     dim, rank = q_up.shape
@@ -251,6 +344,22 @@ def swap_chunks(input: torch.Tensor, dim: int=0) -> torch.Tensor:
     chunks = input.chunk(2, dim=dim)
     return torch.cat([chunks[1], chunks[0]], dim=dim)
 
+def chunk_swap(diffusers: str, original: str):
+    # Conversion rules that swap the two output-dim chunks of a layer whose chunk order differs between
+    # the diffusers and original namespaces (e.g. an adaLN modulation projection). Handles both a full
+    # weight and a LoRA adapter from one definition: the swapped output dim lives in .weight/.bias for a
+    # full tensor and in .lora_up.weight for a LoRA, so those are swapped; .lora_down.weight/.alpha (and
+    # any other suffix) carry no output dim and rename unchanged via the trailing catch-all. In a given
+    # conversion only one of the two shapes is present, so the unused rules never fire. A convert_fn can't
+    # see the key, so the swap-vs-rename split has to be by suffix. swap_chunks is its own inverse, so
+    # these reverse for free.
+    return [
+        (diffusers + ".weight",         original + ".weight",         swap_chunks, swap_chunks),
+        (diffusers + ".bias",           original + ".bias",           swap_chunks, swap_chunks),
+        (diffusers + ".lora_up.weight", original + ".lora_up.weight", swap_chunks, swap_chunks),
+        (diffusers, original),
+    ]
+
 def lora_qkv_fusion(q: str, k: str, v: str, qkv: str):
     return [
         ([f"{q}.lora_up.weight", f"{q}.lora_down.weight", f"{q}.alpha",
@@ -283,9 +392,11 @@ def lora_qkv_mlp_fusion(q: str, k: str, v: str, mlp: str, qkv_mlp: str, separato
         ),
     ]
 
-def qkv_fusion(q: str, k: str, v: str, qkv: str, separator: str='.'):
+def kv_fusion(k: str, v: str, kv: str, separator: str='.'):
+    # two-input fuse of a split k/v into one kv tensor (PixArt cross-attention: attn2.to_k/to_v ->
+    # cross_attn.kv_linear). The query stays separate, so this is not a qkv fuse.
     return [
-        ([q, k, v], qkv, fuse_qkv)
+        ([k, v], kv, fuse_kv)
     ]
 
 def qkv_mlp_fusion(q: str, k: str, v: str, mlp: str, qkv: str, separator: str='.'):

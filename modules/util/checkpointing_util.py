@@ -23,6 +23,7 @@ from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from transformers.models.mistral.modeling_mistral import MistralDecoderLayer
 from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import Qwen2_5_VLDecoderLayer
 from transformers.models.qwen3.modeling_qwen3 import Qwen3DecoderLayer
+from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLTextDecoderLayer
 from transformers.models.t5.modeling_t5 import T5Block
 
 init_compile()
@@ -406,4 +407,24 @@ def enable_checkpointing_for_ernie_transformer(
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, config.compile, [
         (model.layers, ["x"]),
+    ])
+
+def enable_checkpointing_for_krea2_transformer(
+        model: nn.Module,
+        config: TrainConfig,
+) -> LayerOffloadConductor:
+    # Krea2TransformerBlock takes (hidden_states, temb, image_rotary_emb, attention_mask);
+    # only hidden_states is threaded between blocks.
+    return enable_checkpointing(model, config, config.compile, [
+        (model.text_fusion.layerwise_blocks, ["hidden_states"]),
+        (model.text_fusion.refiner_blocks,   ["hidden_states"]),
+        (model.transformer_blocks,           ["hidden_states"]),
+    ])
+
+def enable_checkpointing_for_qwen3vl_encoder_layers(
+        model: nn.Module,
+        config: TrainConfig,
+) -> LayerOffloadConductor:
+    return enable_checkpointing(model, config, False, [
+        (Qwen3VLTextDecoderLayer, []),
     ])

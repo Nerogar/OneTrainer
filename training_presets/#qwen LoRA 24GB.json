@@ -3,6 +3,7 @@
     "batch_size": 2,
     "learning_rate": 0.0003,
     "model_type": "QWEN",
+    "output_model_format": "DIFFUSERS_LORA",
     "resolution": "512",
     "gradient_checkpointing": "CPU_OFFLOADED",
     "layer_offload_fraction": 0.1,

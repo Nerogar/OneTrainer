@@ -18,6 +18,9 @@ torch_version = packaging.version.parse(torch.__version__)
 def state_dict_has_prefix(state_dict: dict | None, prefix: str):
     if not state_dict:
         return False
+    # Match on a dot-delimited segment boundary so "text_encoder" does not also match
+    # "text_encoder_2". Callers pass the bare prefix; the trailing dot is added here.
+    prefix = prefix + '.'
     return any(k.startswith(prefix) for k in state_dict)
 
 def get_tensor_data(
