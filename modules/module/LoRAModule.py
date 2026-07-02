@@ -106,6 +106,15 @@ class PeftBase(nn.Module):
         assert self.orig_module is not None
         assert self.op is not None
 
+    def delta_forward(self, x, *args, **kwargs) -> Tensor | None:
+        # Returns just this adapter's own contribution (the term added to orig_forward(x)), for peft
+        # types whose forward is expressible as orig_forward(x) + delta with delta computable without
+        # touching the (possibly fused) base. Lets FusedModuleGroup add each leaf's real, unfused base
+        # once instead of recomputing the whole fused forward per leaf. Returns None (the default) for
+        # peft types that recompose the base weight itself (DoRA, OFT, LoKr-decompose), which must keep
+        # going through the fused forward.
+        return None
+
     @property
     def orig_module(self) -> nn.Module:
         assert self._orig_module is not None
@@ -265,7 +274,10 @@ class LoHaModule(PeftBase):
         assert self.hada_w2_b is not None
 
     def forward(self, x, *args, **kwargs):
-        # They definitely exist at this point in the execution.
+        self.check_initialized()
+        return self.orig_forward(x) + self.delta_forward(x, *args, **kwargs)
+
+    def delta_forward(self, x, *args, **kwargs) -> Tensor | None:
         self.check_initialized()
 
         # Yeah, yeah, it's different from the A/B parameters in make_weight.
@@ -275,7 +287,7 @@ class LoHaModule(PeftBase):
         W2 = self.make_weight(self.dropout(self.hada_w2_b),
                               self.dropout(self.hada_w2_a))
         W = (W1 * W2) * (self.alpha / self.rank)
-        return self.orig_forward(x) + self.op(x, W, bias=None, **self.layer_kwargs)
+        return self.op(x, W, bias=None, **self.layer_kwargs)
 
     def apply_to_module(self):
         # TODO
@@ -561,8 +573,12 @@ class LoRAModule(PeftBase):
         if isinstance(self.orig_module, BaseLinearSVD):
             return self.orig_module.forward_with_lora(x, self.lora_down, self.lora_up, self.dropout, self.alpha)
 
+        return self.orig_forward(x) + self.delta_forward(x, *args, **kwargs)
+
+    def delta_forward(self, x, *args, **kwargs) -> Tensor | None:
+        self.check_initialized()
         ld = self.lora_up(self.dropout(self.lora_down(x)))
-        return self.orig_forward(x) + ld * (self.alpha / self.rank)
+        return ld * (self.alpha / self.rank)
 
     def apply_to_module(self):
         # TODO
