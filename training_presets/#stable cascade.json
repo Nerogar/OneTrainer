@@ -50,7 +50,7 @@
     },
     "output_dtype": "BFLOAT_16",
     "output_model_destination": "models/model",
-    "output_model_format": "SAFETENSORS",
+    "output_model_format": "LEGACY_SAFETENSORS",
     "resolution": "1024",
     "training_method": "FINE_TUNE",
     "loss_weight_fn": "P2",

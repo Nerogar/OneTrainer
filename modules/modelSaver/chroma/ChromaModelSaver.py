@@ -3,7 +3,7 @@ from pathlib import Path
 
 from modules.model.ChromaModel import ChromaModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
-from modules.util.convert.convert_chroma_diffusers_to_ckpt import convert_chroma_diffusers_to_ckpt
+from modules.util.convert_util import convert
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
@@ -62,9 +62,9 @@ class ChromaModelSaver(
             destination: str,
             dtype: torch.dtype | None,
     ):
-        state_dict = convert_chroma_diffusers_to_ckpt(
-            model.transformer.state_dict(),
-        )
+        # Chroma is transformer-only; the diffusers -> original/native key map (incl. qkv / qkv-mlp
+        # full-weight fusion) comes from the model and is shared with the LoRA converter.
+        state_dict = convert(model.transformer.state_dict(), model.checkpoint_diffusers_to_original())
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
         self._convert_state_dict_to_contiguous(save_state_dict)
 
@@ -89,7 +89,9 @@ class ChromaModelSaver(
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 self.__save_diffusers(model, output_model_destination, dtype)
-            case ModelFormat.SAFETENSORS:
+            case ModelFormat.LEGACY_SAFETENSORS | ModelFormat.ORIGINAL_TRANSFORMER:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)
+            case _:
+                raise NotImplementedError(f"Unsupported output format: {output_model_format}")

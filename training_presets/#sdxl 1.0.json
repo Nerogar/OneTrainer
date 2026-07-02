@@ -2,7 +2,7 @@
     "base_model_name": "stabilityai/stable-diffusion-xl-base-1.0",
     "model_type": "STABLE_DIFFUSION_XL_10_BASE",
     "output_model_destination": "models/model.safetensors",
-    "output_model_format": "SAFETENSORS",
+    "output_model_format": "ORIGINAL_SINGLE_FILE",
     "resolution": "1024",
     "training_method": "FINE_TUNE",
     "vae": {

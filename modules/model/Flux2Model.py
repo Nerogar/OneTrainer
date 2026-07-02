@@ -4,7 +4,7 @@ from random import Random
 
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.convert_util import qkv_fusion, swap_chunks
+from modules.util.convert_util import chunk_swap
 from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
@@ -31,47 +31,6 @@ def qwen3_format_input(text: str):
         {"role": "user", "content": text},
     ]
 
-
-def diffusers_to_original(qkv_fusion):
-    return [
-        ("context_embedder", "txt_in"),
-        ("x_embedder",       "img_in"),
-        ("time_guidance_embed.timestep_embedder", "time_in", [
-            ("linear_1", "in_layer"),
-            ("linear_2", "out_layer"),
-        ]),
-        ("time_guidance_embed.guidance_embedder", "guidance_in", [
-            ("linear_1", "in_layer"),
-            ("linear_2", "out_layer"),
-        ]),
-        ("double_stream_modulation_img.linear", "double_stream_modulation_img.lin"),
-        ("double_stream_modulation_txt.linear", "double_stream_modulation_txt.lin"),
-        ("single_stream_modulation.linear",     "single_stream_modulation.lin"),
-        ("proj_out",                            "final_layer.linear"),
-        ("norm_out.linear", "final_layer.adaLN_modulation.1", swap_chunks, swap_chunks),
-        ("transformer_blocks.{i}", "double_blocks.{i}",
-            qkv_fusion("attn.to_q", "attn.to_k", "attn.to_v", "img_attn.qkv") + \
-            qkv_fusion("attn.add_q_proj", "attn.add_k_proj", "attn.add_v_proj", "txt_attn.qkv") + [
-            ("attn.norm_k.weight",       "img_attn.norm.key_norm.scale"),
-            ("attn.norm_q.weight",       "img_attn.norm.query_norm.scale"),
-            ("attn.to_out.0",            "img_attn.proj"),
-            ("ff.linear_in",             "img_mlp.0"),
-            ("ff.linear_out",            "img_mlp.2"),
-            ("attn.norm_added_k.weight", "txt_attn.norm.key_norm.scale"),
-            ("attn.norm_added_q.weight", "txt_attn.norm.query_norm.scale"),
-            ("attn.to_add_out",          "txt_attn.proj"),
-            ("ff_context.linear_in",     "txt_mlp.0"),
-            ("ff_context.linear_out",    "txt_mlp.2"),
-        ]),
-        ("single_transformer_blocks.{i}", "single_blocks.{i}", [
-            ("attn.to_qkv_mlp_proj", "linear1"),
-            ("attn.to_out",          "linear2"),
-            ("attn.norm_k.weight",   "norm.key_norm.scale"),
-            ("attn.norm_q.weight",   "norm.query_norm.scale"),
-        ]),
-    ]
-
-diffusers_checkpoint_to_original = diffusers_to_original(qkv_fusion)
 
 class Flux2Model(BaseModel):
     # base model data
@@ -116,6 +75,56 @@ class Flux2Model(BaseModel):
         return [a for a in [
             self.transformer_lora,
         ] if a is not None]
+
+    def fusion_groups(self) -> list | None:
+        # Only the two double-block qkv groups -- Flux2's single block is the already-fused attn.to_qkv_mlp_proj.
+        # NOTE: the fused suffix (attn.qkv / attn.added_qkv) is OneTrainer's name for the fused module on the
+        # canonical (diffusers) side; diffusers itself stores qkv split.
+        return [
+            ("transformer_blocks.{i}", ["attn.to_q", "attn.to_k", "attn.to_v"], "attn.qkv", "img_attn.qkv"),
+            ("transformer_blocks.{i}", ["attn.add_q_proj", "attn.add_k_proj", "attn.add_v_proj"], "attn.added_qkv", "txt_attn.qkv"),
+        ]
+
+    def diffusers_to_original(self) -> list | None:
+        # chunk_swap on norm_out.linear (final-layer adaLN): diffusers and original store its two modulation
+        # chunks in opposite order.
+        return [
+            ("context_embedder", "txt_in"),
+            ("x_embedder",       "img_in"),
+            ("time_guidance_embed.timestep_embedder", "time_in", [
+                ("linear_1", "in_layer"),
+                ("linear_2", "out_layer"),
+            ]),
+            ("time_guidance_embed.guidance_embedder", "guidance_in", [
+                ("linear_1", "in_layer"),
+                ("linear_2", "out_layer"),
+            ]),
+            ("double_stream_modulation_img.linear", "double_stream_modulation_img.lin"),
+            ("double_stream_modulation_txt.linear", "double_stream_modulation_txt.lin"),
+            ("single_stream_modulation.linear",     "single_stream_modulation.lin"),
+            ("proj_out",                            "final_layer.linear"),
+            *chunk_swap("norm_out.linear", "final_layer.adaLN_modulation.1"),
+            ("transformer_blocks.{i}", "double_blocks.{i}", [
+                ("attn.qkv",                 "img_attn.qkv"),
+                ("attn.added_qkv",           "txt_attn.qkv"),
+                ("attn.norm_k.weight",       "img_attn.norm.key_norm.scale"),
+                ("attn.norm_q.weight",       "img_attn.norm.query_norm.scale"),
+                ("attn.to_out.0",            "img_attn.proj"),
+                ("ff.linear_in",             "img_mlp.0"),
+                ("ff.linear_out",            "img_mlp.2"),
+                ("attn.norm_added_k.weight", "txt_attn.norm.key_norm.scale"),
+                ("attn.norm_added_q.weight", "txt_attn.norm.query_norm.scale"),
+                ("attn.to_add_out",          "txt_attn.proj"),
+                ("ff_context.linear_in",     "txt_mlp.0"),
+                ("ff_context.linear_out",    "txt_mlp.2"),
+            ]),
+            ("single_transformer_blocks.{i}", "single_blocks.{i}", [
+                ("attn.to_qkv_mlp_proj", "linear1"),
+                ("attn.to_out",          "linear2"),
+                ("attn.norm_k.weight",   "norm.key_norm.scale"),
+                ("attn.norm_q.weight",   "norm.query_norm.scale"),
+            ]),
+        ]
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)

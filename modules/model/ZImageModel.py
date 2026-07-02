@@ -4,6 +4,7 @@ from random import Random
 
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util.convert_util import fuse_qkv
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
@@ -77,6 +78,24 @@ class ZImageModel(BaseModel):
         return [a for a in [
             self.transformer_lora,
         ] if a is not None]
+
+    def checkpoint_diffusers_to_comfy(self) -> list | None:
+        # Full-model COMFY_TRANSFORMER conversion: Z-Image is the one model whose Comfy checkpoint layout
+        # diverges from diffusers/original (ComfyUI #12303). Only these keys change -- everything else passes
+        # through unchanged (run with strict=False). Mirrors Comfy's published z_image_convert_original_to_comfy.py
+        # (and inverts comfy/utils.py:z_image_to_diffusers): fuse q/k/v -> qkv, rename the attention norms
+        # norm_q/norm_k -> q_norm/k_norm and to_out.0 -> out, and drop the all_*.2-1 ModuleDict prefix on the
+        # patch embedder / final layer. {p} matches any attention block (layers / context_refiner / noise_refiner).
+        # Full-model only -- Z-Image's LoRA/ORIGINAL/KOHYA stay split (Comfy fuses + swaps LoRAs at load), so there
+        # is no fusion_groups()/diffusers_to_original(). Attention is bias-free, so qkv/out are weight-only.
+        return [
+            ("all_x_embedder.2-1", "x_embedder"),
+            ("all_final_layer.2-1", "final_layer"),
+            (["{p}.attention.to_q", "{p}.attention.to_k", "{p}.attention.to_v"], "{p}.attention.qkv", fuse_qkv),
+            ("{p}.attention.norm_q.weight", "{p}.attention.q_norm.weight"),
+            ("{p}.attention.norm_k.weight", "{p}.attention.k_norm.weight"),
+            ("{p}.attention.to_out.0", "{p}.attention.out"),
+        ]
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
