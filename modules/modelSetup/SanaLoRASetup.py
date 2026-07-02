@@ -70,8 +70,6 @@ class SanaLoRASetup(
         if config.train_any_embedding():
             model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        # Migrated to the canonical text_encoder / transformer prefixes (was lora_te / lora_transformer).
-        # No fusion: Sana ships as diffusers, original == diffusers, split everywhere.
         create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
         model.text_encoder_lora = LoRAModuleWrapper(
             model.text_encoder, "text_encoder", config

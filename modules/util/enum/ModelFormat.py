@@ -9,15 +9,14 @@ class ModelFormat(Enum):
     COMFY_TRANSFORMER = 'COMFY_TRANSFORMER'  # ORIGINAL_TRANSFORMER + per-model Comfy key quirks (Z-Image: qkv-fuse + norm swap)
     LEGACY_SAFETENSORS = 'LEGACY_SAFETENSORS'  # full model: per-model historical safetensors output
 
-    # LoRA -- every value is single-save-type and _LORA-suffixed
     DIFFUSERS_LORA = 'DIFFUSERS_LORA'  # diffusers-PEFT keys (lora_A/lora_B, folded alpha)
     KOHYA_LORA = 'KOHYA_LORA'  # kohya-flat namespace, lora_down/lora_up, kept .alpha
     ORIGINAL_LORA = 'ORIGINAL_LORA'  # original/native namespace, fused qkv
     COMFY_LORA = 'COMFY_LORA'  # original namespace + diffusion_model. transformer prefix
-    LEGACY_LORA = 'LEGACY_LORA'  # per-model historical LoRA output (mostly the mixture format; Cascade native / identity differ)
+    LEGACY_LORA = 'LEGACY_LORA'  # per-model historical LoRA output
 
     # embedding
-    SAFETENSORS = 'SAFETENSORS'  # embedding vectors file
+    SAFETENSORS = 'SAFETENSORS'
 
     INTERNAL = 'INTERNAL'  # an internal format that stores all information to resume training
 
