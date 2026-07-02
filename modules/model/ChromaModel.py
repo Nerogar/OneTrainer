@@ -6,6 +6,7 @@ from modules.model.util.t5_util import encode_t5
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.DataType import DataType
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
@@ -99,6 +100,61 @@ class ChromaModel(BaseModel):
             self.text_encoder_lora,
             self.transformer_lora,
         ] if a is not None]
+
+    def fusion_groups(self) -> list | None:
+        # Chroma is Flux-structured: double blocks fuse img q/k/v and txt q/k/v separately; single blocks
+        # fuse q/k/v + mlp into one linear1.
+        return [
+            ("transformer_blocks.{i}", ["attn.to_q", "attn.to_k", "attn.to_v"], "attn.qkv", "img_attn.qkv"),
+            ("transformer_blocks.{i}", ["attn.add_q_proj", "attn.add_k_proj", "attn.add_v_proj"], "attn.added_qkv", "txt_attn.qkv"),
+            ("single_transformer_blocks.{i}", ["attn.to_q", "attn.to_k", "attn.to_v", "proj_mlp"], "qkv_mlp", "linear1"),
+        ]
+
+    def diffusers_to_original(self) -> list | None:
+        # Chroma differs from Flux: no adaLN modulation (produced by distilled_guidance_layer instead), so no
+        # chunk_swap.
+        return [
+            ("context_embedder", "txt_in"),
+            ("x_embedder", "img_in"),
+            ("proj_out", "final_layer.linear"),
+            ("distilled_guidance_layer.in_proj", "distilled_guidance_layer.in_proj"),
+            ("distilled_guidance_layer.out_proj", "distilled_guidance_layer.out_proj"),
+            ("distilled_guidance_layer.layers.{i}", "distilled_guidance_layer.layers.{i}", [
+                ("linear_1", "in_layer"),
+                ("linear_2", "out_layer"),
+            ]),
+            ("distilled_guidance_layer.norms.{i}.weight", "distilled_guidance_layer.norms.{i}.scale"),
+            ("transformer_blocks.{i}", "double_blocks.{i}", [
+                ("attn.qkv",                 "img_attn.qkv"),
+                ("attn.added_qkv",           "txt_attn.qkv"),
+                ("attn.norm_k.weight",       "img_attn.norm.key_norm.scale"),
+                ("attn.norm_q.weight",       "img_attn.norm.query_norm.scale"),
+                ("attn.to_out.0",            "img_attn.proj"),
+                ("ff.net.0.proj",            "img_mlp.0"),
+                ("ff.net.2",                 "img_mlp.2"),
+                ("attn.norm_added_k.weight", "txt_attn.norm.key_norm.scale"),
+                ("attn.norm_added_q.weight", "txt_attn.norm.query_norm.scale"),
+                ("attn.to_add_out",          "txt_attn.proj"),
+                ("ff_context.net.0.proj",    "txt_mlp.0"),
+                ("ff_context.net.2",         "txt_mlp.2"),
+            ]),
+            ("single_transformer_blocks.{i}", "single_blocks.{i}", [
+                ("qkv_mlp",            "linear1"),
+                ("attn.norm_k.weight", "norm.key_norm.scale"),
+                ("attn.norm_q.weight", "norm.query_norm.scale"),
+                ("proj_out",           "linear2"),
+            ]),
+        ]
+
+    def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
+        # Single T5 text encoder; Comfy loads it via the PixArt path (a single t5xxl).
+        return [
+            (self.text_encoder, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder",
+                ModelFormat.KOHYA_LORA: "lora_te1",
+                ModelFormat.COMFY_LORA: "text_encoders.t5xxl.transformer",
+            }),
+        ]
 
     def all_embeddings(self) -> list[ChromaModelEmbedding]:
         return self.additional_embeddings \

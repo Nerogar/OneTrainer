@@ -7,6 +7,7 @@ from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import (
     rescale_noise_scheduler_to_zero_terminal_snr,
 )
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
 import torch
@@ -22,6 +23,17 @@ from diffusers import (
     UNet2DConditionModel,
 )
 from transformers import CLIPTextModel, CLIPTokenizer, DPTForDepthEstimation, DPTImageProcessor
+
+# diffusers -> original/sgm resnet-block leaf renames (full-weight; the norm leaves carry no LoRA, so
+# those rules are inert on a LoRA state dict). skip_connection only fires when present.
+_RESNET = [
+    ("norm1", "in_layers.0"),
+    ("conv1", "in_layers.2"),
+    ("time_emb_proj", "emb_layers.1"),
+    ("norm2", "out_layers.0"),
+    ("conv2", "out_layers.3"),
+    ("conv_shortcut", "skip_connection"),
+]
 
 
 class StableDiffusionModelEmbedding:
@@ -97,6 +109,69 @@ class StableDiffusionModel(BaseModel):
             self.text_encoder_lora,
             self.unet_lora,
         ] if a is not None]
+
+    def diffusers_to_original(self) -> list | None:
+        # SD1.5/2.x UNet diffusers -> original/sgm key map, convert()-native (bare sgm names, no top prefix).
+        # SD has NO qkv fusion and NO add_embedding, so this is a pure key rename. Spatial-transformer
+        # (attention) blocks have IDENTICAL leaf names in both namespaces -- only the block addressing differs
+        # -- so each is a single 2-tuple rename; only the resnet blocks (_RESNET) need a leaf map. The
+        # diffusers (block, sub-index) -> flat sgm input/output_blocks index is arithmetic 3*i+j(+1) that
+        # parse-substitution can't express, so per-block rules are generated in a loop. SD is a 4-level UNet:
+        # down attentions in blocks 0-2, up attentions in blocks 1-3.
+        rules = [
+            ("conv_in", "input_blocks.0.0"),
+            ("time_embedding.linear_1", "time_embed.0"),
+            ("time_embedding.linear_2", "time_embed.2"),
+            ("conv_norm_out", "out.0"),
+            ("conv_out", "out.2"),
+        ]
+
+        # down blocks: input_blocks index = 3*i + j + 1; attentions in blocks 0,1,2; downsamplers in 0,1,2.
+        for i in range(4):
+            for j in range(2):
+                sgm = 3 * i + j + 1
+                rules.append((f"down_blocks.{i}.resnets.{j}", f"input_blocks.{sgm}.0", _RESNET))
+                if i < 3:
+                    rules.append((f"down_blocks.{i}.attentions.{j}", f"input_blocks.{sgm}.1"))
+            if i < 3:
+                rules.append((f"down_blocks.{i}.downsamplers.0.conv", f"input_blocks.{3 * i + 3}.0.op"))
+
+        # mid block: resnets.{j} -> middle_block.{2*j}, single attention -> middle_block.1.
+        rules.append(("mid_block.resnets.0", "middle_block.0", _RESNET))
+        rules.append(("mid_block.attentions.0", "middle_block.1"))
+        rules.append(("mid_block.resnets.1", "middle_block.2", _RESNET))
+
+        # up blocks: output_blocks index = 3*i + j; attentions in blocks 1,2,3; upsamplers in 0,1,2. Block 0
+        # has no attention so its upsampler is module .1 (after the single resnet); blocks 1,2 have attention
+        # so their upsampler is module .2.
+        for i in range(4):
+            for j in range(3):
+                sgm = 3 * i + j
+                rules.append((f"up_blocks.{i}.resnets.{j}", f"output_blocks.{sgm}.0", _RESNET))
+                if i > 0:
+                    rules.append((f"up_blocks.{i}.attentions.{j}", f"output_blocks.{sgm}.1"))
+            if i < 3:
+                sub = 1 if i == 0 else 2
+                rules.append((f"up_blocks.{i}.upsamplers.0.conv", f"output_blocks.{3 * i + 2}.{sub}.conv"))
+
+        return rules
+
+    def lora_diffusers_to_kohya(self) -> list | None:
+        # SD's real kohya-ss file keeps diffusers UNet names (sd-scripts only emits sgm for SDXL), so KOHYA
+        # uses no rename -- only SD's ORIGINAL/COMFY use the sgm body above.
+        return None
+
+    def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
+        # Single CLIP under kohya lora_te (no digit). Comfy names it by architecture: SD1.x = clip_l (CLIP-L),
+        # SD2.x = clip_h (OpenCLIP-H).
+        clip = "clip_l" if self.model_type.is_sd_v1() else "clip_h"
+        return [
+            (self.text_encoder, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder",
+                ModelFormat.KOHYA_LORA: "lora_te",
+                ModelFormat.COMFY_LORA: f"text_encoders.{clip}.transformer",
+            }),
+        ]
 
     def all_embeddings(self) -> list[StableDiffusionModelEmbedding]:
         return self.additional_embeddings \

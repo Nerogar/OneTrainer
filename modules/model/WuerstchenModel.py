@@ -5,6 +5,7 @@ from modules.model.BaseModel import BaseModel, BaseModelEmbedding
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.DataType import DataType
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
 import torch
@@ -17,6 +18,16 @@ from diffusers.models import StableCascadeUNet
 from diffusers.pipelines.deprecated.wuerstchen import PaellaVQModel, WuerstchenDiffNeXt, WuerstchenPrior
 from diffusers.pipelines.stable_cascade import StableCascadeCombinedPipeline
 from transformers import CLIPTextModel, CLIPTokenizer
+
+# Stable Cascade LEGACY prior body: OT's historical attn.to_q/k/v/out_proj names (distinct from both the
+# diffusers to_q and the original in_proj.N), so LEGACY is not derivable from the original body.
+cascade_prior_legacy = [
+    ("{a}.attention.to_q", "{a}.attention.attn.to_q"),
+    ("{a}.attention.to_k", "{a}.attention.attn.to_k"),
+    ("{a}.attention.to_v", "{a}.attention.attn.to_v"),
+    ("{a}.attention.to_out.0", "{a}.attention.attn.out_proj"),
+    ("{k}", "{k}"),
+]
 
 
 class WuerstchenEfficientNetEncoder(ModelMixin, ConfigMixin):
@@ -130,6 +141,30 @@ class WuerstchenModel(BaseModel):
             self.prior_text_encoder_lora,
             self.prior_prior_lora,
         ] if a is not None]
+
+    def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
+        # Single CLIP TE (model.prior_text_encoder). No COMFY_LORA name -- ComfyUI cannot load
+        # Wuerstchen/Cascade, so the COMFY format refuses to write its TE keys.
+        return [
+            (self.prior_text_encoder, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder",
+                ModelFormat.KOHYA_LORA: "lora_te",
+            }),
+        ]
+
+    def diffusers_to_original(self) -> list | None:
+        # Stable Cascade prior: diffusers split attention to_q/k/v/to_out.0 -> the native StabilityAI
+        # nn.MultiheadAttention split adapter names. {a} captures the block path; the trailing identity rule
+        # passes every non-attention leaf through. Wuerstchen v2 has no body (identity in every format).
+        if self.model_type.is_stable_cascade():
+            return [
+                ("{a}.attention.to_q", "{a}.attention.attn.in_proj.0"),
+                ("{a}.attention.to_k", "{a}.attention.attn.in_proj.1"),
+                ("{a}.attention.to_v", "{a}.attention.attn.in_proj.2"),
+                ("{a}.attention.to_out.0", "{a}.attention.attn.out_proj"),
+                ("{k}", "{k}"),
+            ]
+        return None
 
     def all_embeddings(self) -> list[WuerstchenModelEmbedding]:
         return self.additional_embeddings \
