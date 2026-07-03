@@ -40,6 +40,8 @@ class ModelType(Enum):
 
     QWEN = 'QWEN'
 
+    KREA_2 = 'KREA_2'
+
     Z_IMAGE = 'Z_IMAGE'
 
     ERNIE = 'ERNIE'
@@ -99,6 +101,9 @@ class ModelType(Enum):
 
     def is_qwen(self):
         return self == ModelType.QWEN
+
+    def is_krea2(self):
+        return self == ModelType.KREA_2
 
     def is_sana(self):
         return self == ModelType.SANA
@@ -160,6 +165,7 @@ class ModelType(Enum):
             or self.is_flux() \
             or self.is_chroma() \
             or self.is_qwen() \
+            or self.is_krea2() \
             or self.is_sana() \
             or self.is_hunyuan_video() \
             or self.is_hi_dream() \
@@ -177,38 +183,52 @@ class ModelType(Enum):
         return _MODEL_PARTS[self][0]
 
     def supported_lora_formats(self) -> list[ModelFormat]:
-        # LoRA output formats this model can produce, in UI display order. Every model supports the four
-        # clean target namespaces; LEGACY (the per-model historical output) is unavailable for HiDream
-        # (OMI) and Sana/Wuerstchen v2 (verbatim dotted), whose only historical output was never loadable.
         formats = [
             ModelFormat.DIFFUSERS_LORA,
             ModelFormat.KOHYA_LORA,
             ModelFormat.ORIGINAL_LORA,
             ModelFormat.COMFY_LORA,
         ]
-        if (self.is_stable_diffusion() or self.is_stable_diffusion_xl() or self.is_stable_diffusion_3()
-                or self.is_flux_1() or self.is_flux_2() or self.is_chroma() or self.is_hunyuan_video()
-                or self.is_pixart() or self.is_qwen() or self.is_ernie() or self.is_z_image()
-                or self.is_stable_cascade()):
+        has_legacy = self.is_stable_diffusion() \
+            or self.is_stable_diffusion_xl() \
+            or self.is_stable_diffusion_3() \
+            or self.is_stable_cascade() \
+            or self.is_pixart() \
+            or self.is_flux_1() \
+            or self.is_flux_2() \
+            or self.is_chroma() \
+            or self.is_qwen() \
+            or self.is_hunyuan_video() \
+            or self.is_z_image() \
+            or self.is_ernie()
+        if has_legacy:
             formats.append(ModelFormat.LEGACY_LORA)
         return formats
 
     def supported_full_model_formats(self) -> list[ModelFormat]:
-        # Full-model output formats this model can produce, in UI display order. Z-Image additionally
-        # offers COMFY_TRANSFORMER (ORIGINAL_TRANSFORMER + Comfy key quirks, ComfyUI #12303).
         formats = [ModelFormat.DIFFUSERS]
         if self.is_stable_diffusion() or self.is_stable_diffusion_xl() or self.is_stable_diffusion_3():
             formats.append(ModelFormat.ORIGINAL_SINGLE_FILE)
         elif (self.is_flux_1() or self.is_flux_2() or self.is_chroma() or self.is_hunyuan_video()
                 or self.is_hi_dream() or self.is_pixart() or self.is_qwen() or self.is_ernie()
-                or self.is_z_image()):
+                or self.is_z_image() or self.is_krea2()):
             formats.append(ModelFormat.ORIGINAL_TRANSFORMER)
         if self.is_z_image():
             formats.append(ModelFormat.COMFY_TRANSFORMER)
-        if (self.is_stable_diffusion() or self.is_stable_diffusion_xl() or self.is_stable_diffusion_3()
-                or self.is_flux_1() or self.is_flux_2() or self.is_chroma() or self.is_hunyuan_video()
-                or self.is_hi_dream() or self.is_pixart() or self.is_qwen() or self.is_ernie()
-                or self.is_z_image() or self.is_stable_cascade()):
+        has_legacy = self.is_stable_diffusion() \
+            or self.is_stable_diffusion_xl() \
+            or self.is_stable_diffusion_3() \
+            or self.is_stable_cascade() \
+            or self.is_pixart() \
+            or self.is_flux_1() \
+            or self.is_flux_2() \
+            or self.is_chroma() \
+            or self.is_qwen() \
+            or self.is_hunyuan_video() \
+            or self.is_hi_dream() \
+            or self.is_z_image() \
+            or self.is_ernie()
+        if has_legacy:
             formats.append(ModelFormat.LEGACY_SAFETENSORS)
         return formats
 
@@ -253,6 +273,7 @@ _MODEL_PARTS: dict[ModelType, tuple[str, ...]] = {
     ModelType.HI_DREAM_FULL: ("transformer", "text_encoder", "text_encoder_2", "text_encoder_3", "text_encoder_4", "vae"),
     ModelType.CHROMA_1: ("transformer", "text_encoder", "vae"),
     ModelType.QWEN: ("transformer", "text_encoder", "vae"),
+    ModelType.KREA_2: ("transformer", "text_encoder", "vae"),
     ModelType.Z_IMAGE: ("transformer", "text_encoder", "vae"),
     ModelType.ERNIE: ("transformer", "text_encoder", "vae"),
 }
