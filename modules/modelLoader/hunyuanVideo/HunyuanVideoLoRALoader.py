@@ -9,6 +9,8 @@ class HunyuanVideoLoRALoader(
     def __init__(self):
         super().__init__()
 
+    def _legacy_conversion(self, model: HunyuanVideoModel) -> list | None:
+        return self._mixture_legacy_conversion(model)
 
     def load(
             self,

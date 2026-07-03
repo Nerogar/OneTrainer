@@ -851,11 +851,6 @@ class TrainConfig(BaseConfig):
         fan_out("decoder_text_encoder")
         fan_out("decoder_vqgan")
 
-        # ModelFormat enum cleanup. The overloaded SAFETENSORS value reproduced whatever OneTrainer
-        # wrote before this change, dispatched per-model inside each saver. It splits by save type into
-        # the frozen "legacy" formats: LEGACY_SAFETENSORS (full model) and LEGACY_LORA (LoRA).
-        # Embedding keeps SAFETENSORS (the learned-vectors file). Only SAFETENSORS was ever
-        # UI-selectable, so it is the only released value that needs migrating.
         if migrated_data.get("output_model_format") == "SAFETENSORS":
             training_method = migrated_data.get("training_method")
             if training_method == "LORA":

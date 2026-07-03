@@ -4,9 +4,7 @@ from abc import ABC, abstractmethod
 from modules.util import path_util
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
-from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.PathIOType import PathIOType
-from modules.util.enum.TrainingMethod import TrainingMethod
 
 
 class BaseModelTabView(ABC):
@@ -377,31 +375,7 @@ class BaseModelTabView(ABC):
         row += 1
 
         # output format
-        if controller.train_config.training_method == TrainingMethod.EMBEDDING:
-            # embedding: a plain safetensors file of the learned vectors
-            formats = [("Safetensors", ModelFormat.SAFETENSORS)]
-        elif controller.train_config.training_method == TrainingMethod.LORA:
-            # LoRA output formats supported by this model (model_type.supported_lora_formats drops the
-            # ones this model can't produce, e.g. LEGACY for HiDream/Sana/Wuerstchen v2).
-            labels = {
-                ModelFormat.DIFFUSERS_LORA: "Diffusers",
-                ModelFormat.KOHYA_LORA: "Kohya",
-                ModelFormat.ORIGINAL_LORA: "Original",
-                ModelFormat.COMFY_LORA: "Comfy",
-                ModelFormat.LEGACY_LORA: "Legacy",
-            }
-            formats = [(labels[fmt], fmt) for fmt in controller.train_config.model_type.supported_lora_formats()]
-        else:
-            # full model output formats supported by this model (model_type.supported_full_model_formats drops the
-            # ones it can't produce, e.g. no single-file for Sana / Wuerstchen v2, COMFY only for Z-Image).
-            labels = {
-                ModelFormat.DIFFUSERS: "Diffusers",
-                ModelFormat.ORIGINAL_SINGLE_FILE: "Original (single file)",
-                ModelFormat.ORIGINAL_TRANSFORMER: "Original (transformer only)",
-                ModelFormat.COMFY_TRANSFORMER: "Comfy (transformer only)",
-                ModelFormat.LEGACY_SAFETENSORS: "Legacy",
-            }
-            formats = [(labels[fmt], fmt) for fmt in controller.train_config.model_type.supported_full_model_formats()]
+        formats = controller.get_output_formats()
 
         self.components.label(frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
