@@ -118,9 +118,11 @@ class BaseModel(metaclass=ABCMeta):
 
     def fusion_groups(self) -> list | None:
         # The model's qkv fusion groups, or None for a non-fusing model. Each entry is
-        # (block_pattern, [split leaf suffixes], fused suffix, original suffix); block index {i} matches any
-        # block. Used by the KOHYA un-flatten to collapse the live split q/k/v leaves into the fused module
-        # name before the body rename, and by the full-model checkpoint_diffusers_to_original pre-stage.
+        # (group_pattern, [split leaf suffixes], fused suffix, original suffix); group_pattern may contain a
+        # placeholder (e.g. "transformer_blocks.{i}") matching any repeated block, or be a fixed key with no
+        # placeholder for a group that occurs once. Used by the KOHYA un-flatten to collapse the live split
+        # q/k/v leaves into the fused module name before the body rename, and by the full-model
+        # checkpoint_diffusers_to_original pre-stage.
         return None
 
     # Per-format denoising bodies. Each returns a canonical(diffusers) -> native conversion for one output

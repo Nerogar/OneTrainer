@@ -202,18 +202,21 @@ class HunyuanVideoModel(BaseModel):
 
     def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
         # HunyuanVideo's two TEs: llama (text_encoder_1) + clip_l (text_encoder_2) (Comfy's HunyuanVideoClipModel).
-        return [
-            (self.text_encoder_1, {
+        # Either can be absent (unchecked in the UI), so only the TEs actually present are declared.
+        text_encoders = []
+        if self.text_encoder_1 is not None:
+            text_encoders.append((self.text_encoder_1, {
                 ModelFormat.DIFFUSERS_LORA: "text_encoder",
                 ModelFormat.KOHYA_LORA: "lora_te1",
                 ModelFormat.COMFY_LORA: "text_encoders.llama.transformer",
-            }),
-            (self.text_encoder_2, {
+            }))
+        if self.text_encoder_2 is not None:
+            text_encoders.append((self.text_encoder_2, {
                 ModelFormat.DIFFUSERS_LORA: "text_encoder_2",
                 ModelFormat.KOHYA_LORA: "lora_te2",
                 ModelFormat.COMFY_LORA: "text_encoders.clip_l.transformer",
-            }),
-        ]
+            }))
+        return text_encoders
 
     def all_embeddings(self) -> list[HunyuanVideoModelEmbedding]:
         return self.additional_embeddings \
