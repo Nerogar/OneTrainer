@@ -1,6 +1,5 @@
 from modules.model.Flux2Model import Flux2Model
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
-from modules.util.convert_lora_util import convert_to_mixture
 
 from torch import Tensor
 
@@ -12,7 +11,9 @@ class Flux2LoRASaver(
         super().__init__()
 
     def _convert_legacy(self, model: Flux2Model, state_dict: dict[str, Tensor]) -> dict[str, Tensor]:
-        return convert_to_mixture(state_dict)
+        # Older OneTrainer versions saved this model's LoRA unconverted (canonical / diffusers-dotted),
+        # so identity reproduces that output.
+        return dict(state_dict)
 
     def _get_state_dict(
             self,

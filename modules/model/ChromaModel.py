@@ -168,12 +168,11 @@ class ChromaModel(BaseModel):
         self.vae.to(device=device)
 
     def text_encoder_to(self, device: torch.device):
-        if self.text_encoder is not None:
-            if self.text_encoder_offload_conductor is not None and \
-                    self.text_encoder_offload_conductor.layer_offload_activated():
-                self.text_encoder_offload_conductor.to(device)
-            else:
-                self.text_encoder.to(device=device)
+        if self.text_encoder_offload_conductor is not None and \
+                self.text_encoder_offload_conductor.layer_offload_activated():
+            self.text_encoder_offload_conductor.to(device)
+        else:
+            self.text_encoder.to(device=device)
 
         if self.text_encoder_lora is not None:
             self.text_encoder_lora.to(device)
@@ -195,8 +194,7 @@ class ChromaModel(BaseModel):
 
     def eval(self):
         self.vae.eval()
-        if self.text_encoder is not None:
-            self.text_encoder.eval()
+        self.text_encoder.eval()
         self.transformer.eval()
 
     def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
