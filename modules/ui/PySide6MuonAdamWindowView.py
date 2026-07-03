@@ -10,6 +10,9 @@ class PySide6MuonAdamWindowView(BaseMuonAdamWindowView, QDialog):
         QDialog.__init__(self, parent)
         BaseMuonAdamWindowView.__init__(self, pyside6_components)
 
+        # delete on close so entry widgets and the field validators they register globally are freed, not leaked
+        self.finished.connect(self.deleteLater)
+
         self.setWindowTitle(controller.get_title())
         self.resize(800, 500)
 
