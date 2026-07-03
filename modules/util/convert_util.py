@@ -5,6 +5,28 @@ import torch
 
 import parse
 
+# The LoRA value-suffix taxonomy, shared by the save-side flatten (kohya_flatten) and the load-side split
+# (_split_value_suffix) so the two never drift. A key's value suffix is either a single trailing segment
+# hanging straight off the module, or two segments (a param segment + this tail). Grouped by that arity, NOT
+# by value type -- scaled_oft is a marker buffer, not a weight, but it is two-segment (oft_R.scaled_oft) so
+# it lives with .weight.
+SINGLE_SEGMENT_SUFFIXES = (".alpha", ".dora_scale")
+DOUBLE_SEGMENT_SUFFIXES = (".weight", ".scaled_oft")
+
+# The single-segment adapter factors (LoHa hada_*, LoKr lokr_*) serialize as one bare param segment with no
+# .weight, so both sides detect them by prefix (their exact names vary: hada_w1_a, lokr_w2_b, ...). LoRA/OFT
+# params always end in .weight/.scaled_oft and are caught by DOUBLE_SEGMENT_SUFFIXES first, so they are NOT
+# factors -- they instead ride the broader supported-param allowlist below (which also lists lora_/oft_).
+FACTOR_PREFIXES = ("hada_", "lokr_")
+
+# The adapter param-name families OneTrainer trains: LoRA/DoRA (lora_*, alpha, dora_scale), OFT (oft_*), plus
+# the LoHa/LoKr factors. This is the closed allowlist the loader checks positively so any foreign LyCORIS
+# algorithm (GLoRA, IA3, full-diff, norm, tlora, ...) is rejected with no per-algorithm table to maintain.
+# The factor prefixes are reused from FACTOR_PREFIXES (not re-listed) so a new factor algorithm is added in
+# exactly one place.
+SUPPORTED_PARAM_PREFIXES = ("lora_", "oft_", *FACTOR_PREFIXES)
+SUPPORTED_PARAM_SCALARS = {"alpha", "dora_scale"}
+
 
 @dataclass
 class ConversionPattern:
@@ -341,74 +363,35 @@ def lora_fuse_qkv_mlp(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down
 
     return qkv_up, qkv_down, qkv_alpha
 
-def lora_fuse_qkv_to_qkv_mlp(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha):
-    #TODO where to get output shape from, if there is no MLP dim?
-    raise NotImplementedError
-
-def lora_fuse_mlp_to_qkv_mlp(mlp_up, mlp_down, mlp_alpha):
-    #TODO where to get output shape from, if there is no qkv dim?
-    raise NotImplementedError
-
 def swap_chunks(input: torch.Tensor, dim: int=0) -> torch.Tensor:
     chunks = input.chunk(2, dim=dim)
     return torch.cat([chunks[1], chunks[0]], dim=dim)
+
+def swap_dora_scale_chunks(input: torch.Tensor) -> torch.Tensor:
+    # swap the output-dim chunks of a DoRA magnitude on a chunk-swapped layer (see chunk_swap). A per-output
+    # dora_scale ([out, 1] / [out, 1, 1, 1]) carries the output dim on axis 0 and is swapped; a per-input
+    # dora_scale ([1, in(, 1, 1)], shape[0]==1) carries no output dim -- the input axis is identical across
+    # the two namespaces -- and passes through unchanged. Its own inverse, like swap_chunks. Always operates
+    # on the canonical .dora_scale spelling: the dora_scale <-> lora_magnitude_vector rename is a separate
+    # suffix-boundary step (Layer 1 on load; the suffix conversion on save), sequenced so the body conversion
+    # only ever sees dora_scale here, never magnitude_vector.
+    if input.shape[0] == 1:
+        return input
+    return swap_chunks(input)
 
 def chunk_swap(diffusers: str, original: str):
     # Conversion rules that swap the two output-dim chunks of a layer whose chunk order differs between
     # the diffusers and original namespaces (e.g. an adaLN modulation projection). Handles both a full
     # weight and a LoRA adapter from one definition: the swapped output dim lives in .weight/.bias for a
-    # full tensor and in .lora_up.weight for a LoRA, so those are swapped; .lora_down.weight/.alpha (and
-    # any other suffix) carry no output dim and rename unchanged via the trailing catch-all. In a given
-    # conversion only one of the two shapes is present, so the unused rules never fire. A convert_fn can't
-    # see the key, so the swap-vs-rename split has to be by suffix. swap_chunks is its own inverse, so
-    # these reverse for free.
+    # full tensor and in .lora_up.weight for a LoRA, so those are swapped; a DoRA magnitude (.dora_scale) is
+    # swapped via swap_dora_scale_chunks. .lora_down.weight/.alpha (and any other suffix) carry no output dim
+    # and rename unchanged via the trailing catch-all. In a given conversion only one of the two full/LoRA
+    # shapes is present, so the unused rules never fire. A convert_fn can't see the key, so the swap-vs-rename
+    # split has to be by suffix. Every swap fn is its own inverse, so these reverse for free.
     return [
         (diffusers + ".weight",         original + ".weight",         swap_chunks, swap_chunks),
         (diffusers + ".bias",           original + ".bias",           swap_chunks, swap_chunks),
         (diffusers + ".lora_up.weight", original + ".lora_up.weight", swap_chunks, swap_chunks),
+        (diffusers + ".dora_scale",     original + ".dora_scale",     swap_dora_scale_chunks, swap_dora_scale_chunks),
         (diffusers, original),
-    ]
-
-def lora_qkv_fusion(q: str, k: str, v: str, qkv: str):
-    return [
-        ([f"{q}.lora_up.weight", f"{q}.lora_down.weight", f"{q}.alpha",
-          f"{k}.lora_up.weight", f"{k}.lora_down.weight", f"{k}.alpha",
-          f"{v}.lora_up.weight", f"{v}.lora_down.weight", f"{v}.alpha"],
-         [f"{qkv}.lora_up.weight", f"{qkv}.lora_down.weight", f"{qkv}.alpha"], lora_fuse_qkv),
-    ]
-
-def lora_qkv_mlp_fusion(q: str, k: str, v: str, mlp: str, qkv_mlp: str, separator: str='.'):
-    return [
-        ([f"{q}.lora_up.weight",   f"{q}.lora_down.weight", f"{q}.alpha",
-          f"{k}.lora_up.weight",   f"{k}.lora_down.weight", f"{k}.alpha",
-          f"{v}.lora_up.weight",   f"{v}.lora_down.weight", f"{v}.alpha",
-          f"{mlp}.lora_up.weight", f"{mlp}.lora_down.weight", f"{mlp}.alpha"],
-         [f"{qkv_mlp}.lora_up.weight", f"{qkv_mlp}.lora_down.weight", f"{qkv_mlp}.alpha"], lora_fuse_qkv_mlp
-        ),
-
-        #qkv only, in case there are no mlp layers:
-        ([f"{q}.lora_up.weight",   f"{q}.lora_down.weight", f"{q}.alpha",
-          f"{k}.lora_up.weight",   f"{k}.lora_down.weight", f"{k}.alpha",
-          f"{v}.lora_up.weight",   f"{v}.lora_down.weight", f"{v}.alpha"],
-         [f"{qkv_mlp}.lora_up.weight", f"{qkv_mlp}.lora_down.weight", f"{qkv_mlp}.alpha"],
-          lambda q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha: lora_fuse_qkv_to_qkv_mlp(q_up, q_down, q_alpha, k_up, k_down, k_alpha, v_up, v_down, v_alpha)
-        ),
-
-        #mlp only, in case there are no qkv layers:
-        ([f"{mlp}.lora_up.weight", f"{mlp}.lora_down.weight", f"{mlp}.alpha"],
-         [f"{qkv_mlp}.lora_up.weight", f"{qkv_mlp}.lora_down.weight", f"{qkv_mlp}.alpha"],
-          lambda mlp_up, mlp_down, mlp_alpha: lora_fuse_mlp_to_qkv_mlp(mlp_up, mlp_down, mlp_alpha)
-        ),
-    ]
-
-def kv_fusion(k: str, v: str, kv: str, separator: str='.'):
-    # two-input fuse of a split k/v into one kv tensor (PixArt cross-attention: attn2.to_k/to_v ->
-    # cross_attn.kv_linear). The query stays separate, so this is not a qkv fuse.
-    return [
-        ([k, v], kv, fuse)
-    ]
-
-def qkv_mlp_fusion(q: str, k: str, v: str, mlp: str, qkv: str, separator: str='.'):
-    return [
-        ([q, k, v, mlp], qkv, fuse)
     ]

@@ -856,8 +856,8 @@ class LoRAModuleWrapper:
         # output format (ModelFormat.needs_qkv_fusion); this module does not know about output formats.
         # `fuse` is separate from `fusion_spec` because a SPLIT wrapper still needs the qkv grouping to
         # recognise (and reject) an incompatible fused file on load -- the file's fused/split state must
-        # match the wrapper's, and detecting that targets the qkv keys via the spec (see
-        # __check_fusion_match). A setup that wants that check passes fusion_spec unconditionally and
+        # match the wrapper's, and detecting that targets the qkv keys via the spec (see the
+        # check_fusion_match call in load_state_dict). A setup that wants that check passes fusion_spec unconditionally and
         # selects fused/split only via `fuse`. When `fuse` is left None it defaults to fusing iff a spec
         # was given.
         self.fuse = (fusion_spec is not None) if fuse is None else fuse
@@ -1033,17 +1033,6 @@ class LoRAModuleWrapper:
             if checkpoint_rank != config_rank:
                 raise ValueError(f"Rank/Dim mismatch: checkpoint={checkpoint_rank}, config={config_rank}, please correct in the UI.")
 
-    def _check_fusion_match(self, state_dict: dict[str, Tensor]):
-        # The incoming file's qkv fused/split state must match this wrapper's (fixed by the output
-        # format). The check targets the qkv keys via fused_groups, which is why the grouping rides along
-        # on split wrappers too (see __init__). See check_fusion_match for why a mismatch is a hard error.
-        groups = []
-        for fused_name, leaf_names, _leaves in self.fused_groups:
-            fused_prefix = (self.prefix + "." + fused_name) if self.prefix != "" else fused_name
-            leaf_prefixes = [(self.prefix + "." + n) if self.prefix != "" else n for n in leaf_names]
-            groups.append((fused_prefix, leaf_prefixes))
-        check_fusion_match(state_dict.keys(), self.fuse, groups)
-
     def load_state_dict(self, state_dict: dict[str, Tensor], strict: bool = True):
         """
         Loads the state dict
@@ -1055,7 +1044,7 @@ class LoRAModuleWrapper:
         # create a copy, so the modules can pop states
         state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
 
-        self._check_fusion_match(state_dict)
+        check_fusion_match(state_dict.keys(), self.fuse, self.fusion_spec)
         # FIXME: disabled rank check, false positive on Flux2 LoHA loading
         # self._check_rank_matches(state_dict)
 

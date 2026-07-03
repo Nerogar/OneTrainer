@@ -171,15 +171,17 @@ def discover_fused_groups(fusion_spec: list[tuple] | None, selected_modules: dic
     # all its leaves are present and selected for the same group and share in_features; otherwise those
     # leaves stay individual modules (never fuse a partial group). Returns the discovered groups as (fused
     # name, leaf names, leaf modules) -- independent of whether they'll be built fused (LoRAModuleWrapper.fuse);
-    # a split wrapper keeps the same list to recognise an incompatible fused file on load (__check_fusion_match).
+    # a split wrapper keeps the same list to recognise an incompatible fused file on load (check_fusion_match).
     #
     # fuse mirrors LoRAModuleWrapper.fuse: True when this wrapper will actually BUILD fused modules (an
-    # output format that needs qkv fusion). A PARTIALLY-selected group -- some of a group's projections
-    # trained, the rest excluded by the layer filter -- cannot be fused: fusion needs every leaf, and the
-    # fused formats (ORIGINAL/KOHYA/COMFY) have no split keys to fall back on. When fuse, raise here at
-    # setup with an actionable message instead of leaking split keys into the saver, which fails much later
-    # with a cryptic "No conversion found". When NOT fusing (split build -- e.g. Flux2 + DIFFUSERS/LEGACY)
-    # a partial group is fine (split formats keep the keys), so it is not checked.
+    # output format that needs qkv fusion). When fuse, two conditions raise here at setup with an actionable
+    # message instead of leaking split keys into the saver, which fails much later with a cryptic "No
+    # conversion found": (1) a PARTIALLY-selected group -- some of a group's projections trained, the rest
+    # excluded by the layer filter -- cannot be fused (fusion needs every leaf, and the fused formats
+    # ORIGINAL/KOHYA/COMFY have no split keys to fall back on); (2) a group whose leaves do not share
+    # in_features cannot be stacked into one weight matrix, so the fusion spec is misconfigured. When NOT
+    # fusing (split build -- e.g. Flux2 + DIFFUSERS/LEGACY) a partial group is fine (split formats keep the
+    # keys), so neither is checked.
     groups = []
     if not fusion_spec:
         return groups
@@ -205,6 +207,14 @@ def discover_fused_groups(fusion_spec: list[tuple] | None, selected_modules: dic
                 continue
             leaves = [selected_modules[name] for name in leaf_names]
             if len({leaf.in_features for leaf in leaves}) != 1:
+                # leaves reading different input spaces cannot be stacked into one weight matrix. When
+                # fusing this is a misconfigured spec (raise); a split build just keeps them separate.
+                if fuse:
+                    raise RuntimeError(
+                        f"The selected output format requires fusing all of {', '.join(leaf_suffixes)} in "
+                        f"{group_key} into a single '{fused_suffix}' module, but they do not share an input "
+                        f"dimension ({', '.join(f'{name}={selected_modules[name].in_features}' for name in leaf_names)}). "
+                        f"Only projections that read the same input can be fused; this fusion group is misconfigured.")
                 continue
             groups.append((f"{group_key}.{fused_suffix}", leaf_names, leaves))
             consumed.update(leaf_names)
