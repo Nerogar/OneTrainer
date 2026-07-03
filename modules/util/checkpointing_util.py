@@ -1,3 +1,4 @@
+import copy
 import inspect
 from collections.abc import Callable
 from typing import Any
@@ -105,6 +106,17 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
         self.dummy = torch.zeros((1,), device=train_device, requires_grad=True)
         self.conductor = conductor
         self.layer_index = layer_index
+
+    def __deepcopy__(self, memo):
+        # conductor holds torch.cuda.Stream/Event objects that cannot be deep-copied or pickled.
+        # deepcopy is only used at save time to build a dtype-converted CPU copy of the pipeline,
+        # where the conductor is never invoked, so share the existing instance instead of copying it.
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for key, value in self.__dict__.items():
+            result.__dict__[key] = value if key == "conductor" else copy.deepcopy(value, memo)
+        return result
 
     def __checkpointing_forward(self, dummy: torch.Tensor, call_id: int, *args):
         init_compile()  # workaround for https://github.com/pytorch/pytorch/issues/186537

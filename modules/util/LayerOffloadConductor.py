@@ -614,13 +614,6 @@ class LayerOffloadConductor:
 
         self.__config = config
 
-    def __deepcopy__(self, memo):
-        # the conductor holds torch.cuda.Stream/Event objects that cannot be deep-copied or pickled.
-        # deepcopy only happens at save time to build a dtype-converted CPU copy of the pipeline, where
-        # the conductor is never invoked, so share the existing instance instead of copying it.
-        memo[id(self)] = self
-        return self
-
     def offload_activated(self) -> bool:
         return self.__offload_activations or self.__offload_layers
 
