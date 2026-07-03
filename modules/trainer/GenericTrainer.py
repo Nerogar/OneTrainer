@@ -23,8 +23,10 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.compile_util import init_compile
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.dpo_beta_controller import DPOBetaController
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
 from modules.util.enum.ConceptType import ConceptType
+from modules.util.enum.DPOObjective import DPOObjective
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
@@ -99,6 +101,7 @@ class GenericTrainer(BaseTrainer):
 
         model_names = self.config.model_names()
 
+        last_backup_path = None
         if self.config.continue_last_backup:
             self.callbacks.on_update_status("searching for previous backups")
             last_backup_path = self.config.get_last_backup_path()
@@ -143,6 +146,14 @@ class GenericTrainer(BaseTrainer):
         self.model.eval()
         torch_gc()
 
+        if self.config.rlhf_enabled and self.config.training_method != TrainingMethod.LORA:
+            raise NotImplementedError("RLHF DPO is currently implemented for adapter training in the LoRA tab only.")
+
+        # Resuming a DPO run: restore the frozen reference saved with the backup so
+        # it is not re-captured from the already-trained adapter weights.
+        if self.config.rlhf_enabled and last_backup_path:
+            self.model_setup.load_dpo_reference(last_backup_path, self.model)
+
         self.callbacks.on_update_status("creating the data loader/caching")
 
         self.data_loader = self.create_data_loader(
@@ -156,10 +167,12 @@ class GenericTrainer(BaseTrainer):
 
         self.parameters = self.model.parameters.parameters()
 
-        if self.config.validation:
+        if self.config.validation or self.config.dpo_validation_active():
             self.validation_data_loader = self.create_data_loader(
                 self.model, self.model_setup, self.model.train_progress, is_validation=True
             )
+
+        self._dpo_beta_controller: DPOBetaController | None = None
 
     def __save_config_to_workspace(self):
         path = path_util.canonical_join(self.config.workspace_dir, "config")
@@ -359,6 +372,44 @@ class GenericTrainer(BaseTrainer):
                 desc="validation_step",
                 total=current_epoch_length_validation)
 
+            if self.config.dpo_validation_active():
+                dpo_val_accuracy = []
+                dpo_val_chosen_reward = []
+                dpo_val_rejected_reward = []
+                dpo_val_reward_margin = []
+
+                for validation_batch in step_tqdm_validation:
+                    if self.__needs_gc(train_progress):
+                        torch_gc()
+
+                    with torch.no_grad():
+                        self.model_setup.calculate_dpo_loss(self.model, validation_batch, self.config, train_progress)
+                    dpo_metrics = self.model_setup.get_last_dpo_metrics()
+                    dpo_val_accuracy.append(dpo_metrics["accuracy"])
+                    dpo_val_chosen_reward.append(dpo_metrics["chosen_reward"])
+                    dpo_val_rejected_reward.append(dpo_metrics["rejected_reward"])
+                    dpo_val_reward_margin.append(dpo_metrics["reward_margin"])
+
+                if dpo_val_accuracy:
+                    # Validation loss is intentionally not tracked: reward hacking
+                    # drives it toward zero, so a low val loss is not evidence of a
+                    # good model. Held-out ranking accuracy is hack-resistant.
+                    val_accuracy = sum(dpo_val_accuracy) / len(dpo_val_accuracy)
+                    val_chosen_reward = sum(dpo_val_chosen_reward) / len(dpo_val_chosen_reward)
+                    val_rejected_reward = sum(dpo_val_rejected_reward) / len(dpo_val_rejected_reward)
+                    val_reward_margin = sum(dpo_val_reward_margin) / len(dpo_val_reward_margin)
+
+                    self.tensorboard.add_scalar("dpo/val_accuracy", val_accuracy, train_progress.global_step)
+                    self.tensorboard.add_scalar("dpo/val_chosen_reward", val_chosen_reward, train_progress.global_step)
+                    self.tensorboard.add_scalar(
+                        "dpo/val_rejected_reward", val_rejected_reward, train_progress.global_step
+                    )
+                    self.tensorboard.add_scalar("dpo/val_reward_margin", val_reward_margin, train_progress.global_step)
+
+                # DPO validation uses a different data pipeline (paired samples) than
+                # standard validation, so they cannot share the same data loader.
+                return
+
             accumulated_loss_per_concept = {}
             concept_counts = {}
             mapping_seed_to_label = {}
@@ -454,6 +505,7 @@ class GenericTrainer(BaseTrainer):
             )
 
             self.__save_backup_config(backup_path)
+            self.model_setup.save_dpo_reference(backup_path)
         except Exception:
             traceback.print_exc()
             print("Could not save backup. Check your disk space!")
@@ -631,8 +683,14 @@ class GenericTrainer(BaseTrainer):
 
         lr_scheduler = None
         accumulated_loss = torch.tensor(0.0, device=train_device)
+        accumulated_dpo_metrics: dict[str, float] | None = None
         ema_loss = None
         ema_loss_steps = 0
+        ema_reward_margin = None
+        ema_reward_margin_steps = 0
+        ema_chosen_reward = None
+        ema_dpo_accuracy = None
+        reward_hacking_streak = 0
         epochs = range(train_progress.epoch, self.config.epochs, 1)
 
         for _epoch in tqdm(epochs, desc="epoch") if multi.is_master() else epochs:
@@ -733,24 +791,46 @@ class GenericTrainer(BaseTrainer):
                     step_seed = train_progress.global_step
                     bf16_stochastic_rounding_set_seed(step_seed, train_device)
 
-                    prior_pred_indices = [i for i in range(self.config.batch_size)
-                                          if ConceptType(batch['concept_type'][i]) == ConceptType.PRIOR_PREDICTION]
-                    if len(prior_pred_indices) > 0 \
-                            or (self.config.masked_training
-                                and self.config.masked_prior_preservation_weight > 0
-                                and self.config.training_method == TrainingMethod.LORA):
-                        with self.model_setup.prior_model(self.model, self.config), torch.no_grad():
-                            #do NOT create a subbatch using the indices, even though it would be more efficient:
-                            #different timesteps are used for a smaller subbatch by predict(), but the conditioning must match exactly:
-                            prior_model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
-                        model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
-                        prior_model_prediction = prior_model_output_data['predicted'].to(dtype=model_output_data['target'].dtype)
-                        model_output_data['target'][prior_pred_indices] = prior_model_prediction[prior_pred_indices]
-                        model_output_data['prior_target'] = prior_model_prediction
+                    if self.config.rlhf_enabled:
+                        loss = self.model_setup.calculate_dpo_loss(self.model, batch, self.config, train_progress)
+                        # Accumulate per-micro-batch DPO metrics across the grad-accum window.
+                        # Without this, only the final micro-batch's metric reaches TensorBoard —
+                        # which produces 0.0/1.0 accuracy when batch_size=1 regardless of effective batch.
+                        micro_dpo_metrics = self.model_setup.get_last_dpo_metrics()
+                        if accumulated_dpo_metrics is None:
+                            accumulated_dpo_metrics = dict.fromkeys(micro_dpo_metrics, 0.0)
+                            accumulated_dpo_metrics["_count"] = 0
+                        for _k, _v in micro_dpo_metrics.items():
+                            accumulated_dpo_metrics[_k] += _v
+                        accumulated_dpo_metrics["_count"] += 1
                     else:
-                        model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                        # Standard training path
+                        prior_pred_indices = [
+                            i
+                            for i in range(self.config.batch_size)
+                            if ConceptType(batch["concept_type"][i]) == ConceptType.PRIOR_PREDICTION
+                        ]
+                        if len(prior_pred_indices) > 0 or (
+                            self.config.masked_training
+                            and self.config.masked_prior_preservation_weight > 0
+                            and self.config.training_method == TrainingMethod.LORA
+                        ):
+                            with self.model_setup.prior_model(self.model, self.config), torch.no_grad():
+                                # do NOT create a subbatch using the indices, even though it would be more efficient:
+                                # different timesteps are used for a smaller subbatch by predict(), but the conditioning must match exactly:
+                                prior_model_output_data = self.model_setup.predict(
+                                    self.model, batch, self.config, train_progress
+                                )
+                            model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
+                            prior_model_prediction = prior_model_output_data["predicted"].to(
+                                dtype=model_output_data["target"].dtype
+                            )
+                            model_output_data["target"][prior_pred_indices] = prior_model_prediction[prior_pred_indices]
+                            model_output_data["prior_target"] = prior_model_prediction
+                        else:
+                            model_output_data = self.model_setup.predict(self.model, batch, self.config, train_progress)
 
-                    loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
+                        loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.config)
 
                     loss = loss / self.config.gradient_accumulation_steps
                     if scaler:
@@ -787,6 +867,30 @@ class GenericTrainer(BaseTrainer):
                         self.model.optimizer.zero_grad(set_to_none=True)
                         has_gradient = False
 
+                        # Adaptive beta must be applied on EVERY rank and driven by
+                        # the global margin: otherwise non-master ranks keep the
+                        # static beta and the averaged gradients mix losses at
+                        # different beta scales. All ranks all-reduce the margin and
+                        # run the same deterministic controller, so they stay in
+                        # lockstep without a broadcast. reduce_tensor_mean is a
+                        # collective, so this must sit outside the is_master() block.
+                        adaptive_beta = None
+                        if (
+                            self.config.rlhf_enabled
+                            and accumulated_dpo_metrics is not None
+                            and self.config.rlhf_dpo_adaptive_beta
+                            and self.config.rlhf_dpo_objective == DPOObjective.SIGMOID
+                        ):
+                            margin_t = torch.tensor(
+                                accumulated_dpo_metrics["reward_margin"] / accumulated_dpo_metrics["_count"],
+                                device=train_device,
+                            )
+                            multi.reduce_tensor_mean(margin_t)
+                            if self._dpo_beta_controller is None:
+                                self._dpo_beta_controller = DPOBetaController(self.config.rlhf_dpo_beta)
+                            adaptive_beta = self._dpo_beta_controller.update(margin_t.item())
+                            self.model_setup.set_dpo_runtime_beta(adaptive_beta)
+
                         if multi.is_master():
                             self.model_setup.report_to_tensorboard(
                                 self.model, self.config, lr_scheduler, self.tensorboard
@@ -796,7 +900,82 @@ class GenericTrainer(BaseTrainer):
                             if math.isnan(accumulated_loss_cpu):
                                 raise RuntimeError("Training loss became NaN. This may be due to invalid parameters, precision issues, or a bug in the loss computation.")
 
-                            self.tensorboard.add_scalar("loss/train_step",accumulated_loss_cpu , train_progress.global_step)
+                            self.tensorboard.add_scalar(
+                                "loss/train_step", accumulated_loss_cpu, train_progress.global_step
+                            )
+                            if self.config.rlhf_enabled and accumulated_dpo_metrics is not None:
+                                count = accumulated_dpo_metrics.pop("_count")
+                                dpo_metrics = {k: v / count for k, v in accumulated_dpo_metrics.items()}
+                                self.tensorboard.add_scalar("loss/dpo", dpo_metrics["loss"], train_progress.global_step)
+                                self.tensorboard.add_scalar(
+                                    "dpo/raw_loss", dpo_metrics["dpo_loss"], train_progress.global_step
+                                )
+                                self.tensorboard.add_scalar(
+                                    "dpo/chosen_reward", dpo_metrics["chosen_reward"], train_progress.global_step
+                                )
+                                self.tensorboard.add_scalar(
+                                    "dpo/rejected_reward", dpo_metrics["rejected_reward"], train_progress.global_step
+                                )
+                                self.tensorboard.add_scalar(
+                                    "dpo/reward_margin", dpo_metrics["reward_margin"], train_progress.global_step
+                                )
+                                ema_reward_margin = ema_reward_margin or dpo_metrics["reward_margin"]
+                                ema_reward_margin_steps += 1
+                                ema_reward_margin_decay = min(0.99, 1 - (1 / ema_reward_margin_steps))
+                                ema_reward_margin = (ema_reward_margin * ema_reward_margin_decay) + (
+                                    dpo_metrics["reward_margin"] * (1 - ema_reward_margin_decay)
+                                )
+                                self.tensorboard.add_scalar(
+                                    "dpo/smooth_reward_margin", ema_reward_margin, train_progress.global_step
+                                )
+                                self.tensorboard.add_scalar(
+                                    "dpo/accuracy", dpo_metrics["accuracy"], train_progress.global_step
+                                )
+
+                                # Reward-hacking signature: the margin keeps growing while
+                                # BOTH rewards go negative (the model degrades chosen and
+                                # rejected alike) and held-out ranking saturates.
+                                ema_chosen_reward = ema_chosen_reward or dpo_metrics["chosen_reward"]
+                                ema_chosen_reward = (ema_chosen_reward * ema_reward_margin_decay) + (
+                                    dpo_metrics["chosen_reward"] * (1 - ema_reward_margin_decay)
+                                )
+                                ema_dpo_accuracy = ema_dpo_accuracy or dpo_metrics["accuracy"]
+                                ema_dpo_accuracy = (ema_dpo_accuracy * ema_reward_margin_decay) + (
+                                    dpo_metrics["accuracy"] * (1 - ema_reward_margin_decay)
+                                )
+                                if ema_chosen_reward < 0 and ema_dpo_accuracy > 0.95:
+                                    reward_hacking_streak += 1
+                                else:
+                                    reward_hacking_streak = 0
+                                if reward_hacking_streak == 25:
+                                    warning = (
+                                        "DPO reward-hacking signature detected: chosen reward has stayed "
+                                        "negative while training accuracy is saturated. The margin is likely "
+                                        "growing by degrading both images of each pair. Lower the learning "
+                                        "rate, raise beta, or switch to the IPO objective."
+                                    )
+                                    print(warning)
+                                    self.tensorboard.add_text("dpo/warnings", warning, train_progress.global_step)
+
+                                if adaptive_beta is not None:
+                                    # Controller already ran on every rank above; here we
+                                    # only log the (globally-consistent) beta it produced.
+                                    self.tensorboard.add_scalar("dpo/beta", adaptive_beta, train_progress.global_step)
+                                    self.tensorboard.add_scalar(
+                                        "dpo/raw_margin_ema",
+                                        self._dpo_beta_controller.margin_ema,
+                                        train_progress.global_step,
+                                    )
+
+                                if self.config.rlhf_dpo_timestep_margin_logging:
+                                    for quartile in range(4):
+                                        quartile_count = dpo_metrics.get(f"margin_t_q{quartile + 1}_count", 0.0)
+                                        if quartile_count > 0:
+                                            self.tensorboard.add_scalar(
+                                                f"dpo/margin_by_t/q{quartile + 1}",
+                                                dpo_metrics[f"margin_t_q{quartile + 1}_sum"] / quartile_count,
+                                                train_progress.global_step,
+                                            )
                             ema_loss = ema_loss or accumulated_loss_cpu
                             ema_loss_steps += 1
                             ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
@@ -808,6 +987,7 @@ class GenericTrainer(BaseTrainer):
                             self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, train_progress.global_step)
 
                         accumulated_loss = 0.0
+                        accumulated_dpo_metrics = None
                         self.model_setup.after_optimizer_step(self.model, self.config, train_progress)
 
                         if self.model.ema:
@@ -825,7 +1005,7 @@ class GenericTrainer(BaseTrainer):
 
                         self.one_step_trained = True
 
-                if self.config.validation and multi.is_master():
+                if (self.config.validation or self.config.dpo_validation_active()) and multi.is_master():
                     self.__validate(train_progress)
 
                 train_progress.next_step(self.config.batch_size)
@@ -857,7 +1037,11 @@ class GenericTrainer(BaseTrainer):
 
                 if self.model.ema:
                     self.model.ema.copy_ema_to(self.parameters, store_temp=False)
-                if os.path.isdir(self.config.output_model_destination) and self.config.output_model_format.is_single_file():
+
+                if (
+                    os.path.isdir(self.config.output_model_destination)
+                    and self.config.output_model_format.is_single_file()
+                ):
                     save_path = os.path.join(
                         self.config.output_model_destination,
                         f"{self.config.save_filename_prefix}{get_string_timestamp()}{self.config.output_model_format.file_extension()}"

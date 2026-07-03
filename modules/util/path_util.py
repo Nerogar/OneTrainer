@@ -57,3 +57,17 @@ def is_supported_video_extension(extension: str) -> bool:
 
 def supported_caption_extensions() -> set[str]:
     return SUPPORTED_CAPTION_EXTENSIONS
+
+
+def walk_skipping_dotted(folder: str, include_subdirectories: bool = True):
+    """``os.walk`` wrapper that prunes dot-prefixed subdirectories in-place
+    (``.thumbnails``, ``.cache``, ``.stversions``, ...) so their contents are
+    never yielded — gallery apps and sync tools plant resized previews there
+    that would otherwise be picked up as real images, the same as mgds
+    CollectPaths. Yields ``(root, files)`` pairs. The top-level ``folder`` itself
+    is always walked, even when its own name starts with a dot. When
+    ``include_subdirectories`` is False only the top level's files are yielded.
+    A missing ``folder`` yields nothing rather than raising."""
+    for root, dirs, files in os.walk(folder):
+        dirs[:] = [] if not include_subdirectories else [d for d in dirs if not d.startswith(".")]
+        yield root, files

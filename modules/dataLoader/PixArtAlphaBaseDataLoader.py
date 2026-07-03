@@ -90,7 +90,12 @@ class PixArtAlphaBaseDataLoader(
             text_caching=not config.train_text_encoder_or_embedding(),
         )
 
-    def _output_modules(self, config: TrainConfig, model: PixArtAlphaModel, model_setup: BasePixArtAlphaSetup):
+    def _output_modules(
+        self,
+        config: TrainConfig,
+        model: PixArtAlphaModel,
+        model_setup: BasePixArtAlphaSetup,
+    ):
         output_names = [
             'image_path', 'latent_image',
             'prompt',

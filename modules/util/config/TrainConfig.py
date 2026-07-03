@@ -12,6 +12,8 @@ from modules.util.config.SecretsConfig import SecretsConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
+from modules.util.enum.DPOObjective import DPOObjective
+from modules.util.enum.DPORefMode import DPORefMode
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
 from modules.util.enum.GradientReducePrecision import GradientReducePrecision
@@ -533,6 +535,17 @@ class TrainConfig(BaseConfig):
     lokr_full_matrix: bool
     lokr_vec_trick: bool
 
+    # dpo
+    rlhf_enabled: bool
+    rlhf_dpo_beta: float
+    rlhf_dpo_label_smoothing: float
+    rlhf_dpo_objective: DPOObjective
+    rlhf_dpo_ipo_tau: float
+    rlhf_dpo_adaptive_beta: bool
+    rlhf_dpo_timestep_margin_logging: bool
+    rlhf_supervised_mix: float
+    rlhf_dpo_validation: bool
+
     # optimizer
     optimizer: TrainOptimizerConfig
     optimizer_defaults: dict[str, TrainOptimizerConfig]
@@ -569,7 +582,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=10,
+            config_version=11,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -581,6 +594,7 @@ class TrainConfig(BaseConfig):
                 7: self.__migration_7,
                 8: self.__migration_8,
                 9: self.__migration_9,
+                10: self.__migration_10,
             }
         )
 
@@ -799,6 +813,30 @@ class TrainConfig(BaseConfig):
         migrated_data.pop("weight_dtype")
 
         return migrated_data
+
+    def __migration_10(self, data: dict) -> dict:
+        # RLHF/DPO training defaults. Seeds the full DPO key set in one step;
+        # the reference mode is derived from lora_model_name at runtime.
+        migrated_data = data.copy()
+        migrated_data.setdefault("rlhf_enabled", False)
+        migrated_data.setdefault("rlhf_dpo_beta", 200.0)
+        migrated_data.setdefault("rlhf_dpo_label_smoothing", 0.0)
+        migrated_data.setdefault("rlhf_dpo_objective", "SIGMOID")
+        migrated_data.setdefault("rlhf_dpo_ipo_tau", 1000.0)
+        migrated_data.setdefault("rlhf_dpo_adaptive_beta", False)
+        migrated_data.setdefault("rlhf_dpo_timestep_margin_logging", False)
+        migrated_data.setdefault("rlhf_supervised_mix", 0.25)
+        migrated_data.setdefault("rlhf_dpo_validation", False)
+        return migrated_data
+
+    def effective_dpo_ref_mode(self) -> DPORefMode:
+        return DPORefMode.EXISTING_ADAPTER if self.lora_model_name else DPORefMode.NEW_ADAPTER
+
+    def dpo_validation_active(self) -> bool:
+        # DPO validation only makes sense inside a DPO run: the paired
+        # chosen/rejected validation pipeline is built only when both flags are
+        # set, so every consumer must gate on both to avoid a mid-run crash.
+        return self.rlhf_enabled and self.rlhf_dpo_validation
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
@@ -1171,6 +1209,17 @@ class TrainConfig(BaseConfig):
         data.append(("lokr_dora_on_output", True, bool, False))
         data.append(("lokr_full_matrix", False, bool, False))
         data.append(("lokr_vec_trick", True, bool, False))
+
+        # dpo
+        data.append(("rlhf_enabled", False, bool, False))
+        data.append(("rlhf_dpo_beta", 200.0, float, False))
+        data.append(("rlhf_dpo_label_smoothing", 0.0, float, False))
+        data.append(("rlhf_dpo_objective", DPOObjective.SIGMOID, DPOObjective, False))
+        data.append(("rlhf_dpo_ipo_tau", 1000.0, float, False))
+        data.append(("rlhf_dpo_adaptive_beta", False, bool, False))
+        data.append(("rlhf_dpo_timestep_margin_logging", False, bool, False))
+        data.append(("rlhf_supervised_mix", 0.25, float, False))
+        data.append(("rlhf_dpo_validation", False, bool, False))
 
         # optimizer
         data.append(("optimizer", TrainOptimizerConfig.default_values(), TrainOptimizerConfig, False))

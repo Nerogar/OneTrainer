@@ -141,7 +141,8 @@ class ConceptWindow(ctk.CTkToplevel):
                                  "VALIDATION: Use concept for validation instead of training\n"
                                  "PRIOR_PREDICTION: Use the sample to make a prediction using the model as it was before training. This prediction is then used as the training target "
                                  "for the model in training. This can be used as regularisation and to preserve prior model knowledge while finetuning the model on other concepts. "
-                                 "Only implemented for LoRA.",
+                                 "Only implemented for LoRA.\n"
+                                 "For DPO preference pairs, set the chosen/rejected patterns below instead.",
                          wide_tooltip=True)
         components.options(frame, 2, 1, [str(x) for x in list(ConceptType)], self.ui_state, "type")
 
@@ -197,6 +198,21 @@ class ConceptWindow(ctk.CTkToplevel):
         components.label(frame, 9, 0, "Loss Weight",
                          tooltip="The loss multiplyer for this concept.")
         components.entry(frame, 9, 1, self.ui_state, "loss_weight")
+
+        # dpo patterns
+        components.label(frame, 10, 0, "DPO Chosen Pattern",
+                         tooltip="Turns this concept into a DPO pair concept. Filename pattern (relative to Path) "
+                                 "that selects the chosen images, e.g. 'chosen/{}'. The '{}' placeholder is the "
+                                 "shared file stem. Leave empty for a normal concept; both patterns must be set "
+                                 "together. Enable 'Include Subdirectories' when the pattern contains '/'.")
+        components.entry(frame, 10, 1, self.ui_state, "dpo_chosen_pattern")
+
+        components.label(frame, 11, 0, "DPO Rejected Pattern",
+                         tooltip="Pattern locating the rejected image for each chosen image, e.g. 'rejected/{}'. "
+                                 "'{}' is the stem matched by the chosen pattern; the file extension may differ. "
+                                 "The rejected image is loaded into the same sample as its chosen image, so both "
+                                 "share augmentations, bucketing and crops.")
+        components.entry(frame, 11, 1, self.ui_state, "dpo_rejected_pattern")
 
         frame.pack(fill="both", expand=1)
         return frame

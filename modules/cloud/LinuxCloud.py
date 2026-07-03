@@ -249,7 +249,7 @@ class LinuxCloud(BaseCloud):
             else:
                 raise
 
-    def _upload_config_file(self,local : Path):
+    def _upload_config_file(self, local: Path):
         self.file_sync.sync_up_file(local,Path(self.config_file))
 
     def sync_workspace(self):

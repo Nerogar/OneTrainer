@@ -97,7 +97,12 @@ class StableDiffusionBaseDataLoader(
             text_caching=not config.train_text_encoder_or_embedding(),
         )
 
-    def _output_modules(self, config: TrainConfig, model: StableDiffusionModel, model_setup: BaseStableDiffusionSetup):
+    def _output_modules(
+        self,
+        config: TrainConfig,
+        model: StableDiffusionModel,
+        model_setup: BaseStableDiffusionSetup,
+    ):
         output_names = [
             'image_path', 'latent_image',
             'prompt',

@@ -131,7 +131,7 @@ class BaseCloud(metaclass=ABCMeta):
         raise NotImplementedError("Tensorboard tunnel not supported on this cloud type")
 
     @abstractmethod
-    def _upload_config_file(self,local : Path):
+    def _upload_config_file(self, local: Path):
         pass
 
     @abstractmethod

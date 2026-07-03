@@ -33,9 +33,14 @@ class BaseDataLoader(
         self.temp_device = temp_device
 
         if is_validation:
+            # Validation-only overrides on a throwaway config copy (never the
+            # training config). rlhf_enabled here means "build the paired DPO
+            # pipeline for this loader", which is true only when DPO validation is
+            # active; the pipeline modules downstream key off config.rlhf_enabled.
             config = copy.copy(config)
             config.batch_size = 1
             config.multi_gpu = False
+            config.rlhf_enabled = config.dpo_validation_active()
 
         self.__ds = self._create_dataset(
             config=config,

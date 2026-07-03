@@ -30,6 +30,16 @@ class StableDiffusionXLBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
 ):
+    def _dpo_rejected_preparation_modules(self, config: TrainConfig, model: StableDiffusionXLModel) -> list:
+        if not config.rlhf_enabled:
+            return []
+
+        rescale_image = RescaleImageChannels(image_in_name='image_rejected', image_out_name='image_rejected', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
+        encode_image = EncodeVAE(in_name='image_rejected', out_name='latent_image_rejected_distribution', vae=model.vae, autocast_contexts=[model.autocast_context, model.vae_autocast_context], dtype=model.vae_train_dtype.torch_dtype())
+        image_sample = SampleVAEDistribution(in_name='latent_image_rejected_distribution', out_name='latent_image_rejected', mode='mean')
+
+        return [rescale_image, encode_image, image_sample]
+
     def _preparation_modules(self, config: TrainConfig, model: StableDiffusionXLModel):
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)

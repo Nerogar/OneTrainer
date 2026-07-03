@@ -75,6 +75,18 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
         return self._offset_noise_psi_schedule
 
 
+    def _apply_dpo_paired_rng(self, tensor: Tensor) -> Tensor:
+        # During a batched DPO forward the batch is [chosen; rejected] along
+        # dim 0, and each pair must be compared at the same timestep with the
+        # same noise. Sequential RNG draws would give rejected[i] draw B+i
+        # instead of draw i, so the second half is overwritten with the first.
+        # calculate_dpo_loss sets _dpo_paired_half to B around its batched
+        # predict() calls; the batch dict itself is not visible here.
+        half = getattr(self, "_dpo_paired_half", None)
+        if half is not None and tensor.shape[0] == 2 * half:
+            tensor[half:] = tensor[:half]
+        return tensor
+
     def _create_noise(
             self,
             source_tensor: Tensor,
@@ -117,7 +129,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             )
             noise = noise + (config.perturbation_noise_weight * perturbation_noise)
 
-        return noise
+        return self._apply_dpo_paired_rng(noise)
 
     def _get_timestep_discrete(
             self,
@@ -250,7 +262,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                 samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True, generator=generator) + min_timestep
                 timestep = samples.to(dtype=torch.long, device=generator.device)
 
-            return timestep.int()
+            return self._apply_dpo_paired_rng(timestep.int())
 
     def _get_timestep_continuous(
             self,
