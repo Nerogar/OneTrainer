@@ -4,6 +4,7 @@ from pathlib import Path
 
 from modules.model.BaseModel import BaseModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
+from modules.module.FusedModule import check_fusion_match
 from modules.util.convert_lora_util import (
     convert_lora_suffix_ab,
     convert_to_diffusers,
@@ -100,15 +101,13 @@ class LoRASaverMixin(
         # ORIGINAL puts the denoising model at the top level with no prefix, which leaves no namespace for a
         # second component: a trained text encoder (or bundled embeddings) would have to sit under its own
         # prefix alongside the unprefixed denoising keys, an asymmetric layout no external tool reads. Refuse
-        # it -- COMFY (every component under its own prefix, the denoising model as "diffusion_model.") is the
-        # format for a multi-component LoRA. Components are the distinct top-level key segments (transformer /
-        # text_encoder[_n] / bundle_emb).
+        # it. Components are the distinct top-level key segments (transformer / text_encoder[_n] / bundle_emb).
         components = {key.split(".", 1)[0] for key in state_dict}
         if len(components) > 1:
             raise RuntimeError(
                 "The ORIGINAL LoRA format places the denoising model at the top level with no prefix and "
                 f"cannot represent more than one trained component (got {len(components)}: "
-                f"{', '.join(sorted(components))}). Use the COMFY format for a multi-component LoRA.")
+                f"{', '.join(sorted(components))}).")
 
         conversion = lora_original_conversion(model, model.lora_diffusers_to_original())
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
@@ -150,8 +149,7 @@ class LoRASaverMixin(
         self._write_lora_file(model, destination, save_state_dict)
 
     def _save_internal(self, model: BaseModel, destination: str):
-        # INTERNAL resume snapshot: the raw canonical in-memory dict (no conversion). OMI (the old
-        # snapshot namespace for not-yet-migrated models) has been dropped.
+        # INTERNAL backup: the raw canonical in-memory dict (no conversion).
         os.makedirs(destination, exist_ok=True)
         state_dict = self._get_state_dict(model)
         save_state_dict = self._convert_state_dict_dtype(state_dict, None)
@@ -164,6 +162,11 @@ class LoRASaverMixin(
             output_model_destination: str,
             dtype: torch.dtype | None,
     ):
+        # INTERNAL is the raw canonical dict, not a foreign format with a fixed fused/split shape -- exempt.
+        if output_model_format != ModelFormat.INTERNAL:
+            state_dict = self._get_state_dict(model)
+            check_fusion_match(state_dict.keys(), output_model_format.needs_qkv_fusion(), model.fusion_groups())
+
         match output_model_format:
             case ModelFormat.DIFFUSERS_LORA:
                 self._save_diffusers(model, output_model_destination, dtype)

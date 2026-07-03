@@ -1,6 +1,7 @@
 from enum import Enum
 
 from modules.util.enum.ModelFormat import ModelFormat
+from modules.util.enum.TrainingMethod import TrainingMethod
 
 
 class ModelType(Enum):
@@ -209,7 +210,9 @@ class ModelType(Enum):
         formats = [ModelFormat.DIFFUSERS]
         if self.is_stable_diffusion() or self.is_stable_diffusion_xl() or self.is_stable_diffusion_3():
             formats.append(ModelFormat.ORIGINAL_SINGLE_FILE)
-        elif not (self.is_sana() or self.is_wuerstchen()):
+        elif (self.is_flux_1() or self.is_flux_2() or self.is_chroma() or self.is_hunyuan_video()
+                or self.is_hi_dream() or self.is_pixart() or self.is_qwen() or self.is_ernie()
+                or self.is_z_image() or self.is_krea2()):
             formats.append(ModelFormat.ORIGINAL_TRANSFORMER)
         if self.is_z_image():
             formats.append(ModelFormat.COMFY_TRANSFORMER)
@@ -228,6 +231,16 @@ class ModelType(Enum):
         if has_legacy:
             formats.append(ModelFormat.LEGACY_SAFETENSORS)
         return formats
+
+    def supported_output_formats(self, training_method: TrainingMethod) -> list[ModelFormat]:
+        if training_method == TrainingMethod.EMBEDDING:
+            return [ModelFormat.SAFETENSORS]
+        elif training_method == TrainingMethod.LORA:
+            return self.supported_lora_formats()
+        elif training_method in (TrainingMethod.FINE_TUNE, TrainingMethod.FINE_TUNE_VAE):
+            return self.supported_full_model_formats()
+        else:
+            raise ValueError(f"Unsupported training method: {training_method}")
 
 
 # The components each model type has, keyed by TrainConfig field names, as the single source of truth.
