@@ -9,11 +9,6 @@ class SanaLoRALoader(
     def __init__(self):
         super().__init__()
 
-
-    def _legacy_conversion(self, model: SanaModel) -> list | None:
-        # Sana dropped LEGACY: its only output was a never-loadable dotted format (see the saver).
-        return None
-
     def load(
             self,
             model: SanaModel,

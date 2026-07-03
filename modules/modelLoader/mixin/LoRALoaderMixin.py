@@ -39,12 +39,10 @@ class LoRALoaderMixin(metaclass=ABCMeta):
         return model.fusion_groups()
 
     def _legacy_conversion(self, model: BaseModel) -> list | None:
-        # Canonical->LEGACY conversion (mirrors the saver's _convert_legacy), one entry per component: the
-        # denoising component flattened under lora_<component> (DIFFUSERS body, split/unfused -> None), each
-        # text encoder under lora_te<n> (n by order), bundle_emb passthrough -- the saver's mixture namespace
-        # restricted to this model's components. Overrides: PixArt/Chroma use a no-digit lora_te; Stable
-        # Cascade uses lora_prior_unet + a native split-attn body. Sana / Wuerstchen v2 return None so a
-        # LEGACY file raises instead of silently mis-loading.
+        # No legacy_flat detection unless overridden -- mirrors the saver's _convert_legacy opt-in default.
+        return None
+
+    def _mixture_legacy_conversion(self, model: BaseModel) -> list:
         component = model.model_type.denoising_model_part()
         conversion = [(component, f"lora_{component}")]
         for i, (_te_module, te_names) in enumerate(model.lora_text_encoders(), start=1):
