@@ -153,7 +153,11 @@ class TrainUIController:
         return VideoToolUIController().create_window(parent, view_cls)
 
     def open_convert_model_tool(self, parent, view_cls):
-        return ConvertModelUIController().create_window(parent, view_cls)
+        return ConvertModelUIController(
+            model_type=self.train_config.model_type,
+            base_model_name=self.train_config.base_model_name,
+            huggingface_token=self.train_config.secrets.huggingface_token,
+        ).create_window(parent, view_cls)
 
     def open_sampling_tool(self, parent, view_cls):
         if not self.training_callbacks and not self.training_commands:

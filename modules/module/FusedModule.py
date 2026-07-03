@@ -2,7 +2,7 @@ from collections.abc import Iterator, Mapping
 from typing import Any
 
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
-from modules.util.convert_util import matched_leaf_groups
+from modules.util.convert_util import match_any, matched_leaf_groups
 from modules.util.quantization_util import get_unquantized_weight
 
 import torch
@@ -210,3 +210,37 @@ def discover_fused_groups(fusion_spec: list[tuple] | None, selected_modules: dic
             consumed.update(leaf_names)
 
     return groups
+
+
+def check_fusion_match(keys, fuse: bool, fusion_groups: list[tuple] | None):
+    # A LoRA's qkv fused/split shape must match what the target needs: the wrapper's own `fuse`, on the
+    # training-resume load path; or the requested output format, on the convert tool's save path (the
+    # convert tool loads straight into a plain dict and never goes through the wrapper, so it needs this
+    # same guard before writing a file the target format can't represent). Converting between them is
+    # unsupported: fusing independent split q/k/v into one rank-r adapter is lossy (SVD/re-rank), and
+    # de-fusing a fused adapter into split leaves, though exact for LoRA, is not implemented -- so a
+    # mismatch is a hard error rather than a silent key drop or an invalid output file.
+    #
+    # `fusion_groups` is the model's raw fusion spec -- (group_pattern, leaf_suffixes, fused_suffix,
+    # original_suffix), the same shape as model.fusion_groups() / LoRAModuleWrapper.fusion_spec -- no live
+    # module or per-instance discovery needed, just a pattern match against the on-disk keys via match_any
+    # (the leading component prefix, e.g. "transformer.", is stripped positionally since fusion groups only
+    # ever apply to the single denoising component; the trailing "{suffix__}" wildcard stands in for
+    # whatever value suffix -- .lora_down.weight, .alpha, hada_w1_a, ... -- follows the module name).
+    if not fusion_groups:
+        return
+    relative_keys = [key.split(".", 1)[1] for key in keys if "." in key]
+    for group_pattern, leaf_suffixes, fused_suffix, _original_suffix in fusion_groups:
+        file_fused = match_any([group_pattern + "." + fused_suffix + ".{suffix__}"], relative_keys)
+        file_split = match_any([group_pattern + "." + leaf + ".{suffix__}" for leaf in leaf_suffixes], relative_keys)
+
+        if fuse and file_split:
+            raise RuntimeError(
+                f"LoRA file has split q/k/v ({fused_suffix}), but the selected output format needs "
+                f"fused qkv. Fusing independent q/k/v adapters into one rank-r adapter is lossy "
+                f"(SVD/re-rank); pick a split output format or retrain.")
+        if not fuse and file_fused:
+            raise RuntimeError(
+                f"LoRA file has fused qkv ({fused_suffix}), but the selected output format keeps q/k/v "
+                f"split. De-fusing a fused adapter on load is not supported yet; pick a fused output "
+                f"format or retrain.")

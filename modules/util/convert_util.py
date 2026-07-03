@@ -137,6 +137,13 @@ def convert(input_orig: dict, conversion_input: list[ConversionPattern] | list, 
     return output
 
 
+def match_any(patterns: list[str], keys) -> bool:
+    # whether any key matches any of the given parse patterns -- the presence-only counterpart to convert():
+    # convert() renames every match it finds, this just answers whether one exists. Used where a caller only
+    # needs to detect an on-disk shape (e.g. a qkv group's fused vs split form) rather than perform a rename.
+    return any(parse.parse(pattern, key) is not None for pattern in patterns for key in keys)
+
+
 def reverse_conversion_pattern(input: ConversionPattern):
     if input.convert_fn is not None and input.reverse_convert_fn is None:
         raise RuntimeError("Conversion cannot be reversed: no reverse_convert_fn defined")

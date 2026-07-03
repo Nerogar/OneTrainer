@@ -4,6 +4,7 @@ from pathlib import Path
 
 from modules.model.BaseModel import BaseModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
+from modules.module.FusedModule import check_fusion_match
 from modules.util.convert_lora_util import (
     convert_lora_suffix_ab,
     convert_to_diffusers,
@@ -161,6 +162,11 @@ class LoRASaverMixin(
             output_model_destination: str,
             dtype: torch.dtype | None,
     ):
+        # INTERNAL is the raw canonical dict, not a foreign format with a fixed fused/split shape -- exempt.
+        if output_model_format != ModelFormat.INTERNAL:
+            state_dict = self._get_state_dict(model)
+            check_fusion_match(state_dict.keys(), output_model_format.needs_qkv_fusion(), model.fusion_groups())
+
         match output_model_format:
             case ModelFormat.DIFFUSERS_LORA:
                 self._save_diffusers(model, output_model_destination, dtype)

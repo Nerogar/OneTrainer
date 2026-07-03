@@ -1,6 +1,7 @@
 from enum import Enum
 
 from modules.util.enum.ModelFormat import ModelFormat
+from modules.util.enum.TrainingMethod import TrainingMethod
 
 
 class ModelType(Enum):
@@ -210,6 +211,16 @@ class ModelType(Enum):
                 or self.is_z_image() or self.is_stable_cascade()):
             formats.append(ModelFormat.LEGACY_SAFETENSORS)
         return formats
+
+    def supported_output_formats(self, training_method: TrainingMethod) -> list[ModelFormat]:
+        if training_method == TrainingMethod.EMBEDDING:
+            return [ModelFormat.SAFETENSORS]
+        elif training_method == TrainingMethod.LORA:
+            return self.supported_lora_formats()
+        elif training_method in (TrainingMethod.FINE_TUNE, TrainingMethod.FINE_TUNE_VAE):
+            return self.supported_full_model_formats()
+        else:
+            raise ValueError(f"Unsupported training method: {training_method}")
 
 
 # The components each model type has, keyed by TrainConfig field names, as the single source of truth.

@@ -5,7 +5,7 @@ from collections import defaultdict
 from collections.abc import Mapping
 from typing import Any
 
-from modules.module.FusedModule import FusedModuleGroup, discover_fused_groups
+from modules.module.FusedModule import FusedModuleGroup, check_fusion_match, discover_fused_groups
 from modules.module.oft_utils import OFTRotationModule
 from modules.module.quantized.LinearSVD import BaseLinearSVD
 from modules.util.config.TrainConfig import TrainConfig
@@ -1035,27 +1035,14 @@ class LoRAModuleWrapper:
 
     def _check_fusion_match(self, state_dict: dict[str, Tensor]):
         # The incoming file's qkv fused/split state must match this wrapper's (fixed by the output
-        # format). Converting between them on load is unsupported -- fusing independent split q/k/v into
-        # one rank-r adapter is lossy (SVD), and de-fusing a fused file into split leaves, though exact
-        # for LoRA, is not implemented yet -- so a mismatch is a hard error rather than a silent key drop
-        # (the fused/split keys simply wouldn't match any module). The check targets the qkv keys via
-        # fused_groups, which is why the grouping rides along on split wrappers too (see __init__).
+        # format). The check targets the qkv keys via fused_groups, which is why the grouping rides along
+        # on split wrappers too (see __init__). See check_fusion_match for why a mismatch is a hard error.
+        groups = []
         for fused_name, leaf_names, _leaves in self.fused_groups:
             fused_prefix = (self.prefix + "." + fused_name) if self.prefix != "" else fused_name
             leaf_prefixes = [(self.prefix + "." + n) if self.prefix != "" else n for n in leaf_names]
-            file_fused = any(k.startswith(fused_prefix + ".") for k in state_dict)
-            file_split = any(k.startswith(lp + ".") for lp in leaf_prefixes for k in state_dict)
-
-            if self.fuse and file_split:
-                raise RuntimeError(
-                    f"LoRA file has split q/k/v ({fused_name}), but the selected output format needs "
-                    f"fused qkv. Fusing independent q/k/v adapters into one rank-r adapter is lossy "
-                    f"(SVD/re-rank); pick a split output format or retrain.")
-            if not self.fuse and file_fused:
-                raise RuntimeError(
-                    f"LoRA file has fused qkv ({fused_name}), but the selected output format keeps q/k/v "
-                    f"split. De-fusing a fused adapter on load is not supported yet; pick a fused output "
-                    f"format or retrain.")
+            groups.append((fused_prefix, leaf_prefixes))
+        check_fusion_match(state_dict.keys(), self.fuse, groups)
 
     def load_state_dict(self, state_dict: dict[str, Tensor], strict: bool = True):
         """
