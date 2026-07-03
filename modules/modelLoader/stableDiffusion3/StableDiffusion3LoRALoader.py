@@ -9,6 +9,8 @@ class StableDiffusion3LoRALoader(
     def __init__(self):
         super().__init__()
 
+    def _legacy_conversion(self, model: StableDiffusion3Model) -> list | None:
+        return self._mixture_legacy_conversion(model)
 
     def load(
             self,
