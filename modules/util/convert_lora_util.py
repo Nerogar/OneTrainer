@@ -138,8 +138,7 @@ def convert_lora_suffix_ab(
 def convert_to_diffusers(
         state_dict: dict[str, Tensor],
 ) -> dict[str, Tensor]:
-    # DIFFUSERS format: the convention HF diffusers' load_lora_weights reads (not the
-    # peft library's native base_model.model. / adapter_config.json layout). The canonical
+    # DIFFUSERS format: the convention HF diffusers' load_lora_weights reads. The canonical
     # in-memory keys are diffusers-dotted module paths but carry OneTrainer's native
     # lora_down/lora_up suffix, so module names need no remap and no key_set is involved --
     # only the suffix/alpha convert to the diffusers lora_A/lora_B convention (peft_convention=True):
@@ -172,10 +171,10 @@ def convert_to_diffusers(
     if any(k.endswith('.dora_scale') for k in out_states):
         print("Warning: this DoRA adapter stores a per-input magnitude (dora_on_output is off), which HF "
               "diffusers cannot read. It is saved as dora_scale, so diffusers will load the file as a plain "
-              "LoRA and drop the DoRA magnitude. Train with dora_on_output, or use the KOHYA/COMFY format.")
+              "LoRA and drop the DoRA magnitude.")
     if any(k.endswith('.lora_magnitude_vector.weight') for k in out_states):
         print("Warning: the DIFFUSERS format stores the DoRA magnitude as lora_magnitude_vector, which "
               "only HF diffusers reads. ComfyUI will load this file as a plain LoRA (the DoRA magnitude "
-              "is dropped). Use the KOHYA or COMFY format to keep DoRA loadable in ComfyUI.")
+              "is dropped).")
 
     return out_states

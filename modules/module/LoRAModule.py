@@ -850,9 +850,7 @@ class LoRAModuleWrapper:
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
         self.lokr_dim = config.lokr_dim
-        # per-model qkv fusion groups (block_pattern, [leaf_suffixes], fused_suffix, original_suffix),
-        # passed in by the setup. The original_suffix field is the converter's concern and ignored here.
-        # See modules/model/FluxModel.py.
+        # per-model qkv fusion groups (group_pattern, [leaf_suffixes], fused_suffix, original_suffix).
         self.fusion_spec = fusion_spec
         # whether to actually BUILD fused modules (vs split leaves). The setup decides from the chosen
         # output format (ModelFormat.needs_qkv_fusion); this module does not know about output formats.
@@ -914,8 +912,6 @@ class LoRAModuleWrapper:
                 'train_device': torch.device(config.train_device),
                 'lokr_vec_trick': config.lokr_vec_trick,
             }
-        # discovered qkv fusion groups (set in __create_modules); [] when there is no orig_module or no
-        # fusion_spec. Consumed by the load-time fused/split match check.
         self.fused_groups = []
         self.lora_modules = self.__create_modules(orig_module, config)
 
@@ -1042,9 +1038,8 @@ class LoRAModuleWrapper:
         # format). Converting between them on load is unsupported -- fusing independent split q/k/v into
         # one rank-r adapter is lossy (SVD), and de-fusing a fused file into split leaves, though exact
         # for LoRA, is not implemented yet -- so a mismatch is a hard error rather than a silent key drop
-        # (the fused/split keys simply wouldn't match any module). Only the qkv groups can differ; the
-        # rest of the namespace is shared. The check targets the qkv keys via fused_groups, which is why
-        # the grouping rides along on split wrappers too (see __init__).
+        # (the fused/split keys simply wouldn't match any module). The check targets the qkv keys via
+        # fused_groups, which is why the grouping rides along on split wrappers too (see __init__).
         for fused_name, leaf_names, _leaves in self.fused_groups:
             fused_prefix = (self.prefix + "." + fused_name) if self.prefix != "" else fused_name
             leaf_prefixes = [(self.prefix + "." + n) if self.prefix != "" else n for n in leaf_names]

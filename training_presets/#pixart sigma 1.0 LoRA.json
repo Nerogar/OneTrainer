@@ -9,7 +9,7 @@
     "resolution": "1024",
     "training_method": "LORA",
     "lora_rank": 16,
-    "lora_alpha": 1.0,
+	"lora_alpha": 1.0,
     "transformer": {
         "weight_dtype": "BFLOAT_16"
     },

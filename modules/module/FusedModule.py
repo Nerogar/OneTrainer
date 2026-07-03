@@ -1,14 +1,13 @@
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
+from modules.util.convert_util import matched_leaf_groups
 from modules.util.quantization_util import get_unquantized_weight
 
 import torch
 from torch import Tensor, nn
 from torch.nn import Parameter
-
-import parse
 
 
 class _FusedLinear(nn.Linear, QuantizedLinearMixin):
@@ -148,11 +147,11 @@ class FusedModuleGroup:
     def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True):
         return self.module.load_state_dict(state_dict, strict=strict)
 
-    def parameters(self) -> list[Parameter]:
-        return list(self.module.parameters())
+    def parameters(self) -> Iterator[Parameter]:
+        return self.module.parameters()
 
-    def modules(self) -> list[nn.Module]:
-        return list(self.module.modules())
+    def modules(self) -> Iterator[nn.Module]:
+        return self.module.modules()
 
     def to(self, device: torch.device = None, dtype: torch.dtype = None) -> 'FusedModuleGroup':
         self.module.to(device, dtype)
@@ -168,12 +167,11 @@ class FusedModuleGroup:
 
 def discover_fused_groups(fusion_spec: list[tuple] | None, selected_modules: dict[str, nn.Module],
                           fuse: bool = False) -> list[tuple[str, list[str], list]]:
-    # Match the per-model fusion_spec against the concrete selected Linear names, capturing the
-    # block index {i} via parse. A group fires only when all its leaves are present and selected
-    # for the same block and share in_features; otherwise those leaves stay individual modules
-    # (never fuse a partial group). Returns the discovered groups as (fused name, leaf names, leaf
-    # modules) -- independent of whether they'll be built fused (LoRAModuleWrapper.fuse); a split
-    # wrapper keeps the same list to recognise an incompatible fused file on load (__check_fusion_match).
+    # Match the per-model fusion_spec against the concrete selected Linear names. A group fires only when
+    # all its leaves are present and selected for the same group and share in_features; otherwise those
+    # leaves stay individual modules (never fuse a partial group). Returns the discovered groups as (fused
+    # name, leaf names, leaf modules) -- independent of whether they'll be built fused (LoRAModuleWrapper.fuse);
+    # a split wrapper keeps the same list to recognise an incompatible fused file on load (__check_fusion_match).
     #
     # fuse mirrors LoRAModuleWrapper.fuse: True when this wrapper will actually BUILD fused modules (an
     # output format that needs qkv fusion). A PARTIALLY-selected group -- some of a group's projections
@@ -187,36 +185,28 @@ def discover_fused_groups(fusion_spec: list[tuple] | None, selected_modules: dic
         return groups
 
     consumed = set()
-    for block_pattern, leaf_suffixes, fused_suffix, _original_suffix in fusion_spec:
-        index_sets = []
-        for leaf in leaf_suffixes:
-            pattern = block_pattern + "." + leaf
-            indices = {match["i"] for name in selected_modules
-                       if (match := parse.parse(pattern, name)) is not None and "i" in match.named}
-            index_sets.append(indices)
+    for group_pattern, leaf_suffixes, fused_suffix, _original_suffix in fusion_spec:
+        group_sets = [matched_leaf_groups(group_pattern, leaf, selected_modules) for leaf in leaf_suffixes]
 
-        complete = set.intersection(*index_sets) if index_sets else set()
+        complete = set.intersection(*group_sets) if group_sets else set()
         if fuse:
-            # blocks where some leaves are selected but not all -> cannot fuse, cannot fall back to split.
-            partial = (set.union(*index_sets) - complete) if index_sets else set()
-            for i in sorted(partial):
-                block = block_pattern.format(i=i)
+            # groups where some leaves are selected but not all -> cannot fuse, cannot fall back to split.
+            partial = (set.union(*group_sets) - complete) if group_sets else set()
+            for group_key in sorted(partial):
                 raise RuntimeError(
                     f"The selected output format requires fusing all of {', '.join(leaf_suffixes)} in "
-                    f"{block} into a single '{fused_suffix}' module, but the layer filter trained only a "
+                    f"{group_key} into a single '{fused_suffix}' module, but the layer filter trained only a "
                     f"subset. Every projection in a fusion group must be trained together. Either add the "
-                    f"missing layer(s) to the layer filter, or save as DIFFUSERS or LEGACY, which keep the "
-                    f"projections split.")
+                    f"missing layer(s) to the layer filter, or choose a different output format.")
 
-        for i in sorted(complete):
-            block = block_pattern.format(i=i)
-            leaf_names = [f"{block}.{leaf}" for leaf in leaf_suffixes]
+        for group_key in sorted(complete):
+            leaf_names = [f"{group_key}.{leaf}" for leaf in leaf_suffixes]
             if any(name in consumed for name in leaf_names):
                 continue
             leaves = [selected_modules[name] for name in leaf_names]
             if len({leaf.in_features for leaf in leaves}) != 1:
                 continue
-            groups.append((f"{block}.{fused_suffix}", leaf_names, leaves))
+            groups.append((f"{group_key}.{fused_suffix}", leaf_names, leaves))
             consumed.update(leaf_names)
 
     return groups

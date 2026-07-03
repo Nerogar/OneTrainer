@@ -4,7 +4,7 @@ from random import Random
 
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.convert_util import fuse_qkv
+from modules.util.convert_util import fuse
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
@@ -91,7 +91,7 @@ class ZImageModel(BaseModel):
         return [
             ("all_x_embedder.2-1", "x_embedder"),
             ("all_final_layer.2-1", "final_layer"),
-            (["{p}.attention.to_q", "{p}.attention.to_k", "{p}.attention.to_v"], "{p}.attention.qkv", fuse_qkv),
+            (["{p}.attention.to_q", "{p}.attention.to_k", "{p}.attention.to_v"], "{p}.attention.qkv", fuse),
             ("{p}.attention.norm_q.weight", "{p}.attention.q_norm.weight"),
             ("{p}.attention.norm_k.weight", "{p}.attention.k_norm.weight"),
             ("{p}.attention.to_out.0", "{p}.attention.out"),

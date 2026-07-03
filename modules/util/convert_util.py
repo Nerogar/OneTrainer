@@ -150,9 +150,9 @@ def reverse_conversion_pattern(input: ConversionPattern):
     )
 
 def reverse_conversion(input: list[ConversionPattern] | list[tuple] | None):
-    # accept the tuple-list form the savers hold (e.g. [("unet", "unet", body)]) as well as a
-    # ConversionPattern list, so a forward save conversion can be reversed for the load side directly.
-    # children is None for a leaf pattern (no nested body) -- pass it through unchanged.
+    # accept the tuple-list form (e.g. [("unet", "unet", body)]) as well as a ConversionPattern list, so a
+    # forward conversion can be reversed directly. children is None for a leaf pattern (no nested body) --
+    # pass it through unchanged.
     if input is None:
         return None
     if input and all(isinstance(entry, list) for entry in input):
@@ -233,31 +233,33 @@ def _create_conversion_pattern_from_tuple(input: tuple | ConversionPattern):
 def _create_conversion_from_tuple_list(input: list):
     return [_create_conversion_pattern_from_tuple(entry) for entry in input]
 
-def fuse_qkv(q, k, v):
-    return torch.cat([q, k, v], dim=0)
-
-def fuse_kv(k, v):
-    return torch.cat([k, v], dim=0)
-
-def fuse_qkv_mlp(q, k, v, mlp):
-    return torch.cat([q, k, v, mlp], dim=0)
-
-def fuse_split(*tensors):
-    # concatenate N split projections along the output dim into one fused tensor -- the generic, arity-
-    # agnostic form of fuse_qkv / fuse_kv / fuse_qkv_mlp, used by the full-model fusion pre-stage (forward
-    # only, so no reverse is needed).
+def fuse(*tensors):
+    # concatenate N split projections along the output dim into one fused tensor, used by the full-model
+    # fusion pre-stage (forward only, so no reverse is needed).
     return torch.cat(tensors, dim=0)
+
+def matched_leaf_groups(group_pattern: str, leaf: str, names) -> set[str]:
+    # the set of group-identity strings among `names` that match `group_pattern` followed by the literal
+    # `leaf` suffix. Any placeholder in group_pattern only constrains match shape, disambiguating groups that
+    # would otherwise share a leaf suffix. No value is ever extracted from the match itself: once a name
+    # matches, its group identity is just the name with the known ".{leaf}" suffix stripped, so this works
+    # whether the placeholder is named, anonymous, or absent.
+    suffix = "." + leaf
+    pattern = group_pattern + suffix
+    return {name.removesuffix(suffix) for name in names
+            if name.endswith(suffix) and parse.parse(pattern, name) is not None}
+
 
 def qkv_fusion(fusion_groups: list) -> list:
     # Full-model checkpoint pre-stage, identical across every fusing model: fuse each group's split leaves
     # into its fused diffusers name in the diffusers namespace, so the shared diffusers->original body can
-    # then rename that fused name. Groups are bucketed by block pattern, since a model may fuse in more than
-    # one block type (e.g. Flux's double + single blocks). The original suffix is unused here -- the body
+    # then rename that fused name. Groups are bucketed by group pattern, since a model may fuse more than
+    # one group shape (e.g. Flux's double + single blocks). The original suffix is unused here -- the body
     # owns the rename; this stage only collapses the split leaves into the fused name.
-    by_block = {}
-    for block, leaves, fused, _original in fusion_groups:
-        by_block.setdefault(block, []).append((list(leaves), fused, fuse_split))
-    return [(block, block, rules) for block, rules in by_block.items()]
+    by_group_pattern = {}
+    for group_pattern, leaves, fused, _original in fusion_groups:
+        by_group_pattern.setdefault(group_pattern, []).append((list(leaves), fused, fuse))
+    return [(group_pattern, group_pattern, rules) for group_pattern, rules in by_group_pattern.items()]
 
 
 def remove_prefix(prefix: str | None = None, separator: str='.'):
@@ -396,10 +398,10 @@ def kv_fusion(k: str, v: str, kv: str, separator: str='.'):
     # two-input fuse of a split k/v into one kv tensor (PixArt cross-attention: attn2.to_k/to_v ->
     # cross_attn.kv_linear). The query stays separate, so this is not a qkv fuse.
     return [
-        ([k, v], kv, fuse_kv)
+        ([k, v], kv, fuse)
     ]
 
 def qkv_mlp_fusion(q: str, k: str, v: str, mlp: str, qkv: str, separator: str='.'):
     return [
-        ([q, k, v, mlp], qkv, fuse_qkv_mlp)
+        ([q, k, v, mlp], qkv, fuse)
     ]
