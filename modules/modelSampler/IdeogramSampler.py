@@ -63,14 +63,13 @@ class IdeogramSampler(BaseModelSampler):
             transformer = self.pipeline.transformer
             dtype = self.model.train_dtype.torch_dtype()
 
-            # Ideogram uses asymmetric (dual-network) CFG: the negative branch is the unconditional_transformer run on
-            # the image tokens with zeroed text features, NOT a negative-prompt encode. negative_prompt is unused.
+            # Ideogram uses asymmetric (dual-network) CFG: the negative branch is normally the unconditional_transformer
+            # run on the image tokens with zeroed text features, NOT a negative-prompt encode. negative_prompt is
+            # unused. If the unconditional transformer was not loaded, fall back to encoding an empty ("") prompt and
+            # running it through the conditional transformer instead, like standard CFG.
             use_cfg = cfg_scale > 1.0
-            if use_cfg and self.model.unconditional_transformer is None:
-                raise RuntimeError(
-                    "cfg_scale > 1.0 requires the unconditional transformer, which was not loaded. "
-                    "Either set cfg_scale to 1.0 or enable loading the unconditional transformer."
-                )
+            use_unconditional_transformer = use_cfg and self.model.unconditional_transformer is not None
+            use_empty_prompt_negative = use_cfg and self.model.unconditional_transformer is None
 
             vae_scale_factor = 8
             patch_size = 2
@@ -79,32 +78,48 @@ class IdeogramSampler(BaseModelSampler):
             grid_w = width // (vae_scale_factor * patch_size)
             num_image_tokens = grid_h * grid_w
 
-            # encode text (conditional branch only)
+            # build the packed [text][image] conditioning for a single text encode (no left pad for a single
+            # prompt). Padding positions are masked out by segment_ids/indicator, so packing to the actual text
+            # length matches the 2048-pad pipeline.
+            def pack_conditioning(text_features: torch.Tensor, text_lengths: torch.Tensor) -> tuple:
+                max_text_tokens = text_features.shape[1]
+                position_ids, segment_ids, indicator = self.model.prepare_packed_ids(
+                    text_lengths, grid_h, grid_w, max_text_tokens, self.train_device,
+                )
+                image_feature_padding = torch.zeros(
+                    text_features.shape[0], num_image_tokens, text_features.shape[-1],
+                    dtype=text_features.dtype, device=self.train_device,
+                )
+                llm_features = torch.cat([text_features, image_feature_padding], dim=1).to(dtype)
+                text_z_padding = torch.zeros(
+                    text_features.shape[0], max_text_tokens, latent_dim, dtype=dtype, device=self.train_device,
+                )
+                return max_text_tokens, position_ids, segment_ids, indicator, llm_features, text_z_padding
+
+            # encode text (conditional branch, and the empty-prompt negative branch if needed)
             self.model.text_encoder_to(self.train_device)
             text_features, text_lengths = self.model.encode_text(
                 train_device=self.train_device,
                 text=prompt,
             )
+            max_text_tokens, position_ids, segment_ids, indicator, llm_features, text_z_padding = pack_conditioning(
+                text_features, text_lengths,
+            )
+
+            if use_empty_prompt_negative:
+                neg_text_features, neg_text_lengths = self.model.encode_text(
+                    train_device=self.train_device,
+                    text="",
+                )
+                (
+                    max_neg_text_tokens, neg_position_ids, neg_segment_ids, neg_indicator, neg_llm_features,
+                    neg_text_z_padding,
+                ) = pack_conditioning(neg_text_features, neg_text_lengths)
             self.model.text_encoder_to(self.temp_device)
             torch_gc()
 
-            # build the packed [text][image] conditioning (no left pad for a single prompt). Padding positions are
-            # masked out by segment_ids/indicator, so packing to the actual text length matches the 2048-pad pipeline.
-            max_text_tokens = text_features.shape[1]
-            position_ids, segment_ids, indicator = self.model.prepare_packed_ids(
-                text_lengths, grid_h, grid_w, max_text_tokens, self.train_device,
-            )
-            image_feature_padding = torch.zeros(
-                text_features.shape[0], num_image_tokens, text_features.shape[-1],
-                dtype=text_features.dtype, device=self.train_device,
-            )
-            llm_features = torch.cat([text_features, image_feature_padding], dim=1).to(dtype)
-            text_z_padding = torch.zeros(
-                text_features.shape[0], max_text_tokens, latent_dim, dtype=dtype, device=self.train_device,
-            )
-
-            # unconditional (image-only) branch: zeroed text features over the image-region slices of the layout
-            if use_cfg:
+            if use_unconditional_transformer:
+                # unconditional (image-only) branch: zeroed text features over the image-region slices of the layout
                 neg_position_ids = position_ids[:, max_text_tokens:]
                 neg_segment_ids = segment_ids[:, max_text_tokens:]
                 neg_indicator = indicator[:, max_text_tokens:]
@@ -119,10 +134,10 @@ class IdeogramSampler(BaseModelSampler):
                 generator=generator, device=self.train_device, dtype=torch.float32,
             )
 
-            # both are dead after this point but stay referenced as locals for the rest of the function (the
-            # denoising loop + VAE decode); image_feature_padding alone is ~832MB fp32 at 1024px, freeing it here
-            # closes the gap on the OOM observed in llm_cond_norm's fp32 variance upcast of neg_llm_features.
-            del image_feature_padding, text_features
+            # dead after this point but stays as a local for the rest of the function (the denoising loop + VAE
+            # decode); freeing it here closes the gap on the OOM observed in llm_cond_norm's fp32 variance upcast
+            # of neg_llm_features.
+            del text_features
 
             # resolution-aware logit-normal Euler schedule (pipeline overrides the scheduler's default sigmas)
             schedule_mu = _resolution_aware_mu(height=height, width=width, base_mu=0.0)
@@ -151,7 +166,7 @@ class IdeogramSampler(BaseModelSampler):
                 )[0]
                 pos_v = pos_out[:, max_text_tokens:].float()
 
-                if use_cfg:
+                if use_unconditional_transformer:
                     neg_v = self.model.unconditional_transformer(
                         hidden_states=latent_image.to(dtype),
                         timestep=t_model,
@@ -161,9 +176,20 @@ class IdeogramSampler(BaseModelSampler):
                         indicator=neg_indicator,
                         return_dict=False,
                     )[0].float()
-                    v = neg_v + cfg_scale * (pos_v - neg_v)
-                else:
-                    v = pos_v
+                elif use_empty_prompt_negative:
+                    neg_z = torch.cat([neg_text_z_padding, latent_image.to(dtype)], dim=1)
+                    neg_out = transformer(
+                        hidden_states=neg_z,
+                        timestep=t_model,
+                        encoder_hidden_states=neg_llm_features,
+                        position_ids=neg_position_ids,
+                        segment_ids=neg_segment_ids,
+                        indicator=neg_indicator,
+                        return_dict=False,
+                    )[0]
+                    neg_v = neg_out[:, max_neg_text_tokens:].float()
+
+                v = neg_v + cfg_scale * (pos_v - neg_v) if use_cfg else pos_v
 
                 latent_image = noise_scheduler.step(-v, timestep, latent_image, return_dict=False)[0]
 
