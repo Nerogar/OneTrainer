@@ -13,6 +13,11 @@ class PySide6OptimizerParamsWindowView(BaseOptimizerParamsWindowView, QDialog):
         QDialog.__init__(self, parent)
         BaseOptimizerParamsWindowView.__init__(self, pyside6_components)
 
+        # delete on close so the entry widgets, and the field validators they register in the global
+        # _active_validators set, are destroyed instead of lingering on the parent and being re-checked
+        # at training start (a parented QDialog is otherwise kept alive after exec() returns).
+        self.finished.connect(self.deleteLater)
+
         self.controller = controller
         self.ui_state = ui_state
         self.optimizer_ui_state = ui_state.get_var("optimizer")

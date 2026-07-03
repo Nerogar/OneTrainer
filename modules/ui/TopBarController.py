@@ -36,6 +36,7 @@ class TopBarController:
             ("Chroma1", ModelType.CHROMA_1),
             ("QwenImage", ModelType.QWEN),
             ("Anima", ModelType.ANIMA),
+            ("Krea 2", ModelType.KREA_2),
             ("Z-Image", ModelType.Z_IMAGE),
             ("Ernie Image", ModelType.ERNIE),
         ]
@@ -65,6 +66,7 @@ class TopBarController:
             ]
         elif model_type.is_qwen() \
                 or model_type.is_anima() \
+                or model_type.is_krea2() \
                 or model_type.is_z_image() \
                 or model_type.is_flux_2() \
                 or model_type.is_ernie():

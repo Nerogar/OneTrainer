@@ -106,7 +106,9 @@ class LoRALoaderMixin(metaclass=ABCMeta):
         if os.path.exists(os.path.join(lora_name, "meta.json")):
             safetensors_lora_name = os.path.join(lora_name, "lora", "lora.safetensors")
             if os.path.exists(safetensors_lora_name):
-                self.__load_safetensors(model, safetensors_lora_name)
+                # backups are saved as the raw canonical wrapper dict (_save_internal, no conversion), so load
+                # them raw -- the exact inverse. _to_canonical is only for foreign files.
+                model.lora_state_dict = load_file(safetensors_lora_name)
         else:
             raise Exception("not an internal model")
 

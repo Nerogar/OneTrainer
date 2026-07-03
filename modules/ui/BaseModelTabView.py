@@ -39,6 +39,8 @@ class BaseModelTabView(ABC):
             self.__setup_qwen_ui(frame, controller, ui_state)
         elif controller.train_config.model_type.is_anima():
             self.__setup_anima_ui(frame, controller, ui_state)
+        elif controller.train_config.model_type.is_krea2():
+            self.__setup_krea2_ui(frame, controller, ui_state)
         elif controller.train_config.model_type.is_sana():
             self.__setup_sana_ui(frame, controller, ui_state)
         elif controller.train_config.model_type.is_hunyuan_video():
@@ -210,6 +212,26 @@ class BaseModelTabView(ABC):
         )
 
     def __setup_anima_ui(self, frame, controller, ui_state):
+        row = 0
+        row = self.__create_base_dtype_components(frame, row, ui_state)
+        row = self.__create_base_components(
+            frame,
+            row,
+            controller,
+            ui_state,
+            has_transformer=True,
+            allow_override_transformer=True,
+            has_text_encoder_1=True,
+            has_vae=True,
+        )
+        row = self.__create_output_components(
+            frame,
+            row,
+            controller,
+            ui_state,
+        )
+
+    def __setup_krea2_ui(self, frame, controller, ui_state):
         row = 0
         row = self.__create_base_dtype_components(frame, row, ui_state)
         row = self.__create_base_components(
