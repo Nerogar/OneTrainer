@@ -3,7 +3,7 @@
     "batch_size": 4,
     "model_type": "STABLE_DIFFUSION_21",
     "output_model_destination": "models/model.safetensors",
-    "output_model_format": "SAFETENSORS",
+    "output_model_format": "ORIGINAL_SINGLE_FILE",
     "resolution": "512",
     "training_method": "FINE_TUNE",
     "vae": {

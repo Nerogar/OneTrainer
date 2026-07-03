@@ -5,7 +5,7 @@
     "epochs": 100,
     "learning_rate": 0.00002,
     "output_model_destination": "models/model",
-    "output_model_format": "SAFETENSORS",
+    "output_model_format": "ORIGINAL_TRANSFORMER",
     "resolution": "1024",
     "training_method": "FINE_TUNE",
     "transformer": {

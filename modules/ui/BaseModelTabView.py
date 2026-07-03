@@ -4,9 +4,7 @@ from abc import ABC, abstractmethod
 from modules.util import path_util
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
-from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.PathIOType import PathIOType
-from modules.util.enum.TrainingMethod import TrainingMethod
 
 
 class BaseModelTabView(ABC):
@@ -63,13 +61,8 @@ class BaseModelTabView(ABC):
         row = self.__create_output_components(
             frame,
             row,
+            controller,
             ui_state,
-            allow_safetensors=True,
-            allow_diffusers=controller.train_config.training_method in [
-                TrainingMethod.FINE_TUNE,
-                TrainingMethod.FINE_TUNE_VAE,
-            ],
-            allow_legacy_safetensors=controller.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_stable_diffusion_3_ui(self, frame, controller, ui_state):
@@ -89,10 +82,8 @@ class BaseModelTabView(ABC):
         row = self.__create_output_components(
             frame,
             row,
+            controller,
             ui_state,
-            allow_safetensors=True,
-            allow_diffusers=controller.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=controller.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_flux_ui(self, frame, controller, ui_state):
@@ -112,10 +103,8 @@ class BaseModelTabView(ABC):
         row = self.__create_output_components(
             frame,
             row,
+            controller,
             ui_state,
-            allow_safetensors=True,
-            allow_diffusers=controller.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=controller.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_flux_2_ui(self, frame, controller, ui_state):
@@ -134,10 +123,8 @@ class BaseModelTabView(ABC):
         row = self.__create_output_components(
             frame,
             row,
+            controller,
             ui_state,
-            allow_safetensors=True,
-            allow_diffusers=controller.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=controller.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_z_image_ui(self, frame, controller, ui_state):
@@ -156,10 +143,8 @@ class BaseModelTabView(ABC):
         row = self.__create_output_components(
             frame,
             row,
+            controller,
             ui_state,
-            allow_safetensors=True,
-            allow_diffusers=controller.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=controller.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_ernie_ui(self, frame, controller, ui_state):
@@ -178,10 +163,8 @@ class BaseModelTabView(ABC):
         row = self.__create_output_components(
             frame,
             row,
+            controller,
             ui_state,
-            allow_safetensors=True,
-            allow_diffusers=controller.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=controller.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_chroma_ui(self, frame, controller, ui_state):
@@ -200,10 +183,8 @@ class BaseModelTabView(ABC):
         row = self.__create_output_components(
             frame,
             row,
+            controller,
             ui_state,
-            allow_safetensors=True,
-            allow_diffusers=controller.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=controller.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_qwen_ui(self, frame, controller, ui_state):
@@ -222,10 +203,8 @@ class BaseModelTabView(ABC):
         row = self.__create_output_components(
             frame,
             row,
+            controller,
             ui_state,
-            allow_safetensors=True,
-            allow_diffusers=controller.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=controller.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_stable_diffusion_xl_ui(self, frame, controller, ui_state):
@@ -244,10 +223,8 @@ class BaseModelTabView(ABC):
         row = self.__create_output_components(
             frame,
             row,
+            controller,
             ui_state,
-            allow_safetensors=True,
-            allow_diffusers=controller.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=controller.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_wuerstchen_ui(self, frame, controller, ui_state):
@@ -267,11 +244,8 @@ class BaseModelTabView(ABC):
         row = self.__create_output_components(
             frame,
             row,
+            controller,
             ui_state,
-            allow_safetensors=controller.train_config.training_method != TrainingMethod.FINE_TUNE
-                              or controller.train_config.model_type.is_stable_cascade(),
-            allow_diffusers=controller.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=controller.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_pixart_alpha_ui(self, frame, controller, ui_state):
@@ -289,10 +263,8 @@ class BaseModelTabView(ABC):
         row = self.__create_output_components(
             frame,
             row,
+            controller,
             ui_state,
-            allow_safetensors=True,
-            allow_diffusers=controller.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=controller.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_sana_ui(self, frame, controller, ui_state):
@@ -310,10 +282,8 @@ class BaseModelTabView(ABC):
         row = self.__create_output_components(
             frame,
             row,
+            controller,
             ui_state,
-            allow_safetensors=controller.train_config.training_method != TrainingMethod.FINE_TUNE,
-            allow_diffusers=controller.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=controller.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_hunyuan_video_ui(self, frame, controller, ui_state):
@@ -333,10 +303,8 @@ class BaseModelTabView(ABC):
         row = self.__create_output_components(
             frame,
             row,
+            controller,
             ui_state,
-            allow_safetensors=True,
-            allow_diffusers=controller.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=controller.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __setup_hi_dream_ui(self, frame, controller, ui_state):
@@ -358,10 +326,8 @@ class BaseModelTabView(ABC):
         row = self.__create_output_components(
             frame,
             row,
+            controller,
             ui_state,
-            allow_safetensors=True,
-            allow_diffusers=controller.train_config.training_method == TrainingMethod.FINE_TUNE,
-            allow_legacy_safetensors=controller.train_config.training_method == TrainingMethod.LORA,
         )
 
     def __create_dtype_options(self, include_gguf: bool = False, include_a8: bool = False) -> list[tuple[str, DataType]]:
@@ -643,11 +609,8 @@ class BaseModelTabView(ABC):
             self,
             frame,
             row: int,
+            controller,
             ui_state,
-            allow_safetensors: bool = False,
-            allow_diffusers: bool = False,
-            allow_legacy_safetensors: bool = False,
-            allow_comfy: bool = False,
     ) -> int:
         # output model destination
         self.components.label(frame, row, 0, "Model Output Destination",
@@ -672,15 +635,7 @@ class BaseModelTabView(ABC):
         row += 1
 
         # output format
-        formats = []
-        if allow_safetensors:
-            formats.append(("Safetensors", ModelFormat.SAFETENSORS))
-        if allow_diffusers:
-            formats.append(("Diffusers", ModelFormat.DIFFUSERS))
-        # if allow_legacy_safetensors:
-        #     formats.append(("Legacy Safetensors", ModelFormat.LEGACY_SAFETENSORS))
-        if allow_comfy:
-            formats.append(("Comfy LoRA", ModelFormat.COMFY_LORA))
+        formats = controller.get_output_formats()
 
         self.components.label(frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
