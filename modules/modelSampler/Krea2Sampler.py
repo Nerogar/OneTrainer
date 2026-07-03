@@ -97,17 +97,12 @@ class Krea2Sampler(BaseModelSampler):
             text_seq_len = combined_prompt_embedding.shape[1]
             grid_height = height // vae_scale_factor // 2  # patch_size = 2
             grid_width = width // vae_scale_factor // 2
-            position_ids = Krea2Pipeline.prepare_position_ids(
-                text_seq_len, grid_height, grid_width, self.train_device
-            )
+            position_ids = Krea2Pipeline.prepare_position_ids(text_seq_len, grid_height, grid_width, self.train_device)
 
             # denoising loop
             extra_step_kwargs = {}
             if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
                 extra_step_kwargs["generator"] = generator
-
-            if torch.all(text_attention_mask):
-                text_attention_mask = None
 
             self.model.transformer_to(self.train_device)
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
@@ -124,13 +119,9 @@ class Krea2Sampler(BaseModelSampler):
 
                 if cfg_scale > 1.0:
                     noise_pred_positive, noise_pred_negative = noise_pred.chunk(2)
-                    # Krea2 CFG: cond + scale*(cond - uncond), matching pipeline_krea2.py
-                    noise_pred = noise_pred_positive + cfg_scale * (noise_pred_positive - noise_pred_negative)
+                    noise_pred = noise_pred_negative + cfg_scale * (noise_pred_positive - noise_pred_negative)
 
-                # compute the previous noisy sample x_t -> x_t-1
-                latent_image = noise_scheduler.step(
-                    noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs
-                )[0]
+                latent_image = noise_scheduler.step(noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs)[0]
 
                 on_update_progress(i + 1, len(timesteps))
 
@@ -143,7 +134,6 @@ class Krea2Sampler(BaseModelSampler):
                 width // vae_scale_factor,
             )
 
-            # decode
             self.model.vae_to(self.train_device)
 
             latents = self.model.unscale_latents(latent_image)

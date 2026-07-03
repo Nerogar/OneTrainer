@@ -50,9 +50,8 @@ class BaseKrea2Setup(
         if config.gradient_checkpointing.enabled():
             model.transformer_offload_conductor = \
                 enable_checkpointing_for_krea2_transformer(model.transformer, config)
-            if model.text_encoder is not None:
-                model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_qwen3vl_encoder_layers(model.text_encoder, config)
+            model.text_encoder_offload_conductor = \
+                enable_checkpointing_for_qwen3vl_encoder_layers(model.text_encoder, config)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
@@ -100,8 +99,7 @@ class BaseKrea2Setup(
                 rand=rand,
                 tokens=batch.get("tokens"),
                 tokens_mask=batch.get("tokens_mask"),
-                text_encoder_output=batch['text_encoder_hidden_state'] \
-                    if 'text_encoder_hidden_state' in batch and not config.train_text_encoder_or_embedding() else None,
+                text_encoder_output=batch.get('text_encoder_hidden_state'),
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
 

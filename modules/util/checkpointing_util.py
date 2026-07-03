@@ -413,8 +413,7 @@ def enable_checkpointing_for_krea2_transformer(
         model: nn.Module,
         config: TrainConfig,
 ) -> LayerOffloadConductor:
-    # Krea2TransformerBlock takes (hidden_states, temb, image_rotary_emb, attention_mask);
-    # only hidden_states is threaded between blocks.
+    # Krea2TransformerBlock takes (hidden_states, temb, image_rotary_emb, attention_mask).
     return enable_checkpointing(model, config, config.compile, [
         (model.text_fusion.layerwise_blocks, ["hidden_states"]),
         (model.text_fusion.refiner_blocks,   ["hidden_states"]),

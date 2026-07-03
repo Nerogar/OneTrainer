@@ -4,7 +4,6 @@ from random import Random
 
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
-from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
@@ -22,7 +21,6 @@ from diffusers import (
 from transformers import Qwen2Tokenizer, Qwen3VLModel
 
 # Selected decoder-layer indices whose hidden states are stacked per token and fed to the transformer.
-# Verified from Krea2Pipeline defaults: (2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35)
 TEXT_ENCODER_SELECT_LAYERS = (2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35)
 
 # Chat-template prefix that is prepended to every prompt before tokenization. Uses the same
@@ -53,13 +51,10 @@ class Krea2Model(BaseModel):
     # autocast context
     text_encoder_autocast_context: torch.autocast | nullcontext
 
-    text_encoder_train_dtype: DataType
-
     text_encoder_offload_conductor: LayerOffloadConductor | None
     transformer_offload_conductor: LayerOffloadConductor | None
 
     # persistent lora training data
-    text_encoder_lora: LoRAModuleWrapper | None
     transformer_lora: LoRAModuleWrapper | None
     lora_state_dict: dict | None
 
@@ -79,18 +74,14 @@ class Krea2Model(BaseModel):
 
         self.text_encoder_autocast_context = nullcontext()
 
-        self.text_encoder_train_dtype = DataType.FLOAT_32
-
         self.text_encoder_offload_conductor = None
         self.transformer_offload_conductor = None
 
-        self.text_encoder_lora = None
         self.transformer_lora = None
         self.lora_state_dict = None
 
     def adapters(self) -> list[LoRAModuleWrapper]:
         return [a for a in [
-            self.text_encoder_lora,
             self.transformer_lora,
         ] if a is not None]
 
@@ -130,22 +121,21 @@ class Krea2Model(BaseModel):
             ("text_fusion.projector",     "txtfusion.projector"),
             ("text_fusion.layerwise_blocks.{i}", "txtfusion.layerwise_blocks.{i}", block_body),
             ("text_fusion.refiner_blocks.{i}",   "txtfusion.refiner_blocks.{i}",   block_body),
-            ("transformer_blocks.{i}",    "blocks.{i}", [*block_body, ("scale_shift_table", "mod.lin", flatten_mod, table_mod)]),
+            ("transformer_blocks.{i}",    "blocks.{i}", [
+                *block_body,
+                ("scale_shift_table", "mod.lin", flatten_mod, table_mod),
+            ]),
         ]
 
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
 
     def text_encoder_to(self, device: torch.device): #TODO share more code between models
-        if self.text_encoder is not None:
-            if self.text_encoder_offload_conductor is not None and \
-                    self.text_encoder_offload_conductor.layer_offload_activated():
-                self.text_encoder_offload_conductor.to(device)
-            else:
-                self.text_encoder.to(device=device)
-
-        if self.text_encoder_lora is not None:
-            self.text_encoder_lora.to(device)
+        if self.text_encoder_offload_conductor is not None and \
+                self.text_encoder_offload_conductor.layer_offload_activated():
+            self.text_encoder_offload_conductor.to(device)
+        else:
+            self.text_encoder.to(device=device)
 
     def transformer_to(self, device: torch.device):
         if self.transformer_offload_conductor is not None and \
@@ -164,8 +154,7 @@ class Krea2Model(BaseModel):
 
     def eval(self):
         self.vae.eval()
-        if self.text_encoder is not None:
-            self.text_encoder.eval()
+        self.text_encoder.eval()
         self.transformer.eval()
 
     def create_pipeline(self) -> DiffusionPipeline:
@@ -185,7 +174,6 @@ class Krea2Model(BaseModel):
             text: str | list[str] = None,
             tokens: Tensor = None,
             tokens_mask: Tensor = None,
-            text_encoder_layer_skip: int = 0,
             text_encoder_dropout_probability: float | None = None,
             text_encoder_output: Tensor = None,
     ) -> tuple[Tensor, Tensor]:
@@ -209,7 +197,7 @@ class Krea2Model(BaseModel):
             tokens = torch.cat([prefix_out.input_ids, suffix_out.input_ids], dim=1).to(self.text_encoder.device)
             tokens_mask = torch.cat([prefix_out.attention_mask, suffix_out.attention_mask], dim=1).bool().to(self.text_encoder.device)
 
-        if text_encoder_output is None and self.text_encoder is not None:
+        if text_encoder_output is None:
             with self.text_encoder_autocast_context:
                 # cumsum position_ids: suffix tokens get positions right after real prompt tokens,
                 # not after the padding block — matches how the model was sampled at training time.
@@ -294,7 +282,7 @@ class Krea2Model(BaseModel):
 
         return latents
 
-    def scale_latents(self, latents: Tensor) -> Tensor:
+    def scale_latents(self, latents: Tensor) -> Tensor: #TODO share with other models using the same VAE (e.g. QwenModel)
         latents_mean = torch.tensor(self.vae.config.latents_mean, device=latents.device, dtype=latents.dtype).view(1, self.vae.config.z_dim, 1, 1, 1)
         latents_std = 1.0 / torch.tensor(self.vae.config.latents_std, device=latents.device, dtype=latents.dtype).view(1, self.vae.config.z_dim, 1, 1, 1)
         return (latents - latents_mean) * latents_std
@@ -304,7 +292,7 @@ class Krea2Model(BaseModel):
         latents_std = 1.0 / torch.tensor(self.vae.config.latents_std, device=latents.device, dtype=latents.dtype).view(1, self.vae.config.z_dim, 1, 1, 1)
         return latents / latents_std + latents_mean
 
-    def calculate_timestep_shift(self, latent_width: int, latent_height: int):
+    def calculate_timestep_shift(self, latent_width: int, latent_height: int): #TODO identical in several models, share this code
         base_seq_len = self.noise_scheduler.config.base_image_seq_len
         max_seq_len = self.noise_scheduler.config.max_image_seq_len
         base_shift = self.noise_scheduler.config.base_shift

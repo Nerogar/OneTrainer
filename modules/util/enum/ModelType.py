@@ -183,7 +183,6 @@ class ModelType(Enum):
         return _MODEL_PARTS[self][0]
 
     def supported_lora_formats(self) -> list[ModelFormat]:
-        # LEGACY is an allowlist: only models with a real, loadable historical LoRA output.
         formats = [
             ModelFormat.DIFFUSERS_LORA,
             ModelFormat.KOHYA_LORA,
@@ -195,7 +194,8 @@ class ModelType(Enum):
             or self.is_stable_diffusion_3() \
             or self.is_stable_cascade() \
             or self.is_pixart() \
-            or self.is_flux() \
+            or self.is_flux_1() \
+            or self.is_flux_2() \
             or self.is_chroma() \
             or self.is_qwen() \
             or self.is_hunyuan_video() \
@@ -206,7 +206,6 @@ class ModelType(Enum):
         return formats
 
     def supported_full_model_formats(self) -> list[ModelFormat]:
-        # LEGACY_SAFETENSORS is an allowlist: only models with a real, loadable historical full-model output.
         formats = [ModelFormat.DIFFUSERS]
         if self.is_stable_diffusion() or self.is_stable_diffusion_xl() or self.is_stable_diffusion_3():
             formats.append(ModelFormat.ORIGINAL_SINGLE_FILE)
@@ -221,7 +220,8 @@ class ModelType(Enum):
             or self.is_stable_diffusion_3() \
             or self.is_stable_cascade() \
             or self.is_pixart() \
-            or self.is_flux() \
+            or self.is_flux_1() \
+            or self.is_flux_2() \
             or self.is_chroma() \
             or self.is_qwen() \
             or self.is_hunyuan_video() \

@@ -15,8 +15,6 @@ class Krea2LoRASaver(
             model: Krea2Model,
     ) -> dict[str, Tensor]:
         state_dict = {}
-        if model.text_encoder_lora is not None:
-            state_dict |= model.text_encoder_lora.state_dict()
         if model.transformer_lora is not None:
             state_dict |= model.transformer_lora.state_dict()
         if model.lora_state_dict is not None:
