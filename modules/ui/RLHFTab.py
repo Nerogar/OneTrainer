@@ -5,15 +5,11 @@ from tkinter import messagebox
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dpo_curation_util import (
     check_dpo_pairs,
-    correct_all_captions_to_chosen,
-    find_caption_mismatches,
     fix_multiline_captions,
     remove_finalized_pair,
-    repair_rejected_pairs,
 )
 from modules.util.dpo_pattern_util import dpo_concept_pattern_dirs
 from modules.util.enum.DPOObjective import DPOObjective
-from modules.util.enum.RLHFMode import RLHFMode
 from modules.util.ui import components
 from modules.util.ui.UIState import UIState
 
@@ -45,14 +41,6 @@ class RLHFTab:
         self.scroll_frame.grid_columnconfigure(4, weight=1)
 
         training_type = "DPO (Existing Adapter)" if self.train_config.lora_model_name else "DPO (New Adapter)"
-
-        mode_options = [
-            ("DPO", RLHFMode.DPO),
-        ]
-        components.label(
-            self.scroll_frame, 0, 0, "RLHF Mode", tooltip="Preference training method. DPO is the current option."
-        )
-        components.options_kv(self.scroll_frame, 0, 1, mode_options, self.ui_state, "rlhf_mode")
 
         components.label(
             self.scroll_frame,
@@ -142,43 +130,6 @@ class RLHFTab:
 
         components.label(
             self.scroll_frame,
-            3,
-            3,
-            "Validation %",
-            tooltip="How many prompt groups the DPO Pair Tool leaves out for validation.",
-        )
-        components.entry(self.scroll_frame, 3, 4, self.ui_state, "rlhf_dpo_validation_percentage")
-
-        components.label(
-            self.scroll_frame,
-            4,
-            3,
-            "Early Stopping",
-            tooltip="Stops DPO training when the validation signal stops improving.",
-        )
-        components.switch(self.scroll_frame, 4, 4, self.ui_state, "rlhf_dpo_patience_enabled")
-
-        components.label(
-            self.scroll_frame,
-            5,
-            3,
-            "Patience",
-            tooltip="How many validation checks can pass without improvement before training stops.",
-        )
-        components.entry(self.scroll_frame, 5, 4, self.ui_state, "rlhf_dpo_patience_value")
-
-        components.label(
-            self.scroll_frame,
-            6,
-            3,
-            "Save Best",
-            tooltip="Saves a checkpoint when validation accuracy hits a new high. "
-            "The best checkpoint is restored at the end of training.",
-        )
-        components.switch(self.scroll_frame, 6, 4, self.ui_state, "rlhf_dpo_save_best")
-
-        components.label(
-            self.scroll_frame,
             8,
             3,
             "Timestep Margins",
@@ -202,16 +153,6 @@ class RLHFTab:
             "Review Pairs",
             command=self._review_pairs,
             tooltip="Visually review your chosen/rejected image pairs. Remove bad pairs and their counterparts.",
-        )
-        components.button(
-            self.scroll_frame,
-            7,
-            2,
-            "Re-pair by Similarity",
-            command=self._repair_rejected,
-            tooltip="Within each caption group, rename rejected images so each is paired with the chosen image it most "
-            "resembles (DINOv2 structural similarity). Sharpens the DPO signal by holding composition constant so the "
-            "gradient keys on the quality difference. Renames rejected files in place — back up first.",
         )
         components.button(
             self.scroll_frame,
@@ -308,40 +249,9 @@ class RLHFTab:
                 fixed = fix_multiline_captions(concept_pairs)
                 messagebox.showinfo("Captions Fixed", f"Flattened {fixed} caption file(s) to single lines.")
 
-        # Caption-content mismatch resolution: chosen.txt vs rejected.txt for
-        # matched image pairs. Runs last so any earlier stray/multiline fixes
-        # are reflected in the matched-pair set this scans.
-        try:
-            mismatches = find_caption_mismatches(concept_pairs)
-        except Exception as ex:
-            messagebox.showerror("Caption Mismatch Error", f"Error checking captions: {ex}")
-            return
-
-        if not mismatches:
-            return
-
-        from modules.ui.DPOCaptionMismatchWindow import (
-            DPOCaptionMismatchChoiceDialog,
-            DPOCaptionMismatchWindow,
-        )
-
-        dialog = DPOCaptionMismatchChoiceDialog(self.master.winfo_toplevel(), len(mismatches))
-        self.master.winfo_toplevel().wait_window(dialog)
-        choice = dialog.result
-        if choice == "correct_all":
-            corrected = correct_all_captions_to_chosen(mismatches)
-            messagebox.showinfo(
-                "Captions Corrected",
-                f"Overwrote {corrected} rejected caption file(s) with the chosen caption.",
-            )
-        elif choice == "manual":
-            DPOCaptionMismatchWindow(self.master.winfo_toplevel(), concept_pairs)
-
     def _remove_strays(self, concept_pairs, result) -> int:
-        from modules.util.dpo_curation_util import dpo_pair_key
-        from modules.util.path_util import supported_image_extensions
+        from modules.util.dpo_curation_util import _index_images
 
-        exts = supported_image_extensions()
         removed = 0
 
         for i, (chosen_path, rejected_path) in enumerate(concept_pairs):
@@ -349,22 +259,8 @@ class RLHFTab:
             if pair_info.get("chosen_stray", 0) == 0 and pair_info.get("rejected_stray", 0) == 0:
                 continue
 
-            chosen_keys: dict[str, str] = {}
-            rejected_keys: dict[str, str] = {}
-
-            for root, _dirs, files in os.walk(chosen_path):
-                for fname in files:
-                    ext = os.path.splitext(fname)[1].lower()
-                    if ext in exts:
-                        full = os.path.join(root, fname)
-                        chosen_keys[dpo_pair_key(full, chosen_path)] = full
-
-            for root, _dirs, files in os.walk(rejected_path):
-                for fname in files:
-                    ext = os.path.splitext(fname)[1].lower()
-                    if ext in exts:
-                        full = os.path.join(root, fname)
-                        rejected_keys[dpo_pair_key(full, rejected_path)] = full
+            chosen_keys = _index_images(chosen_path)
+            rejected_keys = _index_images(rejected_path)
 
             matched = set(chosen_keys) & set(rejected_keys)
 
@@ -394,69 +290,6 @@ class RLHFTab:
         from modules.ui.DPOBucketAnalysisWindow import DPOBucketAnalysisWindow
 
         DPOBucketAnalysisWindow(self.master.winfo_toplevel(), self.train_config)
-
-    def _repair_rejected(self):
-        try:
-            concept_pairs = self._load_concept_pairs()
-        except Exception as ex:
-            messagebox.showerror("Re-pair Error", str(ex))
-            return
-
-        proceed = messagebox.askyesno(
-            "Re-pair Rejected Images?",
-            "This renames rejected image files in place so each is paired with the most visually similar chosen image "
-            "in its caption group (computed with DINOv2). A quality floor (0.85) keeps any pair from being pushed "
-            "below 0.85 cosine or below where it started, so re-pairing only helps. Single-pair captions are left "
-            "untouched and no pairs are lost.\n\nThe first run downloads ~330MB of model weights. Back up your "
-            "dataset before continuing.\n\nProceed?",
-        )
-        if not proceed:
-            return
-
-        # DINOv2 inference can take a while, so run it on a worker thread with an
-        # indeterminate progress dialog rather than freezing the Tk main loop.
-        parent = self.master.winfo_toplevel()
-        dialog = ctk.CTkToplevel(parent)
-        dialog.title("Re-pairing")
-        dialog.transient(parent)
-        dialog.resizable(False, False)
-        ctk.CTkLabel(dialog, text="Computing embeddings and re-pairing rejected images...").pack(padx=20, pady=(20, 10))
-        progress = ctk.CTkProgressBar(dialog, width=320, mode="indeterminate")
-        progress.pack(padx=20, pady=(0, 20))
-        progress.start()
-
-        result: dict = {}
-
-        def _worker():
-            try:
-                result["summary"] = repair_rejected_pairs(concept_pairs)
-            except Exception as ex:  # surfaced on the UI thread by _poll
-                result["error"] = str(ex)
-
-        import threading
-
-        thread = threading.Thread(target=_worker, daemon=True)
-        thread.start()
-
-        def _poll():
-            if thread.is_alive():
-                dialog.after(150, _poll)
-                return
-            progress.stop()
-            dialog.destroy()
-            if "error" in result:
-                messagebox.showerror("Re-pair Error", f"Error re-pairing: {result['error']}")
-                return
-            summary = result.get("summary", {})
-            messagebox.showinfo(
-                "Re-pair Complete",
-                f"Re-paired {summary.get('pairs_repaired', 0)} rejected image(s) across "
-                f"{summary.get('groups_processed', 0)} multi-pair caption group(s).\n"
-                f"Single-pair groups skipped: {summary.get('groups_skipped_single', 0)}\n"
-                f"Total matched pairs considered: {summary.get('pairs_total', 0)}",
-            )
-
-        dialog.after(150, _poll)
 
     def _load_concept_pairs(self):
         concept_pairs = dpo_concept_pattern_dirs(self._load_concepts())

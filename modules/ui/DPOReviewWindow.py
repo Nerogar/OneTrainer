@@ -5,10 +5,10 @@ from modules.util.dpo_curation_util import (
     remove_finalized_pair,
     scan_finalized_pairs,
 )
+from modules.util.image_util import load_fitted_image
 from modules.util.ui.ui_utils import set_window_icon
 
 import customtkinter as ctk
-from PIL import Image
 
 
 class DPOReviewWindow(ctk.CTkToplevel):
@@ -153,12 +153,6 @@ class DPOReviewWindow(ctk.CTkToplevel):
             self._index = max(0, len(self._pairs) - 1)
         self._build_review_ui()
 
-    def _fit_image(self, pil_img: Image.Image, max_w: int, max_h: int) -> Image.Image:
-        scale = min(max_w / pil_img.width, max_h / pil_img.height)
-        new_w = max(1, int(pil_img.width * scale))
-        new_h = max(1, int(pil_img.height * scale))
-        return pil_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-
     def _display_image(self, master, path: str, row: int, col: int):
         try:
             self.update_idletasks()
@@ -166,8 +160,7 @@ class DPOReviewWindow(ctk.CTkToplevel):
             win_h = self.winfo_height() or self.winfo_screenheight()
             max_w = max(400, win_w // 2 - 40)
             max_h = max(400, win_h - 200)
-            with Image.open(path) as _raw:
-                pil_img = self._fit_image(_raw, max_w, max_h).copy()
+            pil_img = load_fitted_image(path, max_w, max_h)
             ctk_img = ctk.CTkImage(light_image=pil_img, size=pil_img.size)
 
             label = ctk.CTkLabel(master, text="", image=ctk_img)

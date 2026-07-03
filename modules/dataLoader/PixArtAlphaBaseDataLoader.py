@@ -95,7 +95,6 @@ class PixArtAlphaBaseDataLoader(
         config: TrainConfig,
         model: PixArtAlphaModel,
         model_setup: BasePixArtAlphaSetup,
-        is_validation: bool = False,
     ):
         output_names = [
             'image_path', 'latent_image',
@@ -121,7 +120,6 @@ class PixArtAlphaBaseDataLoader(
             vae=model.vae,
             autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
-            is_validation=is_validation,
         )
 
     def _debug_modules(self, config: TrainConfig, model: PixArtAlphaModel):

@@ -75,7 +75,9 @@ class DeriveDPORejectedPath(
 
             self._rejected_paths.append(rejected_path)
 
-            if resolve_aspect_ratio("", image_path) != resolve_aspect_ratio("", rejected_path):
+            # The chosen/rejected file dimensions are static across variations, so
+            # only open the image headers for the aspect warning on the first pass.
+            if variation == 0 and resolve_aspect_ratio("", image_path) != resolve_aspect_ratio("", rejected_path):
                 aspect_mismatches.append(f"{image_path} vs {rejected_path}")
 
         if missing:

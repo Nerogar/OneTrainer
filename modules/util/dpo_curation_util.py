@@ -5,44 +5,42 @@ import random
 import re
 import shutil
 import threading
+from fractions import Fraction
 
 _SHA256_CHUNK_BYTES = 65536
 
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.image_metadata_util import strip_angle_bracket_segments
-from modules.util.path_util import supported_image_extensions
+from modules.util.path_util import supported_image_extensions, walk_skipping_dotted
+
+from mgds.pipelineModules.AspectBucketing import AspectBucketing
 
 UNCONDITIONAL_PROMPT = "UNCONDITIONAL"
 
 
-def walk_skipping_dotted(folder: str):
-    """``os.walk`` wrapper that prunes dot-prefixed subdirectories in-place
-    (``.thumbnails``, ``.cache``, ``.stversions``, ...) so their contents are
-    never yielded — gallery apps and sync tools plant resized previews there
-    that would otherwise dhash-collide with (or duplicate) the real images.
-    Yields ``(root, files)`` pairs. The top-level ``folder`` itself is always
-    walked, even when its own name starts with a dot — only subdirectories
-    are filtered."""
-    for root, dirs, files in os.walk(folder):
-        dirs[:] = [d for d in dirs if not d.startswith(".")]
-        yield root, files
+def _index_images(root: str) -> dict[str, str]:
+    """Map each supported image under ``root`` (recursively) to its dpo pair
+    key. Dot-prefixed subdirs (``.thumbnails`` etc.) are pruned via
+    :func:`walk_skipping_dotted` so gallery previews are never counted as pairs."""
+    exts = supported_image_extensions()
+    keys: dict[str, str] = {}
+    for walk_root, files in walk_skipping_dotted(root):
+        for fname in files:
+            if os.path.splitext(fname)[1].lower() in exts:
+                full = os.path.join(walk_root, fname)
+                keys[dpo_pair_key(full, root)] = full
+    return keys
 
 
-# Mirrors mgds AspectBucketing.all_possible_input_aspects: the trainer snaps
-# every image's aspect to the nearest of these ratios (and their inverses)
-# regardless of target resolution, then center-crops to fit. Each entry is the
-# (W, H) label parts of the landscape orientation — aspect value W/H.
-_TRAINER_BUCKET_RATIOS: tuple[tuple[int, int], ...] = (
-    (1, 1),
-    (5, 4),
-    (3, 2),
-    (7, 4),
-    (2, 1),
-    (5, 2),
-    (3, 1),
-    (7, 2),
-    (4, 1),
+# Derived from mgds AspectBucketing.all_possible_input_aspects so this module's
+# bucket set can't silently drift from the trainer's. The trainer snaps every
+# image's aspect to the nearest of these ratios (and their inverses) regardless
+# of target resolution, then center-crops to fit. Each mgds (W, H) float aspect
+# is reduced to the integer (num, den) label parts of its landscape orientation.
+_TRAINER_BUCKET_RATIOS: tuple[tuple[int, int], ...] = tuple(
+    ((frac := Fraction(h / w).limit_denominator(1000)).numerator, frac.denominator)
+    for w, h in AspectBucketing.all_possible_input_aspects
 )
 
 
@@ -190,32 +188,25 @@ def compute_file_sha256(path: str) -> str | None:
 
 
 def compute_pixel_hash(path: str) -> str | None:
-    """BLAKE3 over the decoded pixel buffer (mode, size, raw bytes) rather than
+    """BLAKE2b over the decoded pixel buffer (mode, size, raw bytes) rather than
     the file: PNG text chunks, EXIF, ICC profiles, and re-encoded container
     metadata don't count as a difference, but a single different pixel does.
-    Falls back to BLAKE3 of the raw file bytes when PIL can't decode (corrupt,
+    Falls back to BLAKE2b of the raw file bytes when PIL can't decode (corrupt,
     unsupported, zero-byte) so the file still gets a stable hash. Returns None
     only when the file can't be read at all."""
-    import blake3
     from PIL import Image, UnidentifiedImageError
 
     try:
         with Image.open(path) as im:
             im.load()
-            hasher = blake3.blake3()
+            hasher = hashlib.blake2b()
             hasher.update(f"{im.mode}|{im.size[0]}x{im.size[1]}|".encode())
             hasher.update(im.tobytes())
             return hasher.hexdigest()
     except (OSError, ValueError, UnidentifiedImageError, Image.DecompressionBombError):
         pass
     try:
-        hasher = blake3.blake3()
-        hasher.update_mmap(path)
-        return hasher.hexdigest()
-    except (OSError, ValueError):
-        pass
-    try:
-        hasher = blake3.blake3()
+        hasher = hashlib.blake2b()
         with open(path, "rb") as f:
             while True:
                 chunk = f.read(1 << 20)
@@ -243,7 +234,8 @@ class DpoScanCache:
 
     # v2: group_key aspect component changed from exact reduced/metadata
     # strings to trainer bucket labels (trainer_bucket_key).
-    _VERSION = 2
+    # v3: pixel hash algorithm changed from BLAKE3 to stdlib BLAKE2b.
+    _VERSION = 3
 
     def __init__(self, cache_path: str):
         self._cache_path = cache_path
@@ -310,16 +302,6 @@ class DpoScanCache:
         if value is None:
             return None
         return tuple(value)
-
-    def get_embedding(self, path: str, compute) -> list[float] | None:
-        """Cached perceptual embedding (a plain ``list[float]``) for ``path``.
-        ``compute(path)`` must return a sequence of floats. Additive field — it
-        coexists with the hash/group_key fields without invalidating them, so a
-        re-pair run does not blow away an existing curation scan cache."""
-        value = self._get_field(path, "embedding", lambda p: [float(x) for x in compute(p)])
-        if value is None:
-            return None
-        return list(value)
 
     def save(self) -> None:
         """Persist to disk (atomic replace). Entries whose file no longer exists
@@ -634,80 +616,6 @@ def _write_pattern_concepts(abs_output: str):
         json.dump(concepts, f, indent=2)
 
 
-def has_existing_exports(output_dir: str) -> bool:
-    for subdir in ("chosen", "rejected"):
-        d = os.path.join(output_dir, subdir)
-        if os.path.isdir(d):
-            for _root, _dirs, files in os.walk(d):
-                if any(file_name.startswith("pair_") for file_name in files):
-                    return True
-    return False
-
-
-def export_curated_pairs(
-    groups: list[dict],
-    results: dict[int, list[dict]],
-    output_dir: str,
-    val_percentage: float = 0.0,
-) -> tuple[str, str, str, str, int, int, int]:
-    chosen_train_dir = os.path.join(output_dir, "chosen", "train")
-    chosen_val_dir = os.path.join(output_dir, "chosen", "val")
-    rejected_train_dir = os.path.join(output_dir, "rejected", "train")
-    rejected_val_dir = os.path.join(output_dir, "rejected", "val")
-    for d in (chosen_train_dir, chosen_val_dir, rejected_train_dir, rejected_val_dir):
-        os.makedirs(d, exist_ok=True)
-
-    group_indices = list(results.keys())
-    random.shuffle(group_indices)
-    val_count_target = int(len(group_indices) * (val_percentage / 100.0))
-    val_groups = set(group_indices[:val_count_target])
-
-    skipped_count = len(groups) - len(results)
-    val_count = 0
-    train_count = 0
-
-    for group_idx, pairs in results.items():
-        group = groups[group_idx]
-        # UNCONDITIONAL is an internal grouping sentinel, not a real caption —
-        # skip the .txt sidecar entirely so these pairs train unconditionally
-        # instead of being captioned with the literal word.
-        is_unconditional = group["prompt"] == UNCONDITIONAL_PROMPT
-        caption = strip_angle_bracket_segments(group["prompt"])
-        is_val = group_idx in val_groups
-
-        if is_val:
-            chosen_dir, rejected_dir = chosen_val_dir, rejected_val_dir
-        else:
-            chosen_dir, rejected_dir = chosen_train_dir, rejected_train_dir
-
-        for pair_idx, pair in enumerate(pairs):
-            safe_name = f"pair_{group_idx:04d}_{pair_idx:04d}"
-            chosen_ext = os.path.splitext(pair["chosen"])[1].lower()
-            rejected_ext = os.path.splitext(pair["rejected"])[1].lower()
-            _copy_image(pair["chosen"], os.path.join(chosen_dir, safe_name + chosen_ext))
-            _copy_image(pair["rejected"], os.path.join(rejected_dir, safe_name + rejected_ext))
-            if not is_unconditional:
-                with open(os.path.join(chosen_dir, safe_name + ".txt"), "w", encoding="utf-8") as f:
-                    f.write(caption)
-
-        if is_val:
-            val_count += len(pairs)
-        else:
-            train_count += len(pairs)
-
-    _write_pattern_concepts(os.path.abspath(output_dir))
-
-    return (
-        chosen_train_dir,
-        rejected_train_dir,
-        chosen_val_dir,
-        rejected_val_dir,
-        skipped_count,
-        val_count,
-        train_count,
-    )
-
-
 def dpo_pair_key(image_path: str, concept_path: str) -> str:
     try:
         relative = os.path.relpath(image_path, concept_path)
@@ -717,7 +625,6 @@ def dpo_pair_key(image_path: str, concept_path: str) -> str:
 
 
 def check_dpo_pairs(concept_pairs: list[tuple[str, str]]) -> dict:
-    exts = supported_image_extensions()
     all_matched = 0
     all_chosen_stray = 0
     all_rejected_stray = 0
@@ -726,22 +633,8 @@ def check_dpo_pairs(concept_pairs: list[tuple[str, str]]) -> dict:
     pairs_info = []
 
     for chosen_path, rejected_path in concept_pairs:
-        chosen_keys: dict[str, str] = {}
-        rejected_keys: dict[str, str] = {}
-
-        for root, _dirs, files in os.walk(chosen_path):
-            for fname in files:
-                ext = os.path.splitext(fname)[1].lower()
-                if ext in exts:
-                    full = os.path.join(root, fname)
-                    chosen_keys[dpo_pair_key(full, chosen_path)] = full
-
-        for root, _dirs, files in os.walk(rejected_path):
-            for fname in files:
-                ext = os.path.splitext(fname)[1].lower()
-                if ext in exts:
-                    full = os.path.join(root, fname)
-                    rejected_keys[dpo_pair_key(full, rejected_path)] = full
+        chosen_keys = _index_images(chosen_path)
+        rejected_keys = _index_images(rejected_path)
 
         matched_keys = set(chosen_keys) & set(rejected_keys)
         chosen_stray = len(chosen_keys) - len(matched_keys)
@@ -814,129 +707,16 @@ def fix_multiline_captions(concept_pairs: list[tuple[str, str]]) -> int:
     return fixed
 
 
-def _read_caption(image_path: str) -> tuple[str | None, str]:
-    """Return (txt_path, caption_text) for the .txt sidecar of `image_path`.
-    txt_path is None if no sidecar exists; caption_text is '' in that case."""
-    txt = os.path.splitext(image_path)[0] + ".txt"
-    if not os.path.isfile(txt):
-        return None, ""
-    try:
-        with open(txt, "r", encoding="utf-8") as f:
-            return txt, f.read()
-    except OSError:
-        return txt, ""
-
-
-def find_caption_mismatches(concept_pairs: list[tuple[str, str]]) -> list[dict]:
-    """For each chosen/rejected image pair that matches by basename key, compare
-    the .txt sidecar contents. Return entries where the captions differ.
-
-    Compares with .rstrip('\\n') on both sides so a trailing-newline difference
-    does not register as a mismatch (use fix_multiline_captions for that).
-    A missing sidecar on one side counts as a mismatch with caption == ''.
-    A pair with no sidecar on either side is a genuinely unconditional pair and
-    does NOT register as a mismatch — otherwise "correct to chosen" would write
-    empty .txt files back onto pairs the exporter intentionally left uncaptioned.
-    """
-    exts = supported_image_extensions()
-    mismatches: list[dict] = []
-
-    for index, (chosen_path, rejected_path) in enumerate(concept_pairs):
-        chosen_keys: dict[str, str] = {}
-        rejected_keys: dict[str, str] = {}
-
-        for root, _dirs, files in os.walk(chosen_path):
-            for fname in files:
-                ext = os.path.splitext(fname)[1].lower()
-                if ext in exts:
-                    full = os.path.join(root, fname)
-                    chosen_keys[dpo_pair_key(full, chosen_path)] = full
-
-        for root, _dirs, files in os.walk(rejected_path):
-            for fname in files:
-                ext = os.path.splitext(fname)[1].lower()
-                if ext in exts:
-                    full = os.path.join(root, fname)
-                    rejected_keys[dpo_pair_key(full, rejected_path)] = full
-
-        for key in sorted(set(chosen_keys) & set(rejected_keys)):
-            chosen_image = chosen_keys[key]
-            rejected_image = rejected_keys[key]
-            chosen_txt, chosen_caption = _read_caption(chosen_image)
-            rejected_txt, rejected_caption = _read_caption(rejected_image)
-            captions_match = chosen_caption.rstrip("\n") == rejected_caption.rstrip("\n")
-            both_present = chosen_txt is not None and rejected_txt is not None
-            both_absent = chosen_txt is None and rejected_txt is None
-            if captions_match and (both_present or both_absent):
-                continue
-            mismatches.append(
-                {
-                    "concept_pair_index": index,
-                    "key": key,
-                    "chosen_image": chosen_image,
-                    "rejected_image": rejected_image,
-                    "chosen_caption_path": chosen_txt,
-                    "rejected_caption_path": rejected_txt,
-                    "chosen_caption": chosen_caption,
-                    "rejected_caption": rejected_caption,
-                }
-            )
-
-    return mismatches
-
-
-def apply_caption_to_pair(chosen_image: str, rejected_image: str, caption_text: str) -> None:
-    """Write `caption_text` to BOTH .txt sidecars for the pair. Creates the file
-    if missing, overwrites if it exists. UTF-8, no trailing newline added."""
-    for image_path in (chosen_image, rejected_image):
-        if not image_path:
-            continue
-        txt = os.path.splitext(image_path)[0] + ".txt"
-        with open(txt, "w", encoding="utf-8") as f:
-            f.write(caption_text)
-
-
-def correct_all_captions_to_chosen(mismatches: list[dict]) -> int:
-    """For each mismatch entry, overwrite the rejected .txt with the chosen
-    caption text. Returns the number of pairs corrected."""
-    corrected = 0
-    for entry in mismatches:
-        rejected_image = entry.get("rejected_image")
-        if not rejected_image:
-            continue
-        caption_text = entry.get("chosen_caption", "")
-        txt = os.path.splitext(rejected_image)[0] + ".txt"
-        with open(txt, "w", encoding="utf-8") as f:
-            f.write(caption_text)
-        corrected += 1
-    return corrected
-
-
 def _copy_image(source_path: str, target_path: str):
     shutil.copy2(source_path, target_path)
 
 
 def scan_finalized_pairs(concept_pairs: list[tuple[str, str]]) -> list[dict]:
-    exts = supported_image_extensions()
     all_pairs: dict[str, dict] = {}
 
     for chosen_path, rejected_path in concept_pairs:
-        chosen_keys: dict[str, str] = {}
-        rejected_keys: dict[str, str] = {}
-
-        for root, _dirs, files in os.walk(chosen_path):
-            for fname in files:
-                ext = os.path.splitext(fname)[1].lower()
-                if ext in exts:
-                    full = os.path.join(root, fname)
-                    chosen_keys[dpo_pair_key(full, chosen_path)] = full
-
-        for root, _dirs, files in os.walk(rejected_path):
-            for fname in files:
-                ext = os.path.splitext(fname)[1].lower()
-                if ext in exts:
-                    full = os.path.join(root, fname)
-                    rejected_keys[dpo_pair_key(full, rejected_path)] = full
+        chosen_keys = _index_images(chosen_path)
+        rejected_keys = _index_images(rejected_path)
 
         all_key_set = set(chosen_keys) | set(rejected_keys)
         for key in sorted(all_key_set):
@@ -959,360 +739,3 @@ def remove_finalized_pair(chosen_path: str | None, rejected_path: str | None):
             txt = os.path.splitext(path)[0] + ".txt"
             if os.path.isfile(txt):
                 os.remove(txt)
-
-
-# --------------------------------------------------------------------------- #
-# Re-pair rejected images by visual similarity
-#
-# Within a caption group with multiple pairs, DPO's signal is cleanest when each
-# rejected image differs from its chosen partner only in quality — not in
-# composition/pose/framing. We re-assign each rejected image to the structurally
-# most-similar chosen image in its group (a min-cost bipartite matching over
-# DINOv2 embeddings) and rename the rejected file to that chosen's stem. The
-# caption lives only on the chosen side, so the new rejected partner inherits the
-# chosen caption automatically and no preference label can be inverted.
-# --------------------------------------------------------------------------- #
-
-_DINO_MODEL_NAME = "facebook/dinov2-base"
-
-
-def assign_rejected_to_chosen(
-    stems: list[str],
-    chosen_vecs,
-    rejected_vecs,
-    quality_floor: float = 1.0,
-) -> dict[str, str]:
-    """Pure min-cost assignment of rejected images to chosen images within one
-    caption group, with a per-pair quality guard.
-
-    ``stems[k]`` is the shared stem of pair ``k``; ``chosen_vecs[k]`` /
-    ``rejected_vecs[k]`` are that pair's chosen/rejected embedding vectors. The
-    assignment maximizes total cosine similarity (Hungarian), but a reassignment
-    that would land chosen ``k`` below ``min(baseline_k, quality_floor)`` is
-    forbidden, where ``baseline_k`` is chosen ``k``'s current pair similarity.
-    Identity is always permitted, so the assignment is always feasible.
-
-    The single ``quality_floor`` knob spans both extremes:
-
-    * ``1.0`` — strict no-regression: no pair may end up less similar than it
-      began (the global optimum is only taken where it harms nobody).
-    * ``0.0`` — pure global optimum: any regression is allowed to maximize the
-      total (individual pairs may end up worse-matched than they started).
-    * e.g. ``0.85`` — middle ground: a pair may be reassigned to a less-similar
-      rejected only if it still lands at/above ``0.85`` cosine, capturing big
-      wins elsewhere while refusing to push an already-decent pair into a bad
-      match.
-
-    Returns ``{old_stem: new_stem}`` for the rejected files that must move; stems
-    that stay put are omitted. The matching never touches a model — callers feed
-    precomputed vectors — so this is unit-testable with hand-built fakes.
-    """
-    import numpy as np
-    from scipy.optimize import linear_sum_assignment
-
-    n = len(stems)
-    if n < 2:
-        return {}
-
-    chosen = np.asarray(chosen_vecs, dtype=np.float64)
-    rejected = np.asarray(rejected_vecs, dtype=np.float64)
-    # Row-normalize so a dot product is the cosine similarity. Zero vectors get a
-    # tiny epsilon to avoid division by zero (they then match nothing well).
-    chosen = chosen / np.clip(np.linalg.norm(chosen, axis=1, keepdims=True), 1e-12, None)
-    rejected = rejected / np.clip(np.linalg.norm(rejected, axis=1, keepdims=True), 1e-12, None)
-
-    # similarity[k, i] = cosine(rejected k, chosen i). Each chosen i's current
-    # pair similarity is the diagonal baseline[i].
-    similarity = rejected @ chosen.T
-    baseline = np.diag(similarity).copy()
-
-    # Forbid (BIG cost) any off-diagonal cell that would push chosen i below its
-    # quality threshold. Identity (k == i) is always allowed, so the diagonal
-    # assignment stays feasible and the optimum never has to pick a BIG cell.
-    BIG = 1e6
-    cost = 1.0 - similarity
-    threshold = np.minimum(baseline, quality_floor)
-    forbidden = similarity < (threshold[np.newaxis, :] - 1e-9)
-    np.fill_diagonal(forbidden, False)
-    cost[forbidden] = BIG
-
-    row_ind, col_ind = linear_sum_assignment(cost)
-
-    # perm[k] = chosen index assigned to rejected k. Defensive: if a BIG cell was
-    # somehow selected (shouldn't happen — identity is always feasible), drop the
-    # whole group to identity rather than emit a quality-violating move.
-    perm = list(range(n))
-    for k, i in zip(row_ind, col_ind, strict=True):
-        if forbidden[k, i]:
-            return {}
-        perm[k] = int(i)
-
-    return {stems[k]: stems[perm[k]] for k in range(n) if perm[k] != k}
-
-
-def align_pool_by_similarity(
-    chosen_paths: list[str],
-    rejected_paths: list[str],
-    *,
-    embed_fn=None,
-    similarity_floor: float = 0.0,
-) -> dict:
-    """Chosen-anchored pairing of a triage pool: give each chosen image its most
-    structurally-similar rejected image (a rectangular min-cost assignment over
-    DINOv2 embeddings), so each formed pair is a near minimal-pair.
-
-    Anchored on the chosen set because it is the smaller, higher-confidence pile
-    (you curated it) — every chosen claims a distinct rejected partner, and any
-    surplus rejected images (the interchangeable discards) fall into the pool.
-    When rejected images are the limiter instead, the unmatched chosen images
-    fall into the pool. ``similarity_floor`` (default 0) optionally refuses to
-    form a pair below that cosine, leaving both images pooled for manual handling.
-
-    ``embed_fn`` defaults to :func:`embed_images_dino`; tests inject a fake. The
-    assignment math is deterministic and never touches a model directly.
-
-    Returns ``{"pairs": [(chosen, rejected), ...], "chosen_pool": [...],
-    "rejected_pool": [...]}``, with ``pairs`` ordered by the input chosen order.
-    """
-    if not chosen_paths or not rejected_paths:
-        return {"pairs": [], "chosen_pool": list(chosen_paths), "rejected_pool": list(rejected_paths)}
-
-    import numpy as np
-    from scipy.optimize import linear_sum_assignment
-
-    if embed_fn is None:
-        embed_fn = embed_images_dino
-    vectors = embed_fn(list(chosen_paths) + list(rejected_paths))
-
-    chosen = np.asarray([vectors[p] for p in chosen_paths], dtype=np.float64)
-    rejected = np.asarray([vectors[p] for p in rejected_paths], dtype=np.float64)
-    chosen = chosen / np.clip(np.linalg.norm(chosen, axis=1, keepdims=True), 1e-12, None)
-    rejected = rejected / np.clip(np.linalg.norm(rejected, axis=1, keepdims=True), 1e-12, None)
-
-    # similarity[i, j] = cosine(chosen i, rejected j). Rectangular assignment
-    # matches min(n_chosen, n_rejected) of them, maximizing total similarity.
-    similarity = chosen @ rejected.T
-    row_ind, col_ind = linear_sum_assignment(1.0 - similarity)
-
-    pairs: list[tuple[str, str]] = []
-    used_chosen: set[int] = set()
-    used_rejected: set[int] = set()
-    for i, j in sorted(zip(row_ind, col_ind, strict=True), key=lambda rc: rc[0]):
-        if similarity[i, j] < similarity_floor:
-            continue
-        pairs.append((chosen_paths[i], rejected_paths[j]))
-        used_chosen.add(int(i))
-        used_rejected.add(int(j))
-
-    chosen_pool = [p for i, p in enumerate(chosen_paths) if i not in used_chosen]
-    rejected_pool = [p for j, p in enumerate(rejected_paths) if j not in used_rejected]
-    return {"pairs": pairs, "chosen_pool": chosen_pool, "rejected_pool": rejected_pool}
-
-
-def load_dino_model():
-    """Lazy-load the DINOv2 image encoder (model, processor) onto the default
-    device, mirroring ``validation_checker_util.load_clip_components``. Returns
-    ``(None, None)`` when transformers/torch or the weights are unavailable so
-    callers can degrade gracefully instead of crashing."""
-    try:
-        import importlib
-
-        transformers = importlib.import_module("transformers")
-        importlib.import_module("torch")
-    except ImportError:
-        return None, None
-
-    try:
-        from modules.util.torch_util import default_device
-
-        model = transformers.AutoModel.from_pretrained(_DINO_MODEL_NAME)
-        processor = transformers.AutoImageProcessor.from_pretrained(_DINO_MODEL_NAME)
-        model.eval().to(default_device)
-        return model, processor
-    except Exception:
-        return None, None
-
-
-def embed_images_dino(
-    paths: list[str],
-    *,
-    loader=load_dino_model,
-    cache: "DpoScanCache | None" = None,
-    batch_size: int = 16,
-    progress=None,
-) -> dict[str, list[float]]:
-    """Compute L2-normalized DINOv2 embeddings for ``paths``, returning
-    ``{path: vector}``. Files already in ``cache`` (validated by size+mtime) are
-    served without a model call; only the misses are batched through DINOv2. The
-    model is loaded once and only if there is at least one cache miss. Raises
-    ``RuntimeError`` when the model is needed but unavailable."""
-    from modules.util.image_util import load_image
-    from modules.util.torch_util import default_device, torch_gc
-
-    import torch
-
-    embeddings: dict[str, list[float]] = {}
-    misses = list(paths)
-
-    # Reserve a slot for the real-compute closure so the cache can call it lazily.
-    state: dict = {"model": None, "processor": None}
-
-    def _compute_single(path: str) -> list[float]:
-        if state["model"] is None:
-            model, processor = loader()
-            if model is None or processor is None:
-                raise RuntimeError(
-                    "Re-pair by similarity requires transformers, torch, and the "
-                    f"'{_DINO_MODEL_NAME}' weights (downloaded on first use)."
-                )
-            state["model"], state["processor"] = model, processor
-        model, processor = state["model"], state["processor"]
-        image = load_image(path)
-        inputs = processor(images=image, return_tensors="pt").to(default_device)
-        with torch.no_grad():
-            output = model(**inputs)
-        # DINOv2 CLS token (pooler_output) is the global structural descriptor.
-        feat = output.pooler_output[0]
-        feat = feat / feat.norm().clamp_min(1e-12)
-        return feat.float().cpu().tolist()
-
-    try:
-        for done, path in enumerate(misses, start=1):
-            vec = cache.get_embedding(path, _compute_single) if cache is not None else _compute_single(path)
-            if vec is not None:
-                embeddings[path] = vec
-            if progress is not None:
-                progress(done, len(misses))
-    finally:
-        state["model"] = None
-        state["processor"] = None
-        torch_gc()
-
-    return embeddings
-
-
-def _rejected_target_path(rejected_dir: str, new_stem: str, ext: str) -> str:
-    """Absolute path a rejected file should take to adopt ``new_stem`` (a
-    forward-slash relative stem from :func:`dpo_pair_key`), preserving its own
-    extension."""
-    rel = new_stem.replace("/", os.sep)
-    return os.path.join(rejected_dir, rel + ext)
-
-
-def _apply_rejected_renames(rejected_dir: str, stem_to_path: dict[str, str], mapping: dict[str, str]) -> int:
-    """Rename rejected IMAGE files per ``mapping`` ``{old_stem: new_stem}`` using a
-    two-phase temp rename so cycles/swaps never collide. Returns the number moved.
-
-    Caption sidecars are deliberately NOT moved. Captions are authoritative on the
-    chosen side, and every stem's caption already matches its chosen partner, so
-    leaving the rejected ``.txt`` pinned to its stem keeps it aligned with the
-    chosen caption there. Re-pairing therefore never rewrites a caption, never
-    drags an original prompt onto a stem whose chosen caption the user has edited,
-    and never writes anything under the chosen folder — only rejected images
-    move."""
-    if not mapping:
-        return 0
-
-    moves = []  # (current_image_path, temp_path, final_path)
-    for index, (old_stem, new_stem) in enumerate(mapping.items()):
-        src = stem_to_path[old_stem]
-        ext = os.path.splitext(src)[1]
-        final = _rejected_target_path(rejected_dir, new_stem, ext)
-        temp = f"{final}.__repair_tmp_{index}__"
-        moves.append((src, temp, final))
-
-    # Phase A: every moving image to a unique temp name (frees the destinations).
-    for src, temp, _final in moves:
-        os.makedirs(os.path.dirname(temp), exist_ok=True)
-        os.replace(src, temp)
-
-    # Phase B: temp names to their final destination.
-    for _src, temp, final in moves:
-        os.makedirs(os.path.dirname(final), exist_ok=True)
-        os.replace(temp, final)
-
-    return len(moves)
-
-
-def repair_rejected_pairs(
-    concept_pairs: list[tuple[str, str]],
-    *,
-    embed_fn=None,
-    quality_floor: float = 0.85,
-    progress=None,
-) -> dict:
-    """Re-pair rejected images to their most structurally-similar chosen image
-    within each caption group, renaming rejected files in place.
-
-    Each ``(chosen_dir, rejected_dir)`` concept is processed independently so
-    renames never cross concept folders. Within a concept, matched (non-orphan)
-    pairs are grouped by their chosen caption; groups with more than one pair are
-    re-assigned via :func:`assign_rejected_to_chosen` over embeddings, with
-    ``quality_floor`` guarding individual pairs (1.0 = strict no-regression, 0.0 =
-    pure global optimum, 0.85 = recommended middle ground). By default embeddings
-    come from DINOv2 (:func:`embed_images_dino`) backed by a per-concept
-    ``.dpo_repair_cache.json`` so re-runs are cheap; tests pass an explicit
-    ``embed_fn`` (``paths -> {path: vector}``) to avoid loading a model. The
-    operation always keeps a strict bijection, so it never creates orphans/strays.
-
-    Returns a summary: ``groups_processed`` (multi-pair groups re-assigned),
-    ``groups_skipped_single``, ``pairs_repaired`` (rejected files moved), and
-    ``pairs_total`` (matched pairs considered).
-    """
-    summary = {
-        "groups_processed": 0,
-        "groups_skipped_single": 0,
-        "pairs_repaired": 0,
-        "pairs_total": 0,
-    }
-
-    for chosen_dir, rejected_dir in concept_pairs:
-        pairs = scan_finalized_pairs([(chosen_dir, rejected_dir)])
-        matched = [p for p in pairs if not p["is_orphan"]]
-        summary["pairs_total"] += len(matched)
-
-        # Default embedder: cached DINOv2 keyed at the concept root (the parent of
-        # the chosen folder) so chosen+rejected embeddings survive across re-runs.
-        cache = None
-        if embed_fn is None:
-            import functools
-
-            concept_root = os.path.dirname(os.path.normpath(chosen_dir))
-            cache = DpoScanCache(os.path.join(concept_root, ".dpo_repair_cache.json"))
-            concept_embed = functools.partial(embed_images_dino, cache=cache)
-        else:
-            concept_embed = embed_fn
-
-        # Group matched pairs by chosen caption text.
-        groups: dict[str, list[dict]] = {}
-        for pair in matched:
-            _txt, caption = _read_caption(pair["chosen_path"])
-            groups.setdefault(caption.rstrip("\n"), []).append(pair)
-
-        for group in groups.values():
-            if len(group) < 2:
-                summary["groups_skipped_single"] += 1
-                continue
-            summary["groups_processed"] += 1
-
-            stems = [p["key"] for p in group]
-            stem_to_rejected = {p["key"]: p["rejected_path"] for p in group}
-            all_paths = [p["chosen_path"] for p in group] + [p["rejected_path"] for p in group]
-            vectors = concept_embed(all_paths)
-
-            try:
-                chosen_vecs = [vectors[p["chosen_path"]] for p in group]
-                rejected_vecs = [vectors[p["rejected_path"]] for p in group]
-            except KeyError:
-                # An image failed to embed; leave this group untouched.
-                continue
-
-            mapping = assign_rejected_to_chosen(stems, chosen_vecs, rejected_vecs, quality_floor)
-            summary["pairs_repaired"] += _apply_rejected_renames(rejected_dir, stem_to_rejected, mapping)
-
-        if cache is not None:
-            cache.save()
-        if progress is not None:
-            progress(summary)
-
-    return summary

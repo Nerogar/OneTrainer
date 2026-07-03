@@ -75,7 +75,7 @@ class ErnieBaseDataLoader(
             text_caching=True,
         )
 
-    def _output_modules(self, config: TrainConfig, model: ErnieModel, model_setup: BaseErnieSetup, is_validation: bool = False):
+    def _output_modules(self, config: TrainConfig, model: ErnieModel, model_setup: BaseErnieSetup):
         pad_masked_tokens = PadMaskedTokens(tokens_name='tokens', tokens_mask_name='tokens_mask', hidden_state_name='text_encoder_hidden_state', max_length=PROMPT_MAX_LENGTH)
 
         output_names = [
@@ -99,7 +99,6 @@ class ErnieBaseDataLoader(
             vae=model.vae,
             autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
-            is_validation=is_validation,
         )
 
         if config.latent_caching:

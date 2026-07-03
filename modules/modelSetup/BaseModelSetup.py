@@ -1,3 +1,4 @@
+import os
 from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 
@@ -166,6 +167,16 @@ class BaseModelSetup(
                 batched[key] = torch.cat([value, batch[rejected_key]], dim=0)
             elif isinstance(value, torch.Tensor) and value.ndim > 0 and value.shape[0] == chosen_b:
                 batched[key] = torch.cat([value, value], dim=0)
+            elif (
+                isinstance(value, (list, tuple))
+                and value
+                and all(isinstance(v, torch.Tensor) and v.ndim > 0 and v.shape[0] == chosen_b for v in value)
+            ):
+                # SDXL-style per-field tensor lists (original_resolution / crop_resolution /
+                # crop_offset collate a per-sample tuple into a list of [B] tensors). The
+                # rejected image shares the chosen sample's bucket, so duplicate each field
+                # elementwise to reach 2B and keep add_time_ids aligned with the latents.
+                batched[key] = type(value)(torch.cat([v, v], dim=0) for v in value)
             else:
                 batched[key] = value
         return batched, chosen_b
@@ -222,8 +233,20 @@ class BaseModelSetup(
         # 2B-sized, so mixing them in one session compiles two graphs.
         batched_input, chosen_b = self._create_dpo_batched_batch(batch)
 
+        # Conditioning (caption) dropout is drawn per-sample inside encode_text.
+        # On the [chosen; rejected] batch that independently zeroes the prompt on
+        # one half of a pair (~2p(1-p) of pairs), comparing a prompted sample
+        # against an unconditional one and silently corrupting the preference
+        # margin. Neutralize it for the paired forward so both halves see
+        # identical conditioning; restore afterwards. (Diffusion-DPO trains on the
+        # given prompts, not CFG-dropped ones.)
+        te_configs = (config.text_encoder, config.text_encoder_2, config.text_encoder_3, config.text_encoder_4)
+        saved_dropout = [te.dropout_probability for te in te_configs]
+
         self._dpo_paired_half = chosen_b
         try:
+            for te in te_configs:
+                te.dropout_probability = 0.0
             with torch.no_grad(), self.reference_model(model, config):
                 ref_output = self.predict(model, batched_input, config, train_progress)
                 ref_predicted = ref_output["predicted"]
@@ -235,6 +258,8 @@ class BaseModelSetup(
             policy_output = self.predict(model, batched_input, config, train_progress)
         finally:
             self._dpo_paired_half = None
+            for te, saved in zip(te_configs, saved_dropout, strict=True):
+                te.dropout_probability = saved
         policy_timestep = policy_output.get("timestep")
         policy_predicted = policy_output["predicted"]
         policy_target = policy_output["target"]
@@ -270,28 +295,48 @@ class BaseModelSetup(
             loss = loss + config.rlhf_supervised_mix * supervised_loss
             del supervised_loss
 
-        self._last_dpo_metrics = {
-            "loss": loss.detach().item(),
-            "dpo_loss": dpo_loss.detach().item(),
-            "chosen_reward": chosen_ratio.detach().mean().item(),
-            "rejected_reward": rejected_ratio.detach().mean().item(),
-            "reward_margin": margin.detach().mean().item(),
-            "accuracy": (chosen_ratio > rejected_ratio).float().mean().item(),
-        }
+        # Stack the six scalar metrics and sync once (six separate .item() calls
+        # would be six GPU->CPU stalls on the training hot path).
+        metric_values = torch.stack([
+            loss.detach().float(),
+            dpo_loss.detach().float(),
+            chosen_ratio.detach().mean(),
+            rejected_ratio.detach().mean(),
+            margin.detach().mean(),
+            (chosen_ratio > rejected_ratio).float().mean(),
+        ]).tolist()
+        self._last_dpo_metrics = dict(zip(
+            ("loss", "dpo_loss", "chosen_reward", "rejected_reward", "reward_margin", "accuracy"),
+            metric_values,
+            strict=True,
+        ))
 
         if config.rlhf_dpo_timestep_margin_logging and policy_timestep is not None:
             # Per-sample raw margins bucketed by the chosen half's timestep
             # quartile. Sums and counts are emitted for every quartile so the
             # trainer's accumulation always sees the same key set.
-            t = policy_timestep[:chosen_b].detach().float()
-            if t.numel() > 0 and t.max() > 1.0:
-                t = t / 1000.0  # discrete schedulers train on 1000 timesteps
+            raw_t = policy_timestep[:chosen_b].detach()
+            if torch.is_floating_point(raw_t):
+                # Continuous-timestep models already emit t in (0, 1].
+                t = raw_t.float()
+            else:
+                # Discrete schedulers emit integer steps in [0, num_train_timesteps);
+                # normalize by the model's actual count rather than sniffing the
+                # batch max (which misbuckets batches that only sample steps {0,1})
+                # or assuming 1000.
+                num_train_timesteps = model.noise_scheduler.config['num_train_timesteps']
+                t = raw_t.float() / num_train_timesteps
             quartile_index = (t * 4).long().clamp(0, 3)
-            per_sample_margin = margin.detach()
+            per_sample_margin = margin.detach().float()
+            # bincount for counts + scatter_add for sums, then one sync for all
+            # eight quartile scalars instead of eight .item() calls.
+            counts = torch.bincount(quartile_index, minlength=4).float()
+            sums = torch.zeros(4, device=per_sample_margin.device, dtype=per_sample_margin.dtype)
+            sums.scatter_add_(0, quartile_index, per_sample_margin)
+            sums_l, counts_l = torch.stack([sums, counts]).tolist()
             for quartile in range(4):
-                mask = quartile_index == quartile
-                self._last_dpo_metrics[f"margin_t_q{quartile + 1}_sum"] = per_sample_margin[mask].sum().item()
-                self._last_dpo_metrics[f"margin_t_q{quartile + 1}_count"] = float(mask.sum().item())
+                self._last_dpo_metrics[f"margin_t_q{quartile + 1}_sum"] = sums_l[quartile]
+                self._last_dpo_metrics[f"margin_t_q{quartile + 1}_count"] = counts_l[quartile]
 
         return loss
 
@@ -366,7 +411,13 @@ class BaseModelSetup(
             policy_data = [[p.data for p in adapter.parameters()] for adapter in adapters]
             try:
                 for adapter, ref_params in zip(adapters, self._dpo_ref_params, strict=True):
-                    for param, ref_data in zip(adapter.parameters(), ref_params, strict=True):
+                    for i, (param, ref_data) in enumerate(zip(adapter.parameters(), ref_params, strict=True)):
+                        # Reference params restored from a backup live on CPU; move
+                        # them onto the live param's device/dtype once and cache the
+                        # moved tensor (a no-op for the lazily-cloned in-run case).
+                        if ref_data.device != param.data.device or ref_data.dtype != param.data.dtype:
+                            ref_data = ref_data.to(device=param.data.device, dtype=param.data.dtype)
+                            ref_params[i] = ref_data
                         param.data = ref_data
                 yield
             finally:
@@ -375,6 +426,44 @@ class BaseModelSetup(
                         param.data = policy_ptr
         else:
             raise ValueError(f"Unsupported DPO reference mode: {ref_mode}")
+
+    _DPO_REFERENCE_FILENAME = "dpo_reference.pt"
+
+    def save_dpo_reference(self, backup_path: str) -> None:
+        # Persist the frozen EXISTING_ADAPTER reference alongside a backup so it
+        # survives resume. Without this the reference is re-captured from the
+        # resumed (already DPO-trained) adapter weights, silently moving the KL
+        # anchor. NEW_ADAPTER mode never captures params, so nothing is written.
+        if self._dpo_ref_params is None:
+            return
+        try:
+            payload = [[t.detach().to("cpu", copy=True) for t in adapter] for adapter in self._dpo_ref_params]
+            torch.save(payload, os.path.join(backup_path, self._DPO_REFERENCE_FILENAME))
+        except OSError:
+            pass
+
+    def load_dpo_reference(self, backup_path: str, model: BaseModel) -> bool:
+        # Restore the frozen reference saved next to the backup we are resuming
+        # from. Returns True on success; on any structural mismatch it leaves
+        # _dpo_ref_params unset so the caller falls back to lazy capture rather
+        # than adopting a wrong reference.
+        path = os.path.join(backup_path, self._DPO_REFERENCE_FILENAME)
+        if not os.path.isfile(path):
+            return False
+        saved = torch.load(path, map_location="cpu", weights_only=True)
+        adapters = model.adapters()
+        if not isinstance(saved, list) or len(saved) != len(adapters):
+            return False
+        restored: list[list[Tensor]] = []
+        for adapter, adapter_saved in zip(adapters, saved, strict=True):
+            params = list(adapter.parameters())
+            if len(adapter_saved) != len(params):
+                return False
+            if any(tuple(t.shape) != tuple(p.shape) for t, p in zip(adapter_saved, params, strict=True)):
+                return False
+            restored.append(list(adapter_saved))
+        self._dpo_ref_params = restored
+        return True
 
     def _create_model_part_parameters(
         self,

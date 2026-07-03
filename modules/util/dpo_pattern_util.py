@@ -1,4 +1,5 @@
 import os
+from functools import cache
 
 from modules.util import path_util
 
@@ -7,6 +8,13 @@ import parse
 
 def _normalize_relpath(relpath: str) -> str:
     return relpath.replace("\\", "/")
+
+
+@cache
+def _compiled_pattern(pattern: str):
+    # parse.compile rebuilds a regex from the format string; cache one Parser per
+    # distinct pattern so match_chosen doesn't recompile it on every image.
+    return parse.compile(pattern)
 
 
 def pattern_has_extension(pattern: str) -> bool:
@@ -43,7 +51,7 @@ def match_chosen(chosen_pattern: str, concept_path: str, image_path: str) -> str
         return None
     pattern = _normalize_relpath(chosen_pattern)
     target = relpath if pattern_has_extension(pattern) else os.path.splitext(relpath)[0]
-    result = parse.parse(pattern, target)
+    result = _compiled_pattern(pattern).parse(target)
     if result is None or not result.fixed:
         return None
     return result.fixed[0]
@@ -54,22 +62,13 @@ def build_rejected_index(concept_path: str, include_subdirectories: bool) -> dic
     every supported image under concept_path. Dot-directories are skipped, the
     same as mgds CollectPaths."""
     index: dict[str, list[str]] = {}
-
-    def _walk(path: str):
-        try:
-            entries = [os.path.join(path, name) for name in os.listdir(path)]
-        except FileNotFoundError:
-            return
-        for entry in entries:
-            if os.path.isfile(entry):
-                if path_util.is_supported_image_extension(os.path.splitext(entry)[1]):
-                    relpath = _normalize_relpath(os.path.relpath(entry, concept_path))
-                    key = os.path.splitext(relpath)[0].lower()
-                    index.setdefault(key, []).append(entry)
-            elif include_subdirectories and os.path.isdir(entry) and not os.path.basename(entry).startswith("."):
-                _walk(entry)
-
-    _walk(concept_path)
+    for root, files in path_util.walk_skipping_dotted(concept_path, include_subdirectories):
+        for name in files:
+            if path_util.is_supported_image_extension(os.path.splitext(name)[1]):
+                entry = os.path.join(root, name)
+                relpath = _normalize_relpath(os.path.relpath(entry, concept_path))
+                key = os.path.splitext(relpath)[0].lower()
+                index.setdefault(key, []).append(entry)
     for paths in index.values():
         paths.sort()
     return index

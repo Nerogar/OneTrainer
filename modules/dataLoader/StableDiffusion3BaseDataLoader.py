@@ -122,7 +122,7 @@ class StableDiffusion3BaseDataLoader(
             text_caching=not config.train_text_encoder_or_embedding() or not config.train_text_encoder_2_or_embedding() or not config.train_text_encoder_3_or_embedding(),
         )
 
-    def _output_modules(self, config: TrainConfig, model: StableDiffusion3Model, model_setup: BaseStableDiffusion3Setup, is_validation: bool = False):
+    def _output_modules(self, config: TrainConfig, model: StableDiffusion3Model, model_setup: BaseStableDiffusion3Setup):
         output_names = [
             'image_path', 'latent_image',
             'prompt_1', 'prompt_2', 'prompt_3',
@@ -154,7 +154,6 @@ class StableDiffusion3BaseDataLoader(
             vae=model.vae,
             autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
-            is_validation=is_validation,
         )
 
     def _debug_modules(self, config: TrainConfig, model: StableDiffusion3Model):

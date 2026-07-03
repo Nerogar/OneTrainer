@@ -301,7 +301,6 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             vae: AutoencoderKL | None = None,
             autocast_context: list[torch.autocast | None] = None,
             train_dtype: DataType | None = None,
-            is_validation: bool = False,
     ):
         if before_cache_image_fun is None:
             def prepare_vae():
@@ -391,14 +390,19 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
         if config.rlhf_enabled:
             image_split_names = image_split_names + ['latent_image_rejected']
 
-        # The DPO patterns change which rows a concept produces, so they are part
-        # of the cache group key.
+        # The DPO patterns change which rows a concept produces, so under DPO they
+        # are part of the cache group key. Gate on rlhf_enabled so non-DPO runs
+        # keep the upstream group key byte-for-byte and don't silently invalidate
+        # every existing on-disk cache (the pattern fields default to "" on every
+        # concept after a ConceptConfig round-trip).
+        dpo_group_names = ['concept.dpo_chosen_pattern', 'concept.dpo_rejected_pattern'] if config.rlhf_enabled else []
+
         image_disk_cache = DiskCache(cache_dir=image_cache_dir, split_names=image_split_names, aggregate_names=image_aggregate_names, variations_in_name='concept.image_variations',
-                                     balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image', 'concept.dpo_chosen_pattern', 'concept.dpo_rejected_pattern'],
+                                     balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy', variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.image'] + dpo_group_names,
                                      group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_image_fun)
 
         text_disk_cache = DiskCache(cache_dir=text_cache_dir, split_names=text_split_names, aggregate_names=[], variations_in_name='concept.text_variations', balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',
-                                    variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text', 'concept.dpo_chosen_pattern', 'concept.dpo_rejected_pattern'], group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
+                                    variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'] + dpo_group_names, group_enabled_in_name='concept.enabled', before_cache_fun=before_cache_text_fun)
 
         modules = []
 
@@ -414,7 +418,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
 
         if len(sort_names) > 0:
             variation_sorting = VariationSorting(names=sort_names, balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',
-                                                 variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text', 'concept.dpo_chosen_pattern', 'concept.dpo_rejected_pattern'], group_enabled_in_name='concept.enabled')
+                                                 variations_group_in_name=['concept.path', 'concept.seed', 'concept.include_subdirectories', 'concept.text'] + dpo_group_names, group_enabled_in_name='concept.enabled')
 
             modules.append(variation_sorting)
 
@@ -444,7 +448,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             inpainting_modules = self._inpainting_modules(config)
         preparation_modules = self._preparation_modules(config, model) + self._dpo_rejected_preparation_modules(config, model)
         cache_modules = self._cache_modules(config, model, model_setup)
-        output_modules = self._output_modules(config, model, model_setup, is_validation=is_validation)
+        output_modules = self._output_modules(config, model, model_setup)
 
         debug_modules = self._debug_modules(config, model)
 
@@ -491,7 +495,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
 
     @abstractmethod
     def _output_modules(
-        self, config: TrainConfig, model: BaseModel, model_setup: BaseModelSetup, is_validation: bool = False
+        self, config: TrainConfig, model: BaseModel, model_setup: BaseModelSetup
     ):
         pass
 

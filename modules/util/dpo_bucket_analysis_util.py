@@ -2,23 +2,12 @@ import math
 import os
 from fractions import Fraction
 
-from modules.util.path_util import supported_image_extensions
+from modules.util.path_util import supported_image_extensions, walk_skipping_dotted
+
+from mgds.pipelineModules.AspectBucketing import AspectBucketing
 
 import numpy as np
 from PIL import Image
-
-ALL_POSSIBLE_INPUT_ASPECTS = [
-    (1.0, 1.0),
-    (1.0, 1.25),
-    (1.0, 1.5),
-    (1.0, 1.75),
-    (1.0, 2.0),
-    (1.0, 2.5),
-    (1.0, 3.0),
-    (1.0, 3.5),
-    (1.0, 4.0),
-]
-
 
 # Quantization per model, cross-checked against modules/dataLoader/*BaseDataLoader.py
 MODEL_QUANTIZATION = {
@@ -69,7 +58,7 @@ def build_buckets(target_resolution: int, q: int):
             h / math.sqrt(h * w) * target_resolution,
             w / math.sqrt(h * w) * target_resolution,
         )
-        for (h, w) in ALL_POSSIBLE_INPUT_ASPECTS
+        for (h, w) in AspectBucketing.all_possible_input_aspects
     ]
     new = new + [(w, h) for (h, w) in new]
     new = [_quantize_res(r, q) for r in new]
@@ -150,8 +139,6 @@ def _iter_image_files(
     - Recurse only when `include_subdirectories` is True
     """
     exts = supported_image_extensions()
-    if not os.path.isdir(concept_path):
-        return
 
     def _matches(fname: str) -> bool:
         stem, ext = os.path.splitext(fname)
@@ -159,22 +146,10 @@ def _iter_image_files(
             return False
         return not any(stem.endswith(pf) for pf in exclude_postfix)
 
-    if include_subdirectories:
-        for root, dirs, files in os.walk(concept_path):
-            # Mutate dirs in place to prevent os.walk from descending into dotted dirs.
-            dirs[:] = [d for d in dirs if not d.startswith(".")]
-            for fname in files:
-                if _matches(fname):
-                    yield os.path.join(root, fname)
-    else:
-        try:
-            entries = os.listdir(concept_path)
-        except OSError:
-            return
-        for fname in entries:
-            full = os.path.join(concept_path, fname)
-            if os.path.isfile(full) and _matches(fname):
-                yield full
+    for root, files in walk_skipping_dotted(concept_path, include_subdirectories):
+        for fname in files:
+            if _matches(fname):
+                yield os.path.join(root, fname)
 
 
 def _read_image_size(path: str):

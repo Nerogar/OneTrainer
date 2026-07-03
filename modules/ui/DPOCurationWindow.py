@@ -3,13 +3,11 @@ import random
 import threading
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from contextlib import suppress
 from queue import Empty, Full, Queue
 from tkinter import filedialog, messagebox
 
 from modules.util import path_util
 from modules.util.dpo_curation_util import (
-    align_pool_by_similarity,
     export_single_pair,
     finalize_export,
     find_exported_file,
@@ -23,14 +21,26 @@ from modules.util.dpo_curation_util import (
     prune_orphaned_pairs,
     remove_pair,
     resolve_aspect_ratio,
-    walk_skipping_dotted,
 )
 from modules.util.dpo_swiss_service import SwissTournament, outermost_pairs
 from modules.util.image_metadata_util import extract_metadata, strip_angle_bracket_segments
+from modules.util.image_util import load_fitted_image, load_thumbnail
 from modules.util.ui.ui_utils import set_window_icon
 
 import customtkinter as ctk
 from PIL import Image
+
+# Cap the per-window thumbnail caches so a long curation session over a large
+# source folder can't grow decoded-image memory without bound.
+_MAX_THUMB_CACHE = 512
+
+
+def _bounded_put(cache: dict, key, value) -> None:
+    """Insert into an insertion-ordered cache, evicting oldest entries once it
+    exceeds ``_MAX_THUMB_CACHE``."""
+    cache[key] = value
+    while len(cache) > _MAX_THUMB_CACHE:
+        cache.pop(next(iter(cache)))
 
 
 class DPOCurationWindow(ctk.CTkToplevel):
@@ -304,7 +314,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         # the expensive per-file metadata reads out across a thread pool. Dot-prefixed
         # subdirectories (.thumbnails, .cache, ...) are pruned from the walk entirely.
         candidate_paths: list[str] = []
-        for root, files in walk_skipping_dotted(folder):
+        for root, files in path_util.walk_skipping_dotted(folder):
             if self._worker_stop.is_set():
                 return
             for filename in files:
@@ -646,12 +656,11 @@ class DPOCurationWindow(ctk.CTkToplevel):
         cached = self._thumb_cache.get(path)
         if cached is None:
             try:
-                with Image.open(path) as _raw:
-                    pil_img = self._fit_image(_raw, thumb_size, thumb_size).copy()
+                pil_img = load_thumbnail(path, thumb_size)
                 cached = (ctk.CTkImage(light_image=pil_img, size=pil_img.size), pil_img)
             except Exception:
                 cached = (None, None)
-            self._thumb_cache[path] = cached
+            _bounded_put(self._thumb_cache, path, cached)
         ctk_img, pil_img = cached
         if ctk_img is None:
             return ctk.CTkLabel(master, text=os.path.basename(path))
@@ -701,9 +710,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
             )
             exported |= {chosen, rejected}
 
-        self.current_remaining_images = [
-            image for image in self.current_remaining_images if image not in exported
-        ]
+        self.current_remaining_images = [image for image in self.current_remaining_images if image not in exported]
         self.pairs_created_in_group += len(pairs)
         self._advance_group()
 
@@ -771,8 +778,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
     def _display_thumbnail(self, master, path: str, row: int, col: int):
         thumb_size = 250
         try:
-            with Image.open(path) as _raw:
-                pil_img = self._fit_image(_raw, thumb_size, thumb_size).copy()
+            pil_img = load_thumbnail(path, thumb_size)
             ctk_img = ctk.CTkImage(light_image=pil_img, size=pil_img.size)
 
             label = ctk.CTkLabel(master, text="", image=ctk_img)
@@ -795,8 +801,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
 
         try:
             sw, sh = preview.winfo_screenwidth(), preview.winfo_screenheight()
-            with Image.open(path) as _raw:
-                pil_img = self._fit_image(_raw, sw, sh - 50).copy()
+            pil_img = load_fitted_image(path, sw, sh - 50)
             ctk_img = ctk.CTkImage(light_image=pil_img, size=pil_img.size)
 
             label = ctk.CTkLabel(preview, text="", image=ctk_img)
@@ -876,12 +881,11 @@ class DPOCurationWindow(ctk.CTkToplevel):
         cached = self._triage_thumb_cache.get((path, size))
         if cached is None:
             try:
-                with Image.open(path) as _raw:
-                    pil_img = self._fit_image(_raw, size, size).copy()
+                pil_img = load_thumbnail(path, size)
                 cached = (ctk.CTkImage(light_image=pil_img, size=pil_img.size), pil_img)
             except Exception:
                 cached = (None, None)
-            self._triage_thumb_cache[(path, size)] = cached
+            _bounded_put(self._triage_thumb_cache, (path, size), cached)
         ctk_img, pil_img = cached
         if ctk_img is None:
             return ctk.CTkLabel(master, text=os.path.basename(path))
@@ -1003,7 +1007,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
         good = [p for p in self.current_remaining_images if self._triage_verdicts.get(p) == "good"]
         bad = [p for p in self.current_remaining_images if self._triage_verdicts.get(p) == "bad"]
         n = min(len(good), len(bad))
-        # Order-based by default; the user can Auto-align for similarity pairing.
+        # Order-based pairing: chosen[i] with rejected[i], leftovers to the pools.
         self._triage_pairs = list(zip(good[:n], bad[:n], strict=False))
         self._triage_good_pool = good[n:]
         self._triage_bad_pool = bad[n:]
@@ -1059,9 +1063,6 @@ class DPOCurationWindow(ctk.CTkToplevel):
         ctk.CTkButton(
             footer, text="← Back to Voting", width=150, fg_color="gray40", command=self._build_triage_voting_ui
         ).pack(side="left", padx=10)
-        ctk.CTkButton(footer, text="✨ Auto-align by Similarity", width=230, command=self._triage_auto_align).pack(
-            side="left", padx=10
-        )
         ctk.CTkButton(footer, text="Skip Group", width=120, fg_color="#8B4513", command=self._skip_group).pack(
             side="right", padx=10
         )
@@ -1083,58 +1084,6 @@ class DPOCurationWindow(ctk.CTkToplevel):
         strip.pack(fill="x")
         for index, path in enumerate(pool):
             self._triage_thumbnail(strip, path, 130).grid(row=0, column=index, padx=4, pady=4)
-
-    def _triage_auto_align(self):
-        good = [chosen for chosen, _ in self._triage_pairs] + list(self._triage_good_pool)
-        bad = [rejected for _, rejected in self._triage_pairs] + list(self._triage_bad_pool)
-        if not good or not bad:
-            return
-
-        # DINOv2 inference is slow, so run it on a worker thread behind an
-        # indeterminate progress dialog rather than freezing the Tk main loop.
-        dialog = ctk.CTkToplevel(self)
-        dialog.title("Auto-align")
-        dialog.transient(self)
-        dialog.resizable(False, False)
-        ctk.CTkLabel(dialog, text="Pairing by similarity (DINOv2)…", font=("", 13)).pack(padx=24, pady=(20, 10))
-        bar = ctk.CTkProgressBar(dialog, width=300, mode="indeterminate")
-        bar.pack(padx=24, pady=(0, 20))
-        bar.start()
-        dialog.after(200, lambda: set_window_icon(dialog))
-        with suppress(Exception):
-            dialog.grab_set()
-
-        holder: dict = {}
-
-        def _worker():
-            try:
-                holder["result"] = align_pool_by_similarity(good, bad)
-            except Exception as ex:  # surfaced on the UI thread by _poll
-                holder["error"] = str(ex)
-
-        thread = threading.Thread(target=_worker, daemon=True)
-        thread.start()
-
-        def _poll():
-            if thread.is_alive():
-                self.after(150, _poll)
-                return
-            bar.stop()
-            with suppress(Exception):
-                dialog.grab_release()
-            dialog.destroy()
-            self._safe_grab()
-            if "error" in holder:
-                messagebox.showerror("Auto-align Failed", f"Could not align by similarity:\n{holder['error']}")
-                return
-            result = holder.get("result")
-            if result is not None:
-                self._triage_pairs = list(result["pairs"])
-                self._triage_good_pool = list(result["chosen_pool"])
-                self._triage_bad_pool = list(result["rejected_pool"])
-                self._build_triage_pairing_ui()
-
-        self.after(150, _poll)
 
     def _triage_confirm(self):
         if not self._triage_pairs:
@@ -1188,12 +1137,6 @@ class DPOCurationWindow(ctk.CTkToplevel):
     def _advance_group(self):
         self._next_group()
 
-    def _fit_image(self, pil_img: Image.Image, max_w: int, max_h: int) -> Image.Image:
-        scale = min(max_w / pil_img.width, max_h / pil_img.height)
-        new_w = max(1, int(pil_img.width * scale))
-        new_h = max(1, int(pil_img.height * scale))
-        return pil_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-
     def _build_prompt_expander(self, parent, prompt: str):
         frame = ctk.CTkFrame(parent, fg_color="transparent")
         frame.pack(fill="x", padx=10, pady=(5, 0))
@@ -1239,8 +1182,7 @@ class DPOCurationWindow(ctk.CTkToplevel):
             win_h = self.winfo_height() or self.winfo_screenheight()
             max_w = max(400, win_w // 2 - 40)
             max_h = max(400, win_h - 200)
-            with Image.open(path) as _raw:
-                pil_img = self._fit_image(_raw, max_w, max_h).copy()
+            pil_img = load_fitted_image(path, max_w, max_h)
             ctk_img = ctk.CTkImage(light_image=pil_img, size=pil_img.size)
 
             label = ctk.CTkLabel(master, text="", image=ctk_img)

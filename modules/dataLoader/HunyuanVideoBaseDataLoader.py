@@ -106,7 +106,6 @@ class HunyuanVideoBaseDataLoader(
         config: TrainConfig,
         model: HunyuanVideoModel,
         model_setup: BaseHunyuanVideoSetup,
-        is_validation: bool = False,
     ):
         output_names = [
             'image_path', 'latent_image',
@@ -136,7 +135,6 @@ class HunyuanVideoBaseDataLoader(
             vae=model.vae,
             autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
-            is_validation=is_validation,
         )
 
     def _debug_modules(self, config: TrainConfig, model: HunyuanVideoModel):

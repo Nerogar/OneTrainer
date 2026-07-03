@@ -101,6 +101,7 @@ class GenericTrainer(BaseTrainer):
 
         model_names = self.config.model_names()
 
+        last_backup_path = None
         if self.config.continue_last_backup:
             self.callbacks.on_update_status("searching for previous backups")
             last_backup_path = self.config.get_last_backup_path()
@@ -148,6 +149,11 @@ class GenericTrainer(BaseTrainer):
         if self.config.rlhf_enabled and self.config.training_method != TrainingMethod.LORA:
             raise NotImplementedError("RLHF DPO is currently implemented for adapter training in the LoRA tab only.")
 
+        # Resuming a DPO run: restore the frozen reference saved with the backup so
+        # it is not re-captured from the already-trained adapter weights.
+        if self.config.rlhf_enabled and last_backup_path:
+            self.model_setup.load_dpo_reference(last_backup_path, self.model)
+
         self.callbacks.on_update_status("creating the data loader/caching")
 
         self.data_loader = self.create_data_loader(
@@ -161,15 +167,11 @@ class GenericTrainer(BaseTrainer):
 
         self.parameters = self.model.parameters.parameters()
 
-        if self.config.validation or self.config.rlhf_dpo_validation:
+        if self.config.validation or self.config.dpo_validation_active():
             self.validation_data_loader = self.create_data_loader(
                 self.model, self.model_setup, self.model.train_progress, is_validation=True
             )
 
-        self._dpo_patience_counter = 0
-        self._dpo_best_accuracy = float("-inf")
-        self._dpo_best_margin = float("-inf")
-        self._dpo_best_backup_path: str | None = None
         self._dpo_beta_controller: DPOBetaController | None = None
 
     def __save_config_to_workspace(self):
@@ -370,7 +372,7 @@ class GenericTrainer(BaseTrainer):
                 desc="validation_step",
                 total=current_epoch_length_validation)
 
-            if self.config.rlhf_dpo_validation:
+            if self.config.dpo_validation_active():
                 dpo_val_accuracy = []
                 dpo_val_chosen_reward = []
                 dpo_val_rejected_reward = []
@@ -403,7 +405,6 @@ class GenericTrainer(BaseTrainer):
                         "dpo/val_rejected_reward", val_rejected_reward, train_progress.global_step
                     )
                     self.tensorboard.add_scalar("dpo/val_reward_margin", val_reward_margin, train_progress.global_step)
-                    self.__check_dpo_patience(val_accuracy, val_reward_margin, train_progress)
 
                 # DPO validation uses a different data pipeline (paired samples) than
                 # standard validation, so they cannot share the same data loader.
@@ -424,12 +425,14 @@ class GenericTrainer(BaseTrainer):
                     loss_validation = self.model_setup.calculate_loss(
                         self.model, validation_batch, model_output_data, self.config)
 
+                # since validation batch size = 1
                 concept_name = validation_batch["concept_name"][0]
                 concept_path = validation_batch["concept_path"][0]
                 concept_seed = validation_batch["concept_seed"].item()
                 loss = loss_validation.item()
 
                 label = concept_name if concept_name else os.path.basename(concept_path)
+                # check and fix collision to display both graphs in tensorboard
                 if label in mapping_label_to_seed and mapping_label_to_seed[label] != concept_seed:
                     suffix = 1
                     new_label = f"{label}({suffix})"
@@ -447,9 +450,10 @@ class GenericTrainer(BaseTrainer):
 
             for concept_seed, total_loss in accumulated_loss_per_concept.items():
                 average_loss = total_loss / concept_counts[concept_seed]
-                label = mapping_seed_to_label[concept_seed]
 
-                self.tensorboard.add_scalar(f"loss/validation_step/{label}", average_loss, train_progress.global_step)
+                self.tensorboard.add_scalar(f"loss/validation_step/{mapping_seed_to_label[concept_seed]}",
+                                            average_loss,
+                                            train_progress.global_step)
 
             if len(concept_counts) > 1:
                 total_loss = sum(accumulated_loss_per_concept[key] for key in concept_counts)
@@ -459,54 +463,6 @@ class GenericTrainer(BaseTrainer):
                 self.tensorboard.add_scalar("loss/validation_step/total_average",
                                             total_average_loss,
                                             train_progress.global_step)
-
-    def __check_dpo_patience(self, val_accuracy: float, val_reward_margin: float, train_progress: TrainProgress):
-        rounded_accuracy = round(val_accuracy, 5)
-        rounded_best_accuracy = round(self._dpo_best_accuracy, 5)
-
-        is_new_best = rounded_accuracy > rounded_best_accuracy or (
-            rounded_accuracy == rounded_best_accuracy and val_reward_margin > self._dpo_best_margin
-        )
-
-        if is_new_best and self.config.rlhf_dpo_save_best:
-            self._dpo_best_backup_path = self.__save_dpo_best(val_accuracy, val_reward_margin, train_progress)
-
-        if is_new_best:
-            self._dpo_best_accuracy = val_accuracy
-            self._dpo_best_margin = val_reward_margin
-
-        if not self.config.rlhf_dpo_patience_enabled:
-            return
-
-        if is_new_best:
-            self._dpo_patience_counter = 0
-        else:
-            self._dpo_patience_counter += 1
-
-        self.tensorboard.add_scalar("dpo/patience_counter", self._dpo_patience_counter, train_progress.global_step)
-
-        if self._dpo_patience_counter >= self.config.rlhf_dpo_patience_value:
-            print(
-                f"DPO early stopping triggered: patience exhausted after {self._dpo_patience_counter} "
-                f"consecutive checks without improvement."
-            )
-            self.commands.stop()
-
-    def __save_dpo_best(self, val_accuracy: float, val_reward_margin: float, train_progress: TrainProgress) -> str:
-        best_path = os.path.join(self.config.workspace_dir, "backup", "dpo-best.pt")
-        os.makedirs(os.path.dirname(best_path), exist_ok=True)
-        try:
-            state = [p.data.clone().cpu() for p in self.parameters]
-            torch.save(state, best_path)
-            print(
-                f"Saved DPO best checkpoint (accuracy={val_accuracy:.4f}, "
-                f"margin={val_reward_margin:.6f}) to {best_path}"
-            )
-        except Exception:
-            traceback.print_exc()
-            print("Could not save DPO best checkpoint.")
-            return self._dpo_best_backup_path or ""
-        return best_path
 
     def __save_backup_config(self, backup_path):
         config_path = os.path.join(backup_path, "onetrainer_config")
@@ -549,6 +505,7 @@ class GenericTrainer(BaseTrainer):
             )
 
             self.__save_backup_config(backup_path)
+            self.model_setup.save_dpo_reference(backup_path)
         except Exception:
             traceback.print_exc()
             print("Could not save backup. Check your disk space!")
@@ -910,6 +867,30 @@ class GenericTrainer(BaseTrainer):
                         self.model.optimizer.zero_grad(set_to_none=True)
                         has_gradient = False
 
+                        # Adaptive beta must be applied on EVERY rank and driven by
+                        # the global margin: otherwise non-master ranks keep the
+                        # static beta and the averaged gradients mix losses at
+                        # different beta scales. All ranks all-reduce the margin and
+                        # run the same deterministic controller, so they stay in
+                        # lockstep without a broadcast. reduce_tensor_mean is a
+                        # collective, so this must sit outside the is_master() block.
+                        adaptive_beta = None
+                        if (
+                            self.config.rlhf_enabled
+                            and accumulated_dpo_metrics is not None
+                            and self.config.rlhf_dpo_adaptive_beta
+                            and self.config.rlhf_dpo_objective == DPOObjective.SIGMOID
+                        ):
+                            margin_t = torch.tensor(
+                                accumulated_dpo_metrics["reward_margin"] / accumulated_dpo_metrics["_count"],
+                                device=train_device,
+                            )
+                            multi.reduce_tensor_mean(margin_t)
+                            if self._dpo_beta_controller is None:
+                                self._dpo_beta_controller = DPOBetaController(self.config.rlhf_dpo_beta)
+                            adaptive_beta = self._dpo_beta_controller.update(margin_t.item())
+                            self.model_setup.set_dpo_runtime_beta(adaptive_beta)
+
                         if multi.is_master():
                             self.model_setup.report_to_tensorboard(
                                 self.model, self.config, lr_scheduler, self.tensorboard
@@ -976,14 +957,9 @@ class GenericTrainer(BaseTrainer):
                                     print(warning)
                                     self.tensorboard.add_text("dpo/warnings", warning, train_progress.global_step)
 
-                                if (
-                                    self.config.rlhf_dpo_adaptive_beta
-                                    and self.config.rlhf_dpo_objective == DPOObjective.SIGMOID
-                                ):
-                                    if self._dpo_beta_controller is None:
-                                        self._dpo_beta_controller = DPOBetaController(self.config.rlhf_dpo_beta)
-                                    adaptive_beta = self._dpo_beta_controller.update(dpo_metrics["reward_margin"])
-                                    self.model_setup.set_dpo_runtime_beta(adaptive_beta)
+                                if adaptive_beta is not None:
+                                    # Controller already ran on every rank above; here we
+                                    # only log the (globally-consistent) beta it produced.
                                     self.tensorboard.add_scalar("dpo/beta", adaptive_beta, train_progress.global_step)
                                     self.tensorboard.add_scalar(
                                         "dpo/raw_margin_ema",
@@ -1029,7 +1005,7 @@ class GenericTrainer(BaseTrainer):
 
                         self.one_step_trained = True
 
-                if (self.config.validation or self.config.rlhf_dpo_validation) and multi.is_master():
+                if (self.config.validation or self.config.dpo_validation_active()) and multi.is_master():
                     self.__validate(train_progress)
 
                 train_progress.next_step(self.config.batch_size)
@@ -1062,19 +1038,6 @@ class GenericTrainer(BaseTrainer):
                 if self.model.ema:
                     self.model.ema.copy_ema_to(self.parameters, store_temp=False)
 
-                # Restore DPO best AFTER EMA copy so it takes precedence
-                if (
-                    self.config.rlhf_enabled
-                    and self.config.rlhf_dpo_save_best
-                    and self._dpo_best_backup_path
-                    and os.path.isfile(self._dpo_best_backup_path)
-                ):
-                    print(f"Restoring DPO best checkpoint from {self._dpo_best_backup_path}")
-                    self.callbacks.on_update_status("Restoring best DPO checkpoint")
-                    best_state = torch.load(self._dpo_best_backup_path, map_location=self.temp_device)
-                    for param, saved in zip(self.parameters, best_state, strict=True):
-                        param.data.copy_(saved)
-                    del best_state
                 if (
                     os.path.isdir(self.config.output_model_destination)
                     and self.config.output_model_format.is_single_file()

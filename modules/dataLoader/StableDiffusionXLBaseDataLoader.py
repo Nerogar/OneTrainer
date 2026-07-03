@@ -114,7 +114,7 @@ class StableDiffusionXLBaseDataLoader(
             text_caching=not config.train_text_encoder_or_embedding() or not config.train_text_encoder_2_or_embedding(),
         )
 
-    def _output_modules(self, config: TrainConfig, model: StableDiffusionXLModel, model_setup: BaseStableDiffusionXLSetup, is_validation: bool = False):
+    def _output_modules(self, config: TrainConfig, model: StableDiffusionXLModel, model_setup: BaseStableDiffusionXLSetup):
         output_names = [
             'image_path', 'latent_image',
             'prompt_1', 'prompt_2',
@@ -142,7 +142,6 @@ class StableDiffusionXLBaseDataLoader(
             vae=model.vae,
             autocast_context=[model.autocast_context, model.vae_autocast_context],
             train_dtype=model.vae_train_dtype,
-            is_validation=is_validation,
         )
 
     def _debug_modules(self, config: TrainConfig, model: StableDiffusionXLModel):

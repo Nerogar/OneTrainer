@@ -140,7 +140,7 @@ class HiDreamBaseDataLoader(
         )
 
     def _output_modules(
-        self, config: TrainConfig, model: HiDreamModel, model_setup: BaseHiDreamSetup, is_validation: bool = False
+        self, config: TrainConfig, model: HiDreamModel, model_setup: BaseHiDreamSetup
     ):
         output_names = [
             'image_path', 'latent_image',
@@ -176,7 +176,6 @@ class HiDreamBaseDataLoader(
             vae=model.vae,
             autocast_context=[model.autocast_context],
             train_dtype=model.train_dtype,
-            is_validation=is_validation,
         )
 
     def _debug_modules(self, config: TrainConfig, model: HiDreamModel):
