@@ -16,11 +16,11 @@ setuptools==81.0.0
 
 # pytorch
 accelerate==1.12.0
-safetensors==0.8.0rc0
+safetensors==0.8.0
 tensorboard==2.20.0
 
 # diffusion models
--e git+https://github.com/huggingface/diffusers.git@0f1abc4#egg=diffusers
+-e git+https://github.com/huggingface/diffusers.git@1ffa423#egg=diffusers
 gguf==0.17.1
 transformers==5.5.4 # pinned below 5.6, see https://github.com/Nerogar/OneTrainer/pull/1506
 sentencepiece==0.2.1 # transitive dependency of transformers for tokenizer loading
