@@ -1,7 +1,13 @@
 from modules.util.convert_util import (
+    DOUBLE_SEGMENT_SUFFIXES,
+    FACTOR_PREFIXES,
+    SINGLE_SEGMENT_SUFFIXES,
+    SUPPORTED_PARAM_PREFIXES,
+    SUPPORTED_PARAM_SCALARS,
     add_prefix,
     component_body_conversion,
     convert,
+    matched_leaf_groups,
     peft_magnitude_to_dora_scale,
     remove_prefix,
     reverse_conversion,
@@ -10,14 +16,12 @@ from modules.util.convert_util import (
 import torch.nn as nn
 from torch import Tensor
 
-import parse
-
 # Load-side LAYER 1: the model-independent universal pre-pass + feature detector.
 #
-# Every on-disk LoRA format decomposes into the same orthogonal dimensions (see the ecosystem
-# survey). Five of those dimensions carry NO model knowledge -- they are pure prefix/suffix/value
-# conventions -- so they can be normalised in one place, before any per-model namespace reverse
-# (Layer 2) runs. This module owns exactly those dimensions:
+# Every on-disk LoRA format decomposes into the same orthogonal dimensions. Five of those dimensions
+# carry NO model knowledge -- they are pure prefix/suffix/value conventions -- so they can be
+# normalised in one place, before any per-model namespace reverse (Layer 2) runs. This module owns
+# exactly those dimensions:
 #
 #   - Container:  strip the peft directory wrapper's `base_model.model.` top prefix, the single-
 #                 adapter `.default` infix, and the generic LyCORIS `lycoris_` wrapper prefix.
@@ -35,15 +39,7 @@ import parse
 #
 # A file already in diffusers-split names (OT DIFFUSERS / INTERNAL, and the ecosystem's diffusers-
 # keyed variants) reaches the canonical namespace with this pass ALONE -- its module paths already
-# carry the canonical `transformer.`/`unet.` prefix, so Layer 2 is a no-op. That is the case this
-# module is independently testable on.
-
-
-# The adapter param-name families OneTrainer trains: LoRA/DoRA (lora_*, alpha, dora_scale), LoHa (hada_*),
-# LoKr (lokr_*), OFT (oft_*). This is the closed allowlist -- checked positively so any foreign LyCORIS
-# algorithm (GLoRA, IA3, full-diff, norm, tlora, ...) is rejected with no per-algorithm table to maintain.
-_SUPPORTED_PARAM_PREFIXES = ("lora_", "hada_", "lokr_", "oft_")
-_SUPPORTED_PARAM_SCALARS = {"alpha", "dora_scale"}
+# carry the canonical `transformer.`/`unet.` prefix, so Layer 2 is a no-op.
 
 
 def _reject_unsupported_algorithms(state_dict: dict[str, Tensor]) -> None:
@@ -53,14 +49,15 @@ def _reject_unsupported_algorithms(state_dict: dict[str, Tensor]) -> None:
     # (lora_down/up, dora_scale), so the input-only spellings those steps fold in -- lora_A/B and the DoRA
     # magnitude/lora_magnitude_vector -- are already canonical by the time we check and aren't mistaken for
     # a foreign algorithm. Checking the raw dict would wrongly reject them. The param is the last path
-    # segment, or the one before a trailing .weight. bundle_emb.* is a passthrough embedding and is exempt
+    # segment, or the one before a trailing .weight / .scaled_oft (Scaled-OFT stores its marker buffer as
+    # oft_R.scaled_oft, so oft_R is the param). bundle_emb.* is a passthrough embedding and is exempt
     # (_aux.* bookkeeping tensors are already dropped in normalize_various before this runs).
     for key in state_dict:
         if key.startswith("bundle_emb"):
             continue
         segments = key.split(".")
-        param = segments[-2] if segments[-1] == "weight" and len(segments) > 1 else segments[-1]
-        if param in _SUPPORTED_PARAM_SCALARS or param.startswith(_SUPPORTED_PARAM_PREFIXES):
+        param = segments[-2] if key.endswith(DOUBLE_SEGMENT_SUFFIXES) and len(segments) > 1 else segments[-1]
+        if param in SUPPORTED_PARAM_SCALARS or param.startswith(SUPPORTED_PARAM_PREFIXES):
             continue
         raise RuntimeError(
             f"this LoRA file uses an adapter type OneTrainer can't load for training (key '{key}'). Only "
@@ -186,11 +183,15 @@ def normalize_namespace(
     # passes the already-canonical TE keys through unchanged -- the same result as "component_prefixed".
     #
     # legacy_denoising_prefix is the model's flat LEGACY denoising prefix (from _legacy_conversion, None if
-    # the model dropped LEGACY). LEGACY is a separate family ONLY when that prefix differs from kohya's
-    # lora_unet -- lora_transformer for the transformer models, lora_prior_unet for Stable Cascade. When a
-    # model's LEGACY instead reuses lora_unet (SD/SDXL), it is NOT separable here and is handled in the
-    # kohya_flat branch (body scoring). Checked before kohya_flat because a TE model's LEGACY also carries
-    # lora_te*_ keys that the kohya prefix would otherwise match.
+    # the model dropped LEGACY). LEGACY is frozen -- every per-model _legacy_conversion override lists the
+    # denoising component first, mirroring the saver's _convert_legacy output order, so entry [0] is always
+    # the denoising component's (canonical_prefix, legacy_prefix) pair.
+    #
+    # LEGACY is a separate family ONLY when that prefix differs from kohya's lora_unet -- lora_transformer
+    # for the transformer models, lora_prior_unet for Stable Cascade. When a model's LEGACY instead reuses
+    # lora_unet (SD/SDXL), it is NOT separable here and is handled in the kohya_flat branch (body scoring).
+    # Checked before kohya_flat because a TE model's LEGACY also carries lora_te*_ keys that the kohya
+    # prefix would otherwise match.
     legacy_denoising_prefix = legacy_conversion[0][1] if legacy_conversion is not None else None
     keys = list(state_dict)
     if any(k.startswith(component + ".") for k in keys):
@@ -218,13 +219,6 @@ def normalize_namespace(
             family = "component_prefixed"
 
     return state_dict, family
-
-
-def _denoising_body_conversion(component: str, top: str, body: list | None) -> list:
-    # the denoising component's canonical prefix mapped to `top` (the component itself for original, "lora_unet"
-    # for kohya), applying `body`. Mirrors the savers' head entry (component_body_conversion with no TE extras);
-    # a multi-pass body is emitted as chained passes there, and reverse_conversion inverts it pass by pass.
-    return component_body_conversion(component, top, body)
 
 
 def _partition_denoising(
@@ -259,7 +253,7 @@ def reverse_original(
     # out (the strict denoising-body reverse would otherwise reject them) and pass through unchanged.
     denoising, passthrough = _partition_denoising(state_dict, text_encoder_prefixes)
     denoising = convert(denoising, add_prefix(component), strict=False)
-    denoising = convert(denoising, reverse_conversion(_denoising_body_conversion(component, component, body)), strict=True)
+    denoising = convert(denoising, reverse_conversion(component_body_conversion(component, component, body)), strict=True)
     return denoising | passthrough
 
 
@@ -282,7 +276,7 @@ def reverse_comfy(
         state_dict = convert(state_dict, [(comfy, canonical) for canonical, comfy in comfy_te_prefixes.items()], strict=False)
     denoising, passthrough = _partition_denoising(state_dict, text_encoder_prefixes)
     denoising = convert(denoising, [("diffusion_model", component)], strict=False)
-    denoising = convert(denoising, reverse_conversion(_denoising_body_conversion(component, component, body)), strict=True)
+    denoising = convert(denoising, reverse_conversion(component_body_conversion(component, component, body)), strict=True)
     return denoising | passthrough
 
 
@@ -315,16 +309,17 @@ def reverse_legacy(state_dict: dict[str, Tensor], conversion: list, native_modul
 
 def _split_value_suffix(key: str) -> tuple[str, str]:
     # split a key into (module path, value suffix). Mirrors kohya_flatten: the suffix is .alpha /
-    # .dora_scale (one segment) or .<param>.weight (two segments). Keys with neither (bundle_emb.*)
-    # have no module path -> empty suffix, whole key is the "module".
-    if key.endswith((".alpha", ".dora_scale")):
+    # .dora_scale (one segment) or .<param>.weight / .oft_R.scaled_oft (two segments). Keys with neither
+    # (bundle_emb.*) have no module path -> empty suffix, whole key is the "module".
+    if key.endswith(SINGLE_SEGMENT_SUFFIXES):
         suffix = key[key.rfind("."):]
-    elif key.endswith(".weight"):
+    elif key.endswith(DOUBLE_SEGMENT_SUFFIXES):
         suffix = key[key.removesuffix(key[key.rfind("."):]).rfind("."):]
     else:
-        # LoHa (hada_*), LoKR (lokr_*), OFT (oft_*) params are single-segment and don't end in .weight.
+        # LoHa (hada_*) and LoKr (lokr_*) factors are single bare segments that don't end in .weight (LoRA
+        # and OFT params end in .weight/.scaled_oft and were already caught above).
         last_seg = key[key.rfind(".") + 1:]
-        if last_seg.startswith(_SUPPORTED_PARAM_PREFIXES):
+        if last_seg.startswith(FACTOR_PREFIXES):
             return key[:key.rfind(".")], key[key.rfind("."):]
         return key, ""
     return key.removesuffix(suffix), suffix
@@ -359,27 +354,21 @@ def count_key_matches(state_dict: dict[str, Tensor], candidate_keys: set[str]) -
 def collapse_fusion_groups(names: set[str], fusion_groups: list | None) -> set[str]:
     # Replace each complete qkv fusion group's live split leaves with the single fused module name, so the
     # canonical module set matches what a FUSED wrapper emits (and what the saver converted to the on-disk
-    # fused KOHYA names). fusion_groups entries are (block_pattern, [leaf_suffixes], fused_suffix, _orig);
-    # a group collapses only for blocks where ALL its leaves are present (same completeness rule the
-    # wrapper's discovery uses, minus the in_features check -- this only builds candidate names). Names are
+    # fused KOHYA names). fusion_groups entries are (group_pattern, [leaf_suffixes], fused_suffix, _orig);
+    # a group collapses only where ALL its leaves are present (same completeness rule the wrapper's
+    # discovery uses, minus the in_features check -- this only builds candidate names). Names are
     # component-relative (no top prefix yet). With no fusion_groups this is the identity.
     if not fusion_groups:
         return set(names)
 
     names = set(names)
-    for block_pattern, leaf_suffixes, fused_suffix, _original_suffix in fusion_groups:
-        index_sets = []
-        for leaf in leaf_suffixes:
-            pattern = block_pattern + "." + leaf
-            indices = {match["i"] for name in names
-                       if (match := parse.parse(pattern, name)) is not None and "i" in match.named}
-            index_sets.append(indices)
+    for group_pattern, leaf_suffixes, fused_suffix, _original_suffix in fusion_groups:
+        group_sets = [matched_leaf_groups(group_pattern, leaf, names) for leaf in leaf_suffixes]
 
-        for i in set.intersection(*index_sets) if index_sets else []:
-            block = block_pattern.format(i=i)
+        for group_key in set.intersection(*group_sets) if group_sets else []:
             for leaf in leaf_suffixes:
-                names.discard(f"{block}.{leaf}")
-            names.add(f"{block}.{fused_suffix}")
+                names.discard(f"{group_key}.{leaf}")
+            names.add(f"{group_key}.{fused_suffix}")
 
     return names
 
@@ -399,7 +388,7 @@ def native_module_keys_from_names(
     # <native>"). For an identity body and no fusion groups this is just the renamed canonical paths.
     names = collapse_fusion_groups(set(names), fusion_groups)
     canonical = {(f"{component}.{name}" if component else name): None for name in names}  # names only; no tensors
-    renamed = convert(canonical, _denoising_body_conversion(component, top, body), strict=True)
+    renamed = convert(canonical, component_body_conversion(component, top, body), strict=True)
     return set(renamed.keys())
 
 
@@ -460,7 +449,7 @@ def to_canonical(
         denoising_modules = {_split_value_suffix(k[len(denoising_prefix):])[0]
                              for k in denoising if k.startswith(denoising_prefix)}
         if not denoising_modules.issubset(module_names[component]):
-            denoising = convert(denoising, reverse_conversion(_denoising_body_conversion(component, component, original_conversion)), strict=False)
+            denoising = convert(denoising, reverse_conversion(component_body_conversion(component, component, original_conversion)), strict=False)
         return denoising | passthrough
     te_prefixes = [prefix for prefix, _kohya_prefix in text_encoders]
     if family == "unprefixed":

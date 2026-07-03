@@ -43,6 +43,8 @@ class LoRALoaderMixin(metaclass=ABCMeta):
         return None
 
     def _mixture_legacy_conversion(self, model: BaseModel) -> list:
+        # LEGACY conversion for models that historically flattened as lora_<component>/lora_te<n> with no
+        # native body (diffusers names throughout) -- the generic shape the saver's mixture path emits.
         component = model.model_type.denoising_model_part()
         conversion = [(component, f"lora_{component}")]
         for i, (_te_module, te_names) in enumerate(model.lora_text_encoders(), start=1):
@@ -53,15 +55,10 @@ class LoRALoaderMixin(metaclass=ABCMeta):
     def _to_canonical(self, model: BaseModel, state_dict: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         # Layer 1 (model-independent) then Layer 2 (the shared, model-independent namespace dispatch). All
         # per-model knowledge is gathered from the model here and handed to to_canonical as plain data, so
-        # the dispatch itself lives in exactly one place (load_lora_util.to_canonical), shared with offline
-        # callers (the LoRA stress harness) that supply the same data from a captured key list.
+        # the dispatch itself lives in exactly one place (load_lora_util.to_canonical).
         state_dict = normalize_various(state_dict)
 
         component = model.model_type.denoising_model_part()
-        # a TE is declared as a (live base module, {ModelFormat: name} dict) tuple; its canonical prefix is the
-        # in-memory source name (ModelFormat.DIFFUSERS_LORA) and its live base module is the module the model
-        # handed us directly (no attribute-name guessing). The native name in ORIGINAL/COMFY is the canonical
-        # name (the bare native name is never persisted), so the loader carries only (canonical, kohya).
         text_encoders = model.lora_text_encoders()
         module_names = {component: lora_module_names(self._denoising_module(model))}
         module_names.update({
