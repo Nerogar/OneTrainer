@@ -1,7 +1,6 @@
 # Legacy CUDA 12.6 build of PyTorch, for hosts whose NVIDIA driver is too old
-# for CUDA 13, or whose GPU is pre-Turing (compute capability < 7.5). CUDA 13
-# dropped Maxwell/Pascal/Volta support, so those cards must use these wheels.
-# Kept version-identical to requirements-cuda.txt; only the CUDA build differs.
+# for CUDA 13. Kept version-identical to requirements-cuda.txt; only the CUDA
+# build differs.
 
 # pytorch
 --extra-index-url https://download.pytorch.org/whl/cu126
