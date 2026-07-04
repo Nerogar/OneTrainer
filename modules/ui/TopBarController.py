@@ -46,39 +46,13 @@ class TopBarController:
         ]
 
     def get_training_methods(self, model_type: ModelType) -> list[tuple[str, TrainingMethod]]:
-        #TODO simplify
-        if model_type.is_stable_diffusion():
-            return [
-                ("Fine Tune", TrainingMethod.FINE_TUNE),
-                ("LoRA", TrainingMethod.LORA),
-                ("Embedding", TrainingMethod.EMBEDDING),
-                ("Fine Tune VAE", TrainingMethod.FINE_TUNE_VAE),
-            ]
-        elif model_type.is_stable_diffusion_3() \
-                or model_type.is_stable_diffusion_xl() \
-                or model_type.is_wuerstchen() \
-                or model_type.is_pixart() \
-                or model_type.is_flux_1() \
-                or model_type.is_sana() \
-                or model_type.is_hunyuan_video() \
-                or model_type.is_hi_dream() \
-                or model_type.is_chroma():
-            return [
-                ("Fine Tune", TrainingMethod.FINE_TUNE),
-                ("LoRA", TrainingMethod.LORA),
-                ("Embedding", TrainingMethod.EMBEDDING),
-            ]
-        elif model_type.is_qwen() \
-                or model_type.is_anima() \
-                or model_type.is_krea2() \
-                or model_type.is_z_image() \
-                or model_type.is_flux_2() \
-                or model_type.is_ernie():
-            return [
-                ("Fine Tune", TrainingMethod.FINE_TUNE),
-                ("LoRA", TrainingMethod.LORA),
-            ]
-        return []
+        labels = {
+            TrainingMethod.FINE_TUNE: "Fine Tune",
+            TrainingMethod.LORA: "LoRA",
+            TrainingMethod.EMBEDDING: "Embedding",
+            TrainingMethod.FINE_TUNE_VAE: "Fine Tune VAE",
+        }
+        return [(labels[m], m) for m in model_type.supported_training_methods()]
 
     def load_preset_tree(self, dir: str = "training_presets") -> list[tuple[str, str | list]]:
         # mirrors whatever directory structure happens to exist under `dir`; a node is either
