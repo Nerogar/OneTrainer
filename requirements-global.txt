@@ -32,7 +32,7 @@ pooch==1.8.2
 open-clip-torch==2.32.0
 
 # data loader
--e git+https://github.com/dxqb/mgds.git@krea2#egg=mgds # Tokenize suffix_text + EncodeQwenText position_ids, not yet upstream
+-e git+https://github.com/Nerogar/mgds.git@bae73e5#egg=mgds
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers

@@ -40,6 +40,7 @@ class ModelType(Enum):
 
     QWEN = 'QWEN'
 
+    ANIMA = 'ANIMA'
     KREA_2 = 'KREA_2'
 
     Z_IMAGE = 'Z_IMAGE'
@@ -101,6 +102,9 @@ class ModelType(Enum):
 
     def is_qwen(self):
         return self == ModelType.QWEN
+
+    def is_anima(self):
+        return self == ModelType.ANIMA
 
     def is_krea2(self):
         return self == ModelType.KREA_2
@@ -165,6 +169,7 @@ class ModelType(Enum):
             or self.is_flux() \
             or self.is_chroma() \
             or self.is_qwen() \
+            or self.is_anima() \
             or self.is_krea2() \
             or self.is_sana() \
             or self.is_hunyuan_video() \
@@ -211,7 +216,7 @@ class ModelType(Enum):
             formats.append(ModelFormat.ORIGINAL_SINGLE_FILE)
         elif (self.is_flux_1() or self.is_flux_2() or self.is_chroma() or self.is_hunyuan_video()
                 or self.is_hi_dream() or self.is_pixart() or self.is_qwen() or self.is_ernie()
-                or self.is_z_image() or self.is_krea2()):
+                or self.is_z_image() or self.is_anima() or self.is_krea2()):
             formats.append(ModelFormat.ORIGINAL_TRANSFORMER)
         if self.is_z_image():
             formats.append(ModelFormat.COMFY_TRANSFORMER)
@@ -268,6 +273,7 @@ _MODEL_PARTS: dict[ModelType, tuple[str, ...]] = {
     ModelType.FLUX_DEV_1: ("transformer", "text_encoder", "text_encoder_2", "vae"),
     ModelType.FLUX_FILL_DEV_1: ("transformer", "text_encoder", "text_encoder_2", "vae"),
     ModelType.FLUX_2: ("transformer", "text_encoder", "vae"),
+    ModelType.ANIMA: ("transformer", "text_encoder", "vae"),
     ModelType.SANA: ("transformer", "text_encoder", "vae"),
     ModelType.HUNYUAN_VIDEO: ("transformer", "text_encoder", "text_encoder_2", "vae"),
     ModelType.HI_DREAM_FULL: ("transformer", "text_encoder", "text_encoder_2", "text_encoder_3", "text_encoder_4", "vae"),
