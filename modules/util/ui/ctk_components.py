@@ -389,8 +389,6 @@ def preset_menu_button(master, row, column, text, tree: list[tuple[str, Any]],
                 parent_menu.add_command(label=name, command=lambda v=value: command(v))
 
     def open_menu():
-        menu = tk.Menu(component, tearoff=0)
-        build_menu(menu, tree)
         x = component.winfo_rootx()
         y = component.winfo_rooty() + component.winfo_height()
         try:
@@ -399,6 +397,9 @@ def preset_menu_button(master, row, column, text, tree: list[tuple[str, Any]],
             menu.grab_release()
 
     component = ctk.CTkButton(master, text=text, command=open_menu)
+    # build the menu once; rebuilding on every open leaks a Menu widget per click
+    menu = tk.Menu(component, tearoff=0)
+    build_menu(menu, tree)
     component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="new")
     return component
 
