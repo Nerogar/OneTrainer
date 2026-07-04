@@ -104,7 +104,9 @@ class LinuxCloud(BaseCloud):
 
         if result.exited == 0:
             if update:
-                self.connection.run(cmd_env + "&& ./update.sh", in_stream=False)
+                # updating can switch a dependency's git remote (e.g. a different fork/branch),
+                # which makes pip prompt interactively unless told to always wipe and re-clone.
+                self.connection.run(cmd_env + "&& export PIP_EXISTS_ACTION=w && ./update.sh", in_stream=False)
         else:
             self.connection.run(cmd_env + "&& ./install.sh", in_stream=False)
 

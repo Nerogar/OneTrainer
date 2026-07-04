@@ -188,9 +188,6 @@ class ModelType(Enum):
         return _MODEL_PARTS[self][0]
 
     def supported_lora_formats(self) -> list[ModelFormat]:
-        # LoRA output formats this model can produce, in UI display order. Every model supports the four
-        # clean target namespaces; LEGACY (the per-model historical output) is only listed for models with
-        # a loadable historical format. Kept in sync with the per-model LoRASaver._convert_legacy raises.
         formats = [
             ModelFormat.DIFFUSERS_LORA,
             ModelFormat.KOHYA_LORA,
@@ -214,8 +211,6 @@ class ModelType(Enum):
         return formats
 
     def supported_full_model_formats(self) -> list[ModelFormat]:
-        # Full-model output formats this model can produce, in UI display order. Z-Image additionally
-        # offers COMFY_TRANSFORMER (ORIGINAL_TRANSFORMER + Comfy key quirks, ComfyUI #12303).
         formats = [ModelFormat.DIFFUSERS]
         if self.is_stable_diffusion() or self.is_stable_diffusion_xl() or self.is_stable_diffusion_3():
             formats.append(ModelFormat.ORIGINAL_SINGLE_FILE)
