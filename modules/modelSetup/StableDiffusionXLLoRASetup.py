@@ -81,8 +81,6 @@ class StableDiffusionXLLoRASetup(
         create_te1 = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
         create_te2 = config.text_encoder_2.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder_2")
 
-        # canonical (diffusers) wrapper prefixes: unet / text_encoder / text_encoder_2 (step 0). SDXL has
-        # no qkv fusion (split to_q/k/v in both namespaces), so no fusion_spec is passed.
         model.text_encoder_1_lora = LoRAModuleWrapper(
             model.text_encoder_1, "text_encoder", config
         ) if create_te1 else None

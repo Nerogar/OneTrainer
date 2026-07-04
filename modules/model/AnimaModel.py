@@ -43,7 +43,6 @@ class AnimaModel(BaseModel):
     transformer_offload_conductor: LayerOffloadConductor | None
 
     # persistent lora training data
-    text_encoder_lora: LoRAModuleWrapper | None
     transformer_lora: LoRAModuleWrapper | None
     lora_state_dict: dict | None
 
@@ -70,13 +69,11 @@ class AnimaModel(BaseModel):
         self.text_encoder_offload_conductor = None
         self.transformer_offload_conductor = None
 
-        self.text_encoder_lora = None
         self.transformer_lora = None
         self.lora_state_dict = None
 
     def adapters(self) -> list[LoRAModuleWrapper]:
         return [a for a in [
-            self.text_encoder_lora,
             self.transformer_lora,
         ] if a is not None]
 
@@ -136,17 +133,13 @@ class AnimaModel(BaseModel):
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
 
-    def text_encoder_to(self, device: torch.device): #TODO share more code between models
-        if self.text_encoder is not None:
-            if self.text_encoder_offload_conductor is not None and \
-                    self.text_encoder_offload_conductor.layer_offload_activated():
-                self.text_encoder_offload_conductor.to(device)
-            else:
-                self.text_encoder.to(device=device)
-            self.text_conditioner.to(device=device)
-
-        if self.text_encoder_lora is not None:
-            self.text_encoder_lora.to(device)
+    def text_encoder_to(self, device: torch.device):
+        if self.text_encoder_offload_conductor is not None and \
+                self.text_encoder_offload_conductor.layer_offload_activated():
+            self.text_encoder_offload_conductor.to(device)
+        else:
+            self.text_encoder.to(device=device)
+        self.text_conditioner.to(device=device)
 
     def transformer_to(self, device: torch.device):
         if self.transformer_offload_conductor is not None and \
@@ -165,9 +158,8 @@ class AnimaModel(BaseModel):
 
     def eval(self):
         self.vae.eval()
-        if self.text_encoder is not None:
-            self.text_encoder.eval()
-            self.text_conditioner.eval()
+        self.text_encoder.eval()
+        self.text_conditioner.eval()
         self.transformer.eval()
 
     def create_pipeline(self):
@@ -221,7 +213,7 @@ class AnimaModel(BaseModel):
             t5_ids = t5_output.input_ids.to(self.text_encoder.device)
             t5_mask = t5_output.attention_mask.to(self.text_encoder.device)
 
-        if text_encoder_output is None and self.text_encoder is not None:
+        if text_encoder_output is None:
             with self.text_encoder_autocast_context:
                 qwen_hidden = self.text_encoder(
                     tokens,

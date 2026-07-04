@@ -49,10 +49,7 @@ class AnimaBaseDataLoader(
         if config.masked_training or config.model_type.has_mask_input():
             modules.append(downscale_mask)
 
-        modules += [tokenize_prompt, tokenize_t5]
-
-        if not config.train_text_encoder_or_embedding():
-            modules.append(encode_prompt)
+        modules += [tokenize_prompt, tokenize_t5, encode_prompt]
 
         return modules
 
@@ -64,15 +61,12 @@ class AnimaBaseDataLoader(
 
         image_aggregate_names = ['crop_resolution', 'image_path']
 
-        text_split_names = []
+        text_split_names = ['tokens', 'tokens_mask', 't5_tokens', 't5_tokens_mask', 'text_encoder_hidden_state']
 
         sort_names = image_aggregate_names + image_split_names + [
             'prompt', 'tokens', 'tokens_mask', 't5_tokens', 't5_tokens_mask', 'text_encoder_hidden_state',
             'concept'
         ]
-
-        if not config.train_text_encoder_or_embedding():
-            text_split_names += ['tokens', 'tokens_mask', 't5_tokens', 't5_tokens_mask', 'text_encoder_hidden_state']
 
         return self._cache_modules_from_names(
             model, model_setup,
@@ -81,7 +75,7 @@ class AnimaBaseDataLoader(
             text_split_names=text_split_names,
             sort_names=sort_names,
             config=config,
-            text_caching=not config.train_text_encoder_or_embedding(),
+            text_caching=True,
         )
 
     def _output_modules(self, config: TrainConfig, model: AnimaModel, model_setup: BaseAnimaSetup):

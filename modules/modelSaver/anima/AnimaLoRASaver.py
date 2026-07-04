@@ -10,14 +10,6 @@ class AnimaLoRASaver(
     def __init__(self):
         super().__init__()
 
-    # Anima is new on this branch and has no frozen pre-branch LoRA output, so _convert_legacy is not
-    # overridden -- it inherits the mixin raise, and ModelType.supported_lora_formats drops LEGACY_LORA.
-    #
-    # ORIGINAL's net. wrapper is no longer a saver override: it lives in the denoising body
-    # (AnimaModel.diffusers_to_original() renames to the netless DiT names then adds net.), so the mixin's
-    # generic _save_original produces net.<DiT> after it strips the transformer. component prefix. COMFY and
-    # KOHYA override the body back to the netless names (AnimaModel.lora_diffusers_to_{comfy,kohya}).
-
     def _get_state_dict(
             self,
             model: AnimaModel,

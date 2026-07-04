@@ -51,6 +51,7 @@ class AnimaFineTuneSetup(
         self._setup_model_part_requires_grad("transformer", model.transformer, config.transformer, model.train_progress)
 
         model.text_encoder.requires_grad_(False)
+        model.text_conditioner.requires_grad_(False)
         model.vae.requires_grad_(False)
 
 
@@ -75,6 +76,7 @@ class AnimaFineTuneSetup(
         model.transformer_to(self.train_device)
 
         model.text_encoder.eval()
+        model.text_conditioner.eval()
 
         model.vae.eval()
 

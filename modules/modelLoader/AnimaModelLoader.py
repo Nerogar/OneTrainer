@@ -170,11 +170,6 @@ class AnimaLoRALoader(
     def __init__(self):
         super().__init__()
 
-    # ORIGINAL Anima LoRAs carry the original checkpoint's net. wrapper on the denoising keys (net.x_embedder...).
-    # No loader override is needed: the net. wrapper lives in the denoising body (AnimaModel.diffusers_to_original
-    # adds it), so the generic reverse re-applies the transformer. component prefix and inverts the body --
-    # including the net. pass -- back to canonical. KOHYA/COMFY/DIFFUSERS carry no net. and use the netless body.
-
     def load(
             self,
             model: AnimaModel,
