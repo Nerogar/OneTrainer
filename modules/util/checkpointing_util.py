@@ -460,9 +460,10 @@ def enable_checkpointing_for_ernie_transformer(
 def enable_checkpointing_for_krea2_transformer(
         model: nn.Module,
         config: TrainConfig,
-) -> LayerOffloadConductor:
+        part: TrainModelPartConfig,
+) -> LayerOffloadConductor | None:
     # Krea2TransformerBlock takes (hidden_states, temb, image_rotary_emb, attention_mask).
-    return enable_checkpointing(model, config, config.compile, [
+    return enable_checkpointing(model, config, part, config.compile, [
         (model.text_fusion.layerwise_blocks, ["hidden_states"]),
         (model.text_fusion.refiner_blocks,   ["hidden_states"]),
         (model.transformer_blocks,           ["hidden_states"]),
@@ -471,7 +472,8 @@ def enable_checkpointing_for_krea2_transformer(
 def enable_checkpointing_for_qwen3vl_encoder_layers(
         model: nn.Module,
         config: TrainConfig,
-) -> LayerOffloadConductor:
-    return enable_checkpointing(model, config, False, [
-        (Qwen3VLTextDecoderLayer, []),
+        part: TrainModelPartConfig,
+) -> LayerOffloadConductor | None:
+    return enable_checkpointing(model, config, part, False, [
+        (Qwen3VLTextDecoderLayer, []),  # no activation offloading: this encoder is never trained
     ])
