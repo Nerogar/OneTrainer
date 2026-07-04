@@ -337,11 +337,9 @@ function get_cuda_requirements_path {
     fi
 
     # Max CUDA version the driver supports, parsed from the nvidia-smi header
-    # (e.g. "CUDA Version: 13.0"). Below 13.0 means the driver is too old.
+    # (e.g. "CUDA Version: 13.0"). Below major version 13 means too old.
     local driver_cuda="$("${smi}" 2>/dev/null | grep -oE 'CUDA Version: [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+' | head -n1)"
-    if [[ -n "${driver_cuda}" ]] && awk "BEGIN{exit !(${driver_cuda} < 13.0)}"; then
-        # NOTE: print_warning writes to stderr, so it won't pollute the captured
-        # filename on stdout.
+    if [[ -n "${driver_cuda}" ]] && (( ${driver_cuda%%.*} < 13 )); then
         print_warning "Your NVIDIA driver only supports up to CUDA ${driver_cuda}, so OneTrainer will install the legacy CUDA 12.6 build of PyTorch. Updating your NVIDIA driver is recommended to use the faster CUDA 13 build."
         echo "${legacy_reqs}"
         return
