@@ -1,5 +1,6 @@
 from enum import Enum
 
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TrainingMethod import TrainingMethod
 
 
@@ -38,6 +39,9 @@ class ModelType(Enum):
     CHROMA_1 = 'CHROMA_1'
 
     QWEN = 'QWEN'
+
+    ANIMA = 'ANIMA'
+    KREA_2 = 'KREA_2'
 
     Z_IMAGE = 'Z_IMAGE'
 
@@ -99,6 +103,12 @@ class ModelType(Enum):
     def is_qwen(self):
         return self == ModelType.QWEN
 
+    def is_anima(self):
+        return self == ModelType.ANIMA
+
+    def is_krea2(self):
+        return self == ModelType.KREA_2
+
     def is_sana(self):
         return self == ModelType.SANA
 
@@ -159,6 +169,8 @@ class ModelType(Enum):
             or self.is_flux() \
             or self.is_chroma() \
             or self.is_qwen() \
+            or self.is_anima() \
+            or self.is_krea2() \
             or self.is_sana() \
             or self.is_hunyuan_video() \
             or self.is_hi_dream() \
@@ -184,10 +196,74 @@ class ModelType(Enum):
                 or self.is_hi_dream() \
                 or self.is_chroma():
             return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA, TrainingMethod.EMBEDDING)
-        if self.is_qwen() or self.is_z_image() or self.is_flux_2() or self.is_ernie():
+        if self.is_qwen() or self.is_z_image() or self.is_flux_2() or self.is_ernie() \
+                or self.is_anima() or self.is_krea2():
             return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA)
         raise ValueError(f"No supported training methods defined for model type {self}")
 
+    def denoising_model_part(self) -> str:
+        # the denoising model component (unet / transformer / prior), always listed first in model_parts().
+        return _MODEL_PARTS[self][0]
+
+    def supported_lora_formats(self) -> list[ModelFormat]:
+        formats = [
+            ModelFormat.DIFFUSERS_LORA,
+            ModelFormat.KOHYA_LORA,
+            ModelFormat.ORIGINAL_LORA,
+            ModelFormat.COMFY_LORA,
+        ]
+        has_legacy = self.is_stable_diffusion() \
+            or self.is_stable_diffusion_xl() \
+            or self.is_stable_diffusion_3() \
+            or self.is_stable_cascade() \
+            or self.is_pixart() \
+            or self.is_flux_1() \
+            or self.is_flux_2() \
+            or self.is_chroma() \
+            or self.is_qwen() \
+            or self.is_hunyuan_video() \
+            or self.is_z_image() \
+            or self.is_ernie()
+        if has_legacy:
+            formats.append(ModelFormat.LEGACY_LORA)
+        return formats
+
+    def supported_full_model_formats(self) -> list[ModelFormat]:
+        formats = [ModelFormat.DIFFUSERS]
+        if self.is_stable_diffusion() or self.is_stable_diffusion_xl() or self.is_stable_diffusion_3():
+            formats.append(ModelFormat.ORIGINAL_SINGLE_FILE)
+        elif (self.is_flux_1() or self.is_flux_2() or self.is_chroma() or self.is_hunyuan_video()
+                or self.is_hi_dream() or self.is_pixart() or self.is_qwen() or self.is_ernie()
+                or self.is_z_image() or self.is_anima() or self.is_krea2()):
+            formats.append(ModelFormat.ORIGINAL_TRANSFORMER)
+        if self.is_z_image():
+            formats.append(ModelFormat.COMFY_TRANSFORMER)
+        has_legacy = self.is_stable_diffusion() \
+            or self.is_stable_diffusion_xl() \
+            or self.is_stable_diffusion_3() \
+            or self.is_stable_cascade() \
+            or self.is_pixart() \
+            or self.is_flux_1() \
+            or self.is_flux_2() \
+            or self.is_chroma() \
+            or self.is_qwen() \
+            or self.is_hunyuan_video() \
+            or self.is_hi_dream() \
+            or self.is_z_image() \
+            or self.is_ernie()
+        if has_legacy:
+            formats.append(ModelFormat.LEGACY_SAFETENSORS)
+        return formats
+
+    def supported_output_formats(self, training_method: TrainingMethod) -> list[ModelFormat]:
+        if training_method == TrainingMethod.EMBEDDING:
+            return [ModelFormat.SAFETENSORS]
+        elif training_method == TrainingMethod.LORA:
+            return self.supported_lora_formats()
+        elif training_method in (TrainingMethod.FINE_TUNE, TrainingMethod.FINE_TUNE_VAE):
+            return self.supported_full_model_formats()
+        else:
+            raise ValueError(f"Unsupported training method: {training_method}")
 
 # The components each model type has, keyed by TrainConfig field names, as the single source of truth.
 # The diffusion model (unet / transformer / prior) is always listed first; the first text encoder is
@@ -214,11 +290,13 @@ _MODEL_PARTS: dict[ModelType, tuple[str, ...]] = {
     ModelType.FLUX_DEV_1: ("transformer", "text_encoder", "text_encoder_2", "vae"),
     ModelType.FLUX_FILL_DEV_1: ("transformer", "text_encoder", "text_encoder_2", "vae"),
     ModelType.FLUX_2: ("transformer", "text_encoder", "vae"),
+    ModelType.ANIMA: ("transformer", "text_encoder", "vae"),
     ModelType.SANA: ("transformer", "text_encoder", "vae"),
     ModelType.HUNYUAN_VIDEO: ("transformer", "text_encoder", "text_encoder_2", "vae"),
     ModelType.HI_DREAM_FULL: ("transformer", "text_encoder", "text_encoder_2", "text_encoder_3", "text_encoder_4", "vae"),
     ModelType.CHROMA_1: ("transformer", "text_encoder", "vae"),
     ModelType.QWEN: ("transformer", "text_encoder", "vae"),
+    ModelType.KREA_2: ("transformer", "text_encoder", "vae"),
     ModelType.Z_IMAGE: ("transformer", "text_encoder", "vae"),
     ModelType.ERNIE: ("transformer", "text_encoder", "vae"),
 }

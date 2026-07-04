@@ -12,6 +12,9 @@ class PySide6TimestepDistributionWindowView(BaseTimestepDistributionWindowView, 
         QDialog.__init__(self, parent)
         BaseTimestepDistributionWindowView.__init__(self, pyside6_components)
 
+        # delete on close so entry widgets and the field validators they register globally are freed, not leaked
+        self.finished.connect(self.deleteLater)
+
         self.setWindowTitle("Timestep Distribution")
         self.resize(900, 600)
         self._controller = controller

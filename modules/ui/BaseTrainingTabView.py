@@ -51,6 +51,10 @@ class BaseTrainingTabView(ABC):
             self.__setup_chroma_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_qwen():
             self.__setup_qwen_ui(column_0, column_1, column_2, controller, ui_state)
+        elif model_type.is_anima():
+            self.__setup_anima_ui(column_0, column_1, column_2, controller, ui_state)
+        elif model_type.is_krea2():
+            self.__setup_krea2_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_sana():
             self.__setup_sana_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_hunyuan_video():
@@ -67,7 +71,7 @@ class BaseTrainingTabView(ABC):
         self.__create_text_encoder_frame(column_0, 1, ui_state)
         self.__create_embedding_frame(column_0, 2, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state, supports_circular_padding=True)
+        self.__create_base2_frame(column_1, 0, controller, ui_state, supports_circular_padding=True)
         self.__create_unet_frame(column_1, 1, ui_state)
         self.__create_noise_frame(column_1, 2, ui_state, supports_generalized_offset_noise=True)
 
@@ -84,7 +88,7 @@ class BaseTrainingTabView(ABC):
         self.__create_text_encoder_n_frame(column_0, 3, ui_state, i=3, supports_include=True)
         self.__create_embedding_frame(column_0, 4, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state)
+        self.__create_base2_frame(column_1, 0, controller, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state)
         self.__create_noise_frame(column_1, 2, ui_state)
 
@@ -98,7 +102,7 @@ class BaseTrainingTabView(ABC):
         self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2)
         self.__create_embedding_frame(column_0, 3, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state, supports_circular_padding=True)
+        self.__create_base2_frame(column_1, 0, controller, ui_state, supports_circular_padding=True)
         self.__create_unet_frame(column_1, 1, ui_state)
         self.__create_noise_frame(column_1, 2, ui_state, supports_generalized_offset_noise=True)
 
@@ -111,7 +115,7 @@ class BaseTrainingTabView(ABC):
         self.__create_text_encoder_frame(column_0, 1, ui_state)
         self.__create_embedding_frame(column_0, 2, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state, supports_circular_padding=True)
+        self.__create_base2_frame(column_1, 0, controller, ui_state, supports_circular_padding=True)
         self.__create_prior_frame(column_1, 1, ui_state)
         self.__create_noise_frame(column_1, 2, ui_state)
 
@@ -124,7 +128,7 @@ class BaseTrainingTabView(ABC):
         self.__create_text_encoder_frame(column_0, 1, ui_state)
         self.__create_embedding_frame(column_0, 2, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state)
+        self.__create_base2_frame(column_1, 0, controller, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state)
         self.__create_noise_frame(column_1, 2, ui_state)
 
@@ -138,7 +142,7 @@ class BaseTrainingTabView(ABC):
         self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2, supports_include=True, supports_sequence_length=True)
         self.__create_embedding_frame(column_0, 4, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state)
+        self.__create_base2_frame(column_1, 0, controller, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=True)
         self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
 
@@ -150,7 +154,7 @@ class BaseTrainingTabView(ABC):
         self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_frame(column_0, 1, ui_state, supports_clip_skip=False, supports_training=False, supports_sequence_length=True)
 
-        self.__create_base2_frame(column_1, 0, ui_state)
+        self.__create_base2_frame(column_1, 0, controller, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=True, supports_force_attention_mask=False)
         self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
 
@@ -163,7 +167,7 @@ class BaseTrainingTabView(ABC):
         self.__create_text_encoder_frame(column_0, 1, ui_state)
         self.__create_embedding_frame(column_0, 4, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state)
+        self.__create_base2_frame(column_1, 0, controller, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=False, supports_force_attention_mask=False)
         self.__create_noise_frame(column_1, 2, ui_state)
 
@@ -175,7 +179,31 @@ class BaseTrainingTabView(ABC):
         self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_frame(column_0, 1, ui_state, supports_clip_skip=False)
 
-        self.__create_base2_frame(column_1, 0, ui_state)
+        self.__create_base2_frame(column_1, 0, controller, ui_state)
+        self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=False, supports_force_attention_mask=False)
+        self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
+
+        self.__create_masked_frame(column_2, 1, ui_state)
+        self.__create_loss_frame(column_2, 2, controller, ui_state)
+        self.__create_layer_frame(column_2, 3, controller, ui_state)
+
+    def __setup_anima_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
+        self.__create_text_encoder_frame(column_0, 1, ui_state, supports_clip_skip=False, supports_training=False)
+
+        self.__create_base2_frame(column_1, 0, controller, ui_state)
+        self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=False, supports_force_attention_mask=False)
+        self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
+
+        self.__create_masked_frame(column_2, 1, ui_state)
+        self.__create_loss_frame(column_2, 2, controller, ui_state)
+        self.__create_layer_frame(column_2, 3, controller, ui_state)
+
+    def __setup_krea2_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
+        self.__create_text_encoder_frame(column_0, 1, ui_state, supports_clip_skip=False, supports_training=False)
+
+        self.__create_base2_frame(column_1, 0, controller, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=False, supports_force_attention_mask=False)
         self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
 
@@ -187,7 +215,7 @@ class BaseTrainingTabView(ABC):
         self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_frame(column_0, 1, ui_state, supports_clip_skip=False, supports_training=False)
 
-        self.__create_base2_frame(column_1, 0, ui_state)
+        self.__create_base2_frame(column_1, 0, controller, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=False, supports_force_attention_mask=False)
         self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
 
@@ -199,7 +227,7 @@ class BaseTrainingTabView(ABC):
         self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_frame(column_0, 1, ui_state, supports_clip_skip=False, supports_training=False)
 
-        self.__create_base2_frame(column_1, 0, ui_state)
+        self.__create_base2_frame(column_1, 0, controller, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=False, supports_force_attention_mask=False)
         self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
 
@@ -212,7 +240,7 @@ class BaseTrainingTabView(ABC):
         self.__create_text_encoder_frame(column_0, 1, ui_state)
         self.__create_embedding_frame(column_0, 2, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state)
+        self.__create_base2_frame(column_1, 0, controller, ui_state)
         self.__create_transformer_frame(column_1, 1, ui_state)
         self.__create_noise_frame(column_1, 2, ui_state)
 
@@ -226,7 +254,7 @@ class BaseTrainingTabView(ABC):
         self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2, supports_include=True)
         self.__create_embedding_frame(column_0, 4, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state, video_training_enabled=True)
+        self.__create_base2_frame(column_1, 0, controller, ui_state, video_training_enabled=True)
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=True)
         self.__create_noise_frame(column_1, 2, ui_state)
 
@@ -242,7 +270,7 @@ class BaseTrainingTabView(ABC):
         self.__create_text_encoder_n_frame(column_0, 4, ui_state, i=4, supports_include=True, supports_layer_skip=False)
         self.__create_embedding_frame(column_0, 5, ui_state)
 
-        self.__create_base2_frame(column_1, 0, ui_state, video_training_enabled=True)
+        self.__create_base2_frame(column_1, 0, controller, ui_state, video_training_enabled=True)
         self.__create_transformer_frame(column_1, 1, ui_state)
         self.__create_noise_frame(column_1, 2, ui_state)
 
@@ -323,10 +351,17 @@ class BaseTrainingTabView(ABC):
                               tooltip="Clips the gradient norm. Leave empty to disable gradient clipping.")
         self.components.entry(frame, 10, 1, ui_state, "clip_grad_norm")
 
-    def __create_base2_frame(self, master, row, ui_state, video_training_enabled: bool = False,
+    def __create_base2_frame(self, master, row, controller, ui_state, video_training_enabled: bool = False,
                               supports_circular_padding: bool = False):
         frame = self.components.section_frame(master, row)
         row = 0
+
+        # attention mechanism
+        self.components.label(frame, row, 0, "Attention",
+                              tooltip="The attention mechanism used during training. Use `torch SDPA` on linux. On windows, `flash-attn` can be faster, but it has to be installed manually and does not support all models. `torch cuDNN` is an alternative backend some models require or benefit from.")
+        self.components.options_kv(frame, row, 1, controller.get_attention_mechanisms(), ui_state,
+                                   "attention_mechanism")
+        row += 1
 
         # ema
         self.components.label(frame, row, 0, "EMA",

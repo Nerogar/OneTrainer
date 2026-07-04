@@ -9,6 +9,7 @@ from modules.util.config.CloudConfig import CloudConfig
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.SecretsConfig import SecretsConfig
+from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
@@ -429,6 +430,7 @@ class TrainConfig(BaseConfig):
     only_cache: bool
     resolution: str
     frames: str
+    attention_mechanism: AttentionMechanism
     mse_strength: float
     mae_strength: float
     log_cosh_strength: float
@@ -848,6 +850,13 @@ class TrainConfig(BaseConfig):
         fan_out("decoder_text_encoder")
         fan_out("decoder_vqgan")
 
+        if migrated_data.get("output_model_format") == "SAFETENSORS":
+            training_method = migrated_data.get("training_method")
+            if training_method == "LORA":
+                migrated_data["output_model_format"] = "LEGACY_LORA"
+            elif training_method != "EMBEDDING":
+                migrated_data["output_model_format"] = "LEGACY_SAFETENSORS"
+
         return migrated_data
 
     def model_part_configs(self) -> list[TrainModelPartConfig]:
@@ -1058,6 +1067,7 @@ class TrainConfig(BaseConfig):
         data.append(("only_cache", False, bool, False))
         data.append(("resolution", "512", str, False))
         data.append(("frames", "25", str, False))
+        data.append(("attention_mechanism", AttentionMechanism.SDP, AttentionMechanism, False))
         data.append(("mse_strength", 1.0, float, False))
         data.append(("mae_strength", 0.0, float, False))
         data.append(("log_cosh_strength", 0.0, float, False))

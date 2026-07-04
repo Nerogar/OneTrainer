@@ -38,7 +38,7 @@ class BaseFluxSetup(
     metaclass=ABCMeta
 ):
     LAYER_PRESETS = {
-        "attn-mlp": ["attn", "ff.net"],
+        "attn-mlp": ["attn", "ff.net", "proj_mlp"],
         "attn-only": ["attn"],
         "blocks": ["transformer_block"],
         "full": [],
@@ -81,6 +81,8 @@ class BaseFluxSetup(
         quantize_layers(model.text_encoder_2, self.train_device, model.text_encoder_2_train_dtype, config)
         quantize_layers(model.vae, self.train_device, model.train_dtype, config)
         quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
+
+        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=False)
 
     def _setup_embeddings(
             self,

@@ -4,9 +4,7 @@ from abc import ABC, abstractmethod
 from modules.util import path_util
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
-from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.PathIOType import PathIOType
-from modules.util.enum.TrainingMethod import TrainingMethod
 
 
 class BaseModelTabView(ABC):
@@ -20,19 +18,7 @@ class BaseModelTabView(ABC):
 
     def build_content(self, frame, controller, ui_state):
         model_type = controller.train_config.model_type
-        training_method = controller.train_config.training_method
         parts = model_type.model_parts()
-
-        # The transformer override path exists only for these architectures; SD3, PixArt, Sana
-        # and HiDream have a transformer but expose no override field.
-        allow_override_transformer = (
-            model_type.is_flux()
-            or model_type.is_z_image()
-            or model_type.is_ernie()
-            or model_type.is_chroma()
-            or model_type.is_qwen()
-            or model_type.is_hunyuan_video()
-        )
 
         row = 0
         row = self.__create_base_dtype_components(frame, row, ui_state)
@@ -45,7 +31,7 @@ class BaseModelTabView(ABC):
             has_prior="prior" in parts,
             allow_override_prior=model_type.is_stable_cascade(),
             has_transformer="transformer" in parts,
-            allow_override_transformer=allow_override_transformer,
+            allow_override_transformer=controller.supports_override_transformer(),
             has_text_encoder=not model_type.has_multiple_text_encoders(),
             has_text_encoder_1=model_type.has_multiple_text_encoders(),
             has_text_encoder_2="text_encoder_2" in parts,
@@ -59,26 +45,11 @@ class BaseModelTabView(ABC):
         if "decoder" in parts:
             row = self.__create_decoder_components(frame, row, ui_state, "decoder_text_encoder" in parts)
 
-        if model_type.is_sana():
-            allow_safetensors = training_method != TrainingMethod.FINE_TUNE
-        elif model_type.is_wuerstchen():
-            allow_safetensors = training_method != TrainingMethod.FINE_TUNE \
-                                or model_type.is_stable_cascade()
-        else:
-            allow_safetensors = True
-
-        if model_type.is_stable_diffusion():
-            allow_diffusers = training_method in [TrainingMethod.FINE_TUNE, TrainingMethod.FINE_TUNE_VAE]
-        else:
-            allow_diffusers = training_method == TrainingMethod.FINE_TUNE
-
         self.__create_output_components(
             frame,
             row,
+            controller,
             ui_state,
-            allow_safetensors=allow_safetensors,
-            allow_diffusers=allow_diffusers,
-            allow_legacy_safetensors=training_method == TrainingMethod.LORA,
         )
 
     def __create_dtype_options(self, include_gguf: bool = False, include_a8: bool = False) -> list[tuple[str, DataType]]:
@@ -360,11 +331,8 @@ class BaseModelTabView(ABC):
             self,
             frame,
             row: int,
+            controller,
             ui_state,
-            allow_safetensors: bool = False,
-            allow_diffusers: bool = False,
-            allow_legacy_safetensors: bool = False,
-            allow_comfy: bool = False,
     ) -> int:
         # output model destination
         self.components.label(frame, row, 0, "Model Output Destination",
@@ -389,15 +357,7 @@ class BaseModelTabView(ABC):
         row += 1
 
         # output format
-        formats = []
-        if allow_safetensors:
-            formats.append(("Safetensors", ModelFormat.SAFETENSORS))
-        if allow_diffusers:
-            formats.append(("Diffusers", ModelFormat.DIFFUSERS))
-        # if allow_legacy_safetensors:
-        #     formats.append(("Legacy Safetensors", ModelFormat.LEGACY_SAFETENSORS))
-        if allow_comfy:
-            formats.append(("Comfy LoRA", ModelFormat.COMFY_LORA))
+        formats = controller.get_output_formats()
 
         self.components.label(frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")

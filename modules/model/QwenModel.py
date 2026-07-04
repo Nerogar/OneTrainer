@@ -5,6 +5,7 @@ from random import Random
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.DataType import DataType
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
@@ -76,15 +77,24 @@ class QwenModel(BaseModel):
             self.transformer_lora,
         ] if a is not None]
 
+    def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
+        # Single Qwen2.5-VL TE (Comfy's QwenImageTEModel is a single qwen25_7b).
+        return [
+            (self.text_encoder, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder",
+                ModelFormat.KOHYA_LORA: "lora_te",
+                ModelFormat.COMFY_LORA: "text_encoders.qwen25_7b.transformer",
+            }),
+        ]
+
     def vae_to(self, device: torch.device):
         self.vae.to(device=device)
 
     def text_encoder_to(self, device: torch.device): #TODO share more code between models
-        if self.text_encoder is not None:
-            if self.text_encoder_offload_conductor is not None:
-                self.text_encoder_offload_conductor.to(device)
-            else:
-                self.text_encoder.to(device=device)
+        if self.text_encoder_offload_conductor is not None:
+            self.text_encoder_offload_conductor.to(device)
+        else:
+            self.text_encoder.to(device=device)
 
         if self.text_encoder_lora is not None:
             self.text_encoder_lora.to(device)
@@ -105,8 +115,7 @@ class QwenModel(BaseModel):
 
     def eval(self):
         self.vae.eval()
-        if self.text_encoder is not None:
-            self.text_encoder.eval()
+        self.text_encoder.eval()
         self.transformer.eval()
 
     def create_pipeline(self) -> DiffusionPipeline:
@@ -145,7 +154,7 @@ class QwenModel(BaseModel):
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
             tokens_mask = tokenizer_output.attention_mask.to(self.text_encoder.device)
 
-        if text_encoder_output is None and self.text_encoder is not None:
+        if text_encoder_output is None:
             with self.text_encoder_autocast_context:
                 text_encoder_output = self.text_encoder(
                     tokens,

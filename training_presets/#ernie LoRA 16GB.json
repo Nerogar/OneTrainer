@@ -3,6 +3,7 @@
     "batch_size": 2,
     "learning_rate": 3e-4,
     "model_type": "ERNIE",
+    "output_model_format": "DIFFUSERS_LORA",
     "resolution": "512",
     "compile": true,
     "transformer": {

@@ -4,6 +4,7 @@ from modules.ui.SchedulerParamsWindowController import SchedulerParamsWindowCont
 from modules.ui.TimestepDistributionWindowController import TimestepDistributionWindowController
 from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.optimizer_util import change_optimizer
 
 
@@ -14,6 +15,13 @@ class TrainingTabController:
     def restore_optimizer_config(self, ui_state):
         optimizer_config = change_optimizer(self.config)
         ui_state.get_var("optimizer").update(optimizer_config)
+
+    def get_attention_mechanisms(self) -> list[tuple[str, AttentionMechanism]]:
+        return [
+            ("torch SDPA", AttentionMechanism.SDP),
+            ("flash-attn", AttentionMechanism.FLASH),
+            ("torch cuDNN", AttentionMechanism.CUDNN),
+        ]
 
     def get_layer_presets(self) -> dict:
         cls = create.get_model_setup_class(self.config.model_type, self.config.training_method)

@@ -14,6 +14,7 @@
         "train": false,
         "weight_dtype": "FLOAT_8"
     },
+    "output_model_format": "DIFFUSERS_LORA",
     "training_method": "LORA",
     "vae": {
         "weight_dtype": "FLOAT_32"
@@ -23,7 +24,7 @@
     "output_dtype": "BFLOAT_16",
     "timestep_distribution": "INVERTED_PARABOLA",
     "noising_weight": 7.7,
-    "layer_filter": "attn,ff.net",
+    "layer_filter": "attn,ff.net,proj_mlp",
     "layer_filter_preset": "attn-mlp",
     "quantization": {
         "layer_filter": "transformer_block",
