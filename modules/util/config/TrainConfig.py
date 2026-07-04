@@ -275,14 +275,17 @@ class TrainModelPartConfig(BaseConfig):
         super().__init__(data)
 
     def offloading_enabled(self) -> bool:
-        # a conductor should exist iff this is True. Layer offloading applies even to frozen parts (to fit
-        # them in VRAM), but activation offloading only does work during a backward pass, so it only applies
-        # when the part is trained -- even if activation_offloading is True in the config.
-        return self.offload_fraction > 0 or (self.activation_offloading and self.train)
+        # a conductor should exist iff this is True. Not gated on train: activations are built and cost
+        # VRAM whenever grad flows through a part, not only when it is trained (e.g. embedding training
+        # runs grad through the frozen denoiser and TE), so both layer and activation offloading apply to
+        # frozen grad-carrying parts too.
+        return self.offload_fraction > 0 or self.activation_offloading
 
     def checkpointing_enabled(self) -> bool:
-        # the inner torch checkpoint() should run iff this is True
-        return self.gradient_checkpointing and self.train
+        # the inner torch checkpoint() should run iff this is True. Not gated on train: grad can flow
+        # through a frozen part (e.g. embedding training runs grad through the frozen denoiser and TE),
+        # and checkpointing then still saves VRAM. On a part with no grad flow the wrapper is a no-op.
+        return self.gradient_checkpointing
 
     def checkpointing_or_offloading_enabled(self) -> bool:
         # whether the checkpoint layer wrapper needs to be installed for this part at all

@@ -140,11 +140,7 @@ class ModelType(Enum):
         return self == ModelType.STABLE_DIFFUSION_20_DEPTH
 
     def has_multiple_text_encoders(self):
-        return self.is_stable_diffusion_3() \
-            or self.is_stable_diffusion_xl() \
-            or self.is_flux_1() \
-            or self.is_hunyuan_video() \
-            or self.is_hi_dream() \
+        return "text_encoder_2" in self.model_parts()
 
     def is_sd_v1(self):
         return self == ModelType.STABLE_DIFFUSION_15 \

@@ -594,7 +594,7 @@ class BaseTrainingTabView(ABC):
         self.components.switch(frame, row, 1, ui_state, "unet.train")
         row += 1
 
-        row = self.__create_offloading_widgets(frame, row, ui_state, "unet", supports_activation_offloading=True)
+        row = self.__create_offloading_widgets(frame, row, ui_state, "unet", supports_layer_offloading=False)
 
         # train unet epochs
         self.components.label(frame, row, 0, "Stop Training After",
@@ -626,7 +626,7 @@ class BaseTrainingTabView(ABC):
         self.components.switch(frame, row, 1, ui_state, "prior.train")
         row += 1
 
-        row = self.__create_offloading_widgets(frame, row, ui_state, "prior", supports_activation_offloading=True)
+        row = self.__create_offloading_widgets(frame, row, ui_state, "prior", supports_layer_offloading=False)
 
         # train prior epochs
         self.components.label(frame, row, 0, "Stop Training After",

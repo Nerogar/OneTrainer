@@ -48,7 +48,7 @@ class BaseStableDiffusionXLSetup(
             model: StableDiffusionXLModel,
             config: TrainConfig,
     ):
-        if config.unet.checkpointing_or_offloading_enabled():
+        if config.unet.checkpointing_enabled():
             model.unet.enable_gradient_checkpointing()
             enable_checkpointing_for_basic_transformer_blocks(model.unet, config, config.unet, offload_enabled=False)
         enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config, config.text_encoder)
