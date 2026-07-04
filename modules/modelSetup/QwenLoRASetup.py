@@ -50,8 +50,7 @@ class QwenLoRASetup(
             model: QwenModel,
             config: TrainConfig,
     ):
-        if model.text_encoder is not None:
-            model.text_encoder.requires_grad_(False)
+        model.text_encoder.requires_grad_(False)
         model.transformer.requires_grad_(False)
         model.vae.requires_grad_(False)
 
@@ -65,10 +64,9 @@ class QwenLoRASetup(
     ):
         create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
 
-        if model.text_encoder is not None:
-            model.text_encoder_lora = LoRAModuleWrapper(
-                model.text_encoder, "text_encoder", config
-            ) if create_te else None
+        model.text_encoder_lora = LoRAModuleWrapper(
+            model.text_encoder, "text_encoder", config
+        ) if create_te else None
 
         model.transformer_lora = LoRAModuleWrapper(
             model.transformer, "transformer", config, config.layer_filter.split(",")
@@ -107,11 +105,10 @@ class QwenLoRASetup(
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.transformer_to(self.train_device)
 
-        if model.text_encoder:
-            if config.text_encoder.train:
-                model.text_encoder.train()
-            else:
-                model.text_encoder.eval()
+        if config.text_encoder.train:
+            model.text_encoder.train()
+        else:
+            model.text_encoder.eval()
 
         model.vae.eval()
 

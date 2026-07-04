@@ -52,9 +52,8 @@ class BaseChromaSetup(
         if config.gradient_checkpointing.enabled():
             model.transformer_offload_conductor = \
                 enable_checkpointing_for_chroma_transformer(model.transformer, config)
-            if model.text_encoder is not None:
-                model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_t5_encoder_layers(model.text_encoder, config)
+            model.text_encoder_offload_conductor = \
+                enable_checkpointing_for_t5_encoder_layers(model.text_encoder, config)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
@@ -133,7 +132,7 @@ class BaseChromaSetup(
             model: ChromaModel,
             config: TrainConfig,
     ):
-        if model.tokenizer is not None and model.text_encoder is not None:
+        if model.tokenizer is not None:
             model.embedding_wrapper = AdditionalEmbeddingWrapper(
                 tokenizer=model.tokenizer,
                 orig_module=model.text_encoder.encoder.embed_tokens,
@@ -148,14 +147,13 @@ class BaseChromaSetup(
             model: ChromaModel,
             config: TrainConfig,
     ):
-        if model.text_encoder is not None:
-            for embedding, embedding_config in zip(model.all_text_encoder_embeddings(),
-                                                   config.all_embedding_configs(), strict=True):
-                train_embedding = \
-                    embedding_config.train \
-                    and config.text_encoder.train_embedding \
-                    and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
-                embedding.requires_grad_(train_embedding)
+        for embedding, embedding_config in zip(model.all_text_encoder_embeddings(),
+                                               config.all_embedding_configs(), strict=True):
+            train_embedding = \
+                embedding_config.train \
+                and config.text_encoder.train_embedding \
+                and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
+            embedding.requires_grad_(train_embedding)
 
     def predict(
             self,
