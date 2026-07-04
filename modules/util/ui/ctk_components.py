@@ -377,6 +377,32 @@ def button(master, row, column, text, command, tooltip=None, padx=PAD, pady=PAD,
     return component
 
 
+def preset_menu_button(master, row, column, text, tree: list[tuple[str, Any]],
+                       command: Callable[[Any], None], sticky="new"):
+    def build_menu(parent_menu, nodes):
+        for name, value in nodes:
+            if isinstance(value, list):
+                submenu = tk.Menu(parent_menu, tearoff=0)
+                build_menu(submenu, value)
+                parent_menu.add_cascade(label=name, menu=submenu)
+            else:
+                parent_menu.add_command(label=name, command=lambda v=value: command(v))
+
+    def open_menu():
+        menu = tk.Menu(component, tearoff=0)
+        build_menu(menu, tree)
+        x = component.winfo_rootx()
+        y = component.winfo_rooty() + component.winfo_height()
+        try:
+            menu.tk_popup(x, y)
+        finally:
+            menu.grab_release()
+
+    component = ctk.CTkButton(master, text=text, command=open_menu)
+    component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky="new")
+    return component
+
+
 def options(master, row, column, values, ui_state: CtkUIState, var_name: str, command: Callable[[str], None] | None = None):
     component = ctk.CTkOptionMenu(master, values=values, variable=ui_state.get_var(var_name), command=command)
     component.grid(row=row, column=column, padx=PAD, pady=(PAD, PAD), sticky="new")

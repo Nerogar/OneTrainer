@@ -6,7 +6,7 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import pyside6_components
 
-from PySide6.QtWidgets import QInputDialog, QMessageBox, QWidget
+from PySide6.QtWidgets import QFileDialog, QWidget
 
 
 class PySide6TopBarView(BaseTopBarView, QWidget):
@@ -33,13 +33,6 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
         self.build(self.frame, master, controller, ui_state,
                    change_model_type_callback, change_training_method_callback, load_preset_callback)
 
-    def _make_config_ui_state(self, master, data):
-        from modules.util.ui.PySide6UIState import PySide6UIState
-        return PySide6UIState(data)
-
-    def _get_dropdown_text(self, widget) -> str:
-        return widget.currentText()
-
     def _setup_frame_column_weight(self):
         pyside6_components._layout(self.frame).setColumnStretch(5, 1)
 
@@ -49,13 +42,15 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
         widget.hide()
         widget.deleteLater()
 
-    def _show_save_dialog(self, default_value: str, callback):
-        text, ok = QInputDialog.getText(self, "name", "Config Name", text=default_value)
-        if not ok:
-            return
-        if text.startswith("#"):
-            # names starting with '#' are reserved for built-in presets; warn
-            # instead of silently discarding the save, so the user can retry
-            QMessageBox.warning(self, "Invalid name", "Config names starting with '#' are reserved for built-in presets.")
-            return
-        callback(text)
+    def _show_save_dialog(self, initial_dir: str, callback):
+        path, _ = QFileDialog.getSaveFileName(self, "Save config", initial_dir, "JSON (*.json)")
+        if path:
+            # the native dialog doesn't reliably append the filter's extension on every platform
+            if not path.endswith(".json"):
+                path += ".json"
+            callback(path)
+
+    def _show_open_dialog(self, initial_dir: str, callback):
+        path, _ = QFileDialog.getOpenFileName(self, "Load config", initial_dir, "JSON (*.json)")
+        if path:
+            callback(path)
