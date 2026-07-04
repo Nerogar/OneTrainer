@@ -54,8 +54,6 @@ class BaseStableDiffusionSetup(
         if config.unet.checkpointing_or_offloading_enabled():
             model.unet.enable_gradient_checkpointing()
             enable_checkpointing_for_basic_transformer_blocks(model.unet, config, config.unet, offload_enabled=False)
-        if config.vae.checkpointing_enabled():
-            model.vae.enable_gradient_checkpointing()
         enable_checkpointing_for_clip_encoder_layers(model.text_encoder, config, config.text_encoder)
 
         if config.force_circular_padding:

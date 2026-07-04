@@ -306,7 +306,7 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("guidance_scale", 1.0, float, False))
         data.append(("gradient_checkpointing", True, bool, False))
         data.append(("offload_fraction", 0.0, float, False))
-        data.append(("activation_offloading", True, bool, False))
+        data.append(("activation_offloading", False, bool, False))
 
         return TrainModelPartConfig(data)
 

@@ -205,6 +205,10 @@ class ModelType(Enum):
         # the denoising model component (unet / transformer / prior), always listed first in model_parts().
         return _MODEL_PARTS[self][0]
 
+    def text_encoder_parts(self) -> tuple[str, ...]:
+        # the text encoder components, named "text_encoder"/"text_encoder_2"/... by convention (see below).
+        return tuple(part for part in _MODEL_PARTS[self] if part.startswith("text_encoder"))
+
     def supported_lora_formats(self) -> list[ModelFormat]:
         formats = [
             ModelFormat.DIFFUSERS_LORA,
