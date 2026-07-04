@@ -10,6 +10,9 @@ class PySide6OffloadingWindowView(BaseOffloadingWindowView, QDialog):
         QDialog.__init__(self, parent)
         BaseOffloadingWindowView.__init__(self, pyside6_components)
 
+        # delete on close so entry widgets and the field validators they register globally are freed, not leaked
+        self.finished.connect(self.deleteLater)
+
         self.setWindowTitle("Offloading")
         self.resize(800, 400)
 

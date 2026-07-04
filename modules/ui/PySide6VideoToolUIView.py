@@ -6,7 +6,7 @@ from modules.util.ui.pyside6_util import QtABCMeta
 from modules.util.ui.PySide6UIState import PySide6UIState
 
 from PIL.ImageQt import ImageQt
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QDialog,
@@ -112,14 +112,22 @@ class PySide6VideoToolUIView(BaseVideoToolUIView, QDialog, metaclass=QtABCMeta):
         widget.textChanged.connect(lambda: var.set(widget.toPlainText()))
         return widget
 
+    def schedule_on_main_thread(self, fn):
+        QTimer.singleShot(0, self, fn)
+
     def update_status(self, status_text: str):
-        self._status_box.append(status_text)
+        # Called from the video tool's worker thread — defer to main thread
+        self.schedule_on_main_thread(lambda: self._status_box.append(status_text))
 
     def clear_status(self):
         self._status_box.clear()
 
     def update_preview(self, preview_image, label_text: str):
+        # Called from the video tool's worker thread — defer to main thread
         pixmap = QPixmap.fromImage(ImageQt(preview_image.convert("RGBA")))
+        self.schedule_on_main_thread(lambda: self._do_update_preview(pixmap, label_text))
+
+    def _do_update_preview(self, pixmap: QPixmap, label_text: str):
         self._preview_label.setPixmap(
             pixmap.scaled(150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         )

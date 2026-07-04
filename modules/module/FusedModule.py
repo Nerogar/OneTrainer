@@ -150,6 +150,9 @@ class FusedModuleGroup:
     def parameters(self) -> Iterator[Parameter]:
         return self.module.parameters()
 
+    def named_parameters(self, prefix: str = "", recurse: bool = True) -> Iterator[tuple[str, Parameter]]:
+        return self.module.named_parameters(prefix=prefix, recurse=recurse)
+
     def modules(self) -> Iterator[nn.Module]:
         return self.module.modules()
 
