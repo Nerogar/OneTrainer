@@ -5,13 +5,12 @@
     "model_type": "Z_IMAGE",
     "output_model_format": "DIFFUSERS_LORA",
     "resolution": "512",
-    "gradient_checkpointing": "CPU_OFFLOADED",
-    "layer_offload_fraction": 0.6,
     "compile": true,
     "transformer": {
         "train": true,
         "weight_dtype": "INT_W8A8",
-        "model_name": "https://huggingface.co/ostris/Z-Image-De-Turbo/blob/main/z_image_de_turbo_v1_bf16.safetensors"
+        "model_name": "https://huggingface.co/ostris/Z-Image-De-Turbo/blob/main/z_image_de_turbo_v1_bf16.safetensors",
+        "offload_fraction": 0.6
     },
     "text_encoder": {
         "train": false,

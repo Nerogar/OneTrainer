@@ -1,5 +1,4 @@
 
-from modules.ui.OffloadingWindowController import OffloadingWindowController
 from modules.ui.OptimizerParamsWindowController import OptimizerParamsWindowController
 from modules.ui.SchedulerParamsWindowController import SchedulerParamsWindowController
 from modules.ui.TimestepDistributionWindowController import TimestepDistributionWindowController
@@ -42,6 +41,3 @@ class TrainingTabController:
 
     def open_timestep_distribution_window(self, parent, ui_state, view_cls):
         return view_cls(parent, TimestepDistributionWindowController(self.config), ui_state)
-
-    def open_offloading_window(self, parent, ui_state, view_cls):
-        return view_cls(parent, OffloadingWindowController(self.config), ui_state)

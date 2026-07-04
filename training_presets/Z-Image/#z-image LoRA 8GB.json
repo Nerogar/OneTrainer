@@ -5,12 +5,11 @@
     "model_type": "Z_IMAGE",
     "output_model_format": "DIFFUSERS_LORA",
     "resolution": "512",
-    "gradient_checkpointing": "CPU_OFFLOADED",
-    "layer_offload_fraction": 0.6,
     "compile": true,
     "transformer": {
         "train": true,
-        "weight_dtype": "FLOAT_8"
+        "weight_dtype": "FLOAT_8",
+        "offload_fraction": 0.6
     },
     "text_encoder": {
         "train": false,

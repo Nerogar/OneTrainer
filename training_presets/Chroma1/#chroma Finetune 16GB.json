@@ -4,16 +4,15 @@
     "learning_rate": 1e-5,
     "model_type": "CHROMA_1",
     "resolution": "512",
-    "gradient_checkpointing": "CPU_OFFLOADED",
-    "layer_offload_fraction": 0.4,
     "dataloader_threads": 1,
     "transformer": {
         "train": true,
-        "weight_dtype": "BFLOAT_16"
+        "weight_dtype": "BFLOAT_16",
+        "offload_fraction": 0.4
     },
     "text_encoder": {
         "train": false,
-        "weight_dtype": "BFLOAT_16"
+        "weight_dtype": "FLOAT_8"
     },
     "output_model_format": "ORIGINAL_TRANSFORMER",
     "training_method": "FINE_TUNE",

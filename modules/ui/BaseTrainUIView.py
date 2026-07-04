@@ -190,6 +190,10 @@ class BaseTrainUIView(ABC):
                          tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\". Must be \"cuda\" for multi-GPU training.")
         self.components.entry(frame, 11, 1, ui_state, "train_device", required=True)
 
+        self.components.label(frame, 11, 2, "Async Offloading",
+                         tooltip="Overlaps CPU<->GPU transfers with computation using CUDA streams. Applies to every offloaded component")
+        self.components.switch(frame, 11, 3, ui_state, "async_offloading")
+
         self.components.label(frame, 12, 0, "Multi-GPU",
                          tooltip="Enable multi-GPU training")
         self.components.switch(frame, 12, 1, ui_state, "multi_gpu")

@@ -140,11 +140,7 @@ class ModelType(Enum):
         return self == ModelType.STABLE_DIFFUSION_20_DEPTH
 
     def has_multiple_text_encoders(self):
-        return self.is_stable_diffusion_3() \
-            or self.is_stable_diffusion_xl() \
-            or self.is_flux_1() \
-            or self.is_hunyuan_video() \
-            or self.is_hi_dream() \
+        return "text_encoder_2" in self.model_parts()
 
     def is_sd_v1(self):
         return self == ModelType.STABLE_DIFFUSION_15 \
@@ -205,6 +201,10 @@ class ModelType(Enum):
         # the denoising model component (unet / transformer / prior), always listed first in model_parts().
         return _MODEL_PARTS[self][0]
 
+    def text_encoder_parts(self) -> tuple[str, ...]:
+        # the text encoder components, named "text_encoder"/"text_encoder_2"/... by convention (see below).
+        return tuple(part for part in _MODEL_PARTS[self] if part.startswith("text_encoder"))
+
     def supported_lora_formats(self) -> list[ModelFormat]:
         formats = [
             ModelFormat.DIFFUSERS_LORA,
@@ -264,7 +264,6 @@ class ModelType(Enum):
             return self.supported_full_model_formats()
         else:
             raise ValueError(f"Unsupported training method: {training_method}")
-
 
 # The components each model type has, keyed by TrainConfig field names, as the single source of truth.
 # The diffusion model (unet / transformer / prior) is always listed first; the first text encoder is

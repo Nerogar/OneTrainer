@@ -6,13 +6,12 @@
     "output_model_format": "DIFFUSERS_LORA",
     "resolution": "512",
     "attention_mechanism": "CUDNN",
-    "gradient_checkpointing": "CPU_OFFLOADED",
-    "layer_offload_fraction": 0.3,
     "dataloader_threads": 1,
     "compile": true,
     "transformer": {
         "train": true,
-        "weight_dtype": "INT_W8A8"
+        "weight_dtype": "INT_W8A8",
+        "offload_fraction": 0.3
     },
     "text_encoder": {
         "train": false,

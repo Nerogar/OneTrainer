@@ -5,12 +5,11 @@
     "model_type": "QWEN",
     "output_model_format": "DIFFUSERS_LORA",
     "resolution": "512",
-    "gradient_checkpointing": "CPU_OFFLOADED",
-    "layer_offload_fraction": 0.5,
     "dataloader_threads": 1,
     "transformer": {
         "train": true,
-        "weight_dtype": "FLOAT_8"
+        "weight_dtype": "FLOAT_8",
+        "offload_fraction": 0.5
     },
     "text_encoder": {
         "train": false,

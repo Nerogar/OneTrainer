@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
-from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
 from modules.util.enum.LearningRateScaler import LearningRateScaler
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
 from modules.util.enum.LossScaler import LossScaler
@@ -27,9 +26,6 @@ class BaseTrainingTabView(ABC):
 
     @abstractmethod
     def open_scheduler_params(self): pass
-
-    @abstractmethod
-    def open_offloading(self): pass
 
     @abstractmethod
     def open_timestep_distribution(self): pass
@@ -71,7 +67,7 @@ class BaseTrainingTabView(ABC):
 
     def __setup_stable_diffusion_ui(self, column_0, column_1, column_2, controller, ui_state):
         self.__create_base_frame(column_0, 0, controller, ui_state)
-        self.__create_text_encoder_frame(column_0, 1, ui_state)
+        self.__create_text_encoder_frame(column_0, 1, ui_state, supports_layer_offloading=False)
         self.__create_embedding_frame(column_0, 2, ui_state)
 
         self.__create_base2_frame(column_1, 0, controller, ui_state, supports_circular_padding=True)
@@ -84,8 +80,8 @@ class BaseTrainingTabView(ABC):
 
     def __setup_stable_diffusion_3_ui(self, column_0, column_1, column_2, controller, ui_state):
         self.__create_base_frame(column_0, 0, controller, ui_state)
-        self.__create_text_encoder_n_frame(column_0, 1, ui_state, i=1, supports_include=True)
-        self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 1, ui_state, i=1, supports_include=True, supports_layer_offloading=False)
+        self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2, supports_include=True, supports_layer_offloading=False)
         self.__create_text_encoder_n_frame(column_0, 3, ui_state, i=3, supports_include=True)
         self.__create_embedding_frame(column_0, 4, ui_state)
 
@@ -99,8 +95,8 @@ class BaseTrainingTabView(ABC):
 
     def __setup_stable_diffusion_xl_ui(self, column_0, column_1, column_2, controller, ui_state):
         self.__create_base_frame(column_0, 0, controller, ui_state)
-        self.__create_text_encoder_n_frame(column_0, 1, ui_state, i=1)
-        self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2)
+        self.__create_text_encoder_n_frame(column_0, 1, ui_state, i=1, supports_layer_offloading=False)
+        self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2, supports_layer_offloading=False)
         self.__create_embedding_frame(column_0, 3, ui_state)
 
         self.__create_base2_frame(column_1, 0, controller, ui_state, supports_circular_padding=True)
@@ -113,7 +109,7 @@ class BaseTrainingTabView(ABC):
 
     def __setup_wuerstchen_ui(self, column_0, column_1, column_2, controller, ui_state):
         self.__create_base_frame(column_0, 0, controller, ui_state)
-        self.__create_text_encoder_frame(column_0, 1, ui_state)
+        self.__create_text_encoder_frame(column_0, 1, ui_state, supports_layer_offloading=False)
         self.__create_embedding_frame(column_0, 2, ui_state)
 
         self.__create_base2_frame(column_1, 0, controller, ui_state, supports_circular_padding=True)
@@ -139,7 +135,7 @@ class BaseTrainingTabView(ABC):
 
     def __setup_flux_ui(self, column_0, column_1, column_2, controller, ui_state):
         self.__create_base_frame(column_0, 0, controller, ui_state)
-        self.__create_text_encoder_n_frame(column_0, 1, ui_state, i=1, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 1, ui_state, i=1, supports_include=True, supports_layer_offloading=False)
         self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2, supports_include=True, supports_sequence_length=True)
         self.__create_embedding_frame(column_0, 4, ui_state)
 
@@ -252,7 +248,7 @@ class BaseTrainingTabView(ABC):
     def __setup_hunyuan_video_ui(self, column_0, column_1, column_2, controller, ui_state):
         self.__create_base_frame(column_0, 0, controller, ui_state)
         self.__create_text_encoder_n_frame(column_0, 1, ui_state, i=1, supports_include=True)
-        self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2, supports_include=True, supports_layer_offloading=False)
         self.__create_embedding_frame(column_0, 4, ui_state)
 
         self.__create_base2_frame(column_1, 0, controller, ui_state, video_training_enabled=True)
@@ -265,8 +261,8 @@ class BaseTrainingTabView(ABC):
 
     def __setup_hi_dream_ui(self, column_0, column_1, column_2, controller, ui_state):
         self.__create_base_frame(column_0, 0, controller, ui_state)
-        self.__create_text_encoder_n_frame(column_0, 1, ui_state, i=1, supports_include=True)
-        self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2, supports_include=True)
+        self.__create_text_encoder_n_frame(column_0, 1, ui_state, i=1, supports_include=True, supports_layer_offloading=False)
+        self.__create_text_encoder_n_frame(column_0, 2, ui_state, i=2, supports_include=True, supports_layer_offloading=False)
         self.__create_text_encoder_n_frame(column_0, 3, ui_state, i=3, supports_include=True)
         self.__create_text_encoder_n_frame(column_0, 4, ui_state, i=4, supports_include=True, supports_layer_skip=False)
         self.__create_embedding_frame(column_0, 5, ui_state)
@@ -384,20 +380,6 @@ class BaseTrainingTabView(ABC):
         self.components.entry(frame, row, 1, ui_state, "ema_update_step_interval")
         row += 1
 
-        # gradient checkpointing
-        self.components.label(frame, row, 0, "Gradient checkpointing",
-                              tooltip="Enables gradient checkpointing. This reduces memory usage, but increases training time")
-        self.components.options_adv(frame, row, 1, [str(x) for x in list(GradientCheckpointingMethod)], ui_state,
-                                    "gradient_checkpointing",
-                                    adv_command=self.open_offloading)
-        row += 1
-
-        # gradient checkpointing layer offloading
-        self.components.label(frame, row, 0, "Layer offload fraction",
-                              tooltip="Enables offloading of individual layers during training to reduce VRAM usage. Increases training time and uses more RAM. Only available if checkpointing is set to CPU_OFFLOADED. values between 0 and 1, 0=disabled")
-        self.components.entry(frame, row, 1, ui_state, "layer_offload_fraction")
-        row += 1
-
         # train dtype
         self.components.label(frame, row, 0, "Train Data Type",
                               tooltip="The mixed precision data type used for training. This can increase training speed, but reduces precision")
@@ -444,8 +426,30 @@ class BaseTrainingTabView(ABC):
                                   tooltip="Enables circular padding for all conv layers to better train seamless images")
             self.components.switch(frame, row, 1, ui_state, "force_circular_padding")
 
+    def __create_offloading_widgets(self, frame, row, ui_state, part, supports_checkpointing=True,
+                                    supports_activation_offloading=False, supports_layer_offloading=True):
+        if supports_checkpointing:
+            self.components.label(frame, row, 0, "Gradient Checkpointing",
+                                  tooltip="Enables gradient checkpointing for this component. Reduces VRAM usage at the cost of training speed")
+            self.components.switch(frame, row, 1, ui_state, f"{part}.gradient_checkpointing")
+            row += 1
+
+        if supports_layer_offloading:
+            self.components.label(frame, row, 0, "Layer Offload Fraction",
+                                  tooltip="Fraction of this component's layers to offload to CPU to reduce VRAM usage. Increases training time and RAM usage. 0=disabled, 1=all layers")
+            self.components.entry(frame, row, 1, ui_state, f"{part}.offload_fraction")
+            row += 1
+
+        if supports_activation_offloading:
+            self.components.label(frame, row, 0, "Offload Activations",
+                                  tooltip="Offloads this component's activations to CPU during training to reduce VRAM usage")
+            self.components.switch(frame, row, 1, ui_state, f"{part}.activation_offloading")
+            row += 1
+
+        return row
+
     def __create_text_encoder_frame(self, master, row, ui_state, supports_clip_skip=True, supports_training=True,
-                                    supports_sequence_length=False):
+                                    supports_sequence_length=False, supports_layer_offloading=True):
         frame = self.components.section_frame(master, row)
         row = 0
 
@@ -454,6 +458,13 @@ class BaseTrainingTabView(ABC):
                                   tooltip="Enables training the text encoder model")
             self.components.switch(frame, row, 1, ui_state, "text_encoder.train")
             row += 1
+        else:
+            # no Train switch to act as the frame's header, so add an explicit one
+            self.components.label(frame, row, 0, "Text Encoder")
+            row += 1
+
+        row = self.__create_offloading_widgets(frame, row, ui_state, "text_encoder", supports_checkpointing=supports_training,
+                                               supports_layer_offloading=supports_layer_offloading)
 
         # dropout
         self.components.label(frame, row, 0, "Caption Dropout Probability",
@@ -498,6 +509,7 @@ class BaseTrainingTabView(ABC):
             supports_include: bool = False,
             supports_layer_skip: bool = True,
             supports_sequence_length: bool = False,
+            supports_layer_offloading: bool = True,
     ):
         frame = self.components.section_frame(master, row)
         row = 0
@@ -516,6 +528,9 @@ class BaseTrainingTabView(ABC):
                               tooltip=f"Enables training the text encoder {i} model")
         self.components.switch(frame, row, 1, ui_state, f"text_encoder{suffix}.train")
         row += 1
+
+        row = self.__create_offloading_widgets(frame, row, ui_state, f"text_encoder{suffix}",
+                                               supports_layer_offloading=supports_layer_offloading)
 
         # train text encoder embedding
         self.components.label(frame, row, 0, f"Train Text Encoder {i} Embedding",
@@ -571,79 +586,100 @@ class BaseTrainingTabView(ABC):
 
     def __create_unet_frame(self, master, row, ui_state):
         frame = self.components.section_frame(master, row)
+        row = 0
 
         # train unet
-        self.components.label(frame, 0, 0, "Train UNet",
+        self.components.label(frame, row, 0, "Train UNet",
                               tooltip="Enables training the UNet model")
-        self.components.switch(frame, 0, 1, ui_state, "unet.train")
+        self.components.switch(frame, row, 1, ui_state, "unet.train")
+        row += 1
+
+        row = self.__create_offloading_widgets(frame, row, ui_state, "unet", supports_layer_offloading=False)
 
         # train unet epochs
-        self.components.label(frame, 1, 0, "Stop Training After",
+        self.components.label(frame, row, 0, "Stop Training After",
                               tooltip="When to stop training the UNet")
-        self.components.time_entry(frame, 1, 1, ui_state, "unet.stop_training_after", "unet.stop_training_after_unit",
+        self.components.time_entry(frame, row, 1, ui_state, "unet.stop_training_after", "unet.stop_training_after_unit",
                                    supports_time_units=False)
+        row += 1
 
         # unet learning rate
-        self.components.label(frame, 2, 0, "UNet Learning Rate",
+        self.components.label(frame, row, 0, "UNet Learning Rate",
                               tooltip="The learning rate of the UNet. Overrides the base learning rate")
-        self.components.entry(frame, 2, 1, ui_state, "unet.learning_rate")
+        self.components.entry(frame, row, 1, ui_state, "unet.learning_rate")
+        row += 1
 
         # rescale noise scheduler to zero terminal SNR
-        self.components.label(frame, 3, 0, "Rescale Noise Scheduler + V-pred",
+        self.components.label(frame, row, 0, "Rescale Noise Scheduler + V-pred",
                               tooltip="Rescales the noise scheduler to a zero terminal signal to noise ratio and switches the model to a v-prediction target",
                               wraplength=130)
-        self.components.switch(frame, 3, 1, ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
+        self.components.switch(frame, row, 1, ui_state, "rescale_noise_scheduler_to_zero_terminal_snr")
+        row += 1
 
     def __create_prior_frame(self, master, row, ui_state):
         frame = self.components.section_frame(master, row)
+        row = 0
 
         # train prior
-        self.components.label(frame, 0, 0, "Train Prior",
+        self.components.label(frame, row, 0, "Train Prior",
                               tooltip="Enables training the Prior model")
-        self.components.switch(frame, 0, 1, ui_state, "prior.train")
+        self.components.switch(frame, row, 1, ui_state, "prior.train")
+        row += 1
+
+        row = self.__create_offloading_widgets(frame, row, ui_state, "prior", supports_layer_offloading=False)
 
         # train prior epochs
-        self.components.label(frame, 1, 0, "Stop Training After",
+        self.components.label(frame, row, 0, "Stop Training After",
                               tooltip="When to stop training the Prior")
-        self.components.time_entry(frame, 1, 1, ui_state, "prior.stop_training_after",
+        self.components.time_entry(frame, row, 1, ui_state, "prior.stop_training_after",
                                    "prior.stop_training_after_unit", supports_time_units=False)
+        row += 1
 
         # prior learning rate
-        self.components.label(frame, 2, 0, "Prior Learning Rate",
+        self.components.label(frame, row, 0, "Prior Learning Rate",
                               tooltip="The learning rate of the Prior. Overrides the base learning rate")
-        self.components.entry(frame, 2, 1, ui_state, "prior.learning_rate")
+        self.components.entry(frame, row, 1, ui_state, "prior.learning_rate")
+        row += 1
 
     def __create_transformer_frame(self, master, row, ui_state, supports_guidance_scale: bool = False,
                                    supports_force_attention_mask: bool = True):
         frame = self.components.section_frame(master, row)
+        row = 0
 
         # train transformer
-        self.components.label(frame, 0, 0, "Train Transformer",
+        self.components.label(frame, row, 0, "Train Transformer",
                               tooltip="Enables training the Transformer model")
-        self.components.switch(frame, 0, 1, ui_state, "transformer.train")
+        self.components.switch(frame, row, 1, ui_state, "transformer.train")
+        row += 1
+
+        row = self.__create_offloading_widgets(frame, row, ui_state, "transformer", supports_activation_offloading=True)
 
         # train transformer epochs
-        self.components.label(frame, 1, 0, "Stop Training After",
+        self.components.label(frame, row, 0, "Stop Training After",
                               tooltip="When to stop training the Transformer")
-        self.components.time_entry(frame, 1, 1, ui_state, "transformer.stop_training_after",
+        self.components.time_entry(frame, row, 1, ui_state, "transformer.stop_training_after",
                                    "transformer.stop_training_after_unit", supports_time_units=False)
+        row += 1
 
         # transformer learning rate
-        self.components.label(frame, 2, 0, "Transformer Learning Rate",
+        self.components.label(frame, row, 0, "Transformer Learning Rate",
                               tooltip="The learning rate of the Transformer. Overrides the base learning rate")
-        self.components.entry(frame, 2, 1, ui_state, "transformer.learning_rate")
+        self.components.entry(frame, row, 1, ui_state, "transformer.learning_rate")
+        row += 1
 
         if supports_force_attention_mask:
             # transformer learning rate
-            self.components.label(frame, 3, 0, "Force Attention Mask",
+            self.components.label(frame, row, 0, "Force Attention Mask",
                                   tooltip="Force enables passing of a text embedding attention mask to the transformer. This can improve training on shorter captions.")
-            self.components.switch(frame, 3, 1, ui_state, "transformer.attention_mask")
+            self.components.switch(frame, row, 1, ui_state, "transformer.attention_mask")
+            row += 1
 
         if supports_guidance_scale:
             # guidance scale
-            self.components.label(frame, 4, 0, "Guidance Scale",
+            self.components.label(frame, row, 0, "Guidance Scale",
                                   tooltip="The guidance scale of guidance distilled models passed to the transformer during training.")
-            self.components.entry(frame, 4, 1, ui_state, "transformer.guidance_scale")
+            self.components.entry(frame, row, 1, ui_state, "transformer.guidance_scale")
+            row += 1
 
     def __create_noise_frame(self, master, row, ui_state,
                               supports_generalized_offset_noise: bool = False,

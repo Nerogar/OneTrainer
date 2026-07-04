@@ -5,12 +5,11 @@
     "model_type": "Z_IMAGE",
     "output_model_format": "ORIGINAL_TRANSFORMER",
     "resolution": "512",
-    "gradient_checkpointing": "CPU_OFFLOADED",
-    "layer_offload_fraction": 0.1,
     "compile": true,
     "transformer": {
         "train": true,
-        "weight_dtype": "BFLOAT_16"
+        "weight_dtype": "BFLOAT_16",
+        "offload_fraction": 0.1
     },
     "text_encoder": {
         "train": false,
