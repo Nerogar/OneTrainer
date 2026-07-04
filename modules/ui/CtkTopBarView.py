@@ -1,11 +1,11 @@
 from collections.abc import Callable
+from tkinter import filedialog
 
 from modules.ui.BaseTopBarView import BaseTopBarView
 from modules.ui.TopBarController import TopBarController
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.ui import ctk_components, dialogs
-from modules.util.ui.CtkUIState import CtkUIState
+from modules.util.ui import ctk_components
 
 import customtkinter as ctk
 
@@ -27,24 +27,23 @@ class CtkTopBarView(BaseTopBarView):
 
         self.build(frame, master, controller, ui_state, change_model_type_callback, change_training_method_callback, load_preset_callback)
 
-    def _make_config_ui_state(self, master, data):
-        return CtkUIState(master, data)
-
-    def _get_dropdown_text(self, widget) -> str:
-        return widget.get()
-
     def _setup_frame_column_weight(self):
         self.frame.grid_columnconfigure(5, weight=1)
 
     def _forget_dropdown(self, widget):
         widget.destroy()
 
-    def _show_save_dialog(self, default_value: str, callback):
-        dialogs.StringInputDialog(
-            parent=self.master,
-            title="name",
-            question="Config Name",
-            callback=callback,
-            default_value=default_value,
-            validate_callback=lambda x: not x.startswith("#"),
+    def _show_save_dialog(self, initial_dir: str, callback):
+        chosen = filedialog.asksaveasfilename(
+            initialdir=initial_dir, defaultextension=".json",
+            filetypes=[("JSON", "*.json")],
         )
+        if chosen:
+            callback(chosen)
+
+    def _show_open_dialog(self, initial_dir: str, callback):
+        chosen = filedialog.askopenfilename(
+            initialdir=initial_dir, filetypes=[("JSON", "*.json")],
+        )
+        if chosen:
+            callback(chosen)

@@ -78,11 +78,10 @@ class QwenFineTuneSetup(
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.transformer_to(self.train_device)
 
-        if model.text_encoder:
-            if config.text_encoder.train:
-                model.text_encoder.train()
-            else:
-                model.text_encoder.eval()
+        if config.text_encoder.train:
+            model.text_encoder.train()
+        else:
+            model.text_encoder.eval()
 
         model.vae.eval()
 
