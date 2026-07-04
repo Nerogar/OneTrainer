@@ -38,6 +38,18 @@ def create_application() -> QApplication:
         QProgressBar {
             background-color: #c8c8c8;
         }
+        QToolButton {
+            padding-top: 0px;
+            padding-bottom: 0px;
+            padding-right: 40px;
+        }
+        QToolButton::menu-indicator {
+            subcontrol-origin: padding;
+            subcontrol-position: right center;
+            width: 12px;
+            height: 12px;
+            right: 10px;
+        }
     """)
 
     return app

@@ -20,10 +20,12 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QLabel,
     QLineEdit,
+    QMenu,
     QProgressBar,
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -480,6 +482,41 @@ def button(
     if tooltip:
         _set_tooltip(component, tooltip)
     _add(_layout(master), component, row, column, sticky=sticky, padx=padx, pady=pady)
+    return component
+
+
+def preset_menu_button(
+        master: QWidget,
+        row: int,
+        column: int,
+        text: str,
+        tree: list[tuple[str, Any]],
+        command: Callable[[Any], None],
+        sticky: str = "new",
+) -> QToolButton:
+    def build_menu(parent_menu: QMenu, nodes):
+        for name, value in nodes:
+            if isinstance(value, list):
+                submenu = parent_menu.addMenu(name)
+                build_menu(submenu, value)
+            else:
+                parent_menu.addAction(name, lambda v=value: command(v))
+
+    menu = QMenu(master)
+    build_menu(menu, tree)
+
+    component = QToolButton(master)
+    component.setText(text)
+    component.setMenu(menu)
+    component.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+    # the global QToolButton stylesheet (pyside6_util.create_application) enlarges the
+    # menu-indicator, which switches this widget to the CSS box model and resets its
+    # vertical padding away from the native style's — match a plain QPushButton's
+    # height explicitly so it doesn't grow taller than its siblings.
+    reference_button = QPushButton("", master)
+    component.setFixedHeight(reference_button.sizeHint().height())
+    reference_button.deleteLater()
+    _add(_layout(master), component, row, column, sticky=sticky)
     return component
 
 

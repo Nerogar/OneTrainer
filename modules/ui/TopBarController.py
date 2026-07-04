@@ -1,7 +1,11 @@
+import json
 import os
+import traceback
 import webbrowser
+from contextlib import suppress
 
 from modules.util import path_util
+from modules.util.config.SecretsConfig import SecretsConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -42,58 +46,61 @@ class TopBarController:
         ]
 
     def get_training_methods(self, model_type: ModelType) -> list[tuple[str, TrainingMethod]]:
-        #TODO simplify
-        if model_type.is_stable_diffusion():
-            return [
-                ("Fine Tune", TrainingMethod.FINE_TUNE),
-                ("LoRA", TrainingMethod.LORA),
-                ("Embedding", TrainingMethod.EMBEDDING),
-                ("Fine Tune VAE", TrainingMethod.FINE_TUNE_VAE),
-            ]
-        elif model_type.is_stable_diffusion_3() \
-                or model_type.is_stable_diffusion_xl() \
-                or model_type.is_wuerstchen() \
-                or model_type.is_pixart() \
-                or model_type.is_flux_1() \
-                or model_type.is_sana() \
-                or model_type.is_hunyuan_video() \
-                or model_type.is_hi_dream() \
-                or model_type.is_chroma():
-            return [
-                ("Fine Tune", TrainingMethod.FINE_TUNE),
-                ("LoRA", TrainingMethod.LORA),
-                ("Embedding", TrainingMethod.EMBEDDING),
-            ]
-        elif model_type.is_qwen() \
-                or model_type.is_anima() \
-                or model_type.is_krea2() \
-                or model_type.is_z_image() \
-                or model_type.is_flux_2() \
-                or model_type.is_ernie():
-            return [
-                ("Fine Tune", TrainingMethod.FINE_TUNE),
-                ("LoRA", TrainingMethod.LORA),
-            ]
-        return []
+        labels = {
+            TrainingMethod.FINE_TUNE: "Fine Tune",
+            TrainingMethod.LORA: "LoRA",
+            TrainingMethod.EMBEDDING: "Embedding",
+            TrainingMethod.FINE_TUNE_VAE: "Fine Tune VAE",
+        }
+        return [(labels[m], m) for m in model_type.supported_training_methods()]
 
-    def load_available_config_names(self, dir: str) -> list[tuple[str, str]]:
-        configs = [("", path_util.canonical_join(dir, "#.json"))]
+    def load_preset_tree(self, dir: str = "training_presets") -> list[tuple[str, str | list]]:
+        # mirrors whatever directory structure happens to exist under `dir`; a node is either
+        # (display_name, path) for a leaf preset or (display_name, children) for a group.
+        # "#" marks a built-in preset (vs. a user file); "#.json" is the last-session state,
+        # not a preset. Same convention as load_config_from_file's is_built_in_preset check.
+        nodes = []
         if os.path.isdir(dir):
-            for path in os.listdir(dir):
-                if path != "#.json":
-                    path = path_util.canonical_join(dir, path)
-                    if path.endswith(".json") and os.path.isfile(path):
-                        name = os.path.basename(path)
-                        name = os.path.splitext(name)[0]
-                        configs.append((name, path))
-            configs.sort()
-        return configs
+            for entry in sorted(os.scandir(dir), key=lambda e: e.name.lower()):
+                if entry.is_dir():
+                    children = self.load_preset_tree(entry.path)
+                    if children:
+                        nodes.append((entry.name, children))
+                elif entry.name.startswith("#") and entry.name != "#.json" and entry.name.endswith(".json"):
+                    nodes.append((os.path.splitext(entry.name)[0], path_util.canonical_join(dir, entry.name)))
+        return nodes
 
     def save_to_file(self, name) -> str:
         name = path_util.safe_filename(name)
         path = path_util.canonical_join("training_presets", f"{name}.json")
         write_json_atomic(path, self.train_config.to_settings_dict(secrets=False))
         return path
+
+    def save_config_to_path(self, path: str) -> None:
+        write_json_atomic(path, self.train_config.to_settings_dict(secrets=False))
+
+    def load_config_from_file(self, filename: str) -> TrainConfig | None:
+        try:
+            basename = os.path.basename(filename)
+            is_built_in_preset = basename.startswith("#") and basename != "#.json"
+
+            with open(filename, "r") as f:
+                loaded_dict = json.load(f)
+                default_config = TrainConfig.default_values()
+                # built-in configs are always saved in the most recent version, so migration can be skipped
+                loaded_config = default_config.from_dict(loaded_dict, migrate=not is_built_in_preset).to_unpacked_config()
+
+            with suppress(FileNotFoundError), open("secrets.json", "r") as f:
+                secrets_dict = json.load(f)
+                loaded_config.secrets = SecretsConfig.default_values().from_dict(secrets_dict)
+
+            self.train_config.from_dict(loaded_config.to_dict())
+            return loaded_config
+        except FileNotFoundError:
+            return None
+        except Exception:
+            print(traceback.format_exc())
+            return None
 
     def save_secrets(self, path) -> str:
         write_json_atomic(path, self.train_config.secrets.to_dict())

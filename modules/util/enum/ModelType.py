@@ -183,6 +183,24 @@ class ModelType(Enum):
     def model_parts(self) -> tuple[str, ...]:
         return _MODEL_PARTS[self]
 
+    def supported_training_methods(self) -> tuple[TrainingMethod, ...]:
+        if self.is_stable_diffusion():
+            return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA, TrainingMethod.EMBEDDING, TrainingMethod.FINE_TUNE_VAE)
+        if self.is_stable_diffusion_3() \
+                or self.is_stable_diffusion_xl() \
+                or self.is_wuerstchen() \
+                or self.is_pixart() \
+                or self.is_flux_1() \
+                or self.is_sana() \
+                or self.is_hunyuan_video() \
+                or self.is_hi_dream() \
+                or self.is_chroma():
+            return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA, TrainingMethod.EMBEDDING)
+        if self.is_qwen() or self.is_z_image() or self.is_flux_2() or self.is_ernie() \
+                or self.is_anima() or self.is_krea2():
+            return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA)
+        raise ValueError(f"No supported training methods defined for model type {self}")
+
     def denoising_model_part(self) -> str:
         # the denoising model component (unet / transformer / prior), always listed first in model_parts().
         return _MODEL_PARTS[self][0]

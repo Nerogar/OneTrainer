@@ -1,13 +1,7 @@
-import json
-import os
-import traceback
 from abc import abstractmethod
 from collections.abc import Callable
-from contextlib import suppress
 
 from modules.util import path_util
-from modules.util.config.SecretsConfig import SecretsConfig
-from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.optimizer_util import change_optimizer
@@ -18,14 +12,6 @@ class BaseTopBarView:
         self.components = components
 
     @abstractmethod
-    def _make_config_ui_state(self, master, data):
-        pass
-
-    @abstractmethod
-    def _get_dropdown_text(self, widget) -> str:
-        pass
-
-    @abstractmethod
     def _setup_frame_column_weight(self):
         pass
 
@@ -34,7 +20,11 @@ class BaseTopBarView:
         pass
 
     @abstractmethod
-    def _show_save_dialog(self, default_value: str, callback):
+    def _show_save_dialog(self, initial_dir: str, callback):
+        pass
+
+    @abstractmethod
+    def _show_open_dialog(self, initial_dir: str, callback):
         pass
 
     def build(
@@ -57,12 +47,7 @@ class BaseTopBarView:
 
         self.dir = "training_presets"
 
-        self.config_ui_data = {
-            "config_name": path_util.canonical_join(self.dir, "#.json")
-        }
-        self.config_ui_state = self._make_config_ui_state(master, self.config_ui_data)
-
-        self.configs = controller.load_available_config_names(self.dir)
+        self.preset_tree = controller.load_preset_tree(self.dir)
 
         self.current_config = []
 
@@ -71,13 +56,14 @@ class BaseTopBarView:
         # title
         self.components.app_title(self.frame, 0, 0)
 
-        # dropdown
-        self.configs_dropdown = None
-        self.__create_configs_dropdown()
+        # preset picker: model type -> presets for that type
+        self.components.preset_menu_button(
+            self.frame, 0, 1, "Load Preset", self.preset_tree, self.__load_current_config, sticky="vew",
+        )
 
-        # remove button
-        # TODO
-        # self.components.icon_button(self.frame, 0, 2, "-", self.__remove_config)
+        # load config button
+        self.components.button(self.frame, 0, 2, "Load config", self.__load_config,
+                               tooltip="Load one of your own saved configs", width=90, sticky="vew")
 
         # Wiki button
         self.components.button(self.frame, 0, 4, "Wiki", self.open_wiki, width=50, sticky="vew")
@@ -101,6 +87,9 @@ class BaseTopBarView:
             sticky="vew",
         )
 
+        # restore the config from the previous session
+        self.__load_current_config(path_util.canonical_join(self.dir, "#.json"))
+
     def __create_training_method(self):
         if self.training_method:
             self._forget_dropdown(self.training_method)
@@ -122,63 +111,23 @@ class BaseTopBarView:
         self.change_model_type_callback(model_type)
         self.__create_training_method()
 
-    def __create_configs_dropdown(self):
-        if self.configs_dropdown is not None:
-            self._forget_dropdown(self.configs_dropdown)
-
-        self.configs_dropdown = self.components.options_kv(
-            self.frame, 0, 1, self.configs, self.config_ui_state, "config_name", self.__load_current_config,
-            sticky="vew",
-        )
+    def __load_config(self):
+        self._show_open_dialog("training_configs", self.__load_current_config)
 
     def __save_config(self):
-        default_value = self._get_dropdown_text(self.configs_dropdown)
-        while default_value.startswith('#'):
-            default_value = default_value[1:]
-
-        self._show_save_dialog(default_value, self.__save_new_config)
-
-    def __save_new_config(self, name):
-        path = self.controller.save_to_file(name)
-
-        is_new_config = name not in [x[0] for x in self.configs]
-
-        if is_new_config:
-            self.configs.append((name, path))
-            self.configs.sort()
-
-        if self.config_ui_data["config_name"] != path_util.canonical_join(self.dir, f"{name}.json"):
-            self.config_ui_state.get_var("config_name").set(path_util.canonical_join(self.dir, f"{name}.json"))
-
-        if is_new_config:
-            self.__create_configs_dropdown()
+        self._show_save_dialog("training_configs", self.controller.save_config_to_path)
 
     def __load_current_config(self, filename):
-        try:
-            basename = os.path.basename(filename)
-            is_built_in_preset = basename.startswith("#") and basename != "#.json"
+        loaded_config = self.controller.load_config_from_file(filename)
+        if loaded_config is None:
+            return
 
-            with open(filename, "r") as f:
-                loaded_dict = json.load(f)
-                default_config = TrainConfig.default_values()
-                # built-in configs are always saved in the most recent version, so migration can be skipped
-                loaded_config = default_config.from_dict(loaded_dict, migrate=not is_built_in_preset).to_unpacked_config()
+        self.ui_state.update(loaded_config)
 
-            with suppress(FileNotFoundError), open("secrets.json", "r") as f:
-                secrets_dict=json.load(f)
-                loaded_config.secrets = SecretsConfig.default_values().from_dict(secrets_dict)
+        optimizer_config = change_optimizer(self.controller.train_config)
+        self.ui_state.get_var("optimizer").update(optimizer_config)
 
-            self.controller.train_config.from_dict(loaded_config.to_dict())
-            self.ui_state.update(loaded_config)
-
-            optimizer_config = change_optimizer(self.controller.train_config)
-            self.ui_state.get_var("optimizer").update(optimizer_config)
-
-            self.load_preset_callback()
-        except FileNotFoundError:
-            pass
-        except Exception:
-            print(traceback.format_exc())
+        self.load_preset_callback()
 
     def __remove_config(self):
         # TODO
