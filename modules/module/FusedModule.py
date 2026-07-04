@@ -1,14 +1,13 @@
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
+from modules.util.convert_util import match_any, matched_leaf_groups
 from modules.util.quantization_util import get_unquantized_weight
 
 import torch
 from torch import Tensor, nn
 from torch.nn import Parameter
-
-import parse
 
 
 class _FusedLinear(nn.Linear, QuantizedLinearMixin):
@@ -148,11 +147,14 @@ class FusedModuleGroup:
     def load_state_dict(self, state_dict: Mapping[str, Any], strict: bool = True):
         return self.module.load_state_dict(state_dict, strict=strict)
 
-    def parameters(self) -> list[Parameter]:
-        return list(self.module.parameters())
+    def parameters(self) -> Iterator[Parameter]:
+        return self.module.parameters()
 
-    def modules(self) -> list[nn.Module]:
-        return list(self.module.modules())
+    def named_parameters(self, prefix: str = "", recurse: bool = True) -> Iterator[tuple[str, Parameter]]:
+        return self.module.named_parameters(prefix=prefix, recurse=recurse)
+
+    def modules(self) -> Iterator[nn.Module]:
+        return self.module.modules()
 
     def to(self, device: torch.device = None, dtype: torch.dtype = None) -> 'FusedModuleGroup':
         self.module.to(device, dtype)
@@ -168,55 +170,90 @@ class FusedModuleGroup:
 
 def discover_fused_groups(fusion_spec: list[tuple] | None, selected_modules: dict[str, nn.Module],
                           fuse: bool = False) -> list[tuple[str, list[str], list]]:
-    # Match the per-model fusion_spec against the concrete selected Linear names, capturing the
-    # block index {i} via parse. A group fires only when all its leaves are present and selected
-    # for the same block and share in_features; otherwise those leaves stay individual modules
-    # (never fuse a partial group). Returns the discovered groups as (fused name, leaf names, leaf
-    # modules) -- independent of whether they'll be built fused (LoRAModuleWrapper.fuse); a split
-    # wrapper keeps the same list to recognise an incompatible fused file on load (__check_fusion_match).
+    # Match the per-model fusion_spec against the concrete selected Linear names. A group fires only when
+    # all its leaves are present and selected for the same group and share in_features; otherwise those
+    # leaves stay individual modules (never fuse a partial group). Returns the discovered groups as (fused
+    # name, leaf names, leaf modules) -- independent of whether they'll be built fused (LoRAModuleWrapper.fuse);
+    # a split wrapper keeps the same list to recognise an incompatible fused file on load (check_fusion_match).
     #
     # fuse mirrors LoRAModuleWrapper.fuse: True when this wrapper will actually BUILD fused modules (an
-    # output format that needs qkv fusion). A PARTIALLY-selected group -- some of a group's projections
-    # trained, the rest excluded by the layer filter -- cannot be fused: fusion needs every leaf, and the
-    # fused formats (ORIGINAL/KOHYA/COMFY) have no split keys to fall back on. When fuse, raise here at
-    # setup with an actionable message instead of leaking split keys into the saver, which fails much later
-    # with a cryptic "No conversion found". When NOT fusing (split build -- e.g. Flux2 + DIFFUSERS/LEGACY)
-    # a partial group is fine (split formats keep the keys), so it is not checked.
+    # output format that needs qkv fusion). When fuse, two conditions raise here at setup with an actionable
+    # message instead of leaking split keys into the saver, which fails much later with a cryptic "No
+    # conversion found": (1) a PARTIALLY-selected group -- some of a group's projections trained, the rest
+    # excluded by the layer filter -- cannot be fused (fusion needs every leaf, and the fused formats
+    # ORIGINAL/KOHYA/COMFY have no split keys to fall back on); (2) a group whose leaves do not share
+    # in_features cannot be stacked into one weight matrix, so the fusion spec is misconfigured. When NOT
+    # fusing (split build -- e.g. Flux2 + DIFFUSERS/LEGACY) a partial group is fine (split formats keep the
+    # keys), so neither is checked.
     groups = []
     if not fusion_spec:
         return groups
 
     consumed = set()
-    for block_pattern, leaf_suffixes, fused_suffix, _original_suffix in fusion_spec:
-        index_sets = []
-        for leaf in leaf_suffixes:
-            pattern = block_pattern + "." + leaf
-            indices = {match["i"] for name in selected_modules
-                       if (match := parse.parse(pattern, name)) is not None and "i" in match.named}
-            index_sets.append(indices)
+    for group_pattern, leaf_suffixes, fused_suffix, _original_suffix in fusion_spec:
+        group_sets = [matched_leaf_groups(group_pattern, leaf, selected_modules) for leaf in leaf_suffixes]
 
-        complete = set.intersection(*index_sets) if index_sets else set()
+        complete = set.intersection(*group_sets) if group_sets else set()
         if fuse:
-            # blocks where some leaves are selected but not all -> cannot fuse, cannot fall back to split.
-            partial = (set.union(*index_sets) - complete) if index_sets else set()
-            for i in sorted(partial):
-                block = block_pattern.format(i=i)
+            # groups where some leaves are selected but not all -> cannot fuse, cannot fall back to split.
+            partial = (set.union(*group_sets) - complete) if group_sets else set()
+            for group_key in sorted(partial):
                 raise RuntimeError(
                     f"The selected output format requires fusing all of {', '.join(leaf_suffixes)} in "
-                    f"{block} into a single '{fused_suffix}' module, but the layer filter trained only a "
+                    f"{group_key} into a single '{fused_suffix}' module, but the layer filter trained only a "
                     f"subset. Every projection in a fusion group must be trained together. Either add the "
-                    f"missing layer(s) to the layer filter, or save as DIFFUSERS or LEGACY, which keep the "
-                    f"projections split.")
+                    f"missing layer(s) to the layer filter, or choose a different output format.")
 
-        for i in sorted(complete):
-            block = block_pattern.format(i=i)
-            leaf_names = [f"{block}.{leaf}" for leaf in leaf_suffixes]
+        for group_key in sorted(complete):
+            leaf_names = [f"{group_key}.{leaf}" for leaf in leaf_suffixes]
             if any(name in consumed for name in leaf_names):
                 continue
             leaves = [selected_modules[name] for name in leaf_names]
             if len({leaf.in_features for leaf in leaves}) != 1:
+                # leaves reading different input spaces cannot be stacked into one weight matrix. When
+                # fusing this is a misconfigured spec (raise); a split build just keeps them separate.
+                if fuse:
+                    raise RuntimeError(
+                        f"The selected output format requires fusing all of {', '.join(leaf_suffixes)} in "
+                        f"{group_key} into a single '{fused_suffix}' module, but they do not share an input "
+                        f"dimension ({', '.join(f'{name}={selected_modules[name].in_features}' for name in leaf_names)}). "
+                        f"Only projections that read the same input can be fused; this fusion group is misconfigured.")
                 continue
-            groups.append((f"{block}.{fused_suffix}", leaf_names, leaves))
+            groups.append((f"{group_key}.{fused_suffix}", leaf_names, leaves))
             consumed.update(leaf_names)
 
     return groups
+
+
+def check_fusion_match(keys, fuse: bool, fusion_groups: list[tuple] | None):
+    # A LoRA's qkv fused/split shape must match what the target needs: the wrapper's own `fuse`, on the
+    # training-resume load path; or the requested output format, on the convert tool's save path (the
+    # convert tool loads straight into a plain dict and never goes through the wrapper, so it needs this
+    # same guard before writing a file the target format can't represent). Converting between them is
+    # unsupported: fusing independent split q/k/v into one rank-r adapter is lossy (SVD/re-rank), and
+    # de-fusing a fused adapter into split leaves, though exact for LoRA, is not implemented -- so a
+    # mismatch is a hard error rather than a silent key drop or an invalid output file.
+    #
+    # `fusion_groups` is the model's raw fusion spec -- (group_pattern, leaf_suffixes, fused_suffix,
+    # original_suffix), the same shape as model.fusion_groups() / LoRAModuleWrapper.fusion_spec -- no live
+    # module or per-instance discovery needed, just a pattern match against the on-disk keys via match_any
+    # (the leading component prefix, e.g. "transformer.", is stripped positionally since fusion groups only
+    # ever apply to the single denoising component; the trailing "{suffix__}" wildcard stands in for
+    # whatever value suffix -- .lora_down.weight, .alpha, hada_w1_a, ... -- follows the module name).
+    if not fusion_groups:
+        return
+    relative_keys = [key.split(".", 1)[1] for key in keys if "." in key]
+    for group_pattern, leaf_suffixes, fused_suffix, _original_suffix in fusion_groups:
+        file_fused = match_any([group_pattern + "." + fused_suffix + ".{suffix__}"], relative_keys)
+        file_split = match_any([group_pattern + "." + leaf + ".{suffix__}" for leaf in leaf_suffixes], relative_keys)
+
+        if fuse and file_split:
+            raise RuntimeError(
+                f"LoRA file has split q/k/v ({fused_suffix}), but the selected output format needs "
+                f"fused qkv. Fusing independent q/k/v adapters into one rank-r adapter is lossy "
+                f"(SVD/re-rank); pick a split output format or retrain.")
+        if not fuse and file_fused:
+            raise RuntimeError(
+                f"LoRA file has fused qkv ({fused_suffix}), but the selected output format keeps q/k/v "
+                f"split. De-fusing a fused adapter on load is not supported yet; pick a fused output "
+                f"format or retrain.")

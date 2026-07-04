@@ -53,7 +53,10 @@ class BaseTrainUIView(ABC):
     def connect_window_closed(self, window, callback): pass
 
     def sync_cloud_secrets(self):
-        self.ui_state.get_var("secrets.cloud").update(self.controller.train_config.secrets.cloud)
+        # Called from training thread — defer to main thread
+        self.schedule_on_main_thread(
+            lambda: self.ui_state.get_var("secrets.cloud").update(self.controller.train_config.secrets.cloud)
+        )
 
     def start_training(self):
         self.controller.start_training()

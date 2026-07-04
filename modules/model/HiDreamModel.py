@@ -177,29 +177,34 @@ class HiDreamModel(BaseModel):
         ] if a is not None]
 
     def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
-        # HiDream's four TEs: clip_l + clip_g + t5xxl + llama (Comfy's HiDreamTEModel).
-        return [
-            (self.text_encoder_1, {
+        # HiDream's four TEs: clip_l + clip_g + t5xxl + llama (Comfy's HiDreamTEModel). Any can be absent, so
+        # only the TEs actually present are declared.
+        text_encoders = []
+        if self.text_encoder_1 is not None:
+            text_encoders.append((self.text_encoder_1, {
                 ModelFormat.DIFFUSERS_LORA: "text_encoder",
                 ModelFormat.KOHYA_LORA: "lora_te1",
                 ModelFormat.COMFY_LORA: "text_encoders.clip_l.transformer",
-            }),
-            (self.text_encoder_2, {
+            }))
+        if self.text_encoder_2 is not None:
+            text_encoders.append((self.text_encoder_2, {
                 ModelFormat.DIFFUSERS_LORA: "text_encoder_2",
                 ModelFormat.KOHYA_LORA: "lora_te2",
                 ModelFormat.COMFY_LORA: "text_encoders.clip_g.transformer",
-            }),
-            (self.text_encoder_3, {
+            }))
+        if self.text_encoder_3 is not None:
+            text_encoders.append((self.text_encoder_3, {
                 ModelFormat.DIFFUSERS_LORA: "text_encoder_3",
                 ModelFormat.KOHYA_LORA: "lora_te3",
                 ModelFormat.COMFY_LORA: "text_encoders.t5xxl.transformer",
-            }),
-            (self.text_encoder_4, {
+            }))
+        if self.text_encoder_4 is not None:
+            text_encoders.append((self.text_encoder_4, {
                 ModelFormat.DIFFUSERS_LORA: "text_encoder_4",
                 ModelFormat.KOHYA_LORA: "lora_te4",
                 ModelFormat.COMFY_LORA: "text_encoders.llama.transformer",
-            }),
-        ]
+            }))
+        return text_encoders
 
     def all_embeddings(self) -> list[HiDreamModelEmbedding]:
         return self.additional_embeddings \

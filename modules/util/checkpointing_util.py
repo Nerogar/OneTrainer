@@ -1,3 +1,4 @@
+import copy
 import inspect
 from collections.abc import Callable
 from typing import Any
@@ -23,6 +24,7 @@ from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from transformers.models.mistral.modeling_mistral import MistralDecoderLayer
 from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import Qwen2_5_VLDecoderLayer
 from transformers.models.qwen3.modeling_qwen3 import Qwen3DecoderLayer
+from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLTextDecoderLayer
 from transformers.models.t5.modeling_t5 import T5Block
 
 init_compile()
@@ -110,6 +112,17 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
         self.conductor = conductor
         self.layer_index = layer_index
 
+    def __deepcopy__(self, memo):
+        # conductor holds torch.cuda.Stream/Event objects that cannot be deep-copied or pickled.
+        # deepcopy is only used at save time to build a dtype-converted CPU copy of the pipeline,
+        # where the conductor is never invoked, so share the existing instance instead of copying it.
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for key, value in self.__dict__.items():
+            result.__dict__[key] = value if key == "conductor" else copy.deepcopy(value, memo)
+        return result
+
     def __checkpointing_forward(self, dummy: torch.Tensor, call_id: int, *args):
         init_compile()  # workaround for https://github.com/pytorch/pytorch/issues/186537
         if self.layer_index == 0 and not torch.is_grad_enabled():
@@ -165,9 +178,12 @@ def create_checkpoint(
         conductor.add_layer(orig_module, included_offload_param_indices)
 
     if conductor is not None and conductor.offload_activated():
-        # offloading is structurally coupled to use_reentrant=True checkpointing during the back pass
-        # (the recompute is what fires before_layer/after_layer in the backward direction), so the offload
-        # layer always checkpoints when grad is enabled, regardless of the part's gradient_checkpointing flag.
+        # offloading is structurally coupled to use_reentrant=True checkpointing during the back pass:
+        # the recompute is the only thing firing before_layer/after_layer in the backward direction, so
+        # both layer and activation offloading need checkpointing to move tensors back for backward.
+        # Rather than silently forcing checkpointing on when the part disabled it, reject the combination.
+        if not checkpointing:
+            raise NotImplementedError("offloading currently requires gradient checkpointing")
         if compile:
             layer = OffloadCheckpointLayer(orig_module=orig_module, orig_forward=None, train_device=train_device, conductor=conductor, layer_index=layer_index)
             #don't compile the checkpointing layer - offloading cannot be compiled:
@@ -283,7 +299,7 @@ def enable_checkpointing_for_clip_encoder_layers(
 ):
     return enable_checkpointing(model, config, part, False, [
         (CLIPEncoderLayer, []), # No activation offloading for text encoders, because the output might be taken from the middle of the network
-    ])
+    ], offload_enabled=False) # CLIP is non-offloadable; keep it plain-checkpointed so a migrated offload_fraction can't build a self-activating conductor
 
 def enable_checkpointing_for_t5_encoder_layers(
         model: nn.Module,
@@ -452,4 +468,25 @@ def enable_checkpointing_for_ideogram_transformer(
 ) -> LayerOffloadConductor | None:
     return enable_checkpointing(model, config, part, config.compile, [
         (model.layers, ["hidden_states"]),
+    ])
+
+def enable_checkpointing_for_krea2_transformer(
+        model: nn.Module,
+        config: TrainConfig,
+        part: TrainModelPartConfig,
+) -> LayerOffloadConductor | None:
+    # Krea2TransformerBlock takes (hidden_states, temb, image_rotary_emb, attention_mask).
+    return enable_checkpointing(model, config, part, config.compile, [
+        (model.text_fusion.layerwise_blocks, ["hidden_states"]),
+        (model.text_fusion.refiner_blocks,   ["hidden_states"]),
+        (model.transformer_blocks,           ["hidden_states"]),
+    ])
+
+def enable_checkpointing_for_qwen3vl_encoder_layers(
+        model: nn.Module,
+        config: TrainConfig,
+        part: TrainModelPartConfig,
+) -> LayerOffloadConductor | None:
+    return enable_checkpointing(model, config, part, False, [
+        (Qwen3VLTextDecoderLayer, []),  # no activation offloading: this encoder is never trained
     ])

@@ -1,4 +1,7 @@
 from modules.util.convert_util import (
+    DOUBLE_SEGMENT_SUFFIXES,
+    FACTOR_PREFIXES,
+    SINGLE_SEGMENT_SUFFIXES,
     component_body_conversion,
     convert,
     dora_scale_to_peft_magnitude,
@@ -20,15 +23,16 @@ def kohya_flatten(
 ) -> dict[str, Tensor]:
     # flatten the module path ('.' -> '_'), keeping the value suffix dotted. The suffix is one
     # of: a bare single-segment param -- .alpha / .dora_scale, or LoHa/LoKr's hada_*/lokr_*
-    # factors (.hada_w1_a / .lokr_w1 / .lokr_w2_a, which carry no .weight); or .<param>.weight
-    # (two segments, e.g. .lora_down.weight / .oft_R.weight). Keys without a recognized value
+    # factors (.hada_w1_a / .lokr_w1 / .lokr_w2_a, which carry no .weight); or .<param>.weight /
+    # .oft_R.scaled_oft (two segments, e.g. .lora_down.weight / .oft_R.weight; Scaled-OFT's marker
+    # buffer oft_R.scaled_oft is two-segment but not .weight). Keys without a recognized value
     # suffix (bundle_emb.*) carry no module path to flatten and pass through. The flatten is a
     # separate mechanical pass because the convert tool cannot collapse arbitrary-depth dots.
     out_states = {}
     for key, tensor in state_dict.items():
-        if key.endswith(('.alpha', '.dora_scale')) or key.rsplit('.', 1)[-1].startswith(('hada_', 'lokr_')):
+        if key.endswith(SINGLE_SEGMENT_SUFFIXES) or key.rsplit('.', 1)[-1].startswith(FACTOR_PREFIXES):
             suffix = key[key.rfind('.'):]
-        elif key.endswith('.weight'):
+        elif key.endswith(DOUBLE_SEGMENT_SUFFIXES):
             suffix = key[key.removesuffix(key[key.rfind('.'):]).rfind('.'):]
         else:
             out_states[key] = tensor

@@ -618,9 +618,6 @@ class LayerOffloadConductor:
     def offload_activated(self) -> bool:
         return self.__offload_activations or self.__offload_layers
 
-    def layer_offload_activated(self) -> bool:
-        return self.__offload_layers
-
     def to(self, device: torch.device):
         torch_gc()
 

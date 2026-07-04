@@ -20,18 +20,6 @@ class BaseModelTabView(ABC):
         model_type = controller.train_config.model_type
         parts = model_type.model_parts()
 
-        # The transformer override path exists only for these architectures; SD3, PixArt, Sana
-        # and HiDream have a transformer but expose no override field.
-        allow_override_transformer = (
-            model_type.is_flux()
-            or model_type.is_z_image()
-            or model_type.is_ernie()
-            or model_type.is_chroma()
-            or model_type.is_qwen()
-            or model_type.is_hunyuan_video()
-            or model_type.is_ideogram()
-        )
-
         row = 0
         row = self.__create_base_dtype_components(frame, row, ui_state)
         row = self.__create_base_components(
@@ -43,7 +31,7 @@ class BaseModelTabView(ABC):
             has_prior="prior" in parts,
             allow_override_prior=model_type.is_stable_cascade(),
             has_transformer="transformer" in parts,
-            allow_override_transformer=allow_override_transformer,
+            allow_override_transformer=controller.supports_override_transformer(),
             has_unconditional_transformer="unconditional_transformer" in parts,
             has_text_encoder=not model_type.has_multiple_text_encoders(),
             has_text_encoder_1=model_type.has_multiple_text_encoders(),
@@ -58,7 +46,12 @@ class BaseModelTabView(ABC):
         if "decoder" in parts:
             row = self.__create_decoder_components(frame, row, ui_state, "decoder_text_encoder" in parts)
 
-        self.__create_output_components(frame, row, controller, ui_state)
+        self.__create_output_components(
+            frame,
+            row,
+            controller,
+            ui_state,
+        )
 
     def __create_dtype_options(self, include_gguf: bool = False, include_a8: bool = False) -> list[tuple[str, DataType]]:
         options = [

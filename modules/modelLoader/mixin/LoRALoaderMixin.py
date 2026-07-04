@@ -43,6 +43,8 @@ class LoRALoaderMixin(metaclass=ABCMeta):
         return None
 
     def _mixture_legacy_conversion(self, model: BaseModel) -> list:
+        # LEGACY conversion for models that historically flattened as lora_<component>/lora_te<n> with no
+        # native body (diffusers names throughout) -- the generic shape the saver's mixture path emits.
         component = model.model_type.denoising_model_part()
         conversion = [(component, f"lora_{component}")]
         for i, (_te_module, te_names) in enumerate(model.lora_text_encoders(), start=1):
@@ -109,7 +111,9 @@ class LoRALoaderMixin(metaclass=ABCMeta):
         if os.path.exists(os.path.join(lora_name, "meta.json")):
             safetensors_lora_name = os.path.join(lora_name, "lora", "lora.safetensors")
             if os.path.exists(safetensors_lora_name):
-                self.__load_safetensors(model, safetensors_lora_name)
+                # backups are saved as the raw canonical wrapper dict (_save_internal, no conversion), so load
+                # them raw -- the exact inverse. _to_canonical is only for foreign files.
+                model.lora_state_dict = load_file(safetensors_lora_name)
         else:
             raise Exception("not an internal model")
 
