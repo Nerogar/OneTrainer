@@ -86,6 +86,21 @@ def _get_model_defaults(model_type) -> dict:
             "diffusion_steps": 25,
             "cfg_scale": 3.5,
         })
+    elif model_type.is_anima():
+        defaults.update({
+            "width": 1024,
+            "height": 1024,
+            "diffusion_steps": 25,
+            "cfg_scale": 4.0,
+            "negative_prompt": "worst quality, low quality, score_1, score_2, score_3, artist name",
+        })
+    elif model_type.is_krea2():
+        defaults.update({
+            "width": 1024,
+            "height": 1024,
+            "diffusion_steps": 28,
+            "cfg_scale": 3.5,
+        })
     elif model_type.is_z_image():
         defaults.update({
             "width": 1024,

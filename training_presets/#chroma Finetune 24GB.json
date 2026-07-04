@@ -12,6 +12,7 @@
         "train": false,
         "weight_dtype": "BFLOAT_16"
     },
+    "output_model_format": "ORIGINAL_TRANSFORMER",
     "training_method": "FINE_TUNE",
     "vae": {
         "weight_dtype": "FLOAT_32"

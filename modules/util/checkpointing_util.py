@@ -1,3 +1,4 @@
+import copy
 import inspect
 from collections.abc import Callable
 from typing import Any
@@ -23,6 +24,7 @@ from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from transformers.models.mistral.modeling_mistral import MistralDecoderLayer
 from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import Qwen2_5_VLDecoderLayer
 from transformers.models.qwen3.modeling_qwen3 import Qwen3DecoderLayer
+from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLTextDecoderLayer
 from transformers.models.t5.modeling_t5 import T5Block
 
 init_compile()
@@ -105,6 +107,17 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
         self.dummy = torch.zeros((1,), device=train_device, requires_grad=True)
         self.conductor = conductor
         self.layer_index = layer_index
+
+    def __deepcopy__(self, memo):
+        # conductor holds torch.cuda.Stream/Event objects that cannot be deep-copied or pickled.
+        # deepcopy is only used at save time to build a dtype-converted CPU copy of the pipeline,
+        # where the conductor is never invoked, so share the existing instance instead of copying it.
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for key, value in self.__dict__.items():
+            result.__dict__[key] = value if key == "conductor" else copy.deepcopy(value, memo)
+        return result
 
     def __checkpointing_forward(self, dummy: torch.Tensor, call_id: int, *args):
         init_compile()  # workaround for https://github.com/pytorch/pytorch/issues/186537
@@ -406,4 +419,23 @@ def enable_checkpointing_for_ernie_transformer(
 ) -> LayerOffloadConductor:
     return enable_checkpointing(model, config, config.compile, [
         (model.layers, ["x"]),
+    ])
+
+def enable_checkpointing_for_krea2_transformer(
+        model: nn.Module,
+        config: TrainConfig,
+) -> LayerOffloadConductor:
+    # Krea2TransformerBlock takes (hidden_states, temb, image_rotary_emb, attention_mask).
+    return enable_checkpointing(model, config, config.compile, [
+        (model.text_fusion.layerwise_blocks, ["hidden_states"]),
+        (model.text_fusion.refiner_blocks,   ["hidden_states"]),
+        (model.transformer_blocks,           ["hidden_states"]),
+    ])
+
+def enable_checkpointing_for_qwen3vl_encoder_layers(
+        model: nn.Module,
+        config: TrainConfig,
+) -> LayerOffloadConductor:
+    return enable_checkpointing(model, config, False, [
+        (Qwen3VLTextDecoderLayer, []),
     ])

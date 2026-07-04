@@ -101,33 +101,33 @@ class HiDreamLoRASetup(
             model: HiDreamModel,
             config: TrainConfig,
     ):
-        create_te1 = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te1")
-        create_te2 = config.text_encoder_2.train or state_dict_has_prefix(model.lora_state_dict, "lora_te2")
-        create_te3 = config.text_encoder_3.train or state_dict_has_prefix(model.lora_state_dict, "lora_te3")
-        create_te4 = config.text_encoder_4.train or state_dict_has_prefix(model.lora_state_dict, "lora_te4")
+        create_te1 = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
+        create_te2 = config.text_encoder_2.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder_2")
+        create_te3 = config.text_encoder_3.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder_3")
+        create_te4 = config.text_encoder_4.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder_4")
 
         if model.text_encoder_1 is not None:
             model.text_encoder_1_lora = LoRAModuleWrapper(
-                model.text_encoder_1, "lora_te1", config
+                model.text_encoder_1, "text_encoder", config
             ) if create_te1 else None
 
         if model.text_encoder_2 is not None:
             model.text_encoder_2_lora = LoRAModuleWrapper(
-                model.text_encoder_2, "lora_te2", config
+                model.text_encoder_2, "text_encoder_2", config
             ) if create_te2 else None
 
         if model.text_encoder_3 is not None:
             model.text_encoder_3_lora = LoRAModuleWrapper(
-                model.text_encoder_3, "lora_te3", config
+                model.text_encoder_3, "text_encoder_3", config
             ) if create_te3 else None
 
         if model.text_encoder_4 is not None:
             model.text_encoder_4_lora = LoRAModuleWrapper(
-                model.text_encoder_4, "lora_te4", config
+                model.text_encoder_4, "text_encoder_4", config
             ) if create_te4 else None
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "lora_transformer", config, config.layer_filter.split(",")
+            model.transformer, "transformer", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:

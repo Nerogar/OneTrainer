@@ -64,6 +64,9 @@ class PySide6SchedulerParamsWindowView(BaseSchedulerParamsWindowView, QDialog):
         QDialog.__init__(self, parent)
         BaseSchedulerParamsWindowView.__init__(self, pyside6_components)
 
+        # delete on close so entry widgets and the field validators they register globally are freed, not leaked
+        self.finished.connect(self.deleteLater)
+
         self.setWindowTitle("Learning Rate Scheduler Settings")
         self.resize(800, 500)
 
