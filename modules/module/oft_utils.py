@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn as nn
 
@@ -42,6 +44,7 @@ class OFTRotationModule(nn.Module):
         block_size,
         in_features,
         block_share=False,
+        oft_scaled=False,
         use_cayley_neumann=True,
         num_cayley_neumann_terms=5,
         dropout_probability=0.0,
@@ -53,6 +56,12 @@ class OFTRotationModule(nn.Module):
         self.in_features = in_features
         self.weight = nn.Parameter(torch.empty(r, n_elements))
         self.block_share = block_share
+        if oft_scaled:
+            # Register a persistent buffer to indicate this module uses Scaled OFT.
+            # This embeds the scaling configuration directly into the state_dict,
+            # allowing inference tools to automatically detect scaled oft.
+            self.register_buffer("scaled_oft", torch.tensor(True))
+        self.oft_scaled = oft_scaled
         self.use_cayley_neumann = use_cayley_neumann
         self.num_cayley_neumann_terms = num_cayley_neumann_terms
         # Create indices for upper triangle (excluding diagonal)
@@ -121,8 +130,11 @@ class OFTRotationModule(nn.Module):
 
         orig_shape = x.shape
 
+        scaling_factor = 2 * math.sqrt(self.block_size - 1) if self.oft_scaled else 1
+        effective_weight = self.weight / scaling_factor
+
         orth_rotate = self._cayley_batch(
-            self.weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms
+            effective_weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms
         )
         orth_rotate = self.dropout(orth_rotate)
 

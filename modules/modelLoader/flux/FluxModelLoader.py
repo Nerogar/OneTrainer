@@ -1,3 +1,4 @@
+import copy
 import os
 import traceback
 
@@ -58,23 +59,6 @@ class FluxModelLoader(
             include_text_encoder_2: bool,
             quantization: QuantizationConfig,
     ):
-        diffusers_sub = []
-        transformers_sub = []
-        if not transformer_model_name:
-            diffusers_sub.append("transformer")
-        if include_text_encoder_1:
-            transformers_sub.append("text_encoder")
-        if include_text_encoder_2:
-            transformers_sub.append("text_encoder_2")
-        if not vae_model_name:
-            diffusers_sub.append("vae")
-
-        self._prepare_sub_modules(
-            base_model_name,
-            diffusers_modules=diffusers_sub,
-            transformers_modules=transformers_sub,
-        )
-
         if include_text_encoder_1:
             tokenizer_1 = CLIPTokenizer.from_pretrained(
                 base_model_name,
@@ -156,7 +140,9 @@ class FluxModelLoader(
 
         model.model_type = model_type
         model.tokenizer_1 = tokenizer_1
+        model.orig_tokenizer_1 = copy.deepcopy(tokenizer_1)
         model.tokenizer_2 = tokenizer_2
+        model.orig_tokenizer_2 = copy.deepcopy(tokenizer_2)
         model.noise_scheduler = noise_scheduler
         model.text_encoder_1 = text_encoder_1
         model.text_encoder_2 = text_encoder_2
@@ -231,7 +217,9 @@ class FluxModelLoader(
 
         model.model_type = model_type
         model.tokenizer_1 = tokenizer_1
+        model.orig_tokenizer_1 = copy.deepcopy(tokenizer_1)
         model.tokenizer_2 = tokenizer_2
+        model.orig_tokenizer_2 = copy.deepcopy(tokenizer_2)
         model.noise_scheduler = pipeline.scheduler
         model.text_encoder_1 = text_encoder_1
         model.text_encoder_2 = text_encoder_2

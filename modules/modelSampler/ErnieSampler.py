@@ -20,6 +20,7 @@ from PIL import Image as PILImage
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.ERNIE)
 class ErnieSampler(BaseModelSampler):
     def __init__(
             self,
@@ -162,6 +163,3 @@ class ErnieSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-
-factory.register(BaseModelSampler, ErnieSampler, ModelType.ERNIE)

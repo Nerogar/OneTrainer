@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.QWEN, TrainingMethod.FINE_TUNE)
 class QwenFineTuneSetup(
     BaseQwenSetup,
 ):
@@ -97,5 +98,3 @@ class QwenFineTuneSetup(
             train_progress: TrainProgress
     ):
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, QwenFineTuneSetup, ModelType.QWEN, TrainingMethod.FINE_TUNE)
