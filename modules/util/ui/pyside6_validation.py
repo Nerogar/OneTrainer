@@ -40,7 +40,7 @@ class PySide6FieldValidator(BaseFieldValidator):
         self._debounce.timeout.connect(self._on_debounce_fire)
 
     def _apply_error(self) -> None:
-        self.component.setStyleSheet(f"border: 1px solid {ERROR_BORDER_COLOR};")
+        self.component.setStyleSheet(f"border: 2px solid {ERROR_BORDER_COLOR}; border-radius: 4px;")
 
     def _clear_error(self) -> None:
         self.component.setStyleSheet(self._original_style)

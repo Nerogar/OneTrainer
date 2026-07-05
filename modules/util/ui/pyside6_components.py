@@ -256,7 +256,7 @@ def path_entry(
     frame = QWidget(master)
     frame_lo = QGridLayout(frame)
     frame_lo.setContentsMargins(0, 0, 0, 0)
-    frame_lo.setSpacing(0)
+    frame_lo.setSpacing(2)
     frame_lo.setColumnStretch(0, 1)
     _add(_layout(master), frame, row, column, sticky="new", padx=0, pady=0, colspan=columnspan)
 
@@ -335,6 +335,7 @@ def path_entry(
 
     btn = QPushButton("...", frame)
     btn.setFixedWidth(40)
+    btn.setFixedHeight(entry_component.sizeHint().height())
     btn.clicked.connect(_open_dialog)
     frame_lo.addWidget(btn, 0, 1)
 
@@ -772,6 +773,7 @@ def section_frame(parent: QWidget, row: int, col: int = 0, colspan: int = 1) -> 
     from PySide6.QtWidgets import QFrame
     frame = QFrame(parent)
     frame.setFrameShape(QFrame.Shape.StyledPanel)
+    frame.setObjectName("section_frame")
     _layout(parent).addWidget(frame, row, col, 1, colspan)
     frame_lo = _layout(frame)
     frame_lo.setColumnStretch(0, 1)
