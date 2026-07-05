@@ -170,7 +170,8 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
         self.top_bar_component.save_default()
         self.concepts_tab.save_current_config()
         self.sampling_tab.save_current_config()
-        self.additional_embeddings_tab.save_current_config()
+        if self.additional_embeddings_tab:
+            self.additional_embeddings_tab.save_current_config()
 
     def show_validation_errors(self, errors: list[str]):
         bullet_list = "\n".join(f"• {e}" for e in errors)
@@ -261,6 +262,7 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
         self.cloud_tab = self.create_cloud_tab(self.tabview.add("cloud"))
 
         self.change_training_method(self.controller.train_config.training_method)
+        self._update_additional_embeddings_tab(self.controller.train_config.model_type)
 
         return frame
 
@@ -362,6 +364,20 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
 
         if self.lora_tab:
             self.lora_tab.refresh_ui()
+
+        self._update_additional_embeddings_tab(model_type)
+
+    def _update_additional_embeddings_tab(self, model_type: ModelType):
+        if not self.tabview:
+            return
+
+        # additional embeddings only apply to models that support embedding training
+        supported = TrainingMethod.EMBEDDING in model_type.supported_training_methods()
+        if not supported and "additional embeddings" in self.tabview._tab_dict:
+            self.tabview.delete("additional embeddings")
+            self.additional_embeddings_tab = None
+        elif supported and "additional embeddings" not in self.tabview._tab_dict:
+            self.additional_embeddings_tab = self.create_additional_embeddings_tab(self.tabview.add("additional embeddings"))
 
     def change_training_method(self, training_method: TrainingMethod):
         if not self.tabview:
