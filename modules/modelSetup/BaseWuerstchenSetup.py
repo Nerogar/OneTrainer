@@ -19,7 +19,6 @@ from modules.util.dtype_util import (
     disable_bf16_on_fp16_autocast_context,
     disable_fp16_autocast_context,
 )
-from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.quantization_util import quantize_layers
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
@@ -65,26 +64,14 @@ class BaseWuerstchenSetup(
             if model.prior_prior_lora is not None:
                 apply_circular_padding_to_conv2d(model.prior_prior_lora)
 
-        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().decoder_text_encoder,
-            config.weight_dtypes().decoder,
-            config.weight_dtypes().decoder_vqgan,
-            config.weight_dtypes().effnet_encoder,
-            config.weight_dtypes().text_encoder,
-            config.weight_dtypes().prior,
-            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-            config.weight_dtypes().embedding if config.train_any_embedding() else None,
-        ], config.enable_autocast_cache)
+        model.autocast_context, model.train_dtype = create_autocast_context(
+            self.train_device, config.train_dtype, config.enable_autocast_cache)
 
         if model.model_type.is_stable_cascade():
             model.prior_autocast_context, model.prior_train_dtype = disable_fp16_autocast_context(
                 self.train_device,
                 config.train_dtype,
                 config.fallback_train_dtype,
-                [
-                    config.weight_dtypes().prior,
-                    config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-                ],
                 config.enable_autocast_cache,
             )
         else:
