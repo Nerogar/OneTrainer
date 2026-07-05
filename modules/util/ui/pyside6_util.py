@@ -4,7 +4,7 @@ from abc import ABCMeta
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import QApplication, QStyleFactory, QWidget
 
 
 class QtABCMeta(type(QWidget), ABCMeta):
@@ -20,6 +20,10 @@ def create_application() -> QApplication:
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
     app = QApplication(sys.argv)
+    # Force Fusion everywhere: native styles (e.g. windowsvista) draw standard
+    # controls via OS theme APIs, which breaks once an application stylesheet
+    # is set, producing a flatter look than Fusion's own stylesheet-aware painting.
+    app.setStyle(QStyleFactory.create("Fusion"))
     app.styleHints().setColorScheme(Qt.ColorScheme.Light)
 
     palette = app.palette()
