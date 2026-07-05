@@ -8,7 +8,8 @@
     "compile": true,
     "transformer": {
         "train": true,
-        "weight_dtype": "INT_W8A8"
+        "weight_dtype": "INT_W8A8",
+        "offload_fraction": 0.1
     },
     "unconditional_transformer": {
         "weight_dtype": "NFLOAT_4",
