@@ -86,6 +86,7 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
 
         self._create_tabs()
         self.change_training_method(self.controller.train_config.training_method)
+        self._update_additional_embeddings_tab(self.controller.train_config.model_type)
 
         self._profiling_controller = ProfilingWindowController()
         self.profiling_window = self._profiling_controller.create_window(self, PySide6ProfilingWindowView)
@@ -329,6 +330,14 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
             self.training_tab.refresh_ui()
         if self.lora_tab:
             self.lora_tab.refresh_ui()
+        self._update_additional_embeddings_tab(model_type)
+
+    def _update_additional_embeddings_tab(self, model_type: ModelType):
+        # additional embeddings only apply to models that support embedding training
+        supported = TrainingMethod.EMBEDDING in model_type.supported_training_methods()
+        page = self._tab_widgets.get("additional embeddings")
+        if page is not None:
+            self.tabview.setTabVisible(self.tabview.indexOf(page), supported)
 
     def change_training_method(self, training_method: TrainingMethod):
         if not self.tabview:
