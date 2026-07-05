@@ -1,0 +1,14 @@
+# Legacy CUDA 12.6 build of PyTorch, for hosts whose NVIDIA driver is too old
+# for CUDA 13. Kept version-identical to requirements-cuda.txt; only the CUDA
+# build differs.
+
+# pytorch
+--extra-index-url https://download.pytorch.org/whl/cu126
+torch==2.12.0+cu126
+torchvision==0.27.0+cu126
+onnxruntime-gpu==1.23.2
+nvidia-nccl-cu12==2.29.3; sys_platform == "linux"
+triton-windows==3.7.0.post26; sys_platform == "win32"
+
+# optimizers
+bitsandbytes==0.49.1 # bitsandbytes for 8-bit optimizers and weight quantization
