@@ -26,7 +26,6 @@ class ModelTabController:
             or model_type.is_anima()
             or model_type.is_krea2()
             or model_type.is_hunyuan_video()
-            or model_type.is_ideogram()
         )
 
     def get_output_formats(self) -> list[tuple[str, ModelFormat]]:

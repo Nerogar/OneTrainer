@@ -105,7 +105,7 @@ class PixArtAlphaModel(BaseModel):
 
     def fusion_groups(self) -> list | None:
         # PixArt fuses TWO attentions differently: self-attention fuses q/k/v (3 leaves), while cross-attention
-        # fuses ONLY k/v (2 leaves) into kv_linear; fuse_split is arity-agnostic so both groups just work.
+        # fuses ONLY k/v (2 leaves) into kv_linear.
         return [
             ("transformer_blocks.{i}", ["attn1.to_q", "attn1.to_k", "attn1.to_v"], "attn1.qkv", "attn.qkv"),
             ("transformer_blocks.{i}", ["attn2.to_k", "attn2.to_v"], "attn2.kv", "cross_attn.kv_linear"),

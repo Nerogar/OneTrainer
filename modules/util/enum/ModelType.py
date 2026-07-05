@@ -129,6 +129,11 @@ class ModelType(Enum):
     def is_ideogram(self):
         return self == ModelType.IDEOGRAM_4
 
+    def supports_negative_prompt(self) -> bool:
+        # asymmetric dual-network CFG models drive the negative branch from a frozen unconditional network (or an
+        # empty prompt), not a user-supplied negative prompt
+        return not self.is_ideogram()
+
     def has_mask_input(self) -> bool:
         return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \
             or self == ModelType.STABLE_DIFFUSION_20_INPAINTING \
@@ -212,11 +217,6 @@ class ModelType(Enum):
         return tuple(part for part in _MODEL_PARTS[self] if part.startswith("text_encoder"))
 
     def supported_lora_formats(self) -> list[ModelFormat]:
-        # LoRA output formats this model can produce, in UI display order. Every model supports the four
-        # clean target namespaces; LEGACY (the per-model historical output) is offered only by the models that
-        # actually shipped one, the stable set listed here. HiDream (OMI), Sana and Wuerstchen v2 are excluded
-        # because their only historical output was a never-loadable format, and any model added after the clean
-        # formats never had a legacy output at all. Kept in sync with the per-model LoRASaver._convert_legacy.
         formats = [
             ModelFormat.DIFFUSERS_LORA,
             ModelFormat.KOHYA_LORA,
@@ -240,8 +240,6 @@ class ModelType(Enum):
         return formats
 
     def supported_full_model_formats(self) -> list[ModelFormat]:
-        # Full-model output formats this model can produce, in UI display order. Z-Image additionally offers
-        # COMFY_TRANSFORMER (ORIGINAL_TRANSFORMER + Comfy key quirks, ComfyUI #12303).
         formats = [ModelFormat.DIFFUSERS]
         if self.is_stable_diffusion() or self.is_stable_diffusion_xl() or self.is_stable_diffusion_3():
             formats.append(ModelFormat.ORIGINAL_SINGLE_FILE)
@@ -251,9 +249,6 @@ class ModelType(Enum):
             formats.append(ModelFormat.ORIGINAL_TRANSFORMER)
         if self.is_z_image():
             formats.append(ModelFormat.COMFY_TRANSFORMER)
-        # LEGACY (the historical full-model safetensors layout) is offered only by the models that shipped one,
-        # the stable set listed here. Sana and Wuerstchen v2 never had a loadable one, and any model added after
-        # the clean formats never had a legacy output at all.
         has_legacy = self.is_stable_diffusion() \
             or self.is_stable_diffusion_xl() \
             or self.is_stable_diffusion_3() \

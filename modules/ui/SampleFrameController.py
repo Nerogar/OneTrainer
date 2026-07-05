@@ -17,4 +17,4 @@ class SampleFrameController:
         return self.model_type.is_video_model()
 
     def supports_negative_prompt(self) -> bool:
-        return not self.model_type.is_ideogram()
+        return self.model_type.supports_negative_prompt()

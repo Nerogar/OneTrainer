@@ -143,19 +143,9 @@ class BaseIdeogramSetup(
                 text_lengths, grid_h, grid_w, max_text_tokens, self.train_device,
             )
 
-            # encode_text returns front-aligned features, but prepare_packed_ids places the text at the END of the text
-            # block (left-pad). Align each sample's features to those slots before concatenating the image padding.
-            aligned_text_features = torch.zeros_like(text_encoder_output)
-            for b, num_text in enumerate(text_lengths):
-                num_text = int(num_text)
-                aligned_text_features[b, max_text_tokens - num_text:] = text_encoder_output[b, :num_text]
-
+            # encode_text already returns features left-aligned to this layout, so pack them directly
             dtype = model.train_dtype.torch_dtype()
-            image_feature_padding = torch.zeros(
-                batch_size, num_image_tokens, aligned_text_features.shape[-1],
-                dtype=aligned_text_features.dtype, device=self.train_device,
-            )
-            llm_features = torch.cat([aligned_text_features, image_feature_padding], dim=1).to(dtype)
+            llm_features = model.pack_llm_features(text_encoder_output, num_image_tokens).to(dtype)
 
             # hidden states: zero latents over the text positions, the noisy image latents over the image positions
             text_z_padding = torch.zeros(

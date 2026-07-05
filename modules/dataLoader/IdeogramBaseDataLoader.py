@@ -35,7 +35,7 @@ class IdeogramBaseDataLoader(
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=0.125)
 
         # Ideogram wraps each prompt in the Qwen chat template (mirrors Ideogram4Pipeline.encode_prompt / encode_text).
-        # EncodeIdeogramText uses a plain arange for RoPE positions and encode_text trims [:, :max] from the front,
+        # EncodeIdeogramText uses a plain arange for RoPE positions, and encode_text left-aligns by reading [:, :n],
         # both of which require the real tokens to come first — relies on the tokenizer's default right-padding.
         tokenize_prompt = Tokenize(
             in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask',

@@ -703,8 +703,9 @@ class BaseTrainingTabView(ABC):
 
         # include unconditional transformer
         self.components.label(frame, row, 0, "Include Unconditional Transformer",
-                              tooltip="Loads the unconditional transformer, needed for CFG values above 1.0 during sampling. "
-                                      "If disabled, only CFG 1.0 sampling is possible, but VRAM and load time are reduced")
+                              tooltip="Loads the dedicated unconditional transformer used for the negative branch of CFG "
+                                      "during sampling. If disabled, CFG above 1.0 still works by running an empty prompt "
+                                      "through the conditional transformer instead, at reduced VRAM and load time")
         self.components.switch(frame, row, 1, ui_state, "unconditional_transformer.include")
         row += 1
 

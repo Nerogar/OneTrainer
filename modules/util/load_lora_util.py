@@ -221,13 +221,6 @@ def normalize_namespace(
     return state_dict, family
 
 
-def _denoising_body_conversion(component: str, top: str, body: list | None) -> list:
-    # the denoising component's canonical prefix mapped to `top` (the component itself for original, "lora_unet"
-    # for kohya), applying `body`. Mirrors the savers' head entry (component_body_conversion with no TE extras);
-    # a multi-pass body is emitted as chained passes there, and reverse_conversion inverts it pass by pass.
-    return component_body_conversion(component, top, body)
-
-
 def _partition_denoising(
         state_dict: dict[str, Tensor],
         text_encoder_prefixes: list[str],
@@ -260,7 +253,7 @@ def reverse_original(
     # out (the strict denoising-body reverse would otherwise reject them) and pass through unchanged.
     denoising, passthrough = _partition_denoising(state_dict, text_encoder_prefixes)
     denoising = convert(denoising, add_prefix(component), strict=False)
-    denoising = convert(denoising, reverse_conversion(_denoising_body_conversion(component, component, body)), strict=True)
+    denoising = convert(denoising, reverse_conversion(component_body_conversion(component, component, body)), strict=True)
     return denoising | passthrough
 
 
@@ -283,7 +276,7 @@ def reverse_comfy(
         state_dict = convert(state_dict, [(comfy, canonical) for canonical, comfy in comfy_te_prefixes.items()], strict=False)
     denoising, passthrough = _partition_denoising(state_dict, text_encoder_prefixes)
     denoising = convert(denoising, [("diffusion_model", component)], strict=False)
-    denoising = convert(denoising, reverse_conversion(_denoising_body_conversion(component, component, body)), strict=True)
+    denoising = convert(denoising, reverse_conversion(component_body_conversion(component, component, body)), strict=True)
     return denoising | passthrough
 
 
@@ -395,7 +388,7 @@ def native_module_keys_from_names(
     # <native>"). For an identity body and no fusion groups this is just the renamed canonical paths.
     names = collapse_fusion_groups(set(names), fusion_groups)
     canonical = {(f"{component}.{name}" if component else name): None for name in names}  # names only; no tensors
-    renamed = convert(canonical, _denoising_body_conversion(component, top, body), strict=True)
+    renamed = convert(canonical, component_body_conversion(component, top, body), strict=True)
     return set(renamed.keys())
 
 
@@ -456,7 +449,7 @@ def to_canonical(
         denoising_modules = {_split_value_suffix(k[len(denoising_prefix):])[0]
                              for k in denoising if k.startswith(denoising_prefix)}
         if not denoising_modules.issubset(module_names[component]):
-            denoising = convert(denoising, reverse_conversion(_denoising_body_conversion(component, component, original_conversion)), strict=False)
+            denoising = convert(denoising, reverse_conversion(component_body_conversion(component, component, original_conversion)), strict=False)
         return denoising | passthrough
     te_prefixes = [prefix for prefix, _kohya_prefix in text_encoders]
     if family == "unprefixed":

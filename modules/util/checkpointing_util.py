@@ -101,7 +101,7 @@ class CheckpointLayer(BaseCheckpointLayer):
             return self.__orig(*args, **kwargs)
 
 class OffloadCheckpointLayer(BaseCheckpointLayer):
-    def __init__(self, orig_module: nn.Module, orig_forward, train_device: torch.device, conductor: LayerOffloadConductor, layer_index: int):
+    def __init__(self, orig_module: nn.Module, orig_forward, train_device: torch.device, conductor: LayerOffloadConductor, layer_index: int, checkpointing: bool):
         super().__init__()
 
         assert (orig_module is None or orig_forward is None) and not (orig_module is None and orig_forward is None)
@@ -111,6 +111,7 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
         self.dummy = torch.zeros((1,), device=train_device, requires_grad=True)
         self.conductor = conductor
         self.layer_index = layer_index
+        self.checkpointing = checkpointing
 
     def __deepcopy__(self, memo):
         # conductor holds torch.cuda.Stream/Event objects that cannot be deep-copied or pickled.
@@ -145,6 +146,12 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
         call_id = _generate_call_index()
         args = _kwargs_to_args(self.orig_forward if self.checkpoint is None else self.checkpoint.forward, args, kwargs)
         if torch.is_grad_enabled():
+            # a backward will flow through this layer (grad enabled), so offloading needs use_reentrant=True
+            # checkpointing to move the offloaded tensors back during recompute. Fail loud rather than silently
+            # enabling checkpointing the part disabled. Under no_grad (e.g. sampling a frozen part) the branch
+            # below offloads without checkpointing.
+            if not self.checkpointing:
+                raise NotImplementedError("offloading requires gradient checkpointing")
             return torch.utils.checkpoint.checkpoint(
                 self.__checkpointing_forward,
                 self.dummy,
@@ -178,20 +185,19 @@ def create_checkpoint(
         conductor.add_layer(orig_module, included_offload_param_indices)
 
     if conductor is not None and conductor.offload_activated():
-        # offloading is structurally coupled to use_reentrant=True checkpointing during the back pass:
-        # the recompute is the only thing firing before_layer/after_layer in the backward direction, so
-        # both layer and activation offloading need checkpointing to move tensors back for backward.
-        # Rather than silently forcing checkpointing on when the part disabled it, reject the combination.
-        if not checkpointing:
-            raise NotImplementedError("offloading currently requires gradient checkpointing")
+        # offloading is structurally coupled to use_reentrant=True checkpointing during the back pass: the
+        # recompute is the only thing firing before_layer/after_layer in the backward direction, so both layer
+        # and activation offloading need checkpointing to move tensors back for backward. That coupling only
+        # matters when a backward actually flows, so OffloadCheckpointLayer.forward enforces it per call (fail
+        # loud under grad, offload freely under no_grad) instead of rejecting the frozen/inference case here.
         if compile:
-            layer = OffloadCheckpointLayer(orig_module=orig_module, orig_forward=None, train_device=train_device, conductor=conductor, layer_index=layer_index)
+            layer = OffloadCheckpointLayer(orig_module=orig_module, orig_forward=None, train_device=train_device, conductor=conductor, layer_index=layer_index, checkpointing=checkpointing)
             #don't compile the checkpointing layer - offloading cannot be compiled:
             orig_module.compile(fullgraph=True)
             return layer
         else:
             #only patch forward() if possible. Inserting layers is necessary for torch.compile, but causes issues with at least 1 text encoder model. we don't compile text encoders
-            layer = OffloadCheckpointLayer(orig_module=None, orig_forward=orig_module.forward, train_device=train_device, conductor=conductor, layer_index=layer_index)
+            layer = OffloadCheckpointLayer(orig_module=None, orig_forward=orig_module.forward, train_device=train_device, conductor=conductor, layer_index=layer_index, checkpointing=checkpointing)
             orig_module.forward = layer.forward
             return orig_module
     else:
@@ -246,6 +252,14 @@ def enable_checkpointing(
     offload = offload_enabled and part.offloading_enabled()
     conductor = LayerOffloadConductor(model, config, part) if offload else None
     checkpointing = part.checkpointing_enabled()
+
+    # a trained part always has grad flowing through it, so offloading without checkpointing is guaranteed to hit
+    # OffloadCheckpointLayer.forward's fail-loud path. Reject it here so the misconfiguration surfaces at setup
+    # instead of the first training step. Frozen parts (part.train == False) are left to the per-call check: e.g.
+    # Ideogram's unconditional transformer runs only under no_grad during sampling, so it offloads without
+    # checkpointing there, while a frozen denoiser/TE still fails loud when a trained embedding routes grad through it.
+    if offload and not checkpointing and part.train:
+        raise NotImplementedError("offloading requires gradient checkpointing")
 
     layer_index = 0
     for type_or_list, param_names in lists:

@@ -78,19 +78,14 @@ class IdeogramSampler(BaseModelSampler):
             grid_w = width // (vae_scale_factor * patch_size)
             num_image_tokens = grid_h * grid_w
 
-            # build the packed [text][image] conditioning for a single text encode (no left pad for a single
-            # prompt). Padding positions are masked out by segment_ids/indicator, so packing to the actual text
-            # length matches the 2048-pad pipeline.
+            # build the packed [text][image] conditioning for a single text encode. Padding positions are masked
+            # out by segment_ids/indicator, so packing to the actual text length matches the 2048-pad pipeline.
             def pack_conditioning(text_features: torch.Tensor, text_lengths: torch.Tensor) -> tuple:
                 max_text_tokens = text_features.shape[1]
                 position_ids, segment_ids, indicator = self.model.prepare_packed_ids(
                     text_lengths, grid_h, grid_w, max_text_tokens, self.train_device,
                 )
-                image_feature_padding = torch.zeros(
-                    text_features.shape[0], num_image_tokens, text_features.shape[-1],
-                    dtype=text_features.dtype, device=self.train_device,
-                )
-                llm_features = torch.cat([text_features, image_feature_padding], dim=1).to(dtype)
+                llm_features = self.model.pack_llm_features(text_features, num_image_tokens).to(dtype)
                 text_z_padding = torch.zeros(
                     text_features.shape[0], max_text_tokens, latent_dim, dtype=dtype, device=self.train_device,
                 )
@@ -115,6 +110,7 @@ class IdeogramSampler(BaseModelSampler):
                     max_neg_text_tokens, neg_position_ids, neg_segment_ids, neg_indicator, neg_llm_features,
                     neg_text_z_padding,
                 ) = pack_conditioning(neg_text_features, neg_text_lengths)
+                del neg_text_features
             self.model.text_encoder_to(self.temp_device)
             torch_gc()
 
@@ -134,9 +130,8 @@ class IdeogramSampler(BaseModelSampler):
                 generator=generator, device=self.train_device, dtype=torch.float32,
             )
 
-            # dead after this point but stays as a local for the rest of the function (the denoising loop + VAE
-            # decode); freeing it here closes the gap on the OOM observed in llm_cond_norm's fp32 variance upcast
-            # of neg_llm_features.
+            # free before the denoising loop; closes the gap on the OOM observed in llm_cond_norm's fp32 variance
+            # upcast of neg_llm_features
             del text_features
 
             # resolution-aware logit-normal Euler schedule (pipeline overrides the scheduler's default sigmas)
@@ -147,7 +142,7 @@ class IdeogramSampler(BaseModelSampler):
             num_train_timesteps = noise_scheduler.config.num_train_timesteps
 
             self.model.transformer_to(self.train_device)
-            if use_cfg:
+            if use_unconditional_transformer:
                 self.model.unconditional_transformer_to(self.train_device)
 
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):

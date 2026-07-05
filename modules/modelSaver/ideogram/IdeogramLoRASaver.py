@@ -1,8 +1,6 @@
 from modules.model.IdeogramModel import IdeogramModel
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
-from modules.util.enum.ModelFormat import ModelFormat
 
-import torch
 from torch import Tensor
 
 
@@ -23,12 +21,3 @@ class IdeogramLoRASaver(
         if model.lora_state_dict is not None:
             state_dict |= model.lora_state_dict
         return state_dict
-
-    def save(
-            self,
-            model: IdeogramModel,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
-    ):
-        self._save(model, output_model_format, output_model_destination, dtype)

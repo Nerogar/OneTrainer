@@ -367,7 +367,6 @@ def swap_chunks(input: torch.Tensor, dim: int=0) -> torch.Tensor:
     chunks = input.chunk(2, dim=dim)
     return torch.cat([chunks[1], chunks[0]], dim=dim)
 
-
 def swap_dora_scale_chunks(input: torch.Tensor) -> torch.Tensor:
     # swap the output-dim chunks of a DoRA magnitude on a chunk-swapped layer (see chunk_swap). A per-output
     # dora_scale ([out, 1] / [out, 1, 1, 1]) carries the output dim on axis 0 and is swapped; a per-input

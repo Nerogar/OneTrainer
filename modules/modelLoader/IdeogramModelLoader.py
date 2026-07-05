@@ -11,8 +11,6 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 
-import torch
-
 from diffusers import (
     AutoencoderKLFlux2,
     FlowMatchEulerDiscreteScheduler,
@@ -26,20 +24,6 @@ class IdeogramModelLoader(
 ):
     def __init__(self):
         super().__init__()
-
-    @staticmethod
-    def __make_rotary_autocast_safe(transformer: Ideogram4Transformer2DModel):
-        # Under bfloat16 autocast, Ideogram4MRoPE's matmul-based rotary frequencies collapse at the large
-        # image-position offsets, losing all spatial information (flat-color output). Force float32 here.
-        # https://github.com/huggingface/diffusers/issues/13920
-        rotary = transformer.rotary_emb
-        orig_forward = rotary.forward
-
-        def forward(position_ids: torch.Tensor):
-            with torch.autocast(device_type=position_ids.device.type, enabled=False):
-                return orig_forward(position_ids)
-
-        rotary.forward = forward
 
     def __load_internal(
             self,
@@ -84,11 +68,8 @@ class IdeogramModelLoader(
                 "unconditional_transformer",
                 quantization,
             )
-            self.__make_rotary_autocast_safe(unconditional_transformer)
         else:
             unconditional_transformer = None
-
-        self.__make_rotary_autocast_safe(transformer)
 
         text_encoder = self._load_transformers_sub_module(
             Qwen3VLModel,

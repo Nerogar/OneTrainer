@@ -95,16 +95,13 @@ class IdeogramModel(BaseModel):
         self.vae.to(device=device)
 
     def text_encoder_to(self, device: torch.device):
-        if self.text_encoder is not None:
-            if self.text_encoder_offload_conductor is not None and \
-                    self.text_encoder_offload_conductor.layer_offload_activated():
-                self.text_encoder_offload_conductor.to(device)
-            else:
-                self.text_encoder.to(device=device)
+        if self.text_encoder_offload_conductor is not None:
+            self.text_encoder_offload_conductor.to(device)
+        else:
+            self.text_encoder.to(device=device)
 
     def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None and \
-                self.transformer_offload_conductor.layer_offload_activated():
+        if self.transformer_offload_conductor is not None:
             self.transformer_offload_conductor.to(device)
         else:
             self.transformer.to(device=device)
@@ -114,8 +111,7 @@ class IdeogramModel(BaseModel):
 
     def unconditional_transformer_to(self, device: torch.device):
         if self.unconditional_transformer is not None:
-            if self.unconditional_transformer_offload_conductor is not None and \
-                    self.unconditional_transformer_offload_conductor.layer_offload_activated():
+            if self.unconditional_transformer_offload_conductor is not None:
                 self.unconditional_transformer_offload_conductor.to(device)
             else:
                 self.unconditional_transformer.to(device=device)
@@ -128,8 +124,7 @@ class IdeogramModel(BaseModel):
 
     def eval(self):
         self.vae.eval()
-        if self.text_encoder is not None:
-            self.text_encoder.eval()
+        self.text_encoder.eval()
         self.transformer.eval()
         if self.unconditional_transformer is not None:
             self.unconditional_transformer.eval()
@@ -180,7 +175,7 @@ class IdeogramModel(BaseModel):
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
             tokens_mask = tokenizer_output.attention_mask.to(self.text_encoder.device)
 
-        if text_encoder_output is None and self.text_encoder is not None:
+        if text_encoder_output is None:
             with self.text_encoder_autocast_context:
                 # Mirrors Ideogram4Pipeline.encode_prompt: text-only MRoPE shares the linear token position across
                 # all 3 axes, so a plain arange is the position_ids for the real tokens.
@@ -198,8 +193,19 @@ class IdeogramModel(BaseModel):
         text_encoder_output = text_encoder_output * tokens_mask.to(text_encoder_output.dtype).unsqueeze(-1)
 
         text_lengths = tokens_mask.sum(dim=1).long()
-        text_encoder_output = text_encoder_output[:, :text_lengths.max().item(), :]
-        return text_encoder_output, text_lengths
+
+        # Left-align each sample's real tokens to the END of the text block, matching the [left-pad][text][image]
+        # layout that prepare_packed_ids (Ideogram4Pipeline._prepare_ids) builds. The transformer masks padding via
+        # segment_ids, so the padding's sequence position is otherwise irrelevant; aligning to the ids' convention here
+        # lets every caller pack the features directly, with no second alignment pass (the single-prompt sampler has
+        # offset 0, so this is a no-op there). Real tokens are front-aligned coming in (right-padded tokenizer output).
+        max_text_tokens = int(text_lengths.max().item())
+        aligned_output = text_encoder_output.new_zeros(
+            text_encoder_output.shape[0], max_text_tokens, text_encoder_output.shape[-1],
+        )
+        for b, num_text in enumerate(text_lengths.tolist()):
+            aligned_output[b, max_text_tokens - num_text:] = text_encoder_output[b, :num_text]
+        return aligned_output, text_lengths
 
     @staticmethod
     def patchify_latents(latents: torch.Tensor) -> torch.Tensor:
@@ -224,6 +230,18 @@ class IdeogramModel(BaseModel):
         return Ideogram4Pipeline._prepare_ids(text_lengths, grid_h, grid_w, max_text_tokens, device)
 
     @staticmethod
+    def pack_llm_features(text_features: Tensor, num_image_tokens: int) -> Tensor:
+        # Assemble the packed [text][image] conditioning: the image positions carry zeroed text features (they are
+        # conditioned via position_ids/segment_ids/indicator, not features). Mirrors Ideogram4Pipeline.encode_prompt.
+        # The caller supplies text_features already aligned to the target layout (front-aligned for the single-prompt
+        # sampler, left-padded for the batched training predict).
+        image_feature_padding = torch.zeros(
+            text_features.shape[0], num_image_tokens, text_features.shape[-1],
+            dtype=text_features.dtype, device=text_features.device,
+        )
+        return torch.cat([text_features, image_feature_padding], dim=1)
+
+    @staticmethod
     def unpatchify_latents(latents: torch.Tensor, grid_h: int, grid_w: int) -> torch.Tensor:
         # packed (B, L, C * 4) -> (B, C, H, W). Mirrors Ideogram4Pipeline.__call__'s decode unpatchify.
         b, _l, cp = latents.shape
@@ -234,6 +252,8 @@ class IdeogramModel(BaseModel):
 
     def scale_latents(self, latents: Tensor) -> Tensor:
         # Operates on packed (B, L, C * 4); vae.bn stats are per packed-channel, so (C*4,) broadcasts on the last dim.
+        # Same batch-norm de/normalization as Flux2Model.scale_latents (same AutoencoderKLFlux2), duplicated here only
+        # because that copy uses the unpacked (1, -1, 1, 1) broadcast; matches Ideogram4Pipeline.__call__'s bn scaling.
         mean = self.vae.bn.running_mean.view(1, 1, -1).to(latents.device, latents.dtype)
         std = torch.sqrt(
             self.vae.bn.running_var.view(1, 1, -1) + self.vae.config.batch_norm_eps
