@@ -16,7 +16,8 @@ class ModelTabController:
     def supports_override_transformer(self) -> bool:
         model_type = self.train_config.model_type
         # The transformer override path exists only for these architectures; SD3, PixArt, Sana
-        # and HiDream have a transformer but expose no override field.
+        # and HiDream have a transformer but expose no override field. Krea2 and Ideogram are
+        # excluded because their diffusers transformer classes don't support from_single_file.
         return (
             model_type.is_flux()
             or model_type.is_z_image()
@@ -24,7 +25,6 @@ class ModelTabController:
             or model_type.is_chroma()
             or model_type.is_qwen()
             or model_type.is_anima()
-            or model_type.is_krea2()
             or model_type.is_hunyuan_video()
         )
 
