@@ -16,10 +16,25 @@ repos:
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.15.17
   hooks:
-    # Run the Ruff linter, but not the formatter.
     - id: ruff
       args: ["--fix"]
       types_or: [ python, pyi, jupyter ]
+
+- repo: local
+  hooks:
+    - id: eslint
+      name: ESLint (frontend)
+      entry: python -m web.scripts.run_eslint
+      language: system
+      files: '^web/gui/.*\.(ts|tsx)$'
+      pass_filenames: false
+
+    - id: check-hardcoded-dropdown-options
+      name: No hardcoded <Select options> outside types/generated/
+      entry: python -m web.scripts.check_hardcoded_options
+      language: system
+      files: '^web/gui/src/renderer/.*\.(ts|tsx)$'
+      pass_filenames: false
 
 ci:
   autofix_prs: false

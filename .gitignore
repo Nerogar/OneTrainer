@@ -20,6 +20,8 @@ debug*.py
 config.json
 secrets.json
 *.zip
+.env*
+!.env.example
 
 # environments
 /.venv*
@@ -38,3 +40,14 @@ pixi.toml
 train.bat
 debug_report.log
 config_diff.txt
+
+# Web UI
+web/gui/dist/
+web/gui/release/
+web/gui/node_modules/
+web/gui/public/ui-schema.json
+web/gui/src/renderer/types/generated/
+web/gui/.vite-port
+web/backend/__pycache__/
+web/backend/**/__pycache__/
+web/backend/generated/

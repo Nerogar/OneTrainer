@@ -141,6 +141,41 @@ if errorlevel 1 (
     goto :end_error
 )
 
+REM Regenerate UI schema and rebuild web UI if previously built
+echo.
+echo Generating UI schema...
+"%PYTHON%" -m web.scripts.generate_ui_schema
+if errorlevel 1 (
+  echo WARNING: UI schema generation failed. Using existing schema.
+)
+REM Reset errorlevel so schema failure does not affect exit code
+cmd /c "exit /b 0"
+
+where node >NUL 2>NUL
+if errorlevel 1 (
+  echo Node.js not found. Skipping web UI rebuild.
+) else (
+  if exist "web\gui\dist\main\main\index.cjs" (
+    echo Rebuilding web UI...
+    pushd web\gui
+    call npm install
+    if errorlevel 1 (
+      echo WARNING: npm install failed. Web UI may be stale.
+      popd
+      goto :end_success
+    )
+    call npm run build:electron
+    if errorlevel 1 (
+      echo WARNING: Web UI rebuild failed. Web UI may be stale.
+    ) else (
+      echo Web UI rebuilt successfully.
+    )
+    popd
+  ) else (
+    echo Web UI not previously built. Run start-web-ui.bat to launch.
+  )
+)
+
 :end_success
 echo.
 echo ***********

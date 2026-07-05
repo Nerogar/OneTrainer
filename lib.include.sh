@@ -444,4 +444,39 @@ function prepare_runtime_environment {
     else
         install_requirements_in_active_env_if_necessary
     fi
+
+    # Regenerate the web UI schema and rebuild the Electron bundle when possible.
+    print "Generating UI schema..."
+    if ! run_python_in_active_env -m web.scripts.generate_ui_schema; then
+        print_warning "UI schema generation failed. Using existing schema."
+    fi
+
+    build_web_ui_if_available
+}
+
+# Builds the Electron+React web UI when Node.js is available.
+# During "install" runs it builds unconditionally; otherwise only rebuilds
+# when a previously built bundle is detected, so regular headless users
+# are not forced to install Node.js.
+function build_web_ui_if_available {
+    if ! command -v node &> /dev/null; then
+        print "Node.js not found. Skipping web UI build."
+        print "To use the web UI, install Node.js from https://nodejs.org/"
+        return 0
+    fi
+
+    local gui_dir="${SCRIPT_DIR}/web/gui"
+    local dist_marker="${gui_dir}/dist/main/main/index.cjs"
+
+    if [[ -f "${dist_marker}" ]] || [[ "${1:-}" == "install" ]]; then
+        print "Building web UI..."
+        (
+            cd "${gui_dir}"
+            npm install || { print_warning "npm install failed. Web UI may be stale."; return 0; }
+            npm run build:electron || { print_warning "Web UI build failed. Web UI may be stale."; return 0; }
+            print "Web UI built successfully."
+        )
+    else
+        print "Web UI not previously built. Run start-web-ui.sh to build and launch."
+    fi
 }

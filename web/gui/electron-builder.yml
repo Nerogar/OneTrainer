@@ -1,0 +1,62 @@
+appId: com.onetrainer.app
+productName: OneTrainer
+copyright: Copyright © 2024-2026 OneTrainer Contributors
+
+directories:
+  output: release
+
+files:
+  - dist/**/*
+  - node_modules/**/*
+  - "!node_modules/**/*.map"
+  - "!node_modules/**/test/**"
+  - "!node_modules/**/tests/**"
+  - "!node_modules/**/*.md"
+
+extraResources:
+  - from: ../../modules/
+    to: modules/
+    filter:
+      - "**/*"
+      - "!**/__pycache__/**"
+      - "!**/*.pyc"
+  - from: ../../scripts/
+    to: scripts/
+    filter:
+      - "**/*"
+      - "!**/__pycache__/**"
+      - "!**/*.pyc"
+  - from: ../../training_presets/
+    to: training_presets/
+    filter:
+      - "**/*.json"
+  - from: ../backend/
+    to: web/backend/
+    filter:
+      - "**/*.py"
+  - from: ../../requirements.txt
+    to: requirements.txt
+
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+  icon: ../../resources/icons/icon.ico
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  icon: ../../resources/icons/icon.png
+  category: public.app-category.developer-tools
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  icon: ../../resources/icons/icon.png
+  category: Development

@@ -273,6 +273,38 @@ if errorlevel 1 (
     echo %GRN%CUDA is available.%RESET%
 )
 
+rem 7) Generate UI schema and build web UI
+echo.
+echo %CYAN%Generating UI schema...%RESET%
+python -m web.scripts.generate_ui_schema
+if errorlevel 1 (
+  echo %YEL%WARNING: UI schema generation failed. Using existing schema.%RESET%
+)
+
+echo.
+where node >NUL 2>NUL
+if errorlevel 1 (
+  echo %YEL%Node.js not found. Skipping web UI build.%RESET%
+  echo To use the web UI, install Node.js from https://nodejs.org/ and re-run install.bat
+) else (
+  echo %CYAN%Building web UI...%RESET%
+  pushd web\gui
+  call npm install
+  if errorlevel 1 (
+    echo %YEL%WARNING: npm install failed. Web UI will not be available.%RESET%
+    popd
+    goto :skip_web_build
+  )
+  call npm run build:electron
+  if errorlevel 1 (
+    echo %YEL%WARNING: Web UI build failed. Web UI will not be available.%RESET%
+  ) else (
+    echo %GRN%Web UI built successfully.%RESET%
+  )
+  popd
+)
+:skip_web_build
+
 echo.
 echo %GRN%**** Install successful^^! ****%RESET%
 echo.

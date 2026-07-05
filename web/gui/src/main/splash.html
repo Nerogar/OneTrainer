@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
+<title>OneTrainer</title>
+<style>
+  /* Canonical boot-splash palette — hardcoded because the splash loads
+     before the renderer bundle (and its design tokens) exist. Mirrors
+     web/gui/src/shared/brandColors.ts. */
+  :root {
+    --cobalt-600: #2563EB;
+    --azure-500: #38BDF8;
+    --navy-800: #1E3A5F;
+    --bg-base: #0B1120;
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    --accent-negative: #F87171;
+    --track: rgba(255, 255, 255, 0.08);
+    --gradient-bottom: rgba(11, 17, 32, 0.92);
+    --gradient-top: rgba(11, 17, 32, 0);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+    user-select: none;
+    -webkit-app-region: drag;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .noise-overlay {
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .svg-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1;
+    animation: fadeIn 800ms ease-out;
+  }
+
+  .content-bottom {
+    position: relative;
+    z-index: 2;
+    padding: 0 40px 30px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    animation: fadeIn 600ms ease-out 200ms both;
+    background: linear-gradient(to top, var(--gradient-bottom) 0%, var(--gradient-top) 100%);
+  }
+
+  .progress-track {
+    width: 100%;
+    height: 2px;
+    background: var(--track);
+    margin-bottom: 8px;
+    border-radius: 9999px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--cobalt-600), var(--azure-500));
+    transition: width 300ms ease-out;
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.35);
+  }
+
+  .progress-fill.error {
+    background: var(--accent-negative);
+    box-shadow: 0 0 8px rgba(248, 113, 113, 0.4);
+    width: 100% !important;
+  }
+
+  .brand-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+  }
+
+  .accent-text {
+    background: linear-gradient(135deg, var(--cobalt-600), var(--azure-500));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .status-message {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-family: "JetBrains Mono", "SF Mono", "Roboto Mono", Consolas, monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .status-message.error {
+    color: var(--accent-negative);
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @keyframes scrollWave {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-320px); }
+  }
+
+  .wave-back {
+    animation: scrollWave 26s linear infinite;
+  }
+  .wave-mid {
+    animation: scrollWave 19s linear infinite reverse;
+  }
+  .wave-front {
+    animation: scrollWave 13s linear infinite;
+  }
+
+  .wave-fill {
+    fill: url(#splashGrad);
+  }
+  .wave-line {
+    fill: none;
+    stroke: url(#splashGrad);
+    stroke-width: 2;
+    stroke-linejoin: round;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="noise-overlay"></div>
+
+  <!-- Decorative artwork: three drifting training-metric traces (loss/reward
+       style jagged lines), evoking ML data rather than literal ocean waves. -->
+  <div class="svg-container">
+    <svg
+      width="100%"
+      height="100%"
+      viewBox="0 0 640 360"
+      preserveAspectRatio="xMidYMid slice"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        <linearGradient id="splashGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#2563EB" />
+          <stop offset="100%" stop-color="#38BDF8" />
+        </linearGradient>
+      </defs>
+
+      <!-- static chart gridlines -->
+      <g stroke="#FFFFFF" stroke-width="1" opacity="0.05">
+        <line x1="0" y1="140" x2="640" y2="140" />
+        <line x1="0" y1="200" x2="640" y2="200" />
+        <line x1="0" y1="260" x2="640" y2="260" />
+        <line x1="0" y1="320" x2="640" y2="320" />
+      </g>
+
+      <g class="wave-back" opacity="0.06">
+        <path class="wave-fill" opacity="0.10"
+          d="M-320,223 L-240,257 L-160,229 L-80,251 L0,223 L80,257 L160,229 L240,251 L320,223 L400,257 L480,229 L560,251 L640,223 L720,257 L800,229 L880,251 L960,223 L960,360 L-320,360 Z" />
+        <path class="wave-line"
+          d="M-320,223 L-240,257 L-160,229 L-80,251 L0,223 L80,257 L160,229 L240,251 L320,223 L400,257 L480,229 L560,251 L640,223 L720,257 L800,229 L880,251 L960,223" />
+      </g>
+
+      <g class="wave-mid" opacity="0.08">
+        <path class="wave-fill" opacity="0.14"
+          d="M-320,250 L-240,280 L-160,254 L-80,294 L0,250 L80,280 L160,254 L240,294 L320,250 L400,280 L480,254 L560,294 L640,250 L720,280 L800,254 L880,294 L960,250 L960,360 L-320,360 Z" />
+        <path class="wave-line"
+          d="M-320,250 L-240,280 L-160,254 L-80,294 L0,250 L80,280 L160,254 L240,294 L320,250 L400,280 L480,254 L560,294 L640,250 L720,280 L800,254 L880,294 L960,250" />
+      </g>
+
+      <g class="wave-front" opacity="0.11">
+        <path class="wave-fill" opacity="0.20"
+          d="M-320,286 L-240,318 L-160,278 L-80,312 L0,286 L80,318 L160,278 L240,312 L320,286 L400,318 L480,278 L560,312 L640,286 L720,318 L800,278 L880,312 L960,286 L960,360 L-320,360 Z" />
+        <path class="wave-line"
+          d="M-320,286 L-240,318 L-160,278 L-80,312 L0,286 L80,318 L160,278 L240,312 L320,286 L400,318 L480,278 L560,312 L640,286 L720,318 L800,278 L880,312 L960,286" />
+      </g>
+    </svg>
+  </div>
+
+  <div class="content-bottom">
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+    <h1 class="brand-title">One<span class="accent-text">Trainer</span></h1>
+    <span class="status-message" id="statusMessage">Initializing...</span>
+  </div>
+
+  <script>
+    // Canonical boot-splash JS API — signature kept stable so
+    // main/splash.ts executeJavaScript() calls stay unchanged.
+    function updateProgress(step, percent, message) {
+      var msg = document.getElementById('statusMessage');
+      var fill = document.getElementById('progressFill');
+      msg.className = 'status-message';
+      fill.className = 'progress-fill';
+      msg.textContent = message;
+      fill.style.width = Math.min(100, Math.max(0, percent)) + '%';
+    }
+
+    function showError(message) {
+      var msg = document.getElementById('statusMessage');
+      var fill = document.getElementById('progressFill');
+      msg.className = 'status-message error';
+      fill.className = 'progress-fill error';
+      msg.textContent = message;
+    }
+  </script>
+</body>
+</html>
