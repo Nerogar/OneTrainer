@@ -19,6 +19,7 @@ import torch
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.SANA)
 class SanaSampler(BaseModelSampler):
     def __init__(
             self,
@@ -177,5 +178,3 @@ class SanaSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, SanaSampler, ModelType.SANA)

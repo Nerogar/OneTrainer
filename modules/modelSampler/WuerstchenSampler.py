@@ -19,6 +19,8 @@ from PIL import Image
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.WUERSTCHEN_2)
+@factory.register(BaseModelSampler, ModelType.STABLE_CASCADE_1)
 class WuerstchenSampler(BaseModelSampler):
     def __init__(
             self,
@@ -365,6 +367,3 @@ class WuerstchenSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, WuerstchenSampler, ModelType.WUERSTCHEN_2)
-factory.register(BaseModelSampler, WuerstchenSampler, ModelType.STABLE_CASCADE_1)
