@@ -6,7 +6,6 @@
     "output_model_format": "ORIGINAL_TRANSFORMER",
     "resolution": "512",
     "attention_mechanism": "CUDNN",
-    "dataloader_threads": 1,
     "compile": true,
     "transformer": {
         "train": true,
