@@ -3,7 +3,7 @@
     "batch_size": 2,
     "learning_rate": 5e-5,
     "model_type": "IDEOGRAM_4",
-    "output_model_format": "DIFFUSERS_LORA",
+    "output_model_format": "COMFY_LORA",
     "resolution": "512",
     "compile": true,
     "transformer": {
