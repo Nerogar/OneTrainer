@@ -36,6 +36,7 @@ class BaseConvertModelUIView:
             ("Anima", ModelType.ANIMA),
             ("Krea 2", ModelType.KREA_2),
             ("ZImage", ModelType.Z_IMAGE),
+            ("Ideogram 4", ModelType.IDEOGRAM_4),
         ], ui_state, "model_type", command=on_model_or_method_change)
 
         # training method

@@ -47,6 +47,8 @@ class ModelType(Enum):
 
     ERNIE = 'ERNIE'
 
+    IDEOGRAM_4 = 'IDEOGRAM_4'
+
     def __str__(self):
         return self.value
 
@@ -124,6 +126,14 @@ class ModelType(Enum):
     def is_ernie(self):
         return self == ModelType.ERNIE
 
+    def is_ideogram(self):
+        return self == ModelType.IDEOGRAM_4
+
+    def supports_negative_prompt(self) -> bool:
+        # asymmetric dual-network CFG models drive the negative branch from a frozen unconditional network (or an
+        # empty prompt), not a user-supplied negative prompt
+        return not self.is_ideogram()
+
     def has_mask_input(self) -> bool:
         return self == ModelType.STABLE_DIFFUSION_15_INPAINTING \
             or self == ModelType.STABLE_DIFFUSION_20_INPAINTING \
@@ -171,7 +181,8 @@ class ModelType(Enum):
             or self.is_hunyuan_video() \
             or self.is_hi_dream() \
             or self.is_z_image() \
-            or self.is_ernie()
+            or self.is_ernie() \
+            or self.is_ideogram()
 
     def is_video_model(self) -> bool:
         return self.is_hunyuan_video() #incase we add more video models in the future
@@ -193,7 +204,7 @@ class ModelType(Enum):
                 or self.is_chroma():
             return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA, TrainingMethod.EMBEDDING)
         if self.is_qwen() or self.is_z_image() or self.is_flux_2() or self.is_ernie() \
-                or self.is_anima() or self.is_krea2():
+                or self.is_anima() or self.is_krea2() or self.is_ideogram():
             return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA)
         raise ValueError(f"No supported training methods defined for model type {self}")
 
@@ -234,7 +245,7 @@ class ModelType(Enum):
             formats.append(ModelFormat.ORIGINAL_SINGLE_FILE)
         elif (self.is_flux_1() or self.is_flux_2() or self.is_chroma() or self.is_hunyuan_video()
                 or self.is_hi_dream() or self.is_pixart() or self.is_qwen() or self.is_ernie()
-                or self.is_z_image() or self.is_anima() or self.is_krea2()):
+                or self.is_z_image() or self.is_anima() or self.is_krea2() or self.is_ideogram()):
             formats.append(ModelFormat.ORIGINAL_TRANSFORMER)
         if self.is_z_image():
             formats.append(ModelFormat.COMFY_TRANSFORMER)
@@ -299,6 +310,7 @@ _MODEL_PARTS: dict[ModelType, tuple[str, ...]] = {
     ModelType.KREA_2: ("transformer", "text_encoder", "vae"),
     ModelType.Z_IMAGE: ("transformer", "text_encoder", "vae"),
     ModelType.ERNIE: ("transformer", "text_encoder", "vae"),
+    ModelType.IDEOGRAM_4: ("transformer", "text_encoder", "unconditional_transformer", "vae"),
 }
 
 

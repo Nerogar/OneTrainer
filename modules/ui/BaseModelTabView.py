@@ -32,6 +32,7 @@ class BaseModelTabView(ABC):
             allow_override_prior=model_type.is_stable_cascade(),
             has_transformer="transformer" in parts,
             allow_override_transformer=controller.supports_override_transformer(),
+            has_unconditional_transformer="unconditional_transformer" in parts,
             has_text_encoder=not model_type.has_multiple_text_encoders(),
             has_text_encoder_1=model_type.has_multiple_text_encoders(),
             has_text_encoder_2="text_encoder_2" in parts,
@@ -115,6 +116,7 @@ class BaseModelTabView(ABC):
             allow_override_prior: bool = False,
             has_transformer: bool = False,
             allow_override_transformer: bool = False,
+            has_unconditional_transformer: bool = False,
             allow_override_text_encoder_4: bool = False,
             has_text_encoder: bool = False,
             has_text_encoder_1: bool = False,
@@ -165,6 +167,15 @@ class BaseModelTabView(ABC):
                              tooltip="The transformer weight data type")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_gguf=True, include_a8=True),
                                   ui_state, "transformer.weight_dtype")
+
+            row += 1
+
+        if has_unconditional_transformer:
+            # unconditional transformer weight dtype
+            self.components.label(frame, row, 3, "Unconditional Transformer Data Type",
+                             tooltip="The weight data type of the unconditional transformer, used for the negative branch of CFG during sampling")
+            self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True),
+                                  ui_state, "unconditional_transformer.weight_dtype")
 
             row += 1
 

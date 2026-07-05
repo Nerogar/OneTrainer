@@ -15,3 +15,6 @@ class SampleFrameController:
 
     def is_video_model(self) -> bool:
         return self.model_type.is_video_model()
+
+    def supports_negative_prompt(self) -> bool:
+        return self.model_type.supports_negative_prompt()
