@@ -1,15 +1,15 @@
 {
-    "base_model_name": "Tongyi-MAI/Z-Image-Turbo",
+    "base_model_name": "krea/Krea-2-Raw",
     "batch_size": 2,
     "learning_rate": 0.0003,
-    "model_type": "Z_IMAGE",
+    "model_type": "KREA_2",
     "output_model_format": "DIFFUSERS_LORA",
     "resolution": "512",
+    "attention_mechanism": "CUDNN",
     "compile": true,
     "transformer": {
         "train": true,
-        "weight_dtype": "INT_W8A8",
-        "model_name": "https://huggingface.co/ostris/Z-Image-De-Turbo/blob/main/z_image_de_turbo_v1_bf16.safetensors"
+        "weight_dtype": "INT_W8A8"
     },
     "text_encoder": {
         "train": false,
@@ -22,12 +22,11 @@
     "train_dtype": "BFLOAT_16",
     "weight_dtype": "BFLOAT_16",
     "output_dtype": "BFLOAT_16",
-    "layer_filter": "^(?=.*attention)(?!.*refiner).*,^(?=.*feed_forward)(?!.*refiner).*",
+    "timestep_distribution": "LOGIT_NORMAL",
+    "layer_filter": "attn,ff",
     "layer_filter_preset": "attn-mlp",
-    "layer_filter_regex": true,
     "quantization": {
-        "layer_filter": "layers",
-        "layer_filter_preset": "blocks"
-    },
-    "timestep_distribution": "LOGIT_NORMAL"
+        "layer_filter": "attn,ff",
+        "layer_filter_preset": "attn-mlp"
+    }
 }

@@ -1,15 +1,16 @@
 {
-    "base_model_name": "Tongyi-MAI/Z-Image",
+    "base_model_name": "krea/Krea-2-Raw",
     "batch_size": 2,
     "learning_rate": 1e-5,
-    "model_type": "Z_IMAGE",
+    "model_type": "KREA_2",
     "output_model_format": "ORIGINAL_TRANSFORMER",
     "resolution": "512",
+    "attention_mechanism": "CUDNN",
     "compile": true,
     "transformer": {
         "train": true,
         "weight_dtype": "BFLOAT_16",
-        "offload_fraction": 0.1
+        "offload_fraction": 0.8
     },
     "text_encoder": {
         "train": false,
@@ -20,8 +21,15 @@
         "weight_dtype": "FLOAT_32"
     },
     "train_dtype": "BFLOAT_16",
+    "weight_dtype": "BFLOAT_16",
     "output_dtype": "BFLOAT_16",
     "timestep_distribution": "LOGIT_NORMAL",
+    "layer_filter": "transformer_blocks",
+    "layer_filter_preset": "blocks",
+    "quantization": {
+        "layer_filter": "transformer_blocks",
+        "layer_filter_preset": "blocks"
+    },
     "optimizer": {
         "optimizer": "ADAFACTOR"
     },

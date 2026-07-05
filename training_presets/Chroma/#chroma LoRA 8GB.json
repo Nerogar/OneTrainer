@@ -4,7 +4,6 @@
     "learning_rate": 0.0003,
     "model_type": "CHROMA_1",
     "resolution": "512",
-    "dataloader_threads": 1,
     "transformer": {
         "train": true,
         "weight_dtype": "FLOAT_8",

@@ -5,7 +5,6 @@
     "model_type": "QWEN",
     "output_model_format": "DIFFUSERS_LORA",
     "resolution": "512",
-    "dataloader_threads": 1,
     "transformer": {
         "train": true,
         "weight_dtype": "FLOAT_8",

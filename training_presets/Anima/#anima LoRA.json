@@ -6,7 +6,6 @@
     "output_model_format": "KOHYA_LORA",
     "resolution": "512",
     "compile": true,
-    "dataloader_threads": 1,
     "transformer": {
         "train": true,
         "weight_dtype": "INT_W8A8"
