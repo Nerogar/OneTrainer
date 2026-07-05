@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 
-import { videoToolsApi, type VideoToolStatusResponse } from "@/api/videoToolsApi";
+import { type VideoToolResponse, videoToolsApi, type VideoToolStatusResponse } from "@/api/videoToolsApi";
 import { Button, DirPicker, FilePicker, FormEntry, FormFieldWrapper, Toggle } from "@/components/shared";
 import { INPUT_FULL } from "@/utils/inputStyles";
 
@@ -46,39 +46,24 @@ function StatusBar({ status }: { status: VideoToolStatusResponse | null }) {
   );
 }
 
-function ExtractClipsTab({ onStatusChange }: { onStatusChange: () => void }) {
+// Shared state + loading/error/handleExtract boilerplate for the two extraction tabs.
+function useExtractRunner(onStatusChange: () => void) {
   const [videoPath, setVideoPath] = useState("");
   const [directory, setDirectory] = useState("");
   const [outputDir, setOutputDir] = useState("");
   const [timeStart, setTimeStart] = useState("00:00:00");
   const [timeEnd, setTimeEnd] = useState("99:99:99");
   const [outputSubdirectories, setOutputSubdirectories] = useState(false);
-  const [splitAtCuts, setSplitAtCuts] = useState(false);
-  const [maxLength, setMaxLength] = useState<number>(3);
-  const [fps, setFps] = useState<number>(24);
   const [removeBorders, setRemoveBorders] = useState(false);
   const [cropVariation, setCropVariation] = useState<number>(0.2);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleExtract = async (batchMode: boolean) => {
+  const run = async (call: () => Promise<VideoToolResponse>) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await videoToolsApi.extractClips({
-        video_path: videoPath,
-        directory,
-        batch_mode: batchMode,
-        output_dir: outputDir,
-        time_start: timeStart,
-        time_end: timeEnd,
-        output_subdirectories: outputSubdirectories,
-        split_at_cuts: splitAtCuts,
-        max_length: maxLength,
-        fps,
-        remove_borders: removeBorders,
-        crop_variation: cropVariation,
-      });
+      const result = await call();
       if (!result.ok) {
         setError(result.error ?? "Unknown error");
       }
@@ -90,21 +75,79 @@ function ExtractClipsTab({ onStatusChange }: { onStatusChange: () => void }) {
     }
   };
 
+  // Payload fields common to extract-clips and extract-images requests.
+  const sharedPayload = (batchMode: boolean) => ({
+    video_path: videoPath,
+    directory,
+    batch_mode: batchMode,
+    output_dir: outputDir,
+    time_start: timeStart,
+    time_end: timeEnd,
+    output_subdirectories: outputSubdirectories,
+    remove_borders: removeBorders,
+    crop_variation: cropVariation,
+  });
+
+  return {
+    videoPath,
+    setVideoPath,
+    directory,
+    setDirectory,
+    outputDir,
+    setOutputDir,
+    timeStart,
+    setTimeStart,
+    timeEnd,
+    setTimeEnd,
+    outputSubdirectories,
+    setOutputSubdirectories,
+    removeBorders,
+    setRemoveBorders,
+    cropVariation,
+    setCropVariation,
+    loading,
+    error,
+    run,
+    sharedPayload,
+  };
+}
+
+type ExtractRunner = ReturnType<typeof useExtractRunner>;
+
+// Shared scaffold for the two extraction tabs: single-video picker + extract button,
+// time range, directory + extract button, output picker, then tab-specific fields
+// (children) and the borders / crop-variation grid. `itemNoun`/`itemNounPlural` fill
+// the few tooltips that differ between clips and images.
+function ExtractScaffold({
+  runner,
+  itemNoun,
+  itemNounPlural,
+  onExtract,
+  children,
+}: {
+  runner: ExtractRunner;
+  itemNoun: string;
+  itemNounPlural: string;
+  onExtract: (batchMode: boolean) => void;
+  children: ReactNode;
+}) {
+  const { loading, error } = runner;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-end gap-2">
         <div className="flex-1">
           <FilePicker
             label="Single Video"
-            value={videoPath}
-            onChange={setVideoPath}
+            value={runner.videoPath}
+            onChange={runner.setVideoPath}
             tooltip="Link to single video file to process."
             filters={[
               { name: "Video files", extensions: ["webm", "mkv", "flv", "avi", "mov", "wmv", "mp4", "mpeg", "m4v"] },
             ]}
           />
         </div>
-        <Button variant="secondary" size="sm" onClick={() => handleExtract(false)} loading={loading} disabled={loading}>
+        <Button variant="secondary" size="sm" onClick={() => onExtract(false)} loading={loading} disabled={loading}>
           Extract Single
         </Button>
       </div>
@@ -116,15 +159,15 @@ function ExtractClipsTab({ onStatusChange }: { onStatusChange: () => void }) {
         <div className="flex gap-2">
           <input
             type="text"
-            value={timeStart}
-            onChange={(e) => setTimeStart(e.target.value)}
+            value={runner.timeStart}
+            onChange={(e) => runner.setTimeStart(e.target.value)}
             className={INPUT_FULL}
             placeholder="00:00:00"
           />
           <input
             type="text"
-            value={timeEnd}
-            onChange={(e) => setTimeEnd(e.target.value)}
+            value={runner.timeEnd}
+            onChange={(e) => runner.setTimeEnd(e.target.value)}
             className={INPUT_FULL}
             placeholder="99:99:99"
           />
@@ -135,28 +178,69 @@ function ExtractClipsTab({ onStatusChange }: { onStatusChange: () => void }) {
         <div className="flex-1">
           <DirPicker
             label="Directory"
-            value={directory}
-            onChange={setDirectory}
+            value={runner.directory}
+            onChange={runner.setDirectory}
             tooltip="Path to directory with multiple videos to process, including in subdirectories."
           />
         </div>
-        <Button variant="secondary" size="sm" onClick={() => handleExtract(true)} loading={loading} disabled={loading}>
+        <Button variant="secondary" size="sm" onClick={() => onExtract(true)} loading={loading} disabled={loading}>
           Extract Directory
         </Button>
       </div>
 
       <DirPicker
         label="Output"
-        value={outputDir}
-        onChange={setOutputDir}
-        tooltip="Path to folder where extracted clips will be saved."
+        value={runner.outputDir}
+        onChange={runner.setOutputDir}
+        tooltip={`Path to folder where extracted ${itemNounPlural} will be saved.`}
       />
+
+      {children}
 
       <div className="grid grid-cols-2 gap-4">
         <Toggle
+          label="Remove Borders"
+          value={runner.removeBorders}
+          onChange={runner.setRemoveBorders}
+          tooltip={`Remove black borders from output ${itemNoun}.`}
+        />
+        <FormEntry
+          label="Crop Variation"
+          value={runner.cropVariation}
+          onChange={(v) => runner.setCropVariation(Number(v))}
+          type="number"
+          tooltip={`Output ${itemNounPlural} will be randomly cropped to +/- the base aspect ratio. Set to 0 to use only base aspect.`}
+        />
+      </div>
+
+      {error && <p className="text-sm text-[var(--color-error-500)]">{error}</p>}
+    </div>
+  );
+}
+
+function ExtractClipsTab({ onStatusChange }: { onStatusChange: () => void }) {
+  const runner = useExtractRunner(onStatusChange);
+  const [splitAtCuts, setSplitAtCuts] = useState(false);
+  const [maxLength, setMaxLength] = useState<number>(3);
+  const [fps, setFps] = useState<number>(24);
+
+  const handleExtract = (batchMode: boolean) =>
+    runner.run(() =>
+      videoToolsApi.extractClips({
+        ...runner.sharedPayload(batchMode),
+        split_at_cuts: splitAtCuts,
+        max_length: maxLength,
+        fps,
+      }),
+    );
+
+  return (
+    <ExtractScaffold runner={runner} itemNoun="clip" itemNounPlural="clips" onExtract={handleExtract}>
+      <div className="grid grid-cols-2 gap-4">
+        <Toggle
           label="Output to Subdirectories"
-          value={outputSubdirectories}
-          onChange={setOutputSubdirectories}
+          value={runner.outputSubdirectories}
+          onChange={runner.setOutputSubdirectories}
           tooltip="If enabled, files are saved to subfolders based on filename and input directory."
         />
         <Toggle
@@ -183,136 +267,30 @@ function ExtractClipsTab({ onStatusChange }: { onStatusChange: () => void }) {
           tooltip="FPS to convert output videos to. Set to 0 to keep original rate."
         />
       </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Toggle
-          label="Remove Borders"
-          value={removeBorders}
-          onChange={setRemoveBorders}
-          tooltip="Remove black borders from output clip."
-        />
-        <FormEntry
-          label="Crop Variation"
-          value={cropVariation}
-          onChange={(v) => setCropVariation(Number(v))}
-          type="number"
-          tooltip="Output clips will be randomly cropped to +/- the base aspect ratio. Set to 0 to use only base aspect."
-        />
-      </div>
-
-      {error && <p className="text-sm text-[var(--color-error-500)]">{error}</p>}
-    </div>
+    </ExtractScaffold>
   );
 }
 
 function ExtractImagesTab({ onStatusChange }: { onStatusChange: () => void }) {
-  const [videoPath, setVideoPath] = useState("");
-  const [directory, setDirectory] = useState("");
-  const [outputDir, setOutputDir] = useState("");
-  const [timeStart, setTimeStart] = useState("00:00:00");
-  const [timeEnd, setTimeEnd] = useState("99:99:99");
-  const [outputSubdirectories, setOutputSubdirectories] = useState(false);
+  const runner = useExtractRunner(onStatusChange);
   const [imagesPerSecond, setImagesPerSecond] = useState<number>(0.5);
   const [blurRemoval, setBlurRemoval] = useState<number>(0.2);
-  const [removeBorders, setRemoveBorders] = useState(false);
-  const [cropVariation, setCropVariation] = useState<number>(0.2);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const handleExtract = async (batchMode: boolean) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await videoToolsApi.extractImages({
-        video_path: videoPath,
-        directory,
-        batch_mode: batchMode,
-        output_dir: outputDir,
-        time_start: timeStart,
-        time_end: timeEnd,
-        output_subdirectories: outputSubdirectories,
+  const handleExtract = (batchMode: boolean) =>
+    runner.run(() =>
+      videoToolsApi.extractImages({
+        ...runner.sharedPayload(batchMode),
         images_per_second: imagesPerSecond,
         blur_removal: blurRemoval,
-        remove_borders: removeBorders,
-        crop_variation: cropVariation,
-      });
-      if (!result.ok) {
-        setError(result.error ?? "Unknown error");
-      }
-      onStatusChange();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Request failed");
-    } finally {
-      setLoading(false);
-    }
-  };
+      }),
+    );
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-end gap-2">
-        <div className="flex-1">
-          <FilePicker
-            label="Single Video"
-            value={videoPath}
-            onChange={setVideoPath}
-            tooltip="Link to single video file to process."
-            filters={[
-              { name: "Video files", extensions: ["webm", "mkv", "flv", "avi", "mov", "wmv", "mp4", "mpeg", "m4v"] },
-            ]}
-          />
-        </div>
-        <Button variant="secondary" size="sm" onClick={() => handleExtract(false)} loading={loading} disabled={loading}>
-          Extract Single
-        </Button>
-      </div>
-
-      <FormFieldWrapper
-        label="Time Range"
-        tooltip="Time range to limit selection for single video. Format: HH:MM:SS, MM:SS, or seconds."
-      >
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={timeStart}
-            onChange={(e) => setTimeStart(e.target.value)}
-            className={INPUT_FULL}
-            placeholder="00:00:00"
-          />
-          <input
-            type="text"
-            value={timeEnd}
-            onChange={(e) => setTimeEnd(e.target.value)}
-            className={INPUT_FULL}
-            placeholder="99:99:99"
-          />
-        </div>
-      </FormFieldWrapper>
-
-      <div className="flex items-end gap-2">
-        <div className="flex-1">
-          <DirPicker
-            label="Directory"
-            value={directory}
-            onChange={setDirectory}
-            tooltip="Path to directory with multiple videos to process, including in subdirectories."
-          />
-        </div>
-        <Button variant="secondary" size="sm" onClick={() => handleExtract(true)} loading={loading} disabled={loading}>
-          Extract Directory
-        </Button>
-      </div>
-
-      <DirPicker
-        label="Output"
-        value={outputDir}
-        onChange={setOutputDir}
-        tooltip="Path to folder where extracted images will be saved."
-      />
-
+    <ExtractScaffold runner={runner} itemNoun="image" itemNounPlural="images" onExtract={handleExtract}>
       <Toggle
         label="Output to Subdirectories"
-        value={outputSubdirectories}
-        onChange={setOutputSubdirectories}
+        value={runner.outputSubdirectories}
+        onChange={runner.setOutputSubdirectories}
         tooltip="If enabled, files are saved to subfolders based on filename and input directory."
       />
 
@@ -332,25 +310,7 @@ function ExtractImagesTab({ onStatusChange }: { onStatusChange: () => void }) {
           tooltip="Threshold for removal of blurry images, relative to all others. At 0.2, the blurriest 20% of frames will not be saved."
         />
       </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Toggle
-          label="Remove Borders"
-          value={removeBorders}
-          onChange={setRemoveBorders}
-          tooltip="Remove black borders from output image."
-        />
-        <FormEntry
-          label="Crop Variation"
-          value={cropVariation}
-          onChange={(v) => setCropVariation(Number(v))}
-          type="number"
-          tooltip="Output images will be randomly cropped to +/- the base aspect ratio. Set to 0 to use only base aspect."
-        />
-      </div>
-
-      {error && <p className="text-sm text-[var(--color-error-500)]">{error}</p>}
-    </div>
+    </ExtractScaffold>
   );
 }
 

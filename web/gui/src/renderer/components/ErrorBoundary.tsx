@@ -2,23 +2,8 @@ import React, { Component, type ErrorInfo, type ReactNode } from "react";
 
 import { ERROR_500, ON_SURFACE_DARK, SURFACE_RAISED_DARK, SURFACE_SUNKEN_DARK } from "../../shared/brandColors";
 
-export interface FallbackProps {
-  error: Error;
-  resetErrorBoundary: () => void;
-}
-
 interface Props {
   children: ReactNode;
-  /**
-   * Static fallback UI. Does NOT receive the reset function — the user cannot
-   * trigger a reset from this element. Prefer `fallbackRender` instead, which
-   * passes `{ error, resetErrorBoundary }` to the callback.
-   */
-  fallback?: ReactNode;
-  /** Render prop for fallback UI that receives the error and a reset function. */
-  fallbackRender?: (props: FallbackProps) => ReactNode;
-  /** Called after the boundary resets and children are about to remount. Use for app-level state cleanup. */
-  onReset?: () => void;
 }
 
 interface State {
@@ -43,28 +28,12 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   resetErrorBoundary = (): void => {
-    this.setState(
-      (prev) => ({ hasError: false, error: null, resetCount: prev.resetCount + 1 }),
-      () => {
-        this.props.onReset?.();
-      },
-    );
+    this.setState((prev) => ({ hasError: false, error: null, resetCount: prev.resetCount + 1 }));
   };
 
   render(): ReactNode {
     if (this.state.hasError) {
       const error = this.state.error;
-
-      if (this.props.fallbackRender && error) {
-        return this.props.fallbackRender({
-          error,
-          resetErrorBoundary: this.resetErrorBoundary,
-        });
-      }
-
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
 
       return (
         <div style={{ padding: "24px", textAlign: "center" }}>

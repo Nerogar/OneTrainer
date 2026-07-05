@@ -1,8 +1,8 @@
-import { memo, useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
+import { ScalarChart } from "@/components/shared/ScalarChart";
 import { useReconnectingWebSocket } from "@/hooks/useReconnectingWebSocket";
 import { useUiStore } from "@/store/uiStore";
-import { formatValue, generateTicks } from "@/utils/chartUtils";
 
 interface GpuMetrics {
   index: number;
@@ -27,15 +27,6 @@ interface TimestampedMetrics extends MetricsSnapshot {
 }
 
 const MAX_POINTS = 300;
-
-const CHART_WIDTH = 520;
-const CHART_HEIGHT = 260;
-const CHART_PADDING = { top: 24, right: 16, bottom: 36, left: 64 };
-
-const LINE_COLOR = "var(--color-cobalt-600)";
-const GRID_COLOR = "var(--color-border-subtle)";
-const TEXT_COLOR = "var(--color-on-surface-secondary)";
-const AXIS_COLOR = "var(--color-on-surface-secondary)";
 
 const GPU_COLORS = [
   "var(--color-cobalt-600)",
@@ -99,206 +90,9 @@ function useSystemWebSocket(): UseSystemWebSocketResult {
 }
 
 interface ChartPoint {
-  time: number;
+  step: number;
   value: number;
 }
-
-interface MetricChartProps {
-  title: string;
-  points: ChartPoint[];
-  unit: string;
-  color?: string;
-  area?: boolean;
-  yMax?: number;
-  yMin?: number;
-}
-
-const MetricChart = memo(function MetricChart({
-  title,
-  points,
-  unit,
-  color = LINE_COLOR,
-  area = false,
-  yMax: fixedYMax,
-  yMin: fixedYMin,
-}: MetricChartProps) {
-  if (points.length === 0) {
-    return (
-      <div className="card card-static p-4">
-        <h4 className="m-0 mb-2 text-caption font-semibold text-[var(--color-on-surface)]">{title}</h4>
-        <div
-          className="flex items-center justify-center text-[var(--color-on-surface-secondary)] text-caption"
-          style={{ height: CHART_HEIGHT }}
-        >
-          Waiting for data...
-        </div>
-      </div>
-    );
-  }
-
-  const times = points.map((p) => p.time);
-  const values = points.map((p) => p.value);
-  const minTime = Math.min(...times);
-  const maxTime = Math.max(...times);
-
-  const rawMinVal = Math.min(...values);
-  const rawMaxVal = Math.max(...values);
-
-  const yMin = fixedYMin !== undefined ? fixedYMin : Math.max(0, rawMinVal - (rawMaxVal - rawMinVal) * 0.05);
-  const yMax = fixedYMax !== undefined ? fixedYMax : rawMaxVal + (rawMaxVal - rawMinVal) * 0.05 || 1;
-
-  const timeRange = maxTime - minTime || 1;
-
-  const plotW = CHART_WIDTH - CHART_PADDING.left - CHART_PADDING.right;
-  const plotH = CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom;
-
-  const xScale = (time: number) => CHART_PADDING.left + ((time - minTime) / timeRange) * plotW;
-  const yScale = (val: number) => CHART_PADDING.top + plotH - ((val - yMin) / (yMax - yMin)) * plotH;
-
-  const pathParts = points.map((p, i) => {
-    const x = xScale(p.time);
-    const y = yScale(p.value);
-    return `${i === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
-  });
-  const linePath = pathParts.join(" ");
-
-  const areaPath =
-    `${linePath} L${xScale(points[points.length - 1].time).toFixed(2)},${(CHART_PADDING.top + plotH).toFixed(2)}` +
-    ` L${xScale(points[0].time).toFixed(2)},${(CHART_PADDING.top + plotH).toFixed(2)} Z`;
-
-  const xTicks = generateTicks(0, maxTime - minTime, 5);
-  const yTicks = generateTicks(yMin, yMax, 5);
-
-  const latestValue = points[points.length - 1].value;
-  const gradId = `perf-area-${title.replace(/[^a-zA-Z0-9]/g, "-")}`;
-
-  return (
-    <div className="card card-static p-4">
-      <div className="flex justify-between items-baseline mb-2">
-        <h4 className="m-0 text-caption font-semibold text-[var(--color-on-surface)]">{title}</h4>
-        <span className="mono tabular-nums text-micro font-semibold" style={{ color }}>
-          {formatValue(latestValue)} {unit}
-        </span>
-      </div>
-      <svg
-        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-        width="100%"
-        className="block"
-        role="img"
-        aria-label={`${title} chart`}
-      >
-        <title>{title}</title>
-        {yTicks.map((tick) => {
-          const y = yScale(tick);
-          return (
-            <line
-              key={`yg-${tick}`}
-              x1={CHART_PADDING.left}
-              y1={y}
-              x2={CHART_WIDTH - CHART_PADDING.right}
-              y2={y}
-              stroke={GRID_COLOR}
-              strokeWidth="0.5"
-              strokeDasharray="4,3"
-            />
-          );
-        })}
-
-        {area && (
-          <>
-            <defs>
-              <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={color} stopOpacity="0.2" />
-                <stop offset="100%" stopColor={color} stopOpacity="0.02" />
-              </linearGradient>
-            </defs>
-            <path d={areaPath} fill={`url(#${gradId})`} />
-          </>
-        )}
-
-        <path d={linePath} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-
-        {xTicks.map((tick) => {
-          const x = xScale(minTime + tick);
-          if (x < CHART_PADDING.left || x > CHART_WIDTH - CHART_PADDING.right) return null;
-          return (
-            <text
-              key={`xl-${tick}`}
-              x={x}
-              y={CHART_HEIGHT - 6}
-              textAnchor="middle"
-              fill={TEXT_COLOR}
-              fontSize="9"
-              fontFamily="var(--font-mono)"
-            >
-              {formatTime(tick)}
-            </text>
-          );
-        })}
-
-        {yTicks.map((tick) => {
-          const y = yScale(tick);
-          if (y < CHART_PADDING.top || y > CHART_PADDING.top + plotH) return null;
-          return (
-            <text
-              key={`yl-${tick}`}
-              x={CHART_PADDING.left - 6}
-              y={y + 3}
-              textAnchor="end"
-              fill={TEXT_COLOR}
-              fontSize="9"
-              fontFamily="var(--font-mono)"
-            >
-              {formatValue(tick)}
-            </text>
-          );
-        })}
-
-        <text
-          x={CHART_PADDING.left + plotW / 2}
-          y={CHART_HEIGHT - 0}
-          textAnchor="middle"
-          fill={AXIS_COLOR}
-          fontSize="9"
-          fontFamily="var(--font-sans)"
-        >
-          time
-        </text>
-
-        <line
-          x1={CHART_PADDING.left}
-          y1={CHART_PADDING.top}
-          x2={CHART_PADDING.left}
-          y2={CHART_PADDING.top + plotH}
-          stroke={AXIS_COLOR}
-          strokeWidth="0.5"
-          opacity="0.5"
-        />
-        <line
-          x1={CHART_PADDING.left}
-          y1={CHART_PADDING.top + plotH}
-          x2={CHART_WIDTH - CHART_PADDING.right}
-          y2={CHART_PADDING.top + plotH}
-          stroke={AXIS_COLOR}
-          strokeWidth="0.5"
-          opacity="0.5"
-        />
-
-        <text
-          x={CHART_WIDTH - CHART_PADDING.right}
-          y={CHART_PADDING.top - 8}
-          textAnchor="end"
-          fill={TEXT_COLOR}
-          fontSize="8"
-          fontFamily="var(--font-mono)"
-          opacity="0.6"
-        >
-          {points.length} pts
-        </text>
-      </svg>
-    </div>
-  );
-});
 
 interface StatCardProps {
   label: string;
@@ -338,7 +132,7 @@ function extractTimeSeries(
   for (const m of history) {
     const val = accessor(m);
     if (val !== null && val !== undefined) {
-      points.push({ time: m.timestamp - startTime, value: val });
+      points.push({ step: m.timestamp - startTime, value: val });
     }
   }
 
@@ -475,16 +269,27 @@ export default function PerformancePage() {
       )}
 
       <div className="grid grid-cols-2 gap-4">
-        <MetricChart title="CPU Usage" points={cpuPoints} unit="%" color="var(--color-info-500)" yMax={100} yMin={0} />
+        <ScalarChart
+          tag="CPU Usage"
+          points={cpuPoints}
+          unit="%"
+          lineColor="var(--color-info-500)"
+          area={false}
+          yMax={100}
+          yMin={0}
+          xFormat={formatTime}
+          xAxisLabel="time"
+        />
 
-        <MetricChart
-          title="RAM Usage"
+        <ScalarChart
+          tag="RAM Usage"
           points={ramPoints}
           unit="GB"
-          color="var(--color-azure-500)"
-          area
+          lineColor="var(--color-azure-500)"
           yMin={0}
           yMax={latest?.ram_total_gb}
+          xFormat={formatTime}
+          xAxisLabel="time"
         />
 
         {Array.from({ length: gpuCount }).flatMap((_, gpuIdx) => {
@@ -495,42 +300,49 @@ export default function PerformancePage() {
           const charts: React.ReactNode[] = [];
 
           charts.push(
-            <MetricChart
+            <ScalarChart
               key={`vram-${gpuIdx}`}
-              title={`VRAM - ${gpuName}`}
+              tag={`VRAM - ${gpuName}`}
               points={series.vram}
               unit="MB"
-              color={color}
-              area
+              lineColor={color}
               yMin={0}
               yMax={gpu?.vram_total_mb}
+              xFormat={formatTime}
+              xAxisLabel="time"
             />,
           );
 
           if (gpu?.utilization !== null) {
             charts.push(
-              <MetricChart
+              <ScalarChart
                 key={`util-${gpuIdx}`}
-                title={`GPU Utilization - ${gpuName}`}
+                tag={`GPU Utilization - ${gpuName}`}
                 points={series.utilization}
                 unit="%"
-                color={color}
+                lineColor={color}
+                area={false}
                 yMax={100}
                 yMin={0}
+                xFormat={formatTime}
+                xAxisLabel="time"
               />,
             );
           }
 
           if (gpu?.temperature !== null) {
             charts.push(
-              <MetricChart
+              <ScalarChart
                 key={`temp-${gpuIdx}`}
-                title={`Temperature - ${gpuName}`}
+                tag={`Temperature - ${gpuName}`}
                 points={series.temperature}
                 unit={"\u00B0C"}
-                color="var(--color-error-500)"
+                lineColor="var(--color-error-500)"
+                area={false}
                 yMin={0}
                 yMax={100}
+                xFormat={formatTime}
+                xAxisLabel="time"
               />,
             );
           }

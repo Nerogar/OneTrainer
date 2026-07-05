@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import type { EnumDef, ModalDef, TabDef, UiSchema } from "@/types/uiSchema";
+import type { UiSchema } from "@/types/uiSchema";
 
 interface UiSchemaState {
   schema: UiSchema | null;
@@ -8,10 +8,6 @@ interface UiSchemaState {
   error: string | null;
 
   loadSchema: () => Promise<void>;
-  getTab: (id: string) => TabDef | undefined;
-  getModal: (id: string) => ModalDef | undefined;
-  getEnum: (name: string) => EnumDef | undefined;
-  getPredicate: (name: string) => string[] | undefined;
 }
 
 function resolveSchemaUrl(): string {
@@ -45,9 +41,4 @@ export const useUiSchemaStore = create<UiSchemaState>((set, get) => ({
       });
     }
   },
-
-  getTab: (id: string) => get().schema?.tabs.find((t) => t.id === id),
-  getModal: (id: string) => get().schema?.modals[id],
-  getEnum: (name: string) => get().schema?.enums[name],
-  getPredicate: (name: string) => get().schema?.predicates[name],
 }));

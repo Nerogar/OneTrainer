@@ -15,6 +15,12 @@ export interface ScalarChartProps {
   lineColor?: string;
   width?: number;
   height?: number;
+  xFormat?: (n: number) => string;
+  xAxisLabel?: string;
+  area?: boolean;
+  yMin?: number;
+  yMax?: number;
+  unit?: string;
 }
 
 export function ScalarChart({
@@ -23,6 +29,12 @@ export function ScalarChart({
   lineColor = DEFAULT_LINE_COLOR,
   width = DEFAULT_WIDTH,
   height = DEFAULT_HEIGHT,
+  xFormat = formatStep,
+  xAxisLabel = "step",
+  area = true,
+  yMin: yMinProp,
+  yMax: yMaxProp,
+  unit,
 }: ScalarChartProps) {
   const gradientId = `area-grad-${tag.replace(/[^a-zA-Z0-9]/g, "-")}`;
 
@@ -48,8 +60,8 @@ export function ScalarChart({
   const maxVal = Math.max(...values);
 
   const valRange = maxVal - minVal || 1;
-  const yMin = minVal - valRange * 0.05;
-  const yMax = maxVal + valRange * 0.05;
+  const yMin = yMinProp !== undefined ? yMinProp : minVal - valRange * 0.05;
+  const yMax = yMaxProp !== undefined ? yMaxProp : maxVal + valRange * 0.05;
 
   const stepRange = maxStep - minStep || 1;
 
@@ -81,6 +93,7 @@ export function ScalarChart({
         <h4 className="m-0 font-semibold text-caption text-[var(--color-on-surface)]">{tag}</h4>
         <span className="mono tabular-nums text-xs font-semibold" style={{ color: lineColor }}>
           {formatValue(latest.value)}
+          {unit ? ` ${unit}` : ""}
         </span>
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} width="100%" className="block">
@@ -100,13 +113,17 @@ export function ScalarChart({
           );
         })}
 
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={lineColor} stopOpacity="0.2" />
-            <stop offset="100%" stopColor={lineColor} stopOpacity="0.02" />
-          </linearGradient>
-        </defs>
-        <path d={areaPath} fill={`url(#${gradientId})`} />
+        {area && (
+          <>
+            <defs>
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={lineColor} stopOpacity="0.2" />
+                <stop offset="100%" stopColor={lineColor} stopOpacity="0.02" />
+              </linearGradient>
+            </defs>
+            <path d={areaPath} fill={`url(#${gradientId})`} />
+          </>
+        )}
 
         <path
           d={linePath}
@@ -130,7 +147,7 @@ export function ScalarChart({
               fontSize="9"
               fontFamily="var(--font-mono)"
             >
-              {formatStep(tick)}
+              {xFormat(tick)}
             </text>
           );
         })}
@@ -161,7 +178,7 @@ export function ScalarChart({
           fontSize="9"
           fontFamily="var(--font-sans)"
         >
-          step
+          {xAxisLabel}
         </text>
 
         <line

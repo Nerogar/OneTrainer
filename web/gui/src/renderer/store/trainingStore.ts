@@ -36,8 +36,6 @@ interface TrainingState {
   setError: (error: string | null) => void;
   setStatusText: (text: string) => void;
   addSampleUrl: (url: string) => void;
-  clearSamples: () => void;
-  reset: () => void;
 
   fetchStatus: () => Promise<void>;
 
@@ -75,8 +73,6 @@ export const useTrainingStore = create<TrainingState>((set, get) => ({
       const urls = s.sampleUrls.length >= 50 ? [...s.sampleUrls.slice(1), entry] : [...s.sampleUrls, entry];
       return { sampleUrls: urls, latestSample: url, nextSampleId: s.nextSampleId + 1 };
     }),
-  clearSamples: () => set({ sampleUrls: [], latestSample: null }),
-  reset: () => set(INITIAL_STATE),
 
   fetchStatus: async () => {
     try {

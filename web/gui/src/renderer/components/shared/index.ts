@@ -14,7 +14,6 @@ export { ProgressBar, type ProgressBarProps } from "./ProgressBar";
 export { SchemaField, type SchemaFieldProps } from "./SchemaField";
 export { SectionCard, type SectionCardProps } from "./SectionCard";
 export { Select, type SelectKVOption, type SelectProps } from "./Select";
-export { Skeleton, type SkeletonProps } from "./Skeleton";
 export { SliderEntry, type SliderEntryProps } from "./SliderEntry";
 export { TimeEntry, type TimeEntryProps } from "./TimeEntry";
 export { Toggle, type ToggleProps } from "./Toggle";

@@ -310,6 +310,72 @@ function flushWindow(win: BrowserWindow, timeoutMs = 3000): Promise<void> {
   });
 }
 
+// Shared renderer webPreferences for every BrowserWindow we create.
+const RENDERER_WEB_PREFERENCES: Electron.WebPreferences = {
+  preload: path.join(__dirname, "preload.cjs"),
+  contextIsolation: true,
+  nodeIntegration: false,
+  // Electron's default sandboxed preload loader can't require() relative
+  // files — it'd break our shared/ipc-channels import. contextIsolation
+  // plus nodeIntegration:false is still the real renderer security
+  // boundary; disabling sandbox just lets the preload use full Node.
+  sandbox: false,
+};
+
+// External-link hardening shared by every window: keep in-app navigation on
+// localhost and hand anything else off to the system browser.
+function hardenWindow(win: BrowserWindow): void {
+  win.webContents.on("will-navigate", (event, url) => {
+    const parsed = new URL(url);
+    if (parsed.hostname === "localhost") return;
+    event.preventDefault();
+    shell.openExternal(url);
+  });
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+}
+
+interface RendererLoadOptions {
+  // Extra query string (with leading `&`) appended to the dev-server loadURL.
+  urlParams?: string;
+  // Extra query entries merged into the built-renderer loadFile query object.
+  fileQuery?: Record<string, string>;
+}
+
+// Dev-server HTTP-probe + loadURL/loadFile fallback shared by every window.
+// Only probes the Vite dev server on an explicit `--dev` launch -- a plain
+// start-web-ui.bat/.sh run is unpackaged too, but should always load the
+// built renderer rather than attempt (and hot-reload from) a dev server.
+function loadRenderer(win: BrowserWindow, options: RendererLoadOptions = {}): Promise<void> {
+  const rendererPath = path.join(__dirname, "..", "..", "renderer", "index.html");
+  const fileQuery = { backendPort: String(BACKEND_PORT), ...options.fileQuery };
+  const loadBuiltRenderer = () => win.loadFile(rendererPath, { query: fileQuery });
+
+  const isDev = devMode && !app.isPackaged;
+  if (!isDev) {
+    loadBuiltRenderer();
+    return Promise.resolve();
+  }
+
+  return new Promise<boolean>((probeResolve) => {
+    const req = http.get(DEV_SERVER_URL, () => probeResolve(true));
+    req.on("error", () => probeResolve(false));
+    req.setTimeout(500, () => {
+      req.destroy();
+      probeResolve(false);
+    });
+  }).then((devServerUp) => {
+    if (devServerUp) {
+      win.loadURL(`${DEV_SERVER_URL}?backendPort=${BACKEND_PORT}${options.urlParams ?? ""}`);
+    } else {
+      loadBuiltRenderer();
+    }
+  });
+}
+
 function createWindow(): Promise<BrowserWindow> {
   return new Promise((resolve) => {
     const win = new BrowserWindow({
@@ -320,61 +386,19 @@ function createWindow(): Promise<BrowserWindow> {
       title: "OneTrainer",
       icon: getAppIcon(),
       show: false,
-      webPreferences: {
-        preload: path.join(__dirname, "preload.cjs"),
-        contextIsolation: true,
-        nodeIntegration: false,
-        // Electron's default sandboxed preload loader can't require() relative
-        // files — it'd break our shared/ipc-channels import. contextIsolation
-        // plus nodeIntegration:false is still the real renderer security
-        // boundary; disabling sandbox just lets the preload use full Node.
-        sandbox: false,
-      },
+      webPreferences: RENDERER_WEB_PREFERENCES,
     });
     mainWindow = win;
 
-    const rendererPath = path.join(__dirname, "..", "..", "renderer", "index.html");
-    // Only probe the Vite dev server on an explicit `--dev` launch -- a plain
-    // start-web-ui.bat/.sh run is unpackaged too, but should always load the
-    // built renderer rather than attempt (and hot-reload from) a dev server.
-    const isDev = devMode && !app.isPackaged;
-    if (isDev) {
-      new Promise<boolean>((probeResolve) => {
-        const req = http.get(DEV_SERVER_URL, () => probeResolve(true));
-        req.on("error", () => probeResolve(false));
-        req.setTimeout(500, () => {
-          req.destroy();
-          probeResolve(false);
-        });
-      }).then((devServerUp) => {
-        if (devServerUp) {
-          win.loadURL(`${DEV_SERVER_URL}?backendPort=${BACKEND_PORT}${devMode ? "&dev=1" : ""}`);
-        } else {
-          win.loadFile(rendererPath, {
-            query: { backendPort: String(BACKEND_PORT), ...(devMode ? { dev: "1" } : {}) },
-          });
-        }
-      });
-      if (process.env.OT_DEVTOOLS === "1") {
-        win.webContents.openDevTools();
-      }
-    } else {
-      win.loadFile(rendererPath, {
-        query: { backendPort: String(BACKEND_PORT), ...(devMode ? { dev: "1" } : {}) },
-      });
+    void loadRenderer(win, {
+      urlParams: devMode ? "&dev=1" : "",
+      fileQuery: devMode ? { dev: "1" } : {},
+    });
+    if (devMode && !app.isPackaged && process.env.OT_DEVTOOLS === "1") {
+      win.webContents.openDevTools();
     }
 
-    win.webContents.on("will-navigate", (event, url) => {
-      const parsed = new URL(url);
-      if (parsed.hostname === "localhost") return;
-      event.preventDefault();
-      shell.openExternal(url);
-    });
-
-    win.webContents.setWindowOpenHandler(({ url }) => {
-      shell.openExternal(url);
-      return { action: "deny" };
-    });
+    hardenWindow(win);
 
     const loadTimeout = setTimeout(() => {
       console.warn("[Electron] Main window ready-to-show timeout, resolving anyway");
@@ -464,8 +488,6 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.OPEN_MASK_EDITOR, async (_event, folder?: string) => {
-    const rendererPath = path.join(__dirname, "..", "..", "renderer", "index.html");
-    const isDev = devMode && !app.isPackaged;
     const folderParam = folder ? `&folder=${encodeURIComponent(folder)}` : "";
 
     const editorWindow = new BrowserWindow({
@@ -475,55 +497,15 @@ function registerIpcHandlers(): void {
       minHeight: 800,
       title: "Mask Editor - OneTrainer",
       icon: getAppIcon(),
-      webPreferences: {
-        preload: path.join(__dirname, "preload.cjs"),
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: false,
-      },
+      webPreferences: RENDERER_WEB_PREFERENCES,
     });
 
-    if (isDev) {
-      const devServerUp = await new Promise<boolean>((probeResolve) => {
-        const req = http.get(DEV_SERVER_URL, () => probeResolve(true));
-        req.on("error", () => probeResolve(false));
-        req.setTimeout(500, () => {
-          req.destroy();
-          probeResolve(false);
-        });
-      });
-      if (devServerUp) {
-        editorWindow.loadURL(`${DEV_SERVER_URL}?backendPort=${BACKEND_PORT}&route=mask-editor${folderParam}`);
-      } else {
-        editorWindow.loadFile(rendererPath, {
-          query: {
-            backendPort: String(BACKEND_PORT),
-            route: "mask-editor",
-            ...(folder ? { folder } : {}),
-          },
-        });
-      }
-    } else {
-      editorWindow.loadFile(rendererPath, {
-        query: {
-          backendPort: String(BACKEND_PORT),
-          route: "mask-editor",
-          ...(folder ? { folder } : {}),
-        },
-      });
-    }
-
-    editorWindow.webContents.on("will-navigate", (event, url) => {
-      const parsed = new URL(url);
-      if (parsed.hostname === "localhost") return;
-      event.preventDefault();
-      shell.openExternal(url);
+    await loadRenderer(editorWindow, {
+      urlParams: `&route=mask-editor${folderParam}`,
+      fileQuery: { route: "mask-editor", ...(folder ? { folder } : {}) },
     });
 
-    editorWindow.webContents.setWindowOpenHandler(({ url }) => {
-      shell.openExternal(url);
-      return { action: "deny" };
-    });
+    hardenWindow(editorWindow);
 
     return true;
   });

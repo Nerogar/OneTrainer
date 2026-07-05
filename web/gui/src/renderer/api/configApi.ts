@@ -12,18 +12,6 @@ export interface PresetInfo {
   is_builtin: boolean;
 }
 
-export interface FieldMetadata {
-  type: string;
-  default: unknown;
-  nullable: boolean;
-  enum_values?: string[];
-  min?: number;
-  max?: number;
-  description?: string;
-}
-
-export type ConfigSchema = Record<string, FieldMetadata>;
-
 export interface OptimizerParamDetail {
   title: string;
   tooltip: string;
@@ -53,8 +41,6 @@ export const configApi = {
     }),
 
   getDefaults: () => request<TrainConfig>("/config/defaults"),
-
-  getSchema: () => request<{ fields: ConfigSchema }>("/config/schema").then((r) => r.fields),
 
   exportConfig: () => request<TrainConfig>("/config/export", { method: "POST" }),
 
