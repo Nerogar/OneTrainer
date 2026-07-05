@@ -5,6 +5,7 @@ from collections import defaultdict
 from collections.abc import Mapping
 from typing import Any
 
+from modules.module.FusedModule import FusedModuleGroup, check_fusion_match, discover_fused_groups
 from modules.module.oft_utils import OFTRotationModule
 from modules.module.quantized.LinearSVD import BaseLinearSVD
 from modules.util.config.TrainConfig import TrainConfig
@@ -104,6 +105,15 @@ class PeftBase(nn.Module):
         assert self.orig_forward is not None
         assert self.orig_module is not None
         assert self.op is not None
+
+    def delta_forward(self, x, *args, **kwargs) -> Tensor | None:
+        # Returns just this adapter's own contribution (the term added to orig_forward(x)), for peft
+        # types whose forward is expressible as orig_forward(x) + delta with delta computable without
+        # touching the (possibly fused) base. Lets FusedModuleGroup add each leaf's real, unfused base
+        # once instead of recomputing the whole fused forward per leaf. Returns None (the default) for
+        # peft types that recompose the base weight itself (DoRA, OFT, LoKr-decompose), which must keep
+        # going through the fused forward.
+        return None
 
     @property
     def orig_module(self) -> nn.Module:
@@ -264,7 +274,10 @@ class LoHaModule(PeftBase):
         assert self.hada_w2_b is not None
 
     def forward(self, x, *args, **kwargs):
-        # They definitely exist at this point in the execution.
+        self.check_initialized()
+        return self.orig_forward(x) + self.delta_forward(x, *args, **kwargs)
+
+    def delta_forward(self, x, *args, **kwargs) -> Tensor | None:
         self.check_initialized()
 
         # Yeah, yeah, it's different from the A/B parameters in make_weight.
@@ -274,7 +287,7 @@ class LoHaModule(PeftBase):
         W2 = self.make_weight(self.dropout(self.hada_w2_b),
                               self.dropout(self.hada_w2_a))
         W = (W1 * W2) * (self.alpha / self.rank)
-        return self.orig_forward(x) + self.op(x, W, bias=None, **self.layer_kwargs)
+        return self.op(x, W, bias=None, **self.layer_kwargs)
 
     def apply_to_module(self):
         # TODO
@@ -560,8 +573,12 @@ class LoRAModule(PeftBase):
         if isinstance(self.orig_module, BaseLinearSVD):
             return self.orig_module.forward_with_lora(x, self.lora_down, self.lora_up, self.dropout, self.alpha)
 
+        return self.orig_forward(x) + self.delta_forward(x, *args, **kwargs)
+
+    def delta_forward(self, x, *args, **kwargs) -> Tensor | None:
+        self.check_initialized()
         ld = self.lora_up(self.dropout(self.lora_down(x)))
-        return self.orig_forward(x) + ld * (self.alpha / self.rank)
+        return ld * (self.alpha / self.rank)
 
     def apply_to_module(self):
         # TODO
@@ -824,6 +841,8 @@ class LoRAModuleWrapper:
             prefix: str,
             config: TrainConfig,
             module_filter: list[str] = None,
+            fusion_spec: list[tuple] | None = None,
+            fuse: bool | None = None,
     ):
         self.orig_module = orig_module
         self.prefix = prefix
@@ -831,6 +850,17 @@ class LoRAModuleWrapper:
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
         self.lokr_dim = config.lokr_dim
+        # per-model qkv fusion groups (group_pattern, [leaf_suffixes], fused_suffix, original_suffix).
+        self.fusion_spec = fusion_spec
+        # whether to actually BUILD fused modules (vs split leaves). The setup decides from the chosen
+        # output format (ModelFormat.needs_qkv_fusion); this module does not know about output formats.
+        # `fuse` is separate from `fusion_spec` because a SPLIT wrapper still needs the qkv grouping to
+        # recognise (and reject) an incompatible fused file on load -- the file's fused/split state must
+        # match the wrapper's, and detecting that targets the qkv keys via the spec (see the
+        # check_fusion_match call in load_state_dict). A setup that wants that check passes fusion_spec unconditionally and
+        # selects fused/split only via `fuse`. When `fuse` is left None it defaults to fusing iff a spec
+        # was given.
+        self.fuse = (fusion_spec is not None) if fuse is None else fuse
 
         self.module_filters = [
             ModuleFilter(pattern, use_regex=config.layer_filter_regex)
@@ -882,6 +912,7 @@ class LoRAModuleWrapper:
                 'train_device': torch.device(config.train_device),
                 'lokr_vec_trick': config.lokr_vec_trick,
             }
+        self.fused_groups = []
         self.lora_modules = self.__create_modules(orig_module, config)
 
     def __create_modules(self, orig_module: nn.Module | None, config: TrainConfig) -> dict[str, PeftBase]:
@@ -894,21 +925,44 @@ class LoRAModuleWrapper:
         unsuitable = []
         oft_adjustments = []
 
+        selected_modules = {}
         for name, child_module in orig_module.named_modules():
             name = name.replace(".checkpoint.", ".")
             if not isinstance(child_module, Linear | Conv2d):
                 unsuitable.append(name)
                 continue
             if len(self.module_filters) == 0 or any(f.matches(name) for f in self.module_filters):
-                prefixed_name = (self.prefix + "." + name) if self.prefix != "" else name
-                lora_module = self.klass(prefixed_name, child_module, *self.additional_args, **self.additional_kwargs)
-                lora_modules[name] = lora_module
-                if self.peft_type == PeftType.OFT_2 and lora_module.adjustment_info:
-                    old, new = lora_module.adjustment_info
-                    oft_adjustments.append({'old': old, 'new': new})
+                selected_modules[name] = child_module
                 selected.append(name)
             else:
                 deselected.append(name)
+
+        # discovered qkv fusion groups, retained for the load-time fused/split match check regardless of
+        # whether they are built fused. With no fusion_spec this is empty -> the loop below builds only
+        # individual (split) modules.
+        self.fused_groups = discover_fused_groups(self.fusion_spec, selected_modules, self.fuse)
+        # when fusing, each complete group becomes one fused module (ORIGINAL/COMFY); its leaves are then
+        # excluded from individual creation. When not fusing, the leaves stay individual (split) modules.
+        consumed = set()
+        if self.fuse:
+            for fused_name, leaf_names, leaves in self.fused_groups:
+                consumed.update(leaf_names)
+                prefixed_name = (self.prefix + "." + fused_name) if self.prefix != "" else fused_name
+                group = FusedModuleGroup(prefixed_name, leaves, self.klass, self.additional_args, self.additional_kwargs)
+                lora_modules[fused_name] = group
+                if self.peft_type == PeftType.OFT_2 and group.module.adjustment_info:
+                    old, new = group.module.adjustment_info
+                    oft_adjustments.append({'old': old, 'new': new})
+
+        for name, child_module in selected_modules.items():
+            if name in consumed:
+                continue
+            prefixed_name = (self.prefix + "." + name) if self.prefix != "" else name
+            lora_module = self.klass(prefixed_name, child_module, *self.additional_args, **self.additional_kwargs)
+            lora_modules[name] = lora_module
+            if self.peft_type == PeftType.OFT_2 and lora_module.adjustment_info:
+                old, new = lora_module.adjustment_info
+                oft_adjustments.append({'old': old, 'new': new})
 
         if oft_adjustments:
             summary = defaultdict(int)
@@ -990,6 +1044,7 @@ class LoRAModuleWrapper:
         # create a copy, so the modules can pop states
         state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
 
+        check_fusion_match(state_dict.keys(), self.fuse, self.fusion_spec)
         # FIXME: disabled rank check, false positive on Flux2 LoHA loading
         # self._check_rank_matches(state_dict)
 

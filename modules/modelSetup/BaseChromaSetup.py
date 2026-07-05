@@ -37,7 +37,7 @@ class BaseChromaSetup(
     metaclass=ABCMeta
 ):
     LAYER_PRESETS = {
-        "attn-mlp": ["attn", "ff.net"],
+        "attn-mlp": ["attn", "ff.net", "proj_mlp"],
         "attn-only": ["attn"],
         "blocks": ["transformer_block"],
         "full": [],
@@ -48,12 +48,8 @@ class BaseChromaSetup(
             model: ChromaModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_chroma_transformer(model.transformer, config)
-            if model.text_encoder is not None:
-                model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_t5_encoder_layers(model.text_encoder, config)
+        model.transformer_offload_conductor = enable_checkpointing_for_chroma_transformer(model.transformer, config, config.transformer)
+        model.text_encoder_offload_conductor = enable_checkpointing_for_t5_encoder_layers(model.text_encoder, config, config.text_encoder)
 
         model.autocast_context, model.train_dtype = create_autocast_context(
             self.train_device, config.train_dtype, config.enable_autocast_cache)
@@ -69,6 +65,8 @@ class BaseChromaSetup(
         quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype, config)
         quantize_layers(model.vae, self.train_device, model.train_dtype, config)
         quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
+
+        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=True)
 
     def _setup_embeddings(
             self,
@@ -120,7 +118,7 @@ class BaseChromaSetup(
             model: ChromaModel,
             config: TrainConfig,
     ):
-        if model.tokenizer is not None and model.text_encoder is not None:
+        if model.tokenizer is not None:
             model.embedding_wrapper = AdditionalEmbeddingWrapper(
                 tokenizer=model.tokenizer,
                 orig_module=model.text_encoder.encoder.embed_tokens,
@@ -135,14 +133,13 @@ class BaseChromaSetup(
             model: ChromaModel,
             config: TrainConfig,
     ):
-        if model.text_encoder is not None:
-            for embedding, embedding_config in zip(model.all_text_encoder_embeddings(),
-                                                   config.all_embedding_configs(), strict=True):
-                train_embedding = \
-                    embedding_config.train \
-                    and config.text_encoder.train_embedding \
-                    and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
-                embedding.requires_grad_(train_embedding)
+        for embedding, embedding_config in zip(model.all_text_encoder_embeddings(),
+                                               config.all_embedding_configs(), strict=True):
+            train_embedding = \
+                embedding_config.train \
+                and config.text_encoder.train_embedding \
+                and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
+            embedding.requires_grad_(train_embedding)
 
     def predict(
             self,

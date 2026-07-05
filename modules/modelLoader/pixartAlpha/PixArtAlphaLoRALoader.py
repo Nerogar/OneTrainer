@@ -1,8 +1,5 @@
-from modules.model.BaseModel import BaseModel
 from modules.model.PixArtAlphaModel import PixArtAlphaModel
 from modules.modelLoader.mixin.LoRALoaderMixin import LoRALoaderMixin
-from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
-from modules.util.convert.lora.convert_pixart_lora import convert_pixart_lora_key_sets
 from modules.util.ModelNames import ModelNames
 
 
@@ -12,8 +9,14 @@ class PixArtAlphaLoRALoader(
     def __init__(self):
         super().__init__()
 
-    def _get_convert_key_sets(self, model: BaseModel) -> list[LoraConversionKeySet] | None:
-        return convert_pixart_lora_key_sets()
+
+    def _legacy_conversion(self, model: PixArtAlphaModel) -> list | None:
+        # Single-TE override: no-digit lora_te (the default numbers it lora_te1); mirrors the saver's _convert_legacy.
+        return [
+            ("transformer", "lora_transformer"),
+            ("text_encoder", "lora_te"),
+            ("bundle_emb", "bundle_emb"),
+        ]
 
     def load(
             self,

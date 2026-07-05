@@ -50,11 +50,10 @@ class BaseStableDiffusionSetup(
             model: StableDiffusionModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
-            model.vae.enable_gradient_checkpointing()
+        if config.unet.checkpointing_enabled():
             model.unet.enable_gradient_checkpointing()
-            enable_checkpointing_for_basic_transformer_blocks(model.unet, config, offload_enabled=False)
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder, config)
+            enable_checkpointing_for_basic_transformer_blocks(model.unet, config, config.unet, offload_enabled=False)
+        enable_checkpointing_for_clip_encoder_layers(model.text_encoder, config, config.text_encoder)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.vae)
@@ -68,6 +67,7 @@ class BaseStableDiffusionSetup(
         quantize_layers(model.text_encoder, self.train_device, model.train_dtype, config)
         quantize_layers(model.vae, self.train_device, model.train_dtype, config)
         quantize_layers(model.unet, self.train_device, model.train_dtype, config)
+        self._set_attention_backend(model.unet, config.attention_mechanism, mask=False)
 
     def _setup_embeddings(
             self,

@@ -1,9 +1,6 @@
 from modules.model.QwenModel import QwenModel
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
-from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
-from modules.util.enum.ModelFormat import ModelFormat
 
-import torch
 from torch import Tensor
 
 
@@ -13,8 +10,10 @@ class QwenLoRASaver(
     def __init__(self):
         super().__init__()
 
-    def _get_convert_key_sets(self, model: QwenModel) -> list[LoraConversionKeySet] | None:
-        return None
+    def _convert_legacy(self, model: QwenModel, state_dict: dict[str, Tensor]) -> dict[str, Tensor]:
+        # Older OneTrainer versions saved this model's LoRA unconverted (canonical / diffusers-dotted),
+        # so identity reproduces that output.
+        return dict(state_dict)
 
     def _get_state_dict(
             self,
@@ -28,12 +27,3 @@ class QwenLoRASaver(
         if model.lora_state_dict is not None:
             state_dict |= model.lora_state_dict
         return state_dict
-
-    def save(
-            self,
-            model: QwenModel,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
-    ):
-        self._save(model, output_model_format, output_model_destination, dtype)

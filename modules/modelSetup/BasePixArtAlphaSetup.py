@@ -50,12 +50,8 @@ class BasePixArtAlphaSetup(
             model: PixArtAlphaModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
-            model.vae.enable_gradient_checkpointing()
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_basic_transformer_blocks(model.transformer, config, offload_enabled=True)
-            model.text_encoder_offload_conductor = \
-                enable_checkpointing_for_t5_encoder_layers(model.text_encoder, config)
+        model.transformer_offload_conductor = enable_checkpointing_for_basic_transformer_blocks(model.transformer, config, config.transformer, offload_enabled=True)
+        model.text_encoder_offload_conductor = enable_checkpointing_for_t5_encoder_layers(model.text_encoder, config, config.text_encoder)
 
         model.autocast_context, model.train_dtype = create_autocast_context(
             self.train_device, config.train_dtype, config.enable_autocast_cache)
@@ -70,6 +66,7 @@ class BasePixArtAlphaSetup(
         quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype, config)
         quantize_layers(model.vae, self.train_device, model.train_dtype, config)
         quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
+        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=True)
 
     def _setup_embeddings(
             self,
