@@ -1,6 +1,5 @@
 
 from modules.ui.BaseTrainingTabView import BaseTrainingTabView
-from modules.ui.CtkOffloadingWindowView import CtkOffloadingWindowView
 from modules.ui.CtkOptimizerParamsWindowView import CtkOptimizerParamsWindowView
 from modules.ui.CtkSchedulerParamsWindowView import CtkSchedulerParamsWindowView
 from modules.ui.CtkTimestepDistributionWindowView import CtkTimestepDistributionWindowView
@@ -63,9 +62,6 @@ class CtkTrainingTabView(BaseTrainingTabView):
 
     def open_scheduler_params(self):
         self.master.wait_window(self.controller.open_scheduler_params_window(self.master, self.ui_state, CtkSchedulerParamsWindowView))
-
-    def open_offloading(self):
-        self.master.wait_window(self.controller.open_offloading_window(self.master, self.ui_state, CtkOffloadingWindowView))
 
     def open_timestep_distribution(self):
         self.master.wait_window(self.controller.open_timestep_distribution_window(self.master, self.ui_state, CtkTimestepDistributionWindowView))

@@ -45,15 +45,11 @@ class BaseFlux2Setup(
             model: Flux2Model,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_flux2_transformer(model.transformer, config)
-            if model.is_dev():
-                model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_mistral_encoder_layers(model.text_encoder, config)
-            else:
-                model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_qwen3_encoder_layers(model.text_encoder, config)
+        model.transformer_offload_conductor = enable_checkpointing_for_flux2_transformer(model.transformer, config, config.transformer)
+        if model.is_dev():
+            model.text_encoder_offload_conductor = enable_checkpointing_for_mistral_encoder_layers(model.text_encoder, config, config.text_encoder)
+        else:
+            model.text_encoder_offload_conductor = enable_checkpointing_for_qwen3_encoder_layers(model.text_encoder, config, config.text_encoder)
 
         model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
             config.weight_dtypes().transformer,
