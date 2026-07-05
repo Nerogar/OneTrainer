@@ -10,7 +10,7 @@
     "transformer": {
         "train": true,
         "weight_dtype": "BFLOAT_16",
-        "offload_fraction": 0.3
+        "offload_fraction": 0.5
     },
     "text_encoder": {
         "train": false,
