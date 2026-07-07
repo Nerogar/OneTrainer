@@ -28,7 +28,8 @@ class GenerateCaptionsWindowController:
         self.parent.load_image()
 
     def create_captions_lmstudio(self, server_url, system_prompt, user_prompt, path, mode_str,
-                                 include_subdirectories, progress_callback=None, error_callback=None):
+                                 include_subdirectories, progress_callback=None, error_callback=None,
+                                 is_cancelled=None):
         self.parent.load_lmstudio_captioning_model(server_url, system_prompt, user_prompt)
 
         mode = {
@@ -43,4 +44,5 @@ class GenerateCaptionsWindowController:
             progress_callback=progress_callback,
             error_callback=error_callback,
             include_subdirectories=include_subdirectories,
+            is_cancelled=is_cancelled,
         )

@@ -26,6 +26,7 @@ class PySide6GenerateCaptionsWindowView(BaseGenerateCaptionsWindowView, QDialog,
         QDialog.__init__(self, parent)
         self.controller = controller
         self._running = False
+        self._cancel_requested = False
 
         settings = load_caption_ui_settings()
 
@@ -88,7 +89,12 @@ class PySide6GenerateCaptionsWindowView(BaseGenerateCaptionsWindowView, QDialog,
 
         self.create_button = QPushButton("Create Captions", self)
         self.create_button.clicked.connect(self._on_create)
-        lo.addWidget(self.create_button, row, 0, 1, 2)
+        lo.addWidget(self.create_button, row, 0)
+
+        self.cancel_button = QPushButton("Cancel", self)
+        self.cancel_button.setEnabled(False)
+        self.cancel_button.clicked.connect(self._on_cancel)
+        lo.addWidget(self.cancel_button, row, 1)
         row += 1
 
         lo.setRowStretch(row, 1)
@@ -139,7 +145,9 @@ class PySide6GenerateCaptionsWindowView(BaseGenerateCaptionsWindowView, QDialog,
         save_caption_ui_settings(server_url, system_prompt, user_prompt)
 
         self._running = True
+        self._cancel_requested = False
         self.create_button.setEnabled(False)
+        self.cancel_button.setEnabled(True)
         self.status_box.clear()
         self._log(f"Connecting to {server_url} ...")
 
@@ -157,8 +165,9 @@ class PySide6GenerateCaptionsWindowView(BaseGenerateCaptionsWindowView, QDialog,
                     include_subdirectories=include_subdirectories,
                     progress_callback=self.set_progress,
                     error_callback=error_callback,
+                    is_cancelled=lambda: self._cancel_requested,
                 )
-                self._log("Done.")
+                self._log("Cancelled." if self._cancel_requested else "Done.")
             except Exception as e:
                 message = str(e)
                 self._log(f"Failed: {message}")
@@ -167,6 +176,13 @@ class PySide6GenerateCaptionsWindowView(BaseGenerateCaptionsWindowView, QDialog,
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def _on_cancel(self):
+        if self._running and not self._cancel_requested:
+            self._cancel_requested = True
+            self.cancel_button.setEnabled(False)
+            self._log("Cancelling after the current image ...")
+
     def _on_done(self):
         self._running = False
         self.create_button.setEnabled(True)
+        self.cancel_button.setEnabled(False)
