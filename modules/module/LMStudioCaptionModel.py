@@ -1,3 +1,11 @@
+"""LM Studio captioning backend.
+
+The request flow (base64 image -> OpenAI-compatible /v1/chat/completions,
+stripping <think>...</think> blocks from reasoning models) is adapted from
+LM_Studio_Image_Captioner by Kazi Shashwata Rahman (MIT License):
+https://github.com/shashwata2020/LM_Studio_Image_Captioner
+"""
+
 import base64
 import os
 import re
