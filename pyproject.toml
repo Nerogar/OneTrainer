@@ -188,12 +188,14 @@ extra-index-urls = ["https://download.pytorch.org/whl/cpu"]
 
 [tool.pixi.dependencies]
 python = "3.13.*"
-compilers = "*"
+c-compiler = "*"
+cxx-compiler = "*"
 
 [tool.pixi.target.linux-64.dependencies]
 tk = { version = "*", build = "xft_*" }
 libgl = "*"
 libglib = "*"
+xcb-util-cursor = "*"
 
 [tool.pixi.pypi-options]
 index-strategy = "unsafe-best-match"
