@@ -2,9 +2,11 @@ import os
 import subprocess
 import traceback
 
+from modules.module.BaseImageCaptionModel import CaptionSample
 from modules.module.Blip2Model import Blip2Model
 from modules.module.BlipModel import BlipModel
 from modules.module.ClipSegModel import ClipSegModel
+from modules.module.LMStudioCaptionModel import LMStudioCaptionModel
 from modules.module.MaskByColor import MaskByColor
 from modules.module.RembgHumanModel import RembgHumanModel
 from modules.module.RembgModel import RembgModel
@@ -346,6 +348,24 @@ class CaptionUIController:
             self._release_models()
             print("loading WD14_VIT_v2 model, this may take a while")
             self.captioning_model = WDModel(default_device, torch.float16)
+
+    def load_lmstudio_captioning_model(self, server_url, system_prompt, user_prompt):
+        self._release_models()
+        self.captioning_model = LMStudioCaptionModel(server_url, system_prompt, user_prompt)
+
+    def caption_current_image(self, server_url, system_prompt, user_prompt):
+        if (
+            len(self.image_rel_paths) == 0
+            or self.current_image_index < 0
+            or self.current_image_index >= len(self.image_rel_paths)
+        ):
+            return None
+
+        image_name = self.image_rel_paths[self.current_image_index]
+        image_path = os.path.join(self.dir, image_name)
+
+        model = LMStudioCaptionModel(server_url, system_prompt, user_prompt)
+        return model.generate_caption(CaptionSample(image_path))
 
     def print_help(self):
         print(self.help_text)
