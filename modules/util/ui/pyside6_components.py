@@ -11,7 +11,7 @@ from modules.util.ui.pyside6_validation import PySide6FieldValidator, PySide6Pat
 from modules.util.ui.UIState import BaseUIState
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -524,6 +524,16 @@ def preset_menu_button(
 # Bound widgets
 # ---------------------------------------------------------------------------
 
+class NoScrollComboBox(QComboBox):
+    # scrolling over a closed combo box is an easy way to accidentally change
+    # its value while just scrolling the surrounding page; only scroll while open
+    def wheelEvent(self, event: QWheelEvent):
+        if self.view().isVisible():
+            super().wheelEvent(event)
+        else:
+            event.ignore()
+
+
 def options(
         master: QWidget,
         row: int,
@@ -534,7 +544,7 @@ def options(
         command: Callable[[str], None] | None = None,
 ) -> QComboBox:
     var = ui_state.get_var(var_name)
-    combo = QComboBox(master)
+    combo = NoScrollComboBox(master)
     combo.addItems(values)
     combo.setCurrentText(str(var.get()))
 
@@ -641,7 +651,7 @@ def options_kv(
                 break
         _updating = False
 
-    combo = QComboBox(master)
+    combo = NoScrollComboBox(master)
     combo.addItems(keys)
     # set initial display from current var value
     for k, v in values:
