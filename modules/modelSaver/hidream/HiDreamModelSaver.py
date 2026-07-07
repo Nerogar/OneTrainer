@@ -1,4 +1,3 @@
-import copy
 import os.path
 from pathlib import Path
 
@@ -26,21 +25,7 @@ class HiDreamModelSaver(
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
         pipeline = model.create_pipeline(use_original_tokenizers=True)
         pipeline.to("cpu")
-        if dtype is not None:
-            # replace the tokenizers __deepcopy__ before calling deepcopy, to prevent a copy being made.
-            # the tokenizer tries to reload from the file system otherwise
-            tokenizer_3 = pipeline.tokenizer_3
-            tokenizer_3.__deepcopy__ = lambda memo: tokenizer_3
-            tokenizer_4 = pipeline.tokenizer_4
-            tokenizer_4.__deepcopy__ = lambda memo: tokenizer_4
-
-            save_pipeline = copy.deepcopy(pipeline)
-            save_pipeline.to(device="cpu", dtype=dtype, silence_dtype_warnings=True)
-
-            delattr(tokenizer_3, '__deepcopy__')
-            delattr(tokenizer_4, '__deepcopy__')
-        else:
-            save_pipeline = pipeline
+        save_pipeline = self._copy_pipeline_to_dtype(pipeline, dtype, pipeline.tokenizer_3, pipeline.tokenizer_4)
 
         os.makedirs(Path(destination).absolute(), exist_ok=True)
         save_pipeline.save_pretrained(destination)
@@ -79,7 +64,9 @@ class HiDreamModelSaver(
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 self.__save_diffusers(model, output_model_destination, dtype)
-            case ModelFormat.SAFETENSORS:
+            case ModelFormat.LEGACY_SAFETENSORS | ModelFormat.ORIGINAL_TRANSFORMER:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)
+            case _:
+                raise NotImplementedError(f"Unsupported output format: {output_model_format}")

@@ -42,3 +42,11 @@ config_diff.txt
 
 # macOS
 **/.DS_Store
+CLAUDE.md
+
+training_presets/*
+!training_presets/.gitignore
+!training_presets/\#*
+
+# #.json is an exception (from the exception). This file stores the ui state from a previous run.
+training_presets/\#.json

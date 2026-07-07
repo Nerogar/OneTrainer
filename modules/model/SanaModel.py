@@ -6,6 +6,7 @@ from modules.model.util.gemma_util import encode_gemma
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.DataType import DataType
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
@@ -104,6 +105,16 @@ class SanaModel(BaseModel):
             self.transformer_lora,
         ] if a is not None]
 
+    def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
+        # Single Gemma2 TE. No COMFY_LORA name -- ComfyUI cannot load Sana, so the COMFY format refuses to
+        # write its TE keys.
+        return [
+            (self.text_encoder, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder",
+                ModelFormat.KOHYA_LORA: "lora_te",
+            }),
+        ]
+
     def all_embeddings(self) -> list[SanaModelEmbedding]:
         return self.additional_embeddings \
                + ([self.embedding] if self.embedding is not None else [])
@@ -116,8 +127,7 @@ class SanaModel(BaseModel):
         self.vae.to(device=device)
 
     def text_encoder_to(self, device: torch.device):
-        if self.text_encoder_offload_conductor is not None and \
-                self.text_encoder_offload_conductor.layer_offload_activated():
+        if self.text_encoder_offload_conductor is not None:
             self.text_encoder_offload_conductor.to(device)
         else:
             self.text_encoder.to(device=device)
@@ -126,8 +136,7 @@ class SanaModel(BaseModel):
             self.text_encoder_lora.to(device)
 
     def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None and \
-                self.transformer_offload_conductor.layer_offload_activated():
+        if self.transformer_offload_conductor is not None:
             self.transformer_offload_conductor.to(device)
         else:
             self.transformer.to(device=device)

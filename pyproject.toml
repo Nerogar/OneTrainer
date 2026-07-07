@@ -15,12 +15,12 @@ dependencies = [
     "imagesize==1.4.1",
     "tqdm==4.67.1",
     "pyyaml==6.0.2",
-    "huggingface-hub==1.16.1",
+    "huggingface-hub==1.22.0",
     "scipy==1.15.3",
     "matplotlib==3.10.3",
     "av==16.1.0",
     "yt-dlp",
-    "scenedetect==0.6.7.1",
+    "scenedetect==0.7",
     "parse==1.20.2",
     "setuptools==81.0.0",
 
@@ -30,7 +30,7 @@ dependencies = [
     "tensorboard==2.20.0",
 
     # diffusion models
-    "diffusers @ git+https://github.com/huggingface/diffusers.git@0f1abc4ae8b0eb2a3b40e82a310507281144c423",
+    "diffusers @ git+https://github.com/huggingface/diffusers.git@1ffa4236a48af8d1d2eaeed6c84027af19acfc39",
     "gguf==0.17.1",
     "transformers==5.5.4",
     "sentencepiece==0.2.1",  # transitive dependency of transformers for tokenizer loading
@@ -42,7 +42,7 @@ dependencies = [
     "open-clip-torch==2.32.0",
 
     # data loader
-    "mgds @ git+https://github.com/Nerogar/mgds.git@9320a696309d21776ed7b5b1f66b05c66e9b5484",
+    "mgds @ git+https://github.com/Nerogar/mgds.git@3a6994ad18a490acc4f3876658167525b7d88da7",
 
     # optimizers
     "dadaptation==3.2",
@@ -59,6 +59,7 @@ dependencies = [
 
     # ui
     "customtkinter==5.2.2",
+    "PySide6==6.11.1",
 
     # cloud
     "runpod==1.7.10",
@@ -66,8 +67,8 @@ dependencies = [
 
     # debug
     "psutil==7.0.0",
-    "requests==2.32.5",
-    "deepdiff==8.6.1", # output easy to read diff for troublshooting
+    "requests==2.33.0",
+    "deepdiff==8.6.2", # output easy to read diff for troublshooting
 ]
 
 [project.optional-dependencies]
@@ -147,9 +148,9 @@ section-order = [
 channels = ["conda-forge"]
 # Order here matters, first match wins
 platforms = [
-    { name = "linux-cuda13", platform = "linux-64", glibc = "2.28", cuda = "13.0" },
-    { name = "linux-cuda12", platform = "linux-64", glibc = "2.28", cuda = "12.6" },
-    { name = "linux-generic", platform = "linux-64", glibc = "2.28" },
+    { name = "linux-cuda13", platform = "linux-64", glibc = "2.34", cuda = "13.0" },
+    { name = "linux-cuda12", platform = "linux-64", glibc = "2.34", cuda = "12.6" },
+    { name = "linux-generic", platform = "linux-64", glibc = "2.34" },
     { name = "win-cuda13", platform = "win-64", cuda = "13.0" },
     { name = "win-cuda12", platform = "win-64", cuda = "12.6" },
     { name = "win-generic", platform = "win-64" },
