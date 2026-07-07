@@ -57,6 +57,10 @@ class _MaskCanvas(QLabel):
         return x, y
 
     def mousePressEvent(self, event):
+        if self._is_editing_enabled():
+            mapped = self._map_to_image(event.position())
+            if mapped is not None:
+                self._controller.set_mask_draw_origin(mapped[0], mapped[1])
         self._handle(event)
 
     def mouseMoveEvent(self, event):

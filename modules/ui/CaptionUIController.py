@@ -238,6 +238,12 @@ class CaptionUIController:
         multiplier = 1.0 + (delta * 0.05)
         self.mask_draw_radius = max(0.0025, self.mask_draw_radius * multiplier)
 
+    def set_mask_draw_origin(self, event_x, event_y):
+        # Called at the start of a fresh stroke (mouse press) so the first dab is a
+        # dot at the click point instead of a line from where the last stroke ended.
+        self.mask_draw_x = event_x
+        self.mask_draw_y = event_y
+
     def handle_edit_mask(self, event_x, event_y, is_left, is_right, alpha):
         if len(self.image_rel_paths) == 0 or self.current_image_index >= len(self.image_rel_paths):
             return
