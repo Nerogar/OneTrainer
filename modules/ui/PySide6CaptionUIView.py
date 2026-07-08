@@ -42,6 +42,9 @@ class _MaskCanvas(QLabel):
         self.setMinimumSize(controller.image_size, controller.image_size)
         self.setMouseTracking(True)
         self.setCursor(Qt.CrossCursor)
+        # take keyboard focus on click so the [ and ] brush-size keys reach the
+        # dialog (rather than the caption text box) once the user is painting
+        self.setFocusPolicy(Qt.ClickFocus)
 
     def set_display_pixmap(self, pixmap: QPixmap):
         self._pixmap_size = (pixmap.width(), pixmap.height())
@@ -198,7 +201,7 @@ class PySide6CaptionUIView(BaseCaptionUIView, QDialog, metaclass=QtABCMeta):
         lo.addStretch(1)
 
         help_button = QPushButton("Help", bar)
-        help_button.setToolTip(self.controller.help_text)
+        help_button.setToolTip(self.controller.help_text + "\n    [ / ]: decrease / increase brush size")
         help_button.clicked.connect(self.controller.print_help)
         lo.addWidget(help_button)
         return bar
@@ -286,6 +289,25 @@ class PySide6CaptionUIView(BaseCaptionUIView, QDialog, metaclass=QtABCMeta):
     def _toggle_mask(self):
         self.controller.toggle_mask()
         self.refresh_image()
+
+    def _change_brush(self, delta):
+        # positive delta grows the brush, negative shrinks it (same as wheel)
+        self.controller.update_mask_draw_radius(delta)
+        self.canvas.update()
+
+    def keyPressEvent(self, event):
+        # handled here (not as a QShortcut) so typing '[' or ']' into the caption
+        # box still works - a focused text field consumes the key before it reaches
+        # the dialog, and only reaches us when focus is on the canvas/dialog
+        if event.key() == Qt.Key_BracketRight:
+            self._change_brush(1)
+            event.accept()
+            return
+        if event.key() == Qt.Key_BracketLeft:
+            self._change_brush(-1)
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     # ---- view callbacks invoked by the controller -----------------------
 
