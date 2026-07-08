@@ -11,7 +11,7 @@ from modules.util.ui.pyside6_util import QtABCMeta
 from PIL import Image
 from PIL.ImageQt import ImageQt
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QKeySequence, QPixmap, QShortcut
+from PySide6.QtGui import QColor, QKeySequence, QPainter, QPen, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -36,13 +36,22 @@ class _MaskCanvas(QLabel):
         self._get_alpha = get_alpha
         self._is_editing_enabled = is_editing_enabled
         self._pixmap_size = (0, 0)
+        self._cursor_pos = None
+        self._cursor_inside = False
         self.setAlignment(Qt.AlignCenter)
         self.setMinimumSize(controller.image_size, controller.image_size)
         self.setMouseTracking(True)
+        self.setCursor(Qt.CrossCursor)
 
     def set_display_pixmap(self, pixmap: QPixmap):
         self._pixmap_size = (pixmap.width(), pixmap.height())
         self.setPixmap(pixmap)
+
+    def _brush_display_radius(self) -> float:
+        # draw_mask sizes the brush as radius * max(mask dimensions); the mask is
+        # uniformly scaled to the display pixmap, so max(pixmap) gives display px
+        pw, ph = self._pixmap_size
+        return self._controller.mask_draw_radius * max(pw, ph)
 
     def _map_to_image(self, pos):
         pw, ph = self._pixmap_size
@@ -56,7 +65,16 @@ class _MaskCanvas(QLabel):
             return None
         return x, y
 
+    def enterEvent(self, event):
+        self._cursor_inside = True
+        self.update()
+
+    def leaveEvent(self, event):
+        self._cursor_inside = False
+        self.update()
+
     def mousePressEvent(self, event):
+        self._cursor_pos = event.position()
         if self._is_editing_enabled():
             mapped = self._map_to_image(event.position())
             if mapped is not None:
@@ -64,7 +82,10 @@ class _MaskCanvas(QLabel):
         self._handle(event)
 
     def mouseMoveEvent(self, event):
+        self._cursor_pos = event.position()
         self._handle(event)
+        if self._is_editing_enabled():
+            self.update()
 
     def _handle(self, event):
         if not self._is_editing_enabled():
@@ -84,6 +105,32 @@ class _MaskCanvas(QLabel):
             return
         delta = 1 if event.angleDelta().y() > 0 else -1
         self._controller.update_mask_draw_radius(delta)
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if not (self._is_editing_enabled() and self._cursor_inside and self._cursor_pos):
+            return
+        if self._pixmap_size == (0, 0):
+            return
+
+        radius = self._brush_display_radius()
+        cx, cy = self._cursor_pos.x(), self._cursor_pos.y()
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setBrush(Qt.NoBrush)
+        # draw a dark ring then a dashed light ring so it stays visible on any image
+        painter.setPen(QPen(QColor(0, 0, 0, 200), 1.5))
+        painter.drawEllipse(self._cursor_pos, radius, radius)
+        pen = QPen(QColor(255, 255, 255, 220), 1.0)
+        pen.setStyle(Qt.DashLine)
+        painter.setPen(pen)
+        painter.drawEllipse(self._cursor_pos, radius, radius)
+        # a small center dot marks the exact brush center
+        painter.setPen(QPen(QColor(255, 255, 255, 220), 1.0))
+        painter.drawPoint(int(cx), int(cy))
+        painter.end()
 
 
 class PySide6CaptionUIView(BaseCaptionUIView, QDialog, metaclass=QtABCMeta):
