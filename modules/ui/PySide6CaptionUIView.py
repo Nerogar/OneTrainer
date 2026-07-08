@@ -141,7 +141,8 @@ class PySide6CaptionUIView(BaseCaptionUIView, QDialog, metaclass=QtABCMeta):
         self.controller = controller
         controller.view = self
 
-        self.setWindowTitle("OneTrainer - Dataset Tool")
+        self._base_title = "OneTrainer - Dataset Tool"
+        self.setWindowTitle(self._base_title)
         self.resize(1280, 980)
 
         root = QVBoxLayout(self)
@@ -246,13 +247,16 @@ class PySide6CaptionUIView(BaseCaptionUIView, QDialog, metaclass=QtABCMeta):
 
         # prompt entry
         self.prompt_edit = QLineEdit(column)
-        self.prompt_edit.returnPressed.connect(self._save)
         lo.addWidget(self.prompt_edit)
         return column
 
     def _install_shortcuts(self):
         QShortcut(QKeySequence(Qt.Key_Up), self, self.controller.previous_image)
         QShortcut(QKeySequence(Qt.Key_Down), self, self.controller.next_image)
+        # window-level so Enter saves regardless of whether the prompt box or the
+        # canvas has focus (covers both the main Return and the keypad Enter keys)
+        QShortcut(QKeySequence(Qt.Key_Return), self, self._save)
+        QShortcut(QKeySequence(Qt.Key_Enter), self, self._save)
         QShortcut(QKeySequence("Ctrl+M"), self, self._toggle_mask)
         QShortcut(QKeySequence("Ctrl+D"), self, self.draw_mask_editing_mode)
         QShortcut(QKeySequence("Ctrl+F"), self, self.fill_mask_editing_mode)
@@ -273,7 +277,11 @@ class PySide6CaptionUIView(BaseCaptionUIView, QDialog, metaclass=QtABCMeta):
         self.controller.config_ui_data["include_subdirectories"] = checked
 
     def _save(self):
+        has_image = 0 <= self.controller.current_image_index < len(self.controller.image_rel_paths)
         self.controller.save(self.prompt_edit.text())
+        if has_image:
+            self.setWindowTitle(f"{self._base_title}  —  saved ✓")
+            QTimer.singleShot(1500, self, lambda: self.setWindowTitle(self._base_title))
 
     def _toggle_mask(self):
         self.controller.toggle_mask()
