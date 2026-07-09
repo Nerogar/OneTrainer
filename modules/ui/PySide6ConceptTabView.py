@@ -113,7 +113,7 @@ class PySide6ConceptWidgetView(BaseConceptWidgetView, QFrame):
         self.i = i
 
         self.setFixedSize(160, 180)
-        self.setStyleSheet("background-color: palette(Base); border-radius: 4px;")
+        self.setObjectName("section_frame")
 
         image = self._get_preview_image()
         pixmap = QPixmap.fromImage(ImageQt(image.convert("RGBA")))
