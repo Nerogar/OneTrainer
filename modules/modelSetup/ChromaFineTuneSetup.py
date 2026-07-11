@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.CHROMA_1, TrainingMethod.FINE_TUNE)
 class ChromaFineTuneSetup(
     BaseChromaSetup,
 ):
@@ -38,7 +39,7 @@ class ChromaFineTuneSetup(
         self._create_model_part_parameters(parameter_group_collection, "text_encoder", model.text_encoder, config.text_encoder)
 
         if config.train_any_embedding() or config.train_any_output_embedding():
-            if config.text_encoder.train_embedding and model.text_encoder is not None:
+            if config.text_encoder.train_embedding:
                 self._add_embedding_param_groups(
                     model.all_text_encoder_embeddings(), parameter_group_collection, config.embedding_learning_rate,
                     "embeddings"
@@ -67,10 +68,8 @@ class ChromaFineTuneSetup(
             config: TrainConfig,
     ):
         if config.train_any_embedding():
-            if model.text_encoder is not None:
-                model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
+            model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
@@ -92,11 +91,10 @@ class ChromaFineTuneSetup(
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.transformer_to(self.train_device)
 
-        if model.text_encoder:
-            if config.text_encoder.train:
-                model.text_encoder.train()
-            else:
-                model.text_encoder.eval()
+        if config.text_encoder.train:
+            model.text_encoder.train()
+        else:
+            model.text_encoder.eval()
 
         model.vae.eval()
 
@@ -116,5 +114,3 @@ class ChromaFineTuneSetup(
             if model.embedding_wrapper is not None:
                 model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, ChromaFineTuneSetup, ModelType.CHROMA_1, TrainingMethod.FINE_TUNE)

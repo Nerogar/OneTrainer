@@ -14,7 +14,6 @@ from modules.modelSetup.BaseFlux2Setup import BaseFlux2Setup
 from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
-from modules.util.thread_safety import apply_thread_safe_forward
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
@@ -30,6 +29,7 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.FLUX_2)
 class Flux2BaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -43,8 +43,6 @@ class Flux2BaseDataLoader(
             tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=config.text_encoder_sequence_length,
                                         apply_chat_template = lambda caption: mistral_format_input([caption], MISTRAL_SYSTEM_MESSAGE), apply_chat_template_kwargs = {'add_generation_prompt': False},
                                       )
-            if config.dataloader_threads > 1:
-                apply_thread_safe_forward(model.text_encoder)  # workaround for transformers#42673
             encode_prompt = EncodeMistralText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask',
                                               text_encoder=model.text_encoder, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(),
                                               hidden_state_output_index=MISTRAL_HIDDEN_STATES_LAYERS,
@@ -53,8 +51,6 @@ class Flux2BaseDataLoader(
             tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=config.text_encoder_sequence_length,
                                         apply_chat_template = lambda caption: qwen3_format_input(caption), apply_chat_template_kwargs = {'add_generation_prompt': True, 'enable_thinking': False}
                                       )
-            if config.dataloader_threads > 1:
-                apply_thread_safe_forward(model.text_encoder)  # workaround for transformers#42673
             encode_prompt = EncodeQwenText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask',
                                            text_encoder=model.text_encoder, hidden_state_output_index=QWEN3_HIDDEN_STATES_LAYERS, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
 
@@ -161,6 +157,3 @@ class Flux2BaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
         )
-
-
-factory.register(BaseDataLoader, Flux2BaseDataLoader, ModelType.FLUX_2)

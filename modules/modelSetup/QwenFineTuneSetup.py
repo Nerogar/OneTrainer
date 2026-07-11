@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.QWEN, TrainingMethod.FINE_TUNE)
 class QwenFineTuneSetup(
     BaseQwenSetup,
 ):
@@ -77,11 +78,10 @@ class QwenFineTuneSetup(
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.transformer_to(self.train_device)
 
-        if model.text_encoder:
-            if config.text_encoder.train:
-                model.text_encoder.train()
-            else:
-                model.text_encoder.eval()
+        if config.text_encoder.train:
+            model.text_encoder.train()
+        else:
+            model.text_encoder.eval()
 
         model.vae.eval()
 
@@ -97,5 +97,3 @@ class QwenFineTuneSetup(
             train_progress: TrainProgress
     ):
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, QwenFineTuneSetup, ModelType.QWEN, TrainingMethod.FINE_TUNE)

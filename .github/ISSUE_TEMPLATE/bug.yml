@@ -22,7 +22,7 @@ body:
       description: Also tell us, what did you expect to happen?
       placeholder: Tell us what you saw!
     validations:
-      required: true
+      required: false
   - type: textarea
     id: logs
     attributes:

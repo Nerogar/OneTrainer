@@ -111,8 +111,12 @@ def create_data_loader(
         train_progress: TrainProgress | None = None,
         is_validation: bool = False
 ) -> BaseDataLoader | None:
-    if config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0 and config.dataloader_threads > 1:
-        raise RuntimeError('layer offloading can not be activated if "dataloader_threads" > 1')
+    # Layer offloading uses a non-thread-safe conductor. Only text encoders run inside the caching dataloader's
+    # worker threads (to produce the text cache), so only their offload_fraction can conflict with threading.
+    if config.dataloader_threads > 1 and any(
+        getattr(config, name).offload_fraction > 0 for name in model_type.text_encoder_parts()
+    ):
+        raise RuntimeError('layer offloading can not be activated for a text encoder if "dataloader_threads" > 1')
 
     if train_progress is None:
         train_progress = TrainProgress()
@@ -134,7 +138,8 @@ def create_optimizer(
     if optimizer_config.optimizer is None:
         return None
 
-    if config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0:
+    # a trained, layer-offloaded part has its params evicted during the back pass, so it needs fused_back_pass
+    if any(part.offload_fraction > 0 and part.train for part in config.model_part_configs()):
         if (not optimizer_config.optimizer.supports_fused_back_pass() or not optimizer_config.fused_back_pass) \
                 and config.training_method == TrainingMethod.FINE_TUNE:
             raise RuntimeError('layer offloading can only be used for fine tuning when using an optimizer that supports "fused_back_pass"')

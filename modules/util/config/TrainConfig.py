@@ -9,11 +9,11 @@ from modules.util.config.CloudConfig import CloudConfig
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.SecretsConfig import SecretsConfig
+from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
-from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
 from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.LearningRateScaler import LearningRateScaler
@@ -305,9 +305,29 @@ class TrainModelPartConfig(BaseConfig):
     train_embedding: bool
     attention_mask: bool
     guidance_scale: float
+    gradient_checkpointing: bool
+    offload_fraction: float
+    activation_offloading: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
+
+    def offloading_enabled(self) -> bool:
+        # a conductor should exist iff this is True. Not gated on train: activations are built and cost
+        # VRAM whenever grad flows through a part, not only when it is trained (e.g. embedding training
+        # runs grad through the frozen denoiser and TE), so both layer and activation offloading apply to
+        # frozen grad-carrying parts too.
+        return self.offload_fraction > 0 or self.activation_offloading
+
+    def checkpointing_enabled(self) -> bool:
+        # the inner torch checkpoint() should run iff this is True. Not gated on train: grad can flow
+        # through a frozen part (e.g. embedding training runs grad through the frozen denoiser and TE),
+        # and checkpointing then still saves VRAM. On a part with no grad flow the wrapper is a no-op.
+        return self.gradient_checkpointing
+
+    def checkpointing_or_offloading_enabled(self) -> bool:
+        # whether the checkpoint layer wrapper needs to be installed for this part at all
+        return self.checkpointing_enabled() or self.offloading_enabled()
 
     @staticmethod
     def default_values():
@@ -325,6 +345,9 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("train_embedding", True, bool, False))
         data.append(("attention_mask", False, bool, False))
         data.append(("guidance_scale", 1.0, float, False))
+        data.append(("gradient_checkpointing", True, bool, False))
+        data.append(("offload_fraction", 0.0, float, False))
+        data.append(("activation_offloading", False, bool, False))
 
         return TrainModelPartConfig(data)
 
@@ -412,10 +435,7 @@ class TrainConfig(BaseConfig):
     output_dtype: DataType
     output_model_format: ModelFormat
     output_model_destination: str
-    gradient_checkpointing: GradientCheckpointingMethod
-    enable_async_offloading: bool
-    enable_activation_offloading: bool
-    layer_offload_fraction: float
+    async_offloading: bool
     force_circular_padding: bool
     compile: bool
 
@@ -451,6 +471,7 @@ class TrainConfig(BaseConfig):
     only_cache: bool
     resolution: str
     frames: str
+    attention_mechanism: AttentionMechanism
     mse_strength: float
     mae_strength: float
     log_cosh_strength: float
@@ -494,6 +515,7 @@ class TrainConfig(BaseConfig):
 
     # transformer
     transformer: TrainModelPartConfig
+    unconditional_transformer: TrainModelPartConfig
     quantization: QuantizationConfig
 
     # text encoder
@@ -607,7 +629,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=10,
+            config_version=11,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -619,6 +641,7 @@ class TrainConfig(BaseConfig):
                 7: self.__migration_7,
                 8: self.__migration_8,
                 9: self.__migration_9,
+                10: self.__migration_10,
             }
         )
 
@@ -765,12 +788,14 @@ class TrainConfig(BaseConfig):
     def __migration_4(self, data: dict) -> dict:
         migrated_data = data.copy()
 
+        # Translate the old bool form of gradient_checkpointing into the v5..v10
+        # string/enum form. __migration_10 later fans this out per-component.
         gradient_checkpointing = migrated_data.pop("gradient_checkpointing", True)
 
         if gradient_checkpointing:
-            migrated_data["gradient_checkpointing"] = GradientCheckpointingMethod.ON
+            migrated_data["gradient_checkpointing"] = "ON"
         else:
-            migrated_data["gradient_checkpointing"] = GradientCheckpointingMethod.OFF
+            migrated_data["gradient_checkpointing"] = "OFF"
 
         return migrated_data
 
@@ -838,6 +863,48 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_10(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        # Fan the four old global offload/checkpointing settings out per-component.
+        # After __migration_4 gradient_checkpointing is a string "OFF"/"ON"/"CPU_OFFLOADED".
+        gc = migrated_data.pop("gradient_checkpointing", "ON")
+        act = migrated_data.pop("enable_activation_offloading", True)
+        frac = migrated_data.pop("layer_offload_fraction", 0.0)
+        migrated_data["async_offloading"] = migrated_data.pop("enable_async_offloading", True)
+
+        def fan_out(part: str):
+            if part in migrated_data:
+                migrated_data[part]["gradient_checkpointing"] = gc != "OFF"
+                migrated_data[part]["activation_offloading"] = (gc == "CPU_OFFLOADED") and act
+                migrated_data[part]["offload_fraction"] = frac if gc == "CPU_OFFLOADED" else 0.0
+
+        fan_out("unet")
+        fan_out("prior")
+        fan_out("transformer")
+        fan_out("text_encoder")
+        fan_out("text_encoder_2")
+        fan_out("text_encoder_3")
+        fan_out("text_encoder_4")
+        fan_out("vae")
+        fan_out("effnet_encoder")
+        fan_out("decoder")
+        fan_out("decoder_text_encoder")
+        fan_out("decoder_vqgan")
+
+        if migrated_data.get("output_model_format") == "SAFETENSORS":
+            training_method = migrated_data.get("training_method")
+            if training_method == "LORA":
+                migrated_data["output_model_format"] = "LEGACY_LORA"
+            elif training_method != "EMBEDDING":
+                migrated_data["output_model_format"] = "LEGACY_SAFETENSORS"
+
+        return migrated_data
+
+    def model_part_configs(self) -> list[TrainModelPartConfig]:
+        # the per-part configs for the components this model_type actually has. Avoids "phantom" parts whose
+        # fields keep their defaults (train=True) or migrated offload values but don't exist in the model.
+        return [getattr(self, name) for name in self.model_type.model_parts()]
 
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
@@ -846,6 +913,7 @@ class TrainConfig(BaseConfig):
             self.unet.weight_dtype,
             self.prior.weight_dtype,
             self.transformer.weight_dtype,
+            self.unconditional_transformer.weight_dtype,
             self.text_encoder.weight_dtype,
             self.text_encoder_2.weight_dtype,
             self.text_encoder_3.weight_dtype,
@@ -877,6 +945,7 @@ class TrainConfig(BaseConfig):
             include_text_encoder_2=self.text_encoder_2.include,
             include_text_encoder_3=self.text_encoder_3.include,
             include_text_encoder_4=self.text_encoder_4.include,
+            include_unconditional_transformer=self.unconditional_transformer.include,
         )
 
     def train_any_embedding(self) -> bool:
@@ -1008,10 +1077,7 @@ class TrainConfig(BaseConfig):
         data.append(("output_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
         data.append(("output_model_destination", "models/model.safetensors", str, False))
-        data.append(("gradient_checkpointing", GradientCheckpointingMethod.ON, GradientCheckpointingMethod, False))
-        data.append(("enable_async_offloading", True, bool, False))
-        data.append(("enable_activation_offloading", True, bool, False))
-        data.append(("layer_offload_fraction", 0.0, float, False))
+        data.append(("async_offloading", True, bool, False))
         data.append(("force_circular_padding", False, bool, False))
         data.append(("compile", False, bool, False))
 
@@ -1045,6 +1111,7 @@ class TrainConfig(BaseConfig):
         data.append(("only_cache", False, bool, False))
         data.append(("resolution", "512", str, False))
         data.append(("frames", "25", str, False))
+        data.append(("attention_mechanism", AttentionMechanism.SDP, AttentionMechanism, False))
         data.append(("mse_strength", 1.0, float, False))
         data.append(("mae_strength", 0.0, float, False))
         data.append(("log_cosh_strength", 0.0, float, False))
@@ -1096,6 +1163,13 @@ class TrainConfig(BaseConfig):
         transformer.stop_training_after = 0
         transformer.learning_rate = None
         data.append(("transformer", transformer, TrainModelPartConfig, False))
+
+        unconditional_transformer = TrainModelPartConfig.default_values()
+        unconditional_transformer.model_name = ""
+        unconditional_transformer.train = False
+        unconditional_transformer.gradient_checkpointing = False
+        unconditional_transformer.activation_offloading = False
+        data.append(("unconditional_transformer", unconditional_transformer, TrainModelPartConfig, False))
 
         #quantization layer filter
         quantization = QuantizationConfig.default_values()
