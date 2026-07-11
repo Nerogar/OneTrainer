@@ -108,6 +108,10 @@ class BaseIdeogramSetup(
                 text_encoder_output=batch.get('text_encoder_hidden_state'),
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
+            if config.cep_gamma > 0 and not deterministic:
+                text_encoder_output = self._apply_conditional_embedding_perturbation(
+                    text_encoder_output, config.cep_gamma, generator
+                )
             max_text_tokens = text_encoder_output.shape[1]
 
             # patchify [B, 32, H, W] -> packed (B, num_image_tokens, 128), then bn-normalize in packed space (the
