@@ -92,6 +92,10 @@ class BaseAnimaSetup(
                     if 'text_encoder_hidden_state' in batch and not config.train_text_encoder_or_embedding() else None,
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
+            if config.cep_gamma > 0 and not deterministic:
+                text_encoder_output = self._apply_conditional_embedding_perturbation(
+                    text_encoder_output, config.cep_gamma, generator
+                )
 
             latent_image = batch['latent_image']
             scaled_latent_image = model.scale_latents(latent_image)
