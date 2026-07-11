@@ -95,6 +95,11 @@ class BaseLoraTabView:
                                   tooltip="Combines Weight-Decomposed Low-Rank Adaptation (DoRA) with OFT. By decoupling the weight into magnitude and direction components, it achieves the superior training dynamics of DoRA but with the stability and performance of OFT. Because OFT is norm-preserving, it avoids the heavy re-calculations typically found in standard DoRA, resulting in faster training (same speed as standard OFT) and better convergence.")
             self.components.switch(master, 3, 4, ui_state, "dora_oft")
 
+            # Clip OFT max norm
+            self.components.label(master, 5, 0, "Spectral Norm Clipping",
+                                  tooltip="Strictly clips the spectral norm of the OFT matrix to guarantee convergence of the Cayley parametrization (requires norm <= 1.0). Smaller values constrain the learned rotation to stay near the identity matrix, limiting adaptation. Default: 1.0 (e.g. 0.8 = 80% of maximum expressiveness). Leave empty to disable.")
+            self.components.entry(master, 5, 1, ui_state, "oft_clipped_norm")
+
             # Dropout Percentage
             self.components.label(master, 2, 0, "Dropout Probability",
                                   tooltip="Dropout probability. This percentage of the rotated adapter nodes that will be randomly restored to the base model initial statue. Helps with overfitting. 0 disables, 1 maximum.")
