@@ -72,15 +72,13 @@ class ErnieModel(BaseModel):
 
     def text_encoder_to(self, device: torch.device):
         if self.text_encoder is not None:
-            if self.text_encoder_offload_conductor is not None and \
-                    self.text_encoder_offload_conductor.layer_offload_activated():
+            if self.text_encoder_offload_conductor is not None:
                 self.text_encoder_offload_conductor.to(device)
             else:
                 self.text_encoder.to(device=device)
 
     def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None and \
-                self.transformer_offload_conductor.layer_offload_activated():
+        if self.transformer_offload_conductor is not None:
             self.transformer_offload_conductor.to(device)
         else:
             self.transformer.to(device=device)

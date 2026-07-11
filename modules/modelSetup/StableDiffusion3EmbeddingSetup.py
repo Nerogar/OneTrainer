@@ -12,6 +12,8 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_3, TrainingMethod.EMBEDDING)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_35, TrainingMethod.EMBEDDING)
 class StableDiffusion3EmbeddingSetup(
     BaseStableDiffusion3Setup,
 ):
@@ -81,9 +83,6 @@ class StableDiffusion3EmbeddingSetup(
         if model.text_encoder_3 is not None:
             model.text_encoder_3.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_1)
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_3)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
@@ -130,6 +129,3 @@ class StableDiffusion3EmbeddingSetup(
             if model.embedding_wrapper_3 is not None:
                 model.embedding_wrapper_3.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, StableDiffusion3EmbeddingSetup, ModelType.STABLE_DIFFUSION_3, TrainingMethod.EMBEDDING)
-factory.register(BaseModelSetup, StableDiffusion3EmbeddingSetup, ModelType.STABLE_DIFFUSION_35, TrainingMethod.EMBEDDING)

@@ -19,6 +19,8 @@ import torch
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_3)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_35)
 class StableDiffusion3Sampler(BaseModelSampler):
     def __init__(
             self,
@@ -191,6 +193,3 @@ class StableDiffusion3Sampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, StableDiffusion3Sampler, ModelType.STABLE_DIFFUSION_3)
-factory.register(BaseModelSampler, StableDiffusion3Sampler, ModelType.STABLE_DIFFUSION_35)

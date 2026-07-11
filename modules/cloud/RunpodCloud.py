@@ -6,6 +6,7 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.CloudAction import CloudAction
 
 import runpod
+from runpod.api.graphql import run_graphql_query
 
 
 class RunpodCloud(LinuxCloud):
@@ -63,13 +64,25 @@ class RunpodCloud(LinuxCloud):
             self.__get_host_port()
         super()._connect()
 
+    __TEMPLATE_ID = "1a33vbssq9"
+
+    def __get_template_image_name(self, template_id: str) -> str:
+        # RunPod's create_pod requires a non-empty image_name even when a template_id is given,
+        # so look up the template's current image instead of hardcoding a version tag here.
+        result = run_graphql_query("query myself { myself { podTemplates { id imageName } } }")
+        templates = result["data"]["myself"]["podTemplates"]
+        for template in templates:
+            if template["id"] == template_id:
+                return template["imageName"]
+        raise ValueError(f"RunPod template {template_id} not found")
+
     def _create(self):
         config=self.config.cloud
         secrets=self.config.secrets.cloud
         pod=runpod.create_pod(
             name=config.name,
-            image_name="",
-            template_id="1a33vbssq9",
+            image_name=self.__get_template_image_name(self.__TEMPLATE_ID),
+            template_id=self.__TEMPLATE_ID,
             gpu_type_id=config.gpu_type,
             cloud_type=config.sub_type,
             support_public_ip=True,
