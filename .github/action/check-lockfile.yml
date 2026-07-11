@@ -3,9 +3,11 @@ on:
   push:
     branches:
       - master
+      - preview
   pull_request:
     branches:
       - master
+      - preview
 jobs:
   Check-Lockfile:
     runs-on: ubuntu-latest
