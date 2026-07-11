@@ -9,6 +9,7 @@ from modules.util.convert.rescale_noise_scheduler_to_zero_terminal_snr import (
     rescale_noise_scheduler_to_zero_terminal_snr,
 )
 from modules.util.enum.DataType import DataType
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
 import torch
@@ -16,6 +17,17 @@ from torch import Tensor
 
 from diffusers import AutoencoderKL, DDIMScheduler, DiffusionPipeline, StableDiffusionXLPipeline, UNet2DConditionModel
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
+
+# diffusers -> original/sgm resnet-block leaf renames (full-weight; the norm leaves carry no LoRA, so
+# those rules are inert on a LoRA state dict). skip_connection only fires when present.
+_RESNET = [
+    ("norm1", "in_layers.0"),
+    ("conv1", "in_layers.2"),
+    ("time_emb_proj", "emb_layers.1"),
+    ("norm2", "out_layers.0"),
+    ("conv2", "out_layers.3"),
+    ("conv_shortcut", "skip_connection"),
+]
 
 
 class StableDiffusionXLModelEmbedding:
@@ -115,6 +127,65 @@ class StableDiffusionXLModel(BaseModel):
             self.text_encoder_2_lora,
             self.unet_lora,
         ] if a is not None]
+
+    def diffusers_to_original(self) -> list | None:
+        # SDXL UNet diffusers -> original/sgm key map, convert()-native (bare sgm names, no top prefix).
+        # SDXL has NO qkv fusion, so this is a pure key rename. Spatial-transformer (attention) blocks have
+        # IDENTICAL leaf names in both namespaces -- only the block addressing differs; only the resnet
+        # blocks (_RESNET) need a leaf map. The diffusers (block, sub-index) -> flat sgm input/output_blocks
+        # index is arithmetic 3*i+j(+1) that parse-substitution can't express, so per-block rules are
+        # generated in a loop.
+        rules = [
+            ("conv_in", "input_blocks.0.0"),
+            ("time_embedding.linear_1", "time_embed.0"),
+            ("time_embedding.linear_2", "time_embed.2"),
+            ("add_embedding.linear_1", "label_emb.0.0"),
+            ("add_embedding.linear_2", "label_emb.0.2"),
+            ("conv_norm_out", "out.0"),
+            ("conv_out", "out.2"),
+        ]
+
+        # down blocks: input_blocks index = 3*i + j + 1; attentions only in blocks 1,2; downsamplers in 0,1.
+        for i in range(3):
+            for j in range(2):
+                sgm = 3 * i + j + 1
+                rules.append((f"down_blocks.{i}.resnets.{j}", f"input_blocks.{sgm}.0", _RESNET))
+                if i > 0:
+                    rules.append((f"down_blocks.{i}.attentions.{j}", f"input_blocks.{sgm}.1"))
+            if i < 2:
+                rules.append((f"down_blocks.{i}.downsamplers.0.conv", f"input_blocks.{3 * i + 3}.0.op"))
+
+        # mid block: resnets.{j} -> middle_block.{2*j}, single attention -> middle_block.1.
+        rules.append(("mid_block.resnets.0", "middle_block.0", _RESNET))
+        rules.append(("mid_block.attentions.0", "middle_block.1"))
+        rules.append(("mid_block.resnets.1", "middle_block.2", _RESNET))
+
+        # up blocks: output_blocks index = 3*i + j; attentions and upsamplers only in blocks 0,1.
+        for i in range(3):
+            for j in range(3):
+                sgm = 3 * i + j
+                rules.append((f"up_blocks.{i}.resnets.{j}", f"output_blocks.{sgm}.0", _RESNET))
+                if i < 2:
+                    rules.append((f"up_blocks.{i}.attentions.{j}", f"output_blocks.{sgm}.1"))
+            if i < 2:
+                rules.append((f"up_blocks.{i}.upsamplers.0.conv", f"output_blocks.{3 * i + 2}.2.conv"))
+
+        return rules
+
+    def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
+        # SDXL's two TEs: clip_l (text_encoder_1) + clip_g (text_encoder_2).
+        return [
+            (self.text_encoder_1, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder",
+                ModelFormat.KOHYA_LORA: "lora_te1",
+                ModelFormat.COMFY_LORA: "text_encoders.clip_l.transformer",
+            }),
+            (self.text_encoder_2, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder_2",
+                ModelFormat.KOHYA_LORA: "lora_te2",
+                ModelFormat.COMFY_LORA: "text_encoders.clip_g.transformer",
+            }),
+        ]
 
     def all_embeddings(self) -> list[StableDiffusionXLModelEmbedding]:
         return self.additional_embeddings \

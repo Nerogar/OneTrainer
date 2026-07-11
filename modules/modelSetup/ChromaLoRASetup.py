@@ -40,7 +40,7 @@ class ChromaLoRASetup(
         self._create_model_part_parameters(parameter_group_collection, "text_encoder_lora", model.text_encoder_lora, config.text_encoder)
 
         if config.train_any_embedding() or config.train_any_output_embedding():
-            if config.text_encoder.train_embedding and model.text_encoder is not None:
+            if config.text_encoder.train_embedding:
                 self._add_embedding_param_groups(
                     model.all_text_encoder_embeddings(), parameter_group_collection, config.embedding_learning_rate,
                     "embeddings"
@@ -56,8 +56,7 @@ class ChromaLoRASetup(
             config: TrainConfig,
     ):
         self._setup_embeddings_requires_grad(model, config)
-        if model.text_encoder is not None:
-            model.text_encoder.requires_grad_(False)
+        model.text_encoder.requires_grad_(False)
         model.transformer.requires_grad_(False)
         model.vae.requires_grad_(False)
 
@@ -69,15 +68,15 @@ class ChromaLoRASetup(
             model: ChromaModel,
             config: TrainConfig,
     ):
-        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te")
+        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
 
-        if model.text_encoder is not None:
-            model.text_encoder_lora = LoRAModuleWrapper(
-                model.text_encoder, "lora_te", config
-            ) if create_te else None
+        model.text_encoder_lora = LoRAModuleWrapper(
+            model.text_encoder, "text_encoder", config
+        ) if create_te else None
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "lora_transformer", config, config.layer_filter.split(",")
+            model.transformer, "transformer", config, config.layer_filter.split(","),
+            fusion_spec=model.fusion_groups(), fuse=config.output_model_format.needs_qkv_fusion(),
         )
 
         if model.lora_state_dict:
@@ -96,8 +95,7 @@ class ChromaLoRASetup(
         model.transformer_lora.hook_to_module()
 
         if config.train_any_embedding():
-            if model.text_encoder is not None:
-                model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
+            model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
@@ -120,11 +118,10 @@ class ChromaLoRASetup(
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.transformer_to(self.train_device)
 
-        if model.text_encoder:
-            if config.text_encoder.train:
-                model.text_encoder.train()
-            else:
-                model.text_encoder.eval()
+        if config.text_encoder.train:
+            model.text_encoder.train()
+        else:
+            model.text_encoder.eval()
 
         model.vae.eval()
 
