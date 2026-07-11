@@ -3,6 +3,7 @@ from contextlib import contextmanager
 
 from modules.model.BaseModel import BaseModel
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig, TrainModelPartConfig
+from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
@@ -235,3 +236,17 @@ class BaseModelSetup(
             if unique_name in self.frozen_parameters:
                 for param in self.frozen_parameters[unique_name]:
                     param.requires_grad_(False)
+
+    @staticmethod
+    def _set_attention_backend(component, attn: AttentionMechanism, mask: bool):
+        match attn:
+            case AttentionMechanism.SDP:
+                component.set_attention_backend("native")
+            case AttentionMechanism.FLASH:
+                if mask:
+                    print("Warning: FLASH attention might fail for this model, depending on other configuration (batch size > 1, etc.)")
+                component.set_attention_backend("flash")
+            case AttentionMechanism.CUDNN:
+                component.set_attention_backend("_native_cudnn")
+            case _:
+                raise NotImplementedError(f"attention mechanism {str(attn)} not implemented")

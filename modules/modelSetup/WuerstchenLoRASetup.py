@@ -14,6 +14,8 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.WUERSTCHEN_2, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_CASCADE_1, TrainingMethod.LORA)
 class WuerstchenLoRASetup(
     BaseWuerstchenSetup,
 ):
@@ -73,13 +75,13 @@ class WuerstchenLoRASetup(
         if config.train_any_embedding():
             model.prior_text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_prior_te")
+        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
         model.prior_text_encoder_lora = LoRAModuleWrapper(
-            model.prior_text_encoder, "lora_prior_te", config
+            model.prior_text_encoder, "text_encoder", config
         ) if create_te else None
 
         model.prior_prior_lora = LoRAModuleWrapper(
-            model.prior_prior, "lora_prior_unet", config, config.layer_filter.split(",")
+            model.prior_prior, "prior", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:
@@ -98,7 +100,6 @@ class WuerstchenLoRASetup(
         model.prior_prior_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
         model.prior_prior_lora.hook_to_module()
 
-        self._remove_added_embeddings_from_tokenizer(model.prior_tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
@@ -153,6 +154,3 @@ class WuerstchenLoRASetup(
             self._normalize_output_embeddings(model.all_prior_text_encoder_embeddings())
             model.prior_embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, WuerstchenLoRASetup, ModelType.WUERSTCHEN_2, TrainingMethod.LORA)
-factory.register(BaseModelSetup, WuerstchenLoRASetup, ModelType.STABLE_CASCADE_1, TrainingMethod.LORA)

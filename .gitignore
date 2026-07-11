@@ -10,7 +10,7 @@ debug*.py
 
 # user data
 /workspace*
-/models*
+/models/*
 /training_concepts
 /training_samples
 /training_user_settings
@@ -37,3 +37,4 @@ pixi.toml
 train.bat
 debug_report.log
 config_diff.txt
+CLAUDE.md
