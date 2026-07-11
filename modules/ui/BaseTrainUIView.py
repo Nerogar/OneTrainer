@@ -227,10 +227,15 @@ class BaseTrainUIView(ABC):
                          tooltip="Aspect ratio bucketing enables training on images with different aspect ratios")
         self.components.switch(frame, 0, 1, ui_state, "aspect_ratio_bucketing")
 
-        # latent caching
-        self.components.label(frame, 1, 0, "Latent Caching",
-                         tooltip="Caching of intermediate training data that can be re-used between epochs")
-        self.components.switch(frame, 1, 1, ui_state, "latent_caching")
+        # image caching
+        self.components.label(frame, 1, 0, "Image Caching",
+                         tooltip="Caches image latents (VAE outputs) so they can be re-used between epochs")
+        self.components.switch(frame, 1, 1, ui_state, "image_caching")
+
+        # text caching
+        self.components.label(frame, 2, 0, "Text Caching",
+                         tooltip="Caches text encoder outputs so they can be re-used between epochs")
+        self.components.switch(frame, 2, 1, ui_state, "text_caching")
 
         # caching threads
         self.components.label(frame, 2, 0, "Caching Threads",
