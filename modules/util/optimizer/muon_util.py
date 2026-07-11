@@ -35,7 +35,7 @@ def build_muon_adam_key_fn(
                     'block', # UNet
                     'text_model.encoder.layers', # TEs (CLIPs)
                 ]
-            case ModelType.STABLE_DIFFUSION_3 | ModelType.STABLE_DIFFUSION_35 | ModelType.SANA  | ModelType.FLUX_DEV_1  | ModelType.FLUX_2 | ModelType.CHROMA_1  | ModelType.QWEN  | ModelType.PIXART_ALPHA | ModelType.PIXART_SIGMA:
+            case ModelType.STABLE_DIFFUSION_3 | ModelType.STABLE_DIFFUSION_35 | ModelType.SANA  | ModelType.FLUX_DEV_1  | ModelType.FLUX_2 | ModelType.CHROMA_1  | ModelType.QWEN  | ModelType.PIXART_ALPHA | ModelType.PIXART_SIGMA | ModelType.ANIMA:
                 default_patterns = [
                     'transformer_blocks',
                     'encoder.block', # TE (T5)
@@ -46,10 +46,16 @@ def build_muon_adam_key_fn(
                     'double_stream_blocks',
                     'single_stream_blocks',
                 ]
-            case ModelType.Z_IMAGE:
+            case ModelType.Z_IMAGE | ModelType.ERNIE | ModelType.IDEOGRAM_4:
                 default_patterns = [
                     'layers',
                     'refiner',
+                ]
+            case ModelType.KREA_2:
+                default_patterns = [
+                    'transformer_blocks',
+                    'text_fusion.layerwise_blocks',
+                    'text_fusion.refiner_blocks',
                 ]
             case _: # Unmatched cases
                 raise NotImplementedError(f"Default hidden layer patterns are not defined for model type: {model.model_type}")

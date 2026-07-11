@@ -6,7 +6,9 @@ from modules.model.util.clip_util import encode_clip
 from modules.model.util.t5_util import encode_t5
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util.convert_util import chunk_swap
 from modules.util.enum.DataType import DataType
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
@@ -58,8 +60,11 @@ class StableDiffusion3ModelEmbedding:
 class StableDiffusion3Model(BaseModel):
     # base model data
     tokenizer_1: CLIPTokenizer | None
+    orig_tokenizer_1: CLIPTokenizer | None
     tokenizer_2: CLIPTokenizer | None
+    orig_tokenizer_2: CLIPTokenizer | None
     tokenizer_3: T5Tokenizer | None
+    orig_tokenizer_3: T5Tokenizer | None
     noise_scheduler: FlowMatchEulerDiscreteScheduler | None
     text_encoder_1: CLIPTextModelWithProjection | None
     text_encoder_2: CLIPTextModelWithProjection | None
@@ -98,8 +103,11 @@ class StableDiffusion3Model(BaseModel):
         )
 
         self.tokenizer_1 = None
+        self.orig_tokenizer_1 = None
         self.tokenizer_2 = None
+        self.orig_tokenizer_2 = None
         self.tokenizer_3 = None
+        self.orig_tokenizer_3 = None
         self.noise_scheduler = None
         self.text_encoder_1 = None
         self.text_encoder_2 = None
@@ -133,6 +141,79 @@ class StableDiffusion3Model(BaseModel):
             self.text_encoder_3_lora,
             self.transformer_lora,
         ] if a is not None]
+
+    def fusion_groups(self) -> list | None:
+        # SD3 fuses TWO joint streams (x_block + context_block) plus a dual-attention attn2 that only exists
+        # in some SD3.5 blocks (the group fires per-block only where all its leaves are present).
+        return [
+            ("transformer_blocks.{i}", ["attn.to_q", "attn.to_k", "attn.to_v"], "attn.qkv", "x_block.attn.qkv"),
+            ("transformer_blocks.{i}", ["attn.add_q_proj", "attn.add_k_proj", "attn.add_v_proj"], "attn.added_qkv", "context_block.attn.qkv"),
+            ("transformer_blocks.{i}", ["attn2.to_q", "attn2.to_k", "attn2.to_v"], "attn2.qkv", "x_block.attn2.qkv"),
+        ]
+
+    def diffusers_to_original(self) -> list | None:
+        # last_block is the highest joint-block index (the context-pre-only block): its norm1_context gets a
+        # chunk_swap (its two modulation chunks are stored in swapped order), placed FIRST as a concrete-index
+        # rule so it fires before the generic {i} block rule. Absent ff_context/to_add_out keys simply make
+        # those general rules not fire.
+        last_block = len(self.transformer.transformer_blocks) - 1
+        return [
+            *chunk_swap(f"transformer_blocks.{last_block}.norm1_context.linear",
+                        f"joint_blocks.{last_block}.context_block.adaLN_modulation.1"),
+            ("pos_embed.pos_embed", "pos_embed"),
+            ("pos_embed.proj", "x_embedder.proj"),
+            ("context_embedder", "context_embedder"),
+            ("proj_out", "final_layer.linear"),
+            *chunk_swap("norm_out.linear", "final_layer.adaLN_modulation.1"),
+            ("time_text_embed.timestep_embedder.linear_1", "t_embedder.mlp.0"),
+            ("time_text_embed.timestep_embedder.linear_2", "t_embedder.mlp.2"),
+            ("time_text_embed.text_embedder.linear_1", "y_embedder.mlp.0"),
+            ("time_text_embed.text_embedder.linear_2", "y_embedder.mlp.2"),
+            ("transformer_blocks.{i}", "joint_blocks.{i}", [
+                ("attn.qkv",                 "x_block.attn.qkv"),
+                ("attn.added_qkv",           "context_block.attn.qkv"),
+                ("attn2.qkv",                "x_block.attn2.qkv"),
+                ("attn.to_out.0",            "x_block.attn.proj"),
+                ("attn.to_add_out",          "context_block.attn.proj"),
+                ("attn.norm_k.weight",       "x_block.attn.ln_k.weight"),
+                ("attn.norm_q.weight",       "x_block.attn.ln_q.weight"),
+                ("attn.norm_added_k.weight", "context_block.attn.ln_k.weight"),
+                ("attn.norm_added_q.weight", "context_block.attn.ln_q.weight"),
+                ("attn2.to_out.0",           "x_block.attn2.proj"),
+                ("attn2.norm_k.weight",      "x_block.attn2.ln_k.weight"),
+                ("attn2.norm_q.weight",      "x_block.attn2.ln_q.weight"),
+                ("norm1.linear",             "x_block.adaLN_modulation.1"),
+                ("norm1_context.linear",     "context_block.adaLN_modulation.1"),
+                ("ff.net.0.proj",            "x_block.mlp.fc1"),
+                ("ff.net.2",                 "x_block.mlp.fc2"),
+                ("ff_context.net.0.proj",    "context_block.mlp.fc1"),
+                ("ff_context.net.2",         "context_block.mlp.fc2"),
+            ]),
+        ]
+
+    def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
+        # SD3's three TEs: clip_l + clip_g + t5xxl (Comfy's SD3ClipModel). Any can be absent (e.g. trained
+        # without T5), so only the TEs actually present are declared.
+        text_encoders = []
+        if self.text_encoder_1 is not None:
+            text_encoders.append((self.text_encoder_1, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder",
+                ModelFormat.KOHYA_LORA: "lora_te1",
+                ModelFormat.COMFY_LORA: "text_encoders.clip_l.transformer",
+            }))
+        if self.text_encoder_2 is not None:
+            text_encoders.append((self.text_encoder_2, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder_2",
+                ModelFormat.KOHYA_LORA: "lora_te2",
+                ModelFormat.COMFY_LORA: "text_encoders.clip_g.transformer",
+            }))
+        if self.text_encoder_3 is not None:
+            text_encoders.append((self.text_encoder_3, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder_3",
+                ModelFormat.KOHYA_LORA: "lora_te3",
+                ModelFormat.COMFY_LORA: "text_encoders.t5xxl.transformer",
+            }))
+        return text_encoders
 
     def all_embeddings(self) -> list[StableDiffusion3ModelEmbedding]:
         return self.additional_embeddings \
@@ -174,8 +255,7 @@ class StableDiffusion3Model(BaseModel):
 
     def text_encoder_3_to(self, device: torch.device):
         if self.text_encoder_3 is not None:
-            if self.text_encoder_3_offload_conductor is not None and \
-                    self.text_encoder_3_offload_conductor.layer_offload_activated():
+            if self.text_encoder_3_offload_conductor is not None:
                 self.text_encoder_3_offload_conductor.to(device)
             else:
                 self.text_encoder_3.to(device=device)
@@ -184,8 +264,7 @@ class StableDiffusion3Model(BaseModel):
             self.text_encoder_3_lora.to(device)
 
     def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None and \
-                self.transformer_offload_conductor.layer_offload_activated():
+        if self.transformer_offload_conductor is not None:
             self.transformer_offload_conductor.to(device)
         else:
             self.transformer.to(device=device)
@@ -208,17 +287,17 @@ class StableDiffusion3Model(BaseModel):
             self.text_encoder_3.eval()
         self.transformer.eval()
 
-    def create_pipeline(self) -> DiffusionPipeline:
+    def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
         return StableDiffusion3Pipeline(
             transformer=self.transformer,
             scheduler=self.noise_scheduler,
             vae=self.vae,
             text_encoder=self.text_encoder_1,
-            tokenizer=self.tokenizer_1,
+            tokenizer=self.orig_tokenizer_1 if use_original_tokenizers else self.tokenizer_1,
             text_encoder_2=self.text_encoder_2,
-            tokenizer_2=self.tokenizer_2,
+            tokenizer_2=self.orig_tokenizer_2 if use_original_tokenizers else self.tokenizer_2,
             text_encoder_3=self.text_encoder_3,
-            tokenizer_3=self.tokenizer_3,
+            tokenizer_3=self.orig_tokenizer_3 if use_original_tokenizers else self.tokenizer_3,
         )
 
     def add_text_encoder_1_embeddings_to_prompt(self, prompt: str) -> str:
@@ -394,21 +473,21 @@ class StableDiffusion3Model(BaseModel):
         )
 
         # apply dropout
-        if text_encoder_1_dropout_probability is not None:
+        if text_encoder_1_dropout_probability is not None and text_encoder_1_dropout_probability > 0.0:
             dropout_text_encoder_1_mask = (torch.tensor(
                 [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
             text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None, None]
             pooled_text_encoder_1_output = pooled_text_encoder_1_output * dropout_text_encoder_1_mask[:, None]
 
-        if text_encoder_2_dropout_probability is not None:
+        if text_encoder_2_dropout_probability is not None and text_encoder_2_dropout_probability > 0.0:
             dropout_text_encoder_2_mask = (torch.tensor(
                 [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
             text_encoder_2_output = text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None]
             pooled_text_encoder_2_output = pooled_text_encoder_2_output * dropout_text_encoder_2_mask[:, None]
 
-        if text_encoder_3_dropout_probability is not None:
+        if text_encoder_3_dropout_probability is not None and text_encoder_3_dropout_probability > 0.0:
             dropout_text_encoder_3_mask = (torch.tensor(
                 [rand.random() > text_encoder_3_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()

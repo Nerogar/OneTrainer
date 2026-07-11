@@ -7,6 +7,7 @@ from modules.model.util.t5_util import encode_t5
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.DataType import DataType
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
@@ -175,6 +176,36 @@ class HiDreamModel(BaseModel):
             self.transformer_lora,
         ] if a is not None]
 
+    def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
+        # HiDream's four TEs: clip_l + clip_g + t5xxl + llama (Comfy's HiDreamTEModel). Any can be absent, so
+        # only the TEs actually present are declared.
+        text_encoders = []
+        if self.text_encoder_1 is not None:
+            text_encoders.append((self.text_encoder_1, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder",
+                ModelFormat.KOHYA_LORA: "lora_te1",
+                ModelFormat.COMFY_LORA: "text_encoders.clip_l.transformer",
+            }))
+        if self.text_encoder_2 is not None:
+            text_encoders.append((self.text_encoder_2, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder_2",
+                ModelFormat.KOHYA_LORA: "lora_te2",
+                ModelFormat.COMFY_LORA: "text_encoders.clip_g.transformer",
+            }))
+        if self.text_encoder_3 is not None:
+            text_encoders.append((self.text_encoder_3, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder_3",
+                ModelFormat.KOHYA_LORA: "lora_te3",
+                ModelFormat.COMFY_LORA: "text_encoders.t5xxl.transformer",
+            }))
+        if self.text_encoder_4 is not None:
+            text_encoders.append((self.text_encoder_4, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder_4",
+                ModelFormat.KOHYA_LORA: "lora_te4",
+                ModelFormat.COMFY_LORA: "text_encoders.llama.transformer",
+            }))
+        return text_encoders
+
     def all_embeddings(self) -> list[HiDreamModelEmbedding]:
         return self.additional_embeddings \
                + ([self.embedding] if self.embedding is not None else [])
@@ -220,8 +251,7 @@ class HiDreamModel(BaseModel):
 
     def text_encoder_3_to(self, device: torch.device):
         if self.text_encoder_3 is not None:
-            if self.text_encoder_3_offload_conductor is not None and \
-                    self.text_encoder_3_offload_conductor.layer_offload_activated():
+            if self.text_encoder_3_offload_conductor is not None:
                 self.text_encoder_3_offload_conductor.to(device)
             else:
                 self.text_encoder_3.to(device=device)
@@ -231,8 +261,7 @@ class HiDreamModel(BaseModel):
 
     def text_encoder_4_to(self, device: torch.device):
         if self.text_encoder_4 is not None:
-            if self.text_encoder_4_offload_conductor is not None and \
-                    self.text_encoder_4_offload_conductor.layer_offload_activated():
+            if self.text_encoder_4_offload_conductor is not None:
                 self.text_encoder_4_offload_conductor.to(device)
             else:
                 self.text_encoder_4.to(device=device)
@@ -241,8 +270,7 @@ class HiDreamModel(BaseModel):
             self.text_encoder_4_lora.to(device)
 
     def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None and \
-                self.transformer_offload_conductor.layer_offload_activated():
+        if self.transformer_offload_conductor is not None:
             self.transformer_offload_conductor.to(device)
         else:
             self.transformer.to(device=device)
@@ -267,19 +295,19 @@ class HiDreamModel(BaseModel):
             self.text_encoder_4.eval()
         self.transformer.eval()
 
-    def create_pipeline(self, use_original_modules: bool) -> DiffusionPipeline:
+    def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
         return HiDreamImagePipeline(
             transformer=self.transformer,
             scheduler=self.noise_scheduler,
             vae=self.vae,
             text_encoder=self.text_encoder_1,
-            tokenizer=self.orig_tokenizer_1 if use_original_modules else self.tokenizer_1,
+            tokenizer=self.orig_tokenizer_1 if use_original_tokenizers else self.tokenizer_1,
             text_encoder_2=self.text_encoder_2,
-            tokenizer_2=self.orig_tokenizer_2 if use_original_modules else self.tokenizer_2,
+            tokenizer_2=self.orig_tokenizer_2 if use_original_tokenizers else self.tokenizer_2,
             text_encoder_3=self.text_encoder_3,
-            tokenizer_3=self.orig_tokenizer_3 if use_original_modules else self.tokenizer_3,
+            tokenizer_3=self.orig_tokenizer_3 if use_original_tokenizers else self.tokenizer_3,
             text_encoder_4=self.text_encoder_4,
-            tokenizer_4=self.orig_tokenizer_4 if use_original_modules else self.tokenizer_4,
+            tokenizer_4=self.orig_tokenizer_4 if use_original_tokenizers else self.tokenizer_4,
         )
 
     def add_text_encoder_1_embeddings_to_prompt(self, prompt: str) -> str:
@@ -442,26 +470,26 @@ class HiDreamModel(BaseModel):
         # )
 
         # apply dropout
-        if text_encoder_1_dropout_probability is not None:
+        if text_encoder_1_dropout_probability is not None and text_encoder_1_dropout_probability > 0.0:
             dropout_text_encoder_1_mask = (torch.tensor(
                 [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
             pooled_text_encoder_1_output = pooled_text_encoder_1_output * dropout_text_encoder_1_mask[:, None]
 
-        if text_encoder_2_dropout_probability is not None:
+        if text_encoder_2_dropout_probability is not None and text_encoder_2_dropout_probability > 0.0:
             dropout_text_encoder_2_mask = (torch.tensor(
                 [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
             pooled_text_encoder_2_output = pooled_text_encoder_2_output * dropout_text_encoder_2_mask[:, None]
 
-        if text_encoder_3_dropout_probability is not None:
+        if text_encoder_3_dropout_probability is not None and text_encoder_3_dropout_probability > 0.0:
             dropout_text_encoder_3_mask = (torch.tensor(
                 [rand.random() > text_encoder_3_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
             text_encoder_3_output = text_encoder_3_output * dropout_text_encoder_3_mask[:, None, None]
 
         text_encoder_4_output = torch.stack(text_encoder_4_output, dim=0)
-        if text_encoder_4_dropout_probability is not None:
+        if text_encoder_4_dropout_probability is not None and text_encoder_4_dropout_probability > 0.0:
             dropout_text_encoder_4_mask = (torch.tensor(
                 [rand.random() > text_encoder_4_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()

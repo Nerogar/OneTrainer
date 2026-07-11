@@ -1,7 +1,7 @@
 try:
     from modules.util.triton_mm_8bit import mm_8bit
 except ImportError as e:
-    print(str(e) + ", continueing without triton")
+    print(str(e) + ", continuing without triton")
     import torch
     def mm_8bit(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
         assert a.shape[1] == b.shape[0], "Incompatible dimensions"
