@@ -23,7 +23,6 @@
     "output_dtype": "BFLOAT_16",
     "timestep_distribution": "INVERTED_PARABOLA",
     "noising_weight": 7.7,
-    "caching_threads": 1,
     "optimizer": {
         "optimizer": "ADAFACTOR"
     },

@@ -1,7 +1,7 @@
 {
     "base_model_name": "Qwen/Qwen-Image",
     "batch_size": 2,
-    "learning_rate": 1e-05,
+    "learning_rate": 1e-5,
     "model_type": "QWEN",
     "output_model_format": "ORIGINAL_TRANSFORMER",
     "resolution": "512",
@@ -42,6 +42,5 @@
         }
     },
     "layer_filter": "transformer_block",
-    "layer_filter_preset": "blocks",
-    "caching_threads": 1
+    "layer_filter_preset": "blocks"
 }

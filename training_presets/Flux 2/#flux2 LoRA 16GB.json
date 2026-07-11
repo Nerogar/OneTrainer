@@ -27,6 +27,5 @@
         "layer_filter_preset": "blocks"
     },
     "timestep_distribution": "LOGIT_NORMAL",
-    "dynamic_timestep_shifting": true,
-    "caching_threads": 1
+    "dynamic_timestep_shifting": true
 }

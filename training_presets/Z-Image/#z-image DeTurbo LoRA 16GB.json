@@ -29,6 +29,5 @@
         "layer_filter": "layers",
         "layer_filter_preset": "blocks"
     },
-    "timestep_distribution": "LOGIT_NORMAL",
-    "caching_threads": 1
+    "timestep_distribution": "LOGIT_NORMAL"
 }

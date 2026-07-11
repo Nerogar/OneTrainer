@@ -1,7 +1,7 @@
 {
     "base_model_name": "Tongyi-MAI/Z-Image",
     "batch_size": 2,
-    "learning_rate": 1e-05,
+    "learning_rate": 1e-5,
     "model_type": "Z_IMAGE",
     "output_model_format": "ORIGINAL_TRANSFORMER",
     "resolution": "512",
@@ -40,6 +40,5 @@
             "warmup_init": false,
             "weight_decay": 0.0
         }
-    },
-    "caching_threads": 1
+    }
 }

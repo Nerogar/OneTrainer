@@ -27,6 +27,5 @@
     "quantization": {
         "layer_filter": "transformer_block",
         "layer_filter_preset": "blocks"
-    },
-    "caching_threads": 1
+    }
 }
