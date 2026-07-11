@@ -90,6 +90,9 @@ cuda13 = [
   "bitsandbytes==0.49.2",
 ]
 
+# CUDA 12 has the same dependencies as CUDA 13.
+# However, CUDA 12 requires a different version of torch.
+# This is managed via the `extra-index-urls` options below.
 cuda12 = ["onetrainer[cuda13]"]
 
 rocm = [
