@@ -30,6 +30,7 @@ from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.PrefetchIterator import PrefetchIterator
 from modules.util.profiling_util import TorchMemoryRecorder, TorchProfiler
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
@@ -679,11 +680,12 @@ class GenericTrainer(BaseTrainer):
 
             current_epoch_length = self.data_loader.get_data_set().approximate_length()
 
+            batches = self.data_loader.get_data_loader()
+            if self.config.prefetch_next_batch:
+                batches = PrefetchIterator(batches)
             if multi.is_master():
-                batches = step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step", total=current_epoch_length,
+                batches = step_tqdm = tqdm(batches, desc="step", total=current_epoch_length,
                                  initial=train_progress.epoch_step)
-            else:
-                batches = self.data_loader.get_data_loader()
             for batch in batches:
                 multi.sync_commands(self.commands)
                 if self.commands.get_stop_command():
