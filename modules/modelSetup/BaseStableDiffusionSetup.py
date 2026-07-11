@@ -18,7 +18,6 @@ from modules.util.checkpointing_util import (
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
 from modules.util.dtype_util import create_autocast_context
-from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.quantization_util import quantize_layers
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
@@ -51,11 +50,10 @@ class BaseStableDiffusionSetup(
             model: StableDiffusionModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
-            model.vae.enable_gradient_checkpointing()
+        if config.unet.checkpointing_enabled():
             model.unet.enable_gradient_checkpointing()
-            enable_checkpointing_for_basic_transformer_blocks(model.unet, config, offload_enabled=False)
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder, config)
+            enable_checkpointing_for_basic_transformer_blocks(model.unet, config, config.unet, offload_enabled=False)
+        enable_checkpointing_for_clip_encoder_layers(model.text_encoder, config, config.text_encoder)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.vae)
@@ -63,17 +61,13 @@ class BaseStableDiffusionSetup(
             if model.unet_lora is not None:
                 apply_circular_padding_to_conv2d(model.unet_lora)
 
-        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().text_encoder,
-            config.weight_dtypes().unet,
-            config.weight_dtypes().vae,
-            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-            config.weight_dtypes().embedding if config.train_any_embedding() else None,
-        ], config.enable_autocast_cache)
+        model.autocast_context, model.train_dtype = create_autocast_context(
+            self.train_device, config.train_dtype, config.enable_autocast_cache)
 
         quantize_layers(model.text_encoder, self.train_device, model.train_dtype, config)
         quantize_layers(model.vae, self.train_device, model.train_dtype, config)
         quantize_layers(model.unet, self.train_device, model.train_dtype, config)
+        self._set_attention_backend(model.unet, config.attention_mechanism, mask=False)
 
     def _setup_embeddings(
             self,

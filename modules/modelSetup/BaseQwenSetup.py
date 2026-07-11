@@ -15,7 +15,6 @@ from modules.util.checkpointing_util import (
 )
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
-from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.quantization_util import quantize_layers
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
@@ -46,35 +45,24 @@ class BaseQwenSetup(
             model: QwenModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_qwen_transformer(model.transformer, config)
-            if model.text_encoder is not None:
-                model.text_encoder_offload_conductor = \
-                    enable_checkpointing_for_qwen25vl_encoder_layers(model.text_encoder, config)
+        model.transformer_offload_conductor = enable_checkpointing_for_qwen_transformer(model.transformer, config, config.transformer)
+        model.text_encoder_offload_conductor = enable_checkpointing_for_qwen25vl_encoder_layers(model.text_encoder, config, config.text_encoder)
 
-        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().transformer,
-            config.weight_dtypes().text_encoder,
-            config.weight_dtypes().vae,
-            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-        ], config.enable_autocast_cache)
+        model.autocast_context, model.train_dtype = create_autocast_context(
+            self.train_device, config.train_dtype, config.enable_autocast_cache)
 
         model.text_encoder_autocast_context, model.text_encoder_train_dtype = \
             disable_fp16_autocast_context(
                 self.train_device,
                 config.train_dtype,
                 config.fallback_train_dtype,
-                [
-                    config.weight_dtypes().text_encoder,
-                    config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-                ],
                 config.enable_autocast_cache,
             )
 
         quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype, config)
         quantize_layers(model.vae, self.train_device, model.train_dtype, config)
         quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
+        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=True)
 
     def predict(
             self,
