@@ -24,6 +24,8 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.PIXART_ALPHA)
+@factory.register(BaseDataLoader, ModelType.PIXART_SIGMA)
 class PixArtAlphaBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -159,6 +161,3 @@ class PixArtAlphaBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=16,
         )
-
-factory.register(BaseDataLoader, PixArtAlphaBaseDataLoader, ModelType.PIXART_ALPHA)
-factory.register(BaseDataLoader, PixArtAlphaBaseDataLoader, ModelType.PIXART_SIGMA)

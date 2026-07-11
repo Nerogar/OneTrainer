@@ -14,6 +14,14 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_21, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.LORA)
 class StableDiffusionLoRASetup(
     BaseStableDiffusionSetup,
 ):
@@ -69,13 +77,13 @@ class StableDiffusionLoRASetup(
         if config.train_any_embedding():
             model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te")
+        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
         model.text_encoder_lora = LoRAModuleWrapper(
-            model.text_encoder, "lora_te", config
+            model.text_encoder, "text_encoder", config
         ) if create_te else None
 
         model.unet_lora = LoRAModuleWrapper(
-            model.unet, "lora_unet", config, config.layer_filter.split(",")
+            model.unet, "unet", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:
@@ -99,7 +107,6 @@ class StableDiffusionLoRASetup(
             model.rescale_noise_scheduler_to_zero_terminal_snr()
             model.force_v_prediction()
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
@@ -145,12 +152,3 @@ class StableDiffusionLoRASetup(
             self._normalize_output_embeddings(model.all_text_encoder_embeddings())
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, StableDiffusionLoRASetup, ModelType.STABLE_DIFFUSION_15, TrainingMethod.LORA)
-factory.register(BaseModelSetup, StableDiffusionLoRASetup, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.LORA)
-factory.register(BaseModelSetup, StableDiffusionLoRASetup, ModelType.STABLE_DIFFUSION_20, TrainingMethod.LORA)
-factory.register(BaseModelSetup, StableDiffusionLoRASetup, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.LORA)
-factory.register(BaseModelSetup, StableDiffusionLoRASetup, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.LORA)
-factory.register(BaseModelSetup, StableDiffusionLoRASetup, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.LORA)
-factory.register(BaseModelSetup, StableDiffusionLoRASetup, ModelType.STABLE_DIFFUSION_21, TrainingMethod.LORA)
-factory.register(BaseModelSetup, StableDiffusionLoRASetup, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.LORA)

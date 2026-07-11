@@ -14,6 +14,8 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.FLUX_DEV_1, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.FLUX_FILL_DEV_1, TrainingMethod.LORA)
 class FluxLoRASetup(
     BaseFluxSetup,
 ):
@@ -77,21 +79,22 @@ class FluxLoRASetup(
             model: FluxModel,
             config: TrainConfig,
     ):
-        create_te1 = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te1")
-        create_te2 = config.text_encoder_2.train or state_dict_has_prefix(model.lora_state_dict, "lora_te2")
+        create_te1 = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
+        create_te2 = config.text_encoder_2.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder_2")
 
         if model.text_encoder_1 is not None:
             model.text_encoder_1_lora = LoRAModuleWrapper(
-                model.text_encoder_1, "lora_te1", config
+                model.text_encoder_1, "text_encoder", config
             ) if create_te1 else None
 
         if model.text_encoder_2 is not None:
             model.text_encoder_2_lora = LoRAModuleWrapper(
-                model.text_encoder_2, "lora_te2", config
+                model.text_encoder_2, "text_encoder_2", config
             ) if create_te2 else None
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "lora_transformer", config, config.layer_filter.split(",")
+            model.transformer, "transformer", config, config.layer_filter.split(","),
+            fusion_spec=model.fusion_groups(), fuse=config.output_model_format.needs_qkv_fusion(),
         )
 
         if model.lora_state_dict:
@@ -122,8 +125,6 @@ class FluxLoRASetup(
             if model.text_encoder_2 is not None:
                 model.text_encoder_2.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_1)
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
@@ -182,6 +183,3 @@ class FluxLoRASetup(
             if model.embedding_wrapper_2 is not None:
                 model.embedding_wrapper_2.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, FluxLoRASetup, ModelType.FLUX_DEV_1, TrainingMethod.LORA)
-factory.register(BaseModelSetup, FluxLoRASetup, ModelType.FLUX_FILL_DEV_1, TrainingMethod.LORA)

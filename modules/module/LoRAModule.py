@@ -5,10 +5,12 @@ from collections import defaultdict
 from collections.abc import Mapping
 from typing import Any
 
+from modules.module.FusedModule import FusedModuleGroup, check_fusion_match, discover_fused_groups
 from modules.module.oft_utils import OFTRotationModule
 from modules.module.quantized.LinearSVD import BaseLinearSVD
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
+from modules.util.lokr_utils import factorization, make_kron, rebuild_tucker
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.quantization_util import get_unquantized_weight, get_weight_shape
 
@@ -103,6 +105,15 @@ class PeftBase(nn.Module):
         assert self.orig_forward is not None
         assert self.orig_module is not None
         assert self.op is not None
+
+    def delta_forward(self, x, *args, **kwargs) -> Tensor | None:
+        # Returns just this adapter's own contribution (the term added to orig_forward(x)), for peft
+        # types whose forward is expressible as orig_forward(x) + delta with delta computable without
+        # touching the (possibly fused) base. Lets FusedModuleGroup add each leaf's real, unfused base
+        # once instead of recomputing the whole fused forward per leaf. Returns None (the default) for
+        # peft types that recompose the base weight itself (DoRA, OFT, LoKr-decompose), which must keep
+        # going through the fused forward.
+        return None
 
     @property
     def orig_module(self) -> nn.Module:
@@ -263,7 +274,10 @@ class LoHaModule(PeftBase):
         assert self.hada_w2_b is not None
 
     def forward(self, x, *args, **kwargs):
-        # They definitely exist at this point in the execution.
+        self.check_initialized()
+        return self.orig_forward(x) + self.delta_forward(x, *args, **kwargs)
+
+    def delta_forward(self, x, *args, **kwargs) -> Tensor | None:
         self.check_initialized()
 
         # Yeah, yeah, it's different from the A/B parameters in make_weight.
@@ -273,7 +287,241 @@ class LoHaModule(PeftBase):
         W2 = self.make_weight(self.dropout(self.hada_w2_b),
                               self.dropout(self.hada_w2_a))
         W = (W1 * W2) * (self.alpha / self.rank)
-        return self.orig_forward(x) + self.op(x, W, bias=None, **self.layer_kwargs)
+        return self.op(x, W, bias=None, **self.layer_kwargs)
+
+    def apply_to_module(self):
+        # TODO
+        pass
+
+    def extract_from_module(self, base_module: nn.Module):
+        # TODO
+        pass
+
+
+class LoKrModule(PeftBase):
+    """Implementation of LoKr from Lycoris."""
+
+    def __init__(self, prefix: str, orig_module: nn.Module | None, dim: int, alpha: float, decompose_both: bool, decompose_factor: int, use_tucker: bool, weight_decompose: bool, dora_on_output: bool, full_matrix: bool, train_device: torch.device, lokr_vec_trick: bool = False):
+        super().__init__(prefix, orig_module)
+        self.dim = dim  # LoKr uses 'dim' as its parameter
+        self.dropout = Dropout(0)
+        self.register_buffer("alpha", torch.tensor(alpha))
+
+        self.decompose_both = decompose_both
+        self.decompose_factor = int(decompose_factor)
+        self.use_tucker = use_tucker
+        self.weight_decompose = weight_decompose
+        self.dora_on_output = dora_on_output
+        self.train_device = train_device
+        self.full_matrix = full_matrix
+        self.lokr_vec_trick = lokr_vec_trick
+
+        self.use_w1 = False
+        self.use_w2 = False
+        self.tucker = False
+        self.dora_scale = None
+
+        # Cache shapes for the forward pass
+        self.in_m = self.in_n = self.out_l = self.out_k = None
+
+        if orig_module is not None:
+            self.initialize_weights()
+            self.alpha = self.alpha.to(orig_module.weight.device)
+        self.alpha.requires_grad_(False)
+
+    def initialize_weights(self):
+        self._initialized = True
+        lokr_dim = self.dim
+        device = self.orig_module.weight.device
+
+        factor = -1 if self.decompose_factor < 0 else self.decompose_factor
+
+        match self.orig_module:
+            case nn.Linear():
+                in_dim, out_dim = self.orig_module.in_features, self.orig_module.out_features
+
+                in_m, in_n = factorization(in_dim, factor)
+                if in_m > in_n:
+                    in_m, in_n = in_n, in_m
+                out_l, out_k = factorization(out_dim, factor)
+                if out_l > out_k:
+                    out_l, out_k = out_k, out_l
+
+                shape = ((out_l, out_k), (in_m, in_n))
+
+                # Store factorization shapes for the forward pass
+                self.in_m, self.in_n = in_m, in_n
+                self.out_l, self.out_k = out_l, out_k
+
+                # Create w1, or w1_a and w1_b
+                if self.decompose_both and lokr_dim < max(shape[0][0], shape[1][0]) / 2:
+                    self.lokr_w1_a = Parameter(torch.empty(shape[0][0], lokr_dim, device=device))
+                    self.lokr_w1_b = Parameter(torch.empty(lokr_dim, shape[1][0], device=device))
+                else:
+                    self.use_w1 = True
+                    self.lokr_w1 = Parameter(torch.empty(shape[0][0], shape[1][0], device=device))
+
+                # Create w2, or w2_a and w2_b
+                if not self.full_matrix and lokr_dim < max(shape[0][1], shape[1][1]) / 2:
+                    self.lokr_w2_a = Parameter(torch.empty(shape[0][1], lokr_dim, device=device))
+                    self.lokr_w2_b = Parameter(torch.empty(lokr_dim, shape[1][1], device=device))
+                else:
+                    if not self.full_matrix:
+                        print(f"LoKr rank {lokr_dim} is too large for dims ({in_dim}, {out_dim}) and factor {self.decompose_factor}, using full matrix mode.")
+                    self.use_w2 = True
+                    self.lokr_w2 = Parameter(torch.empty(shape[0][1], shape[1][1], device=device))
+
+            case nn.Conv2d():
+                in_dim, out_dim = self.orig_module.in_channels, self.orig_module.out_channels
+                k_size = self.orig_module.kernel_size
+
+                in_m, in_n = factorization(in_dim, factor)
+                if in_m > in_n:
+                    in_m, in_n = in_n, in_m
+                out_l, out_k = factorization(out_dim, factor)
+                if out_l > out_k:
+                    out_l, out_k = out_k, out_l
+
+                shape = ((out_l, out_k), (in_m, in_n), *k_size)
+                self.tucker = self.use_tucker and any(i != 1 for i in k_size)
+
+                # Create w1, or w1_a and w1_b
+                if self.decompose_both and lokr_dim < max(shape[0][0], shape[1][0]) / 2:
+                    self.lokr_w1_a = Parameter(torch.empty(shape[0][0], lokr_dim, device=device))
+                    self.lokr_w1_b = Parameter(torch.empty(lokr_dim, shape[1][0], device=device))
+                else:
+                    self.use_w1 = True
+                    self.lokr_w1 = Parameter(torch.empty(shape[0][0], shape[1][0], device=device))
+
+                # Create w2, or decomposed/tucker variants
+                if self.full_matrix or lokr_dim >= max(shape[0][1], shape[1][1]) / 2:
+                    if not self.full_matrix:
+                        print(f"LoKr rank {lokr_dim} is too large for dims ({in_dim}, {out_dim}) and factor {self.decompose_factor}, using full matrix mode.")
+                    self.use_w2 = True
+                    self.lokr_w2 = Parameter(torch.empty(shape[0][1], shape[1][1], *k_size, device=device))
+                elif self.tucker:
+                    self.lokr_t2 = Parameter(torch.empty(lokr_dim, lokr_dim, *shape[2:], device=device))
+                    self.lokr_w2_a = Parameter(torch.empty(lokr_dim, shape[0][1], device=device))
+                    self.lokr_w2_b = Parameter(torch.empty(lokr_dim, shape[1][1], device=device))
+                else:
+                    self.lokr_w2_a = Parameter(torch.empty(shape[0][1], lokr_dim, device=device))
+                    self.lokr_w2_b = Parameter(torch.empty(lokr_dim, shape[1][1] * torch.tensor(shape[2:]).prod().item(), device=device))
+            case _:
+                raise NotImplementedError("Only Linear and Conv2d are supported layers.")
+
+        # Initialize weights
+        if self.use_w1:
+            nn.init.kaiming_uniform_(self.lokr_w1, a=math.sqrt(5))
+        else:
+            nn.init.kaiming_uniform_(self.lokr_w1_a, a=math.sqrt(5))
+            nn.init.kaiming_uniform_(self.lokr_w1_b, a=math.sqrt(5))
+
+        if self.use_w2:
+            nn.init.constant_(self.lokr_w2, 0)
+        else:
+            if self.tucker:
+                nn.init.kaiming_uniform_(self.lokr_t2, a=math.sqrt(5))
+            nn.init.kaiming_uniform_(self.lokr_w2_a, a=math.sqrt(5))
+            nn.init.constant_(self.lokr_w2_b, 0)
+
+        if self.weight_decompose:
+            if isinstance(self.orig_module, nn.Linear):
+                orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
+            else:
+                orig_weight = self.orig_module.weight.detach().float()
+
+            dora_num_dims = orig_weight.dim() - 1
+            if self.dora_on_output:
+                dora_scale_val = torch.norm(orig_weight.reshape(orig_weight.shape[0], -1), dim=1, keepdim=True).reshape(orig_weight.shape[0], *[1] * dora_num_dims)
+            else:
+                dora_scale_val = torch.norm(orig_weight.transpose(1, 0).reshape(orig_weight.shape[1], -1), dim=1, keepdim=True).reshape(orig_weight.shape[1], *[1] * dora_num_dims).transpose(0, 1)
+
+            self.dora_scale = Parameter(
+                dora_scale_val.to(device=self.orig_module.weight.device, dtype=self.orig_module.weight.dtype)
+            )
+            del orig_weight
+
+        if self.use_w1 and self.use_w2:
+            self.alpha.fill_(lokr_dim)
+
+    def _get_factors(self):
+        """Returns the two kronecker components W1 and W2."""
+        # If using DoRA (weight_decompose), we want clean weights here so we can
+        # apply dropout to the input 'x' later.
+        # If not using DoRA, we apply dropout to the internal factors here.
+        d = (lambda x: x) if self.weight_decompose else self.dropout
+
+        # Handle W1
+        w1 = d(self.lokr_w1) if self.use_w1 else d(self.lokr_w1_a) @ d(self.lokr_w1_b)
+
+        # Handle W2
+        if self.use_w2:
+            w2 = d(self.lokr_w2)
+        elif self.tucker:
+            w2 = rebuild_tucker(d(self.lokr_t2), d(self.lokr_w2_a), d(self.lokr_w2_b))
+        else:
+            w2 = d(self.lokr_w2_a) @ d(self.lokr_w2_b)
+
+        return w1, w2
+
+    def get_weight(self):
+        """Computes the full LoKr weight matrix"""
+        w1, w2 = self._get_factors()
+        weight = make_kron(w1, w2.to(w1.dtype))
+        weight = weight.view(self.shape)
+
+        return weight
+
+    def forward(self, x, *args, **kwargs):
+        self.check_initialized()
+
+        scale = self.alpha / self.dim
+
+        # DoRA for LoKr
+        if self.weight_decompose:
+
+            if isinstance(self.orig_module, nn.Linear):
+                orig_weight = get_unquantized_weight(self.orig_module, torch.float, self.train_device)
+            else:
+                orig_weight = self.orig_module.weight.detach().float()
+
+            delta_w = self.get_weight() * scale
+            wp = orig_weight + delta_w
+            del orig_weight
+
+            eps = torch.finfo(wp.dtype).eps
+            if self.dora_on_output:
+                norm = wp.detach().reshape(wp.shape[0], -1).norm(dim=1).reshape(wp.shape[0], *[1] * (wp.dim() - 1)) + eps
+            else:
+                norm = wp.detach().transpose(0, 1).reshape(wp.shape[1], -1).norm(dim=1, keepdim=True).reshape(wp.shape[1], *[1] * (wp.dim() - 1)).transpose(0, 1) + eps
+
+            wp = self.dora_scale * (wp / norm)
+
+            # Apply dropout to the input 'x' (DoRA style)
+            return self.op(self.dropout(x), wp.to(x.dtype), self.orig_module.bias, **self.layer_kwargs)
+        else:
+            if self.lokr_vec_trick and isinstance(self.orig_module, nn.Linear):
+                # Apply W1 and W2 sequentially via einsum instead of
+                # constructing the full Kronecker product.
+                w1, w2 = self._get_factors()
+
+                x_shape = x.shape
+                x_reshaped = x.reshape(-1, self.in_m, self.in_n)
+
+                # Calculate delta = x @ (W1 x W2).T
+                delta_output = torch.einsum(
+                    'bmn, lm, kn -> blk',
+                    x_reshaped, w1.to(x.dtype), w2.to(x.dtype)
+                )
+
+                # Reshape back to [Batch, ..., Out_Features]
+                delta_output = delta_output.reshape(*x_shape[:-1], -1) * scale
+
+                return self.orig_forward(x) + delta_output
+            else:
+                # Fallback for Conv2d layers or when lokr_vec_trick is disabled
+                w = self.get_weight() * scale
+                return self.orig_forward(x) + self.op(x, w.to(x.dtype), bias=None, **self.layer_kwargs)
 
     def apply_to_module(self):
         # TODO
@@ -325,8 +573,12 @@ class LoRAModule(PeftBase):
         if isinstance(self.orig_module, BaseLinearSVD):
             return self.orig_module.forward_with_lora(x, self.lora_down, self.lora_up, self.dropout, self.alpha)
 
+        return self.orig_forward(x) + self.delta_forward(x, *args, **kwargs)
+
+    def delta_forward(self, x, *args, **kwargs) -> Tensor | None:
+        self.check_initialized()
         ld = self.lora_up(self.dropout(self.lora_down(x)))
-        return self.orig_forward(x) + ld * (self.alpha / self.rank)
+        return ld * (self.alpha / self.rank)
 
     def apply_to_module(self):
         # TODO
@@ -342,14 +594,16 @@ class OFTModule(PeftBase):
     rank: int
     oft_block_size: int
     block_share: bool
+    oft_scaled: bool
     dropout_probability: float
     adjustment_info: tuple[int, int] | None # for reporting
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, block_share: bool, **kwargs):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, block_share: bool, oft_scaled: bool, **kwargs):
         super().__init__(prefix, orig_module)
         self.oft_block_size = oft_block_size
         self.rank = 0
         self.block_share = block_share
+        self.oft_scaled = oft_scaled
         self.dropout_probability = kwargs.pop('dropout_probability', 0.0)
         self.oft_R = None
         self.adjustment_info = None
@@ -415,6 +669,7 @@ class OFTModule(PeftBase):
             block_size=self.oft_block_size,
             in_features=in_features,
             block_share=self.block_share,
+            oft_scaled=self.oft_scaled,
             use_cayley_neumann=True,
             num_cayley_neumann_terms=5,
             dropout_probability=self.dropout_probability,
@@ -430,9 +685,12 @@ class OFTModule(PeftBase):
             rotated_x = self.oft_R(x)
             return self.orig_forward(rotated_x, *args, **kwargs)
 
+        scaling_factor = 2 * math.sqrt(self.oft_R.block_size - 1) if self.oft_scaled else 1
+        effective_weight = self.oft_R.weight / scaling_factor
+
         # For Conv2d, we must rotate the weights, not the input, to preserve spatial information.
         orth_rotate = self.oft_R._cayley_batch(
-            self.oft_R.weight, self.oft_R.block_size, self.oft_R.use_cayley_neumann, self.oft_R.num_cayley_neumann_terms
+            effective_weight, self.oft_R.block_size, self.oft_R.use_cayley_neumann, self.oft_R.num_cayley_neumann_terms
         )
         orth_rotate = self.oft_R.dropout(orth_rotate)
 
@@ -565,6 +823,7 @@ DummyLoRAModule = LoRAModule.make_dummy()
 DummyDoRAModule = DoRAModule.make_dummy()
 DummyLoHaModule = LoHaModule.make_dummy()
 DummyOFTModule = OFTModule.make_dummy()
+DummyLoKrModule = LoKrModule.make_dummy()
 
 
 class LoRAModuleWrapper:
@@ -574,6 +833,7 @@ class LoRAModuleWrapper:
     module_filters: list[ModuleFilter]
 
     lora_modules: dict[str, PeftBase]
+    lokr_dim: int
 
     def __init__(
             self,
@@ -581,21 +841,34 @@ class LoRAModuleWrapper:
             prefix: str,
             config: TrainConfig,
             module_filter: list[str] = None,
+            fusion_spec: list[tuple] | None = None,
+            fuse: bool | None = None,
     ):
         self.orig_module = orig_module
         self.prefix = prefix
         self.peft_type = config.peft_type
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
+        self.lokr_dim = config.lokr_dim
+        # per-model qkv fusion groups (group_pattern, [leaf_suffixes], fused_suffix, original_suffix).
+        self.fusion_spec = fusion_spec
+        # whether to actually BUILD fused modules (vs split leaves). The setup decides from the chosen
+        # output format (ModelFormat.needs_qkv_fusion); this module does not know about output formats.
+        # `fuse` is separate from `fusion_spec` because a SPLIT wrapper still needs the qkv grouping to
+        # recognise (and reject) an incompatible fused file on load -- the file's fused/split state must
+        # match the wrapper's, and detecting that targets the qkv keys via the spec (see the
+        # check_fusion_match call in load_state_dict). A setup that wants that check passes fusion_spec unconditionally and
+        # selects fused/split only via `fuse`. When `fuse` is left None it defaults to fusing iff a spec
+        # was given.
+        self.fuse = (fusion_spec is not None) if fuse is None else fuse
 
         self.module_filters = [
             ModuleFilter(pattern, use_regex=config.layer_filter_regex)
             for pattern in (module_filter or [])
         ]
 
-        weight_decompose = config.lora_decompose
         if self.peft_type == PeftType.LORA:
-            if weight_decompose:
+            if config.lora_decompose:
                 self.klass = DoRAModule
                 self.dummy_klass = DummyDoRAModule
                 self.additional_args = [self.rank, self.alpha]
@@ -620,11 +893,26 @@ class LoRAModuleWrapper:
             self.additional_args = [
                 config.oft_block_size,
                 config.oft_block_share,
+                config.oft_scaled,
             ]
             self.additional_kwargs = {
                 'dropout_probability': config.dropout_probability,
             }
-
+        elif self.peft_type == PeftType.LOKR:
+            self.klass = LoKrModule
+            self.dummy_klass = DummyLoKrModule
+            self.additional_args = [self.lokr_dim, self.alpha]
+            self.additional_kwargs = {
+                'decompose_both': config.lokr_decompose_both,
+                'decompose_factor': config.lokr_decompose_factor,
+                'use_tucker': config.lokr_use_tucker,
+                'weight_decompose': config.lokr_weight_decompose,
+                'dora_on_output': config.lokr_dora_on_output,
+                'full_matrix': config.lokr_full_matrix,
+                'train_device': torch.device(config.train_device),
+                'lokr_vec_trick': config.lokr_vec_trick,
+            }
+        self.fused_groups = []
         self.lora_modules = self.__create_modules(orig_module, config)
 
     def __create_modules(self, orig_module: nn.Module | None, config: TrainConfig) -> dict[str, PeftBase]:
@@ -637,21 +925,44 @@ class LoRAModuleWrapper:
         unsuitable = []
         oft_adjustments = []
 
+        selected_modules = {}
         for name, child_module in orig_module.named_modules():
             name = name.replace(".checkpoint.", ".")
             if not isinstance(child_module, Linear | Conv2d):
                 unsuitable.append(name)
                 continue
             if len(self.module_filters) == 0 or any(f.matches(name) for f in self.module_filters):
-                prefixed_name = (self.prefix + "." + name) if self.prefix != "" else name
-                lora_module = self.klass(prefixed_name, child_module, *self.additional_args, **self.additional_kwargs)
-                lora_modules[name] = lora_module
-                if self.peft_type == PeftType.OFT_2 and lora_module.adjustment_info:
-                    old, new = lora_module.adjustment_info
-                    oft_adjustments.append({'old': old, 'new': new})
+                selected_modules[name] = child_module
                 selected.append(name)
             else:
                 deselected.append(name)
+
+        # discovered qkv fusion groups, retained for the load-time fused/split match check regardless of
+        # whether they are built fused. With no fusion_spec this is empty -> the loop below builds only
+        # individual (split) modules.
+        self.fused_groups = discover_fused_groups(self.fusion_spec, selected_modules, self.fuse)
+        # when fusing, each complete group becomes one fused module (ORIGINAL/COMFY); its leaves are then
+        # excluded from individual creation. When not fusing, the leaves stay individual (split) modules.
+        consumed = set()
+        if self.fuse:
+            for fused_name, leaf_names, leaves in self.fused_groups:
+                consumed.update(leaf_names)
+                prefixed_name = (self.prefix + "." + fused_name) if self.prefix != "" else fused_name
+                group = FusedModuleGroup(prefixed_name, leaves, self.klass, self.additional_args, self.additional_kwargs)
+                lora_modules[fused_name] = group
+                if self.peft_type == PeftType.OFT_2 and group.module.adjustment_info:
+                    old, new = group.module.adjustment_info
+                    oft_adjustments.append({'old': old, 'new': new})
+
+        for name, child_module in selected_modules.items():
+            if name in consumed:
+                continue
+            prefixed_name = (self.prefix + "." + name) if self.prefix != "" else name
+            lora_module = self.klass(prefixed_name, child_module, *self.additional_args, **self.additional_kwargs)
+            lora_modules[name] = lora_module
+            if self.peft_type == PeftType.OFT_2 and lora_module.adjustment_info:
+                old, new = lora_module.adjustment_info
+                oft_adjustments.append({'old': old, 'new': new})
 
         if oft_adjustments:
             summary = defaultdict(int)
@@ -706,9 +1017,21 @@ class LoRAModuleWrapper:
         if self.peft_type == PeftType.OFT_2:
             return
 
-        if rank_key := next((k for k in state_dict if k.endswith((".lora_down.weight", ".hada_w1_a"))), None):
-            if (checkpoint_rank := state_dict[rank_key].shape[0]) != self.rank:
-                raise ValueError(f"Rank mismatch: checkpoint={checkpoint_rank}, config={self.rank}, please correct in the UI.")
+        rank_keys = {
+            PeftType.LORA: ".lora_down.weight",
+            PeftType.LOHA: ".hada_w1_a",
+            PeftType.LOKR: ".lokr_w1_a",
+        }
+        key_suffix = rank_keys.get(self.peft_type)
+        if not key_suffix:
+            return
+
+        if rank_key := next((k for k in state_dict if k.endswith(key_suffix)), None):
+            checkpoint_rank = state_dict[rank_key].shape[1] if self.peft_type == PeftType.LOKR else state_dict[rank_key].shape[0]
+            config_rank = self.lokr_dim if self.peft_type == PeftType.LOKR else self.rank
+
+            if checkpoint_rank != config_rank:
+                raise ValueError(f"Rank/Dim mismatch: checkpoint={checkpoint_rank}, config={config_rank}, please correct in the UI.")
 
     def load_state_dict(self, state_dict: dict[str, Tensor], strict: bool = True):
         """
@@ -721,7 +1044,9 @@ class LoRAModuleWrapper:
         # create a copy, so the modules can pop states
         state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
 
-        self._check_rank_matches(state_dict)
+        check_fusion_match(state_dict.keys(), self.fuse, self.fusion_spec)
+        # FIXME: disabled rank check, false positive on Flux2 LoHA loading
+        # self._check_rank_matches(state_dict)
 
         try:
             for module in self.lora_modules.values():

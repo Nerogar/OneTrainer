@@ -7,7 +7,9 @@ from modules.model.util.clip_util import encode_clip
 from modules.model.util.t5_util import encode_t5
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util.convert_util import chunk_swap
 from modules.util.enum.DataType import DataType
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
@@ -50,7 +52,9 @@ class FluxModelEmbedding:
 class FluxModel(BaseModel):
     # base model data
     tokenizer_1: CLIPTokenizer | None
+    orig_tokenizer_1: CLIPTokenizer | None
     tokenizer_2: T5Tokenizer | None
+    orig_tokenizer_2: T5Tokenizer | None
     noise_scheduler: FlowMatchEulerDiscreteScheduler | None
     text_encoder_1: CLIPTextModel | None
     text_encoder_2: T5EncoderModel | None
@@ -86,7 +90,9 @@ class FluxModel(BaseModel):
         )
 
         self.tokenizer_1 = None
+        self.orig_tokenizer_1 = None
         self.tokenizer_2 = None
+        self.orig_tokenizer_2 = None
         self.noise_scheduler = None
         self.text_encoder_1 = None
         self.text_encoder_2 = None
@@ -117,6 +123,77 @@ class FluxModel(BaseModel):
             self.transformer_lora,
         ] if a is not None]
 
+    def fusion_groups(self) -> list | None:
+        # Flux fuses img qkv, txt qkv, and the single-block qkv+mlp (4 leaves -> linear1).
+        return [
+            ("transformer_blocks.{i}", ["attn.to_q", "attn.to_k", "attn.to_v"], "attn.qkv", "img_attn.qkv"),
+            ("transformer_blocks.{i}", ["attn.add_q_proj", "attn.add_k_proj", "attn.add_v_proj"], "attn.added_qkv", "txt_attn.qkv"),
+            ("single_transformer_blocks.{i}", ["attn.to_q", "attn.to_k", "attn.to_v", "proj_mlp"], "qkv_mlp", "linear1"),
+        ]
+
+    def diffusers_to_original(self) -> list | None:
+        # chunk_swap on norm_out.linear (final-layer adaLN): diffusers and original store its two modulation
+        # chunks in opposite order.
+        return [
+            ("context_embedder", "txt_in"),
+            ("x_embedder", "img_in"),
+            ("proj_out", "final_layer.linear"),
+            *chunk_swap("norm_out.linear", "final_layer.adaLN_modulation.1"),
+            ("time_text_embed.guidance_embedder", "guidance_in", [
+                ("linear_1", "in_layer"),
+                ("linear_2", "out_layer"),
+            ]),
+            ("time_text_embed.text_embedder", "vector_in", [
+                ("linear_1", "in_layer"),
+                ("linear_2", "out_layer"),
+            ]),
+            ("time_text_embed.timestep_embedder", "time_in", [
+                ("linear_1", "in_layer"),
+                ("linear_2", "out_layer"),
+            ]),
+            ("transformer_blocks.{i}", "double_blocks.{i}", [
+                ("attn.qkv",                 "img_attn.qkv"),
+                ("attn.added_qkv",           "txt_attn.qkv"),
+                ("attn.norm_k.weight",       "img_attn.norm.key_norm.scale"),
+                ("attn.norm_q.weight",       "img_attn.norm.query_norm.scale"),
+                ("attn.to_out.0",            "img_attn.proj"),
+                ("ff.net.0.proj",            "img_mlp.0"),
+                ("ff.net.2",                 "img_mlp.2"),
+                ("norm1.linear",             "img_mod.lin"),
+                ("attn.norm_added_k.weight", "txt_attn.norm.key_norm.scale"),
+                ("attn.norm_added_q.weight", "txt_attn.norm.query_norm.scale"),
+                ("attn.to_add_out",          "txt_attn.proj"),
+                ("ff_context.net.0.proj",    "txt_mlp.0"),
+                ("ff_context.net.2",         "txt_mlp.2"),
+                ("norm1_context.linear",     "txt_mod.lin"),
+            ]),
+            ("single_transformer_blocks.{i}", "single_blocks.{i}", [
+                ("qkv_mlp",            "linear1"),
+                ("attn.norm_k.weight", "norm.key_norm.scale"),
+                ("attn.norm_q.weight", "norm.query_norm.scale"),
+                ("proj_out",           "linear2"),
+                ("norm.linear",        "modulation.lin"),
+            ]),
+        ]
+
+    def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
+        # Flux's two TEs: clip_l + t5xxl (Comfy's FluxClipModel). Either can be absent (unchecked in the UI),
+        # so only the TEs actually present are declared.
+        text_encoders = []
+        if self.text_encoder_1 is not None:
+            text_encoders.append((self.text_encoder_1, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder",
+                ModelFormat.KOHYA_LORA: "lora_te1",
+                ModelFormat.COMFY_LORA: "text_encoders.clip_l.transformer",
+            }))
+        if self.text_encoder_2 is not None:
+            text_encoders.append((self.text_encoder_2, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder_2",
+                ModelFormat.KOHYA_LORA: "lora_te2",
+                ModelFormat.COMFY_LORA: "text_encoders.t5xxl.transformer",
+            }))
+        return text_encoders
+
     def all_embeddings(self) -> list[FluxModelEmbedding]:
         return self.additional_embeddings \
                + ([self.embedding] if self.embedding is not None else [])
@@ -145,8 +222,7 @@ class FluxModel(BaseModel):
 
     def text_encoder_2_to(self, device: torch.device):
         if self.text_encoder_2 is not None:
-            if self.text_encoder_2_offload_conductor is not None and \
-                    self.text_encoder_2_offload_conductor.layer_offload_activated():
+            if self.text_encoder_2_offload_conductor is not None:
                 self.text_encoder_2_offload_conductor.to(device)
             else:
                 self.text_encoder_2.to(device=device)
@@ -155,8 +231,7 @@ class FluxModel(BaseModel):
             self.text_encoder_2_lora.to(device)
 
     def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None and \
-                self.transformer_offload_conductor.layer_offload_activated():
+        if self.transformer_offload_conductor is not None:
             self.transformer_offload_conductor.to(device)
         else:
             self.transformer.to(device=device)
@@ -177,15 +252,15 @@ class FluxModel(BaseModel):
             self.text_encoder_2.eval()
         self.transformer.eval()
 
-    def create_pipeline(self) -> DiffusionPipeline:
+    def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
         return FluxPipeline(
             transformer=self.transformer,
             scheduler=self.noise_scheduler,
             vae=self.vae,
             text_encoder=self.text_encoder_1,
-            tokenizer=self.tokenizer_1,
+            tokenizer=self.orig_tokenizer_1 if use_original_tokenizers else self.tokenizer_1,
             text_encoder_2=self.text_encoder_2,
-            tokenizer_2=self.tokenizer_2,
+            tokenizer_2=self.orig_tokenizer_2 if use_original_tokenizers else self.tokenizer_2,
         )
 
     def add_text_encoder_1_embeddings_to_prompt(self, prompt: str) -> str:
@@ -287,13 +362,13 @@ class FluxModel(BaseModel):
         )
 
         # apply dropout
-        if text_encoder_1_dropout_probability is not None:
+        if text_encoder_1_dropout_probability is not None and text_encoder_1_dropout_probability > 0.0:
             dropout_text_encoder_1_mask = (torch.tensor(
                 [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()
             pooled_text_encoder_1_output = pooled_text_encoder_1_output * dropout_text_encoder_1_mask[:, None]
 
-        if text_encoder_2_dropout_probability is not None:
+        if text_encoder_2_dropout_probability is not None and text_encoder_2_dropout_probability > 0.0:
             dropout_text_encoder_2_mask = (torch.tensor(
                 [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()

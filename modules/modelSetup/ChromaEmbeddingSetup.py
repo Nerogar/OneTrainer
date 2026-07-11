@@ -12,6 +12,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.CHROMA_1, TrainingMethod.EMBEDDING)
 class ChromaEmbeddingSetup(
     BaseChromaSetup,
 ):
@@ -34,7 +35,7 @@ class ChromaEmbeddingSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.text_encoder.train_embedding and model.text_encoder is not None:
+        if config.text_encoder.train_embedding:
             self._add_embedding_param_groups(
                 model.all_text_encoder_embeddings(), parameter_group_collection, config.embedding_learning_rate,
                 "embeddings"
@@ -48,8 +49,7 @@ class ChromaEmbeddingSetup(
             config: TrainConfig,
     ):
         self._setup_embeddings_requires_grad(model, config)
-        if model.text_encoder is not None:
-            model.text_encoder.requires_grad_(False)
+        model.text_encoder.requires_grad_(False)
         model.transformer.requires_grad_(False)
         model.vae.requires_grad_(False)
 
@@ -58,10 +58,8 @@ class ChromaEmbeddingSetup(
             model: ChromaModel,
             config: TrainConfig,
     ):
-        if model.text_encoder is not None:
-            model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
+        model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
@@ -81,8 +79,7 @@ class ChromaEmbeddingSetup(
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.transformer_to(self.train_device)
 
-        if model.text_encoder is not None:
-            model.text_encoder.eval()
+        model.text_encoder.eval()
         model.vae.eval()
         model.transformer.eval()
 
@@ -97,5 +94,3 @@ class ChromaEmbeddingSetup(
             if model.embedding_wrapper is not None:
                 model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, ChromaEmbeddingSetup, ModelType.CHROMA_1, TrainingMethod.EMBEDDING)

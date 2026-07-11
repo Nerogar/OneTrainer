@@ -14,6 +14,8 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.PIXART_ALPHA, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.PIXART_SIGMA, TrainingMethod.LORA)
 class PixArtAlphaLoRASetup(
     BasePixArtAlphaSetup,
 ):
@@ -69,13 +71,14 @@ class PixArtAlphaLoRASetup(
         if config.train_any_embedding():
             model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te")
+        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
         model.text_encoder_lora = LoRAModuleWrapper(
-            model.text_encoder, "lora_te", config
+            model.text_encoder, "text_encoder", config
         ) if create_te else None
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "lora_transformer", config, config.layer_filter.split(",")
+            model.transformer, "transformer", config, config.layer_filter.split(","),
+            fusion_spec=model.fusion_groups(), fuse=config.output_model_format.needs_qkv_fusion(),
         )
 
         if model.lora_state_dict:
@@ -94,7 +97,6 @@ class PixArtAlphaLoRASetup(
         model.transformer_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
         model.transformer_lora.hook_to_module()
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
@@ -139,6 +141,3 @@ class PixArtAlphaLoRASetup(
             self._normalize_output_embeddings(model.all_text_encoder_embeddings())
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, PixArtAlphaLoRASetup, ModelType.PIXART_ALPHA, TrainingMethod.LORA)
-factory.register(BaseModelSetup, PixArtAlphaLoRASetup, ModelType.PIXART_SIGMA, TrainingMethod.LORA)

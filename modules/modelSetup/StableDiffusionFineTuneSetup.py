@@ -13,6 +13,14 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE)
 class StableDiffusionFineTuneSetup(
     BaseStableDiffusionSetup,
 ):
@@ -76,7 +84,6 @@ class StableDiffusionFineTuneSetup(
         elif config.force_epsilon_prediction:
             model.force_epsilon_prediction()
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
@@ -122,12 +129,3 @@ class StableDiffusionFineTuneSetup(
             self._normalize_output_embeddings(model.all_text_encoder_embeddings())
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE)

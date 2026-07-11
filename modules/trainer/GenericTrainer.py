@@ -20,6 +20,7 @@ from modules.util import create, path_util
 from modules.util.bf16_stochastic_rounding import set_seed as bf16_stochastic_rounding_set_seed
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.compile_util import init_compile
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
@@ -66,6 +67,8 @@ class GenericTrainer(BaseTrainer):
 
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
         super().__init__(config, callbacks, commands)
+        # torch._dynamo.config overrides are thread-local, so init_compile() must be called in the training thread/process.
+        init_compile()
 
         if multi.is_master():
             tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
@@ -115,10 +118,7 @@ class GenericTrainer(BaseTrainer):
         if self.config.secrets.huggingface_token != "":
             self.callbacks.on_update_status("logging into Hugging Face")
             with contextlib.suppress(ConnectionError):
-                huggingface_hub.login(
-                    token = self.config.secrets.huggingface_token,
-                    new_session = False,
-                )
+                huggingface_hub.login(token=self.config.secrets.huggingface_token)
 
         self.callbacks.on_update_status("loading the model")
 
@@ -584,6 +584,7 @@ class GenericTrainer(BaseTrainer):
                             tensor.grad = None
 
                     def __grad_hook(tensor: Tensor, param_group=param_group, i=i):
+                        init_compile()  # workaround for https://github.com/pytorch/pytorch/issues/186537
                         if self.__is_update_step(self.model.train_progress):
                             if fused_reduce:
                                 multi.reduce_grads_mean(

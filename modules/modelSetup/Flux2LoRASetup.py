@@ -13,6 +13,7 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.FLUX_2, TrainingMethod.LORA)
 class Flux2LoRASetup(
     BaseFlux2Setup,
 ):
@@ -55,7 +56,8 @@ class Flux2LoRASetup(
             config: TrainConfig,
     ):
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "transformer", config, config.layer_filter.split(",")
+            model.transformer, "transformer", config, config.layer_filter.split(","),
+            fusion_spec=model.fusion_groups(), fuse=config.output_model_format.needs_qkv_fusion(),
         )
 
         if model.lora_state_dict:
@@ -97,5 +99,3 @@ class Flux2LoRASetup(
             train_progress: TrainProgress
     ):
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, Flux2LoRASetup, ModelType.FLUX_2, TrainingMethod.LORA)
