@@ -17,6 +17,8 @@ class DataType(Enum):
     GGUF = 'GGUF'
     GGUF_A8_FLOAT = 'GGUF_A8_FLOAT'
     GGUF_A8_INT = 'GGUF_A8_INT'
+    BFLOAT_16_A8_INT = 'BFLOAT_16_A8_INT'
+    BFLOAT_16_A8_FLOAT = 'BFLOAT_16_A8_FLOAT'
 
     def __str__(self):
         return self.value
@@ -37,6 +39,10 @@ class DataType(Enum):
                 return torch.bfloat16
             case DataType.TFLOAT_32:
                 return torch.float32
+            case DataType.BFLOAT_16_A8_FLOAT:
+                return torch.bfloat16
+            case DataType.BFLOAT_16_A8_INT:
+                return torch.bfloat16
             case _:
                 return None
 
