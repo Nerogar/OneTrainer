@@ -1,4 +1,5 @@
 # development
+.git/
 .idea
 *.bak
 *.pyc
@@ -6,11 +7,13 @@
 *~
 debug*.ipynb
 debug*.py
+settings.json
 /debug*
 
 # user data
 /workspace*
 /models/*
+!/models/.gitkeep
 /training_concepts
 /training_samples
 /training_user_settings
@@ -27,14 +30,23 @@ secrets.json
 .python-version
 *.egg-info
 
-# pixi environments
-.pixi
-pixi.lock
-pixi.toml
-
 # misc files
 /src
 train.bat
 debug_report.log
 config_diff.txt
+
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# macOS
+**/.DS_Store
 CLAUDE.md
+
+training_presets/*
+!training_presets/.gitignore
+!training_presets/\#*
+
+# #.json is an exception (from the exception). This file stores the ui state from a previous run.
+training_presets/\#.json
