@@ -94,7 +94,7 @@ class StableDiffusionBaseDataLoader(
             text_split_names=text_split_names,
             sort_names=sort_names,
             config=config,
-            text_caching=not config.train_text_encoder_or_embedding(),
+            text_caching=config.text_caching and not config.train_text_encoder_or_embedding(),
         )
 
     def _output_modules(self, config: TrainConfig, model: StableDiffusionModel, model_setup: BaseStableDiffusionSetup):

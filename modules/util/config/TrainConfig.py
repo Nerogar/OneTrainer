@@ -405,7 +405,8 @@ class TrainConfig(BaseConfig):
     concept_file_name: str
     concepts: list[ConceptConfig]
     aspect_ratio_bucketing: bool
-    latent_caching: bool
+    image_caching: bool
+    text_caching: bool
     clear_cache_before_training: bool
 
     # training settings
@@ -591,7 +592,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=11,
+            config_version=12,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -604,6 +605,7 @@ class TrainConfig(BaseConfig):
                 8: self.__migration_8,
                 9: self.__migration_9,
                 10: self.__migration_10,
+                11: self.__migration_11,
             }
         )
 
@@ -868,6 +870,13 @@ class TrainConfig(BaseConfig):
         # fields keep their defaults (train=True) or migrated offload values but don't exist in the model.
         return [getattr(self, name) for name in self.model_type.model_parts()]
 
+    def __migration_11(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        if "latent_caching" in migrated_data:
+            latent_caching = migrated_data.pop("latent_caching")
+            migrated_data["image_caching"] = latent_caching
+            migrated_data["text_caching"] = latent_caching
+        return migrated_data
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
@@ -1047,7 +1056,8 @@ class TrainConfig(BaseConfig):
         data.append(("concept_file_name", "training_concepts/concepts.json", str, False))
         data.append(("concepts", None, list[ConceptConfig], True))
         data.append(("aspect_ratio_bucketing", True, bool, False))
-        data.append(("latent_caching", True, bool, False))
+        data.append(("image_caching", True, bool, False))
+        data.append(("text_caching", True, bool, False))
         data.append(("clear_cache_before_training", True, bool, False))
 
         # training settings

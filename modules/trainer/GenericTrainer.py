@@ -85,7 +85,7 @@ class GenericTrainer(BaseTrainer):
         if multi.is_master():
             self.__save_config_to_workspace()
 
-            if self.config.clear_cache_before_training and self.config.latent_caching:
+            if self.config.clear_cache_before_training and (self.config.image_caching or self.config.text_caching):
                 self.__clear_cache()
 
         if self.config.train_dtype.enable_tf():
@@ -643,7 +643,7 @@ class GenericTrainer(BaseTrainer):
 
             #call start_next_epoch with only one process at first, because it might write to the cache. All subsequent processes can read in parallel:
             for _ in multi.master_first():
-                if self.config.latent_caching:
+                if self.config.image_caching or self.config.text_caching:
                     self.data_loader.get_data_set().start_next_epoch()
                     self.model_setup.setup_train_device(self.model, self.config)
                 else:

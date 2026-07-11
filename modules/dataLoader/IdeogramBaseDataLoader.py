@@ -55,7 +55,7 @@ class IdeogramBaseDataLoader(
             modules.append(downscale_mask)
         modules += [tokenize_prompt, encode_prompt]
 
-        if config.latent_caching:
+        if config.text_caching:
             modules.append(prune_masked_tokens)
 
         return modules
@@ -84,7 +84,7 @@ class IdeogramBaseDataLoader(
             text_split_names=text_split_names,
             sort_names=sort_names,
             config=config,
-            text_caching=True,
+            text_caching=config.text_caching,
         )
 
     def _output_modules(self, config: TrainConfig, model: IdeogramModel, model_setup: BaseIdeogramSetup):
@@ -113,7 +113,7 @@ class IdeogramBaseDataLoader(
             train_dtype=model.train_dtype,
         )
 
-        if config.latent_caching:
+        if config.text_caching:
             output_module_list = [pad_masked_tokens] + output_module_list
 
         return output_module_list

@@ -64,8 +64,8 @@ class ZImageFineTuneSetup(
             model: ZImageModel,
             config: TrainConfig,
     ):
-        vae_on_train_device = not config.latent_caching
-        text_encoder_on_train_device = not config.latent_caching
+        vae_on_train_device = not config.image_caching
+        text_encoder_on_train_device = not config.text_caching
 
         model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
