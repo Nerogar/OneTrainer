@@ -127,6 +127,8 @@ class PySide6ConceptWindowView(BaseConceptWindowView, QDialog):
         text_frame = QWidget()
         text_scroll.setWidget(text_frame)
         pyside6_components._layout(text_frame).setContentsMargins(_pad, _pad, _pad, _pad)
+        pyside6_components._layout(text_frame).setColumnStretch(1, 1)
+        pyside6_components._layout(text_frame).setColumnStretch(2, 1)
         pyside6_components._layout(text_frame).setColumnStretch(3, 1)
         self.build_text_augmentation_tab(text_frame, controller, text_ui_state)
         pyside6_components._pack_form(text_frame)
