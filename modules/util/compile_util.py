@@ -1,7 +1,9 @@
 import torch
+import torch._dynamo.callback
 import torch.utils._sympy.functions
 
 from sympy import S
+from tqdm import tqdm
 
 
 #code from https://github.com/pytorch/pytorch/blob/ed82d5fcfd80110565f69130f286c7bfec6db2dc/torch/utils/_sympy/functions.py#L481
@@ -69,5 +71,16 @@ def init_compile():
     # modules during the backward pass.
     torch._dynamo.config.cache_size_limit = 8192
 
+
+def _on_compile_start(args: "torch._dynamo.callback.CallbackArgs") -> None:
+    frame_id, _, frame_compile_id = args.compile_id.partition("/")
+    direction = "backward" if args.callback_trigger == torch._dynamo.callback.CallbackTrigger.LAZY_BACKWARD else "forward"
+    if frame_compile_id in ("", "0"):
+        tqdm.write(f"[torch.compile] compiling kernel {frame_id} ({direction})...")
+    else:
+        tqdm.write(f"[torch.compile] recompiling kernel {frame_id} (compile #{int(frame_compile_id) + 1} {direction})...")
+
+
+torch._dynamo.callback.on_compile_start(_on_compile_start)
 
 torch.utils._sympy.functions.Mod.eval = Mod_patched_eval
