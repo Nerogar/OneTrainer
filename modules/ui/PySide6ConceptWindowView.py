@@ -22,6 +22,11 @@ from PySide6.QtWidgets import (
 )
 
 
+class NonZoomingFigureCanvas(FigureCanvasQTAgg):
+    def wheelEvent(self, event):
+        event.ignore()
+
+
 class PySide6ConceptWindowView(BaseConceptWindowView, QDialog):
     def __init__(
             self,
@@ -149,7 +154,7 @@ class PySide6ConceptWindowView(BaseConceptWindowView, QDialog):
 
         plt.set_loglevel('WARNING')
         self.bucket_fig, self.bucket_ax = plt.subplots(figsize=(7, 3))
-        self.canvas = FigureCanvasQTAgg(self.bucket_fig)
+        self.canvas = NonZoomingFigureCanvas(self.bucket_fig)
         self.bucket_fig.tight_layout()
         self.bucket_fig.subplots_adjust(bottom=0.15)
 
