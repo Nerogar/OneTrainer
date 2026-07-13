@@ -1,5 +1,5 @@
 try:
-    from modules.util.triton_mm_8bit import mm_8bit
+    from modules.util.triton_mm_8bit import mm_8bit, mm_8bit_scaled
 except ImportError as e:
     print(str(e) + ", continuing without triton")
     import torch
@@ -13,3 +13,10 @@ except ImportError as e:
         else:
             one = torch.ones(1, device=a.device)
             return torch._scaled_mm(a, b.T.contiguous().T, scale_a=one, scale_b=one)
+
+    def mm_8bit_scaled(a: torch.Tensor, b: torch.Tensor, scale_a: torch.Tensor, scale_b: torch.Tensor,
+                       out_dtype: torch.dtype) -> torch.Tensor:
+        assert scale_a.numel() == a.shape[0], "scale_a must be one scale per row of A"
+        assert scale_b.numel() == 1, "scale_b must be a single-element tensor"
+        res = mm_8bit(a, b)
+        return res.float().mul_(scale_b.float() * scale_a.view(-1, 1)).to(out_dtype)
