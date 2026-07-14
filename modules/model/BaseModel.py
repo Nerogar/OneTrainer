@@ -115,6 +115,7 @@ class BaseModel(metaclass=ABCMeta):
         for part in parts or self.model_type.model_parts():
             self._move_part(part, self.temp_device)
         torch_gc()
+        # print_fragmentation(f"evict({', '.join(parts) or 'all'})")
 
     def materialize_only(self, *parts: str):
         # Materialize exactly `parts` on train_device; evict every other component in ModelType.model_parts()
