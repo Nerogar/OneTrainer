@@ -11,7 +11,7 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
-from modules.util.torch_util import torch_gc
+from modules.util.torch_util import create_mem_pool, mem_pool_context, supports_mem_pool, torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -97,6 +97,8 @@ class BaseModel(metaclass=ABCMeta):
         self.autocast_context = nullcontext()
         self.train_dtype = DataType.FLOAT_32
 
+        self._mem_pools = {}
+
     @property
     def train_device(self) -> torch.device:
         return torch.device(self.train_config.train_device)
@@ -144,7 +146,18 @@ class BaseModel(metaclass=ABCMeta):
             # None when the part is excluded from training (e.g. a text encoder with include_text_encoder off):
             # it stays in model_parts() but the loader never populated it, so there is nothing to move.
             if component is not None:
-                component.to(device=device)
+                # give each component its own MemPool to avoid fragmenting the next reload
+                if supports_mem_pool(device):
+                    pool = self._mem_pools.get(stem)
+                    if pool is None:
+                        pool = self._mem_pools[stem] = create_mem_pool(device)
+                    with mem_pool_context(pool):
+                        component.to(device=device)
+                else:
+                    # the target has no MemPool (CPU): move normally and drop this component's pool from the
+                    # earlier GPU move, so evict()'s torch_gc can release its segments
+                    component.to(device=device)
+                    self._mem_pools.pop(stem, None)
 
         lora = getattr(self, f"{stem}_lora", None)
         if lora is not None:
