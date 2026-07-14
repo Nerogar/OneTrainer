@@ -73,7 +73,7 @@ class IdeogramModelLoader(
         else:
             unconditional_transformer = None
 
-        text_encoder = self._load_transformers_sub_module(
+        text_encoder = self._load_text_encoder(
             Qwen3VLModel,
             weight_dtypes.text_encoder,
             weight_dtypes.fallback_train_dtype,
@@ -91,21 +91,13 @@ class IdeogramModelLoader(
             subfolder="scheduler",
         )
 
-        if vae_model_name:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKLFlux2,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                vae_model_name,
-            )
-        else:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKLFlux2,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                base_model_name,
-                "vae",
-            )
+        vae = self._load_vae(
+            AutoencoderKLFlux2,
+            weight_dtypes.vae,
+            weight_dtypes.train_dtype,
+            base_model_name,
+            vae_model_name,
+        )
 
         model.model_type = model_type
         model.tokenizer = tokenizer
