@@ -71,11 +71,6 @@ class Flux2Model(BaseModel):
         self.transformer_lora = None
         self.lora_state_dict = None
 
-    def adapters(self) -> list[LoRAModuleWrapper]:
-        return [a for a in [
-            self.transformer_lora,
-        ] if a is not None]
-
     def fusion_groups(self) -> list | None:
         # Only the two double-block qkv groups -- Flux2's single block is the already-fused attn.to_qkv_mlp_proj.
         # NOTE: the fused suffix (attn.qkv / attn.added_qkv) is OneTrainer's name for the fused module on the
@@ -125,36 +120,6 @@ class Flux2Model(BaseModel):
                 ("attn.norm_q.weight",   "norm.query_norm.scale"),
             ]),
         ]
-
-    def vae_to(self, device: torch.device):
-        self.vae.to(device=device)
-
-    def text_encoder_to(self, device: torch.device):
-        if self.text_encoder is not None:
-            if self.text_encoder_offload_conductor is not None:
-                self.text_encoder_offload_conductor.to(device)
-            else:
-                self.text_encoder.to(device=device)
-
-    def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None:
-            self.transformer_offload_conductor.to(device)
-        else:
-            self.transformer.to(device=device)
-
-        if self.transformer_lora is not None:
-            self.transformer_lora.to(device)
-
-    def to(self, device: torch.device):
-        self.vae_to(device)
-        self.text_encoder_to(device)
-        self.transformer_to(device)
-
-    def eval(self):
-        self.vae.eval()
-        if self.text_encoder is not None:
-            self.text_encoder.eval()
-        self.transformer.eval()
 
     def create_pipeline(self) -> DiffusionPipeline:
         klass = Flux2Pipeline if self.is_dev() else Flux2KleinPipeline
