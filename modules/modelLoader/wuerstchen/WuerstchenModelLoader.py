@@ -75,7 +75,7 @@ class WuerstchenModelLoader(
         )
 
         if model_type.is_wuerstchen_v2():
-            decoder_text_encoder = self._load_transformers_sub_module(
+            decoder_text_encoder = self._load_text_encoder(
                 CLIPTextModel,
                 weight_dtypes.decoder_text_encoder,
                 weight_dtypes.train_dtype,
@@ -164,7 +164,7 @@ class WuerstchenModelLoader(
         )
 
         if model_type.is_wuerstchen_v2():
-            prior_text_encoder = self._load_transformers_sub_module(
+            prior_text_encoder = self._load_text_encoder(
                 CLIPTextModel,
                 weight_dtypes.text_encoder,
                 weight_dtypes.train_dtype,
@@ -172,7 +172,7 @@ class WuerstchenModelLoader(
                 "text_encoder",
             )
         elif model_type.is_stable_cascade():
-            prior_text_encoder = self._load_transformers_sub_module(
+            prior_text_encoder = self._load_text_encoder(
                 CLIPTextModelWithProjection,
                 weight_dtypes.text_encoder,
                 weight_dtypes.train_dtype,
