@@ -11,7 +11,6 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
-from modules.util.torch_util import torch_gc
 
 import torch
 
@@ -92,7 +91,7 @@ class IdeogramSampler(BaseModelSampler):
                 return max_text_tokens, position_ids, segment_ids, indicator, llm_features, text_z_padding
 
             # encode text (conditional branch, and the empty-prompt negative branch if needed)
-            self.model.text_encoder_to(self.train_device)
+            self.model.materialize_only("text_encoder")
             text_features, text_lengths = self.model.encode_text(
                 train_device=self.train_device,
                 text=prompt,
@@ -111,8 +110,6 @@ class IdeogramSampler(BaseModelSampler):
                     neg_text_z_padding,
                 ) = pack_conditioning(neg_text_features, neg_text_lengths)
                 del neg_text_features
-            self.model.text_encoder_to(self.temp_device)
-            torch_gc()
 
             if use_unconditional_transformer:
                 # unconditional (image-only) branch: zeroed text features over the image-region slices of the layout
@@ -141,9 +138,8 @@ class IdeogramSampler(BaseModelSampler):
             timesteps = noise_scheduler.timesteps
             num_train_timesteps = noise_scheduler.config.num_train_timesteps
 
-            self.model.transformer_to(self.train_device)
-            if use_unconditional_transformer:
-                self.model.unconditional_transformer_to(self.train_device)
+            transformer_parts = ("transformer", "unconditional_transformer") if use_unconditional_transformer else ("transformer",)
+            self.model.materialize_only(*transformer_parts)
 
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 # scheduler stores num_train_timesteps-scaled timesteps; convert back to model time (0=noise, 1=data)
@@ -190,10 +186,7 @@ class IdeogramSampler(BaseModelSampler):
 
                 on_update_progress(i + 1, len(timesteps))
 
-            self.model.transformer_to(self.temp_device)
-            self.model.unconditional_transformer_to(self.temp_device)
-            torch_gc()
-            self.model.vae_to(self.train_device)
+            self.model.materialize_only("vae")
 
             # bn-denormalize the packed latents and unpatchify back to (B, C, H, W) before VAE decode
             latents = self.model.unscale_latents(latent_image)
@@ -205,8 +198,7 @@ class IdeogramSampler(BaseModelSampler):
             image = image.cpu().permute(0, 2, 3, 1).float().numpy()
             image = [PILImage.fromarray((img * 255).astype(np.uint8)) for img in image]
 
-            self.model.vae_to(self.temp_device)
-            torch_gc()
+            self.model.evict()
 
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,
