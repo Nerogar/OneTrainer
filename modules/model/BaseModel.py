@@ -139,29 +139,35 @@ class BaseModel(metaclass=ABCMeta):
         stem = f"{part}_1" if hasattr(self, f"{part}_1") else part
 
         conductor = getattr(self, f"{stem}_offload_conductor", None)
+        lora = getattr(self, f"{stem}_lora", None)
+        component = None if conductor is not None else getattr(self, stem)
+
         if conductor is not None:
             conductor.to(device)
-        else:
-            component = getattr(self, stem)  # raises if `part` doesn't name a real attribute
-            # None when the part is excluded from training (e.g. a text encoder with include_text_encoder off):
-            # it stays in model_parts() but the loader never populated it, so there is nothing to move.
-            if component is not None:
-                # give each component its own MemPool to avoid fragmenting the next reload
-                if supports_mem_pool(device):
-                    pool = self._mem_pools.get(stem)
-                    if pool is None:
-                        pool = self._mem_pools[stem] = create_mem_pool(device)
-                    with mem_pool_context(pool):
-                        component.to(device=device)
-                else:
-                    # the target has no MemPool (CPU): move normally and drop this component's pool from the
-                    # earlier GPU move, so evict()'s torch_gc can release its segments
-                    component.to(device=device)
-                    self._mem_pools.pop(stem, None)
 
-        lora = getattr(self, f"{stem}_lora", None)
-        if lora is not None:
-            lora.to(device)
+        if component is None and lora is None:
+            return
+
+        if supports_mem_pool(device):
+            # The component (when not conductor-managed) and its LoRA share a per-stem MemPool so both land
+            # contiguously and release together on evict. A conductor keeps its own pool, so the stem pool then
+            # holds only the LoRA, keeping its small tensors out of the default pool across the part's evict/reload.
+            pool = self._mem_pools.get(stem)
+            if pool is None:
+                pool = self._mem_pools[stem] = create_mem_pool(device)
+            with mem_pool_context(pool):
+                if component is not None:
+                    component.to(device=device)
+                if lora is not None:
+                    lora.to(device=device)
+        else:
+            # the target has no MemPool (CPU): move normally and drop this stem's pool from the earlier GPU move,
+            # so evict()'s torch_gc can release its segments
+            if component is not None:
+                component.to(device=device)
+            if lora is not None:
+                lora.to(device=device)
+            self._mem_pools.pop(stem, None)
 
     def eval(self):
         # Put every present component on eval(); driven by the same part registry as materialize()/evict().

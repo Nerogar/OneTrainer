@@ -63,13 +63,13 @@ class StableDiffusionVaeSampler(BaseModelSampler):
         image_tensor = t_in(image).to(device=self.train_device, dtype=self.model.vae.dtype)
         image_tensor = image_tensor * 2 - 1
 
-        self.model.materialize("vae")
+        self.model.materialize_only("vae")
 
         with torch.no_grad():
             latent_image_tensor = self.model.vae.encode(image_tensor.unsqueeze(0)).latent_dist.mean
             image_tensor = self.model.vae.decode(latent_image_tensor).sample.squeeze()
 
-        self.model.evict("vae")
+        self.model.evict()
 
         image_tensor = (image_tensor + 1) * 0.5
         image_tensor = image_tensor.clamp(0, 1)
