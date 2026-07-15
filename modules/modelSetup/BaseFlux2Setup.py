@@ -16,8 +16,6 @@ from modules.util.checkpointing_util import (
     enable_checkpointing_for_qwen3_encoder_layers,
 )
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
-from modules.util.quantization_util import quantize_layers
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -43,28 +41,12 @@ class BaseFlux2Setup(
             model: Flux2Model,
             config: TrainConfig,
     ):
-        model.transformer_offload_conductor = enable_checkpointing_for_flux2_transformer(model.transformer, config, config.transformer)
-        if model.is_dev():
-            model.text_encoder_offload_conductor = enable_checkpointing_for_mistral_encoder_layers(model.text_encoder, config, config.text_encoder)
-        else:
-            model.text_encoder_offload_conductor = enable_checkpointing_for_qwen3_encoder_layers(model.text_encoder, config, config.text_encoder)
-
-        model.autocast_context, model.train_dtype = create_autocast_context(
-            self.train_device, config.train_dtype, config.enable_autocast_cache)
-
-        model.text_encoder_autocast_context, model.text_encoder_train_dtype = \
-            disable_fp16_autocast_context(
-                self.train_device,
-                config.train_dtype,
-                config.fallback_train_dtype,
-                config.enable_autocast_cache,
-            )
-
-        quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype, config)
-        quantize_layers(model.vae, self.train_device, model.train_dtype, config)
-        quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
-
-        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=False)
+        text_encoder_checkpointing_fn = enable_checkpointing_for_mistral_encoder_layers if model.is_dev() \
+            else enable_checkpointing_for_qwen3_encoder_layers
+        super().setup_optimizations(model, config)
+        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_flux2_transformer, attention_mask=False)
+        self._setup_model_part(model, config, "text_encoder", config.text_encoder, text_encoder_checkpointing_fn, disable_fp16_autocast=True)
+        self._setup_model_part(model, config, "vae", config.vae)
 
     def predict(
             self,

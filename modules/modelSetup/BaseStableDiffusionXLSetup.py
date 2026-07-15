@@ -17,7 +17,7 @@ from modules.util.checkpointing_util import (
 )
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
-from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
+from modules.util.dtype_util import disable_fp16_autocast_context
 from modules.util.quantization_util import quantize_layers
 from modules.util.TrainProgress import TrainProgress
 
@@ -46,9 +46,11 @@ class BaseStableDiffusionXLSetup(
             model: StableDiffusionXLModel,
             config: TrainConfig,
     ):
+        # Not routed through _setup_model_part: the UNet's checkpointing needs supports_offloading=False, which
+        # _setup_model_part's checkpointing_fn slot doesn't pass, so the parts are wired by hand here.
         if config.unet.checkpointing_enabled():
             model.unet.enable_gradient_checkpointing()
-            enable_checkpointing_for_basic_transformer_blocks(model.unet, config, config.unet, offload_enabled=False)
+            enable_checkpointing_for_basic_transformer_blocks(model.unet, config, config.unet, supports_offloading=False)
         enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config, config.text_encoder)
         enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config, config.text_encoder_2)
 
@@ -58,8 +60,7 @@ class BaseStableDiffusionXLSetup(
             if model.unet_lora is not None:
                 apply_circular_padding_to_conv2d(model.unet_lora)
 
-        model.autocast_context, model.train_dtype = create_autocast_context(
-            self.train_device, config.train_dtype, config.enable_autocast_cache)
+        super().setup_optimizations(model, config)
 
         model.vae_autocast_context, model.vae_train_dtype = disable_fp16_autocast_context(
             self.train_device,
