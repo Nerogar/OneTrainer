@@ -17,8 +17,6 @@ from modules.util.checkpointing_util import (
     enable_checkpointing_for_t5_encoder_layers,
 )
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
-from modules.util.quantization_util import quantize_layers
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
@@ -48,29 +46,11 @@ class BaseFluxSetup(
             model: FluxModel,
             config: TrainConfig,
     ):
-        model.transformer_offload_conductor = enable_checkpointing_for_flux_transformer(model.transformer, config, config.transformer)
-        if model.text_encoder_1 is not None:
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config, config.text_encoder)
-        if model.text_encoder_2 is not None:
-            model.text_encoder_2_offload_conductor = enable_checkpointing_for_t5_encoder_layers(model.text_encoder_2, config, config.text_encoder_2)
-
-        model.autocast_context, model.train_dtype = create_autocast_context(
-            self.train_device, config.train_dtype, config.enable_autocast_cache)
-
-        model.text_encoder_2_autocast_context, model.text_encoder_2_train_dtype = \
-            disable_fp16_autocast_context(
-                self.train_device,
-                config.train_dtype,
-                config.fallback_train_dtype,
-                config.enable_autocast_cache,
-            )
-
-        quantize_layers(model.text_encoder_1, self.train_device, model.train_dtype, config)
-        quantize_layers(model.text_encoder_2, self.train_device, model.text_encoder_2_train_dtype, config)
-        quantize_layers(model.vae, self.train_device, model.train_dtype, config)
-        quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
-
-        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=False)
+        super().setup_optimizations(model, config)
+        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_flux_transformer, attention_mask=False)
+        self._setup_model_part(model, config, "text_encoder_1", config.text_encoder, enable_checkpointing_for_clip_encoder_layers)
+        self._setup_model_part(model, config, "text_encoder_2", config.text_encoder_2, enable_checkpointing_for_t5_encoder_layers, disable_fp16_autocast=True)
+        self._setup_model_part(model, config, "vae", config.vae)
 
     def _setup_embeddings(
             self,
