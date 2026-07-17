@@ -157,7 +157,13 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             if torch.is_floating_point(old_value):
                 old_type = type(old_value)
                 if not is_quantized_parameter(module, tensor_name):
-                    if dtype.is_quantized() or module_name in keep_in_fp32_modules:
+                    if module_name in keep_in_fp32_modules:
+                        value = value.to(dtype=train_dtype.torch_dtype())
+                    elif dtype.is_quantized() and type(module) is nn.Linear:
+                        # a plain Linear that the quantization layer filter excluded
+                        fallback_dtype = quantization.fallback_dtype if quantization is not None else DataType.BFLOAT_16
+                        value = value.to(dtype=fallback_dtype.torch_dtype())
+                    elif dtype.is_quantized():
                         value = value.to(dtype=train_dtype.torch_dtype())
                     else:
                         value = value.to(dtype=dtype.torch_dtype())
@@ -283,7 +289,13 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 if value is not None and torch.is_floating_point(value):
                     old_type = type(value)
                     if not is_quantized_parameter(module, tensor_name):
-                        if dtype.is_quantized() or module_name in keep_in_fp32_modules:
+                        if module_name in keep_in_fp32_modules:
+                            value = value.to(dtype=train_dtype.torch_dtype())
+                        elif dtype.is_quantized() and type(module) is nn.Linear:
+                            # a plain Linear that the quantization layer filter excluded
+                            fallback_dtype = quantization.fallback_dtype if quantization is not None else DataType.BFLOAT_16
+                            value = value.to(dtype=fallback_dtype.torch_dtype())
+                        elif dtype.is_quantized():
                             value = value.to(dtype=train_dtype.torch_dtype())
                         else:
                             value = value.to(dtype=dtype.torch_dtype())
