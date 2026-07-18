@@ -78,6 +78,7 @@ def dequantize(q: Tensor, scale: float | Tensor) -> Tensor:
 
 from modules.module.quantized.LinearFp8 import LinearFp8
 from modules.module.quantized.LinearGGUFA8 import LinearGGUFA8
+from modules.module.quantized.LinearInt8ConvRot import LinearInt8ConvRot
 from modules.module.quantized.LinearSVD import BaseLinearSVD, make_svd_linear
 from modules.module.quantized.LinearW8A8 import LinearW8A8
 
@@ -184,6 +185,8 @@ def replace_linear_with_quantized_layers(
     elif dtype.quantize_intW8A8():
         linear_class = LinearW8A8
         kwargs = {'dtype': torch.int8}
+    elif dtype.quantize_intW8A8_convrot():
+        linear_class = LinearInt8ConvRot
     elif dtype.quantize_fpW8A8():
         linear_class=LinearW8A8
         kwargs = {'dtype': torch.float8_e4m3fn}
