@@ -1,3 +1,4 @@
+import os
 import signal
 import sys
 from abc import ABCMeta
@@ -18,6 +19,14 @@ def create_application() -> QApplication:
     # own SIGINT handler would never get a chance to run while app.exec() is
     # active and Ctrl+C would be ignored.
     signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+    # On desktops without the xdg-desktop-portal Settings interface, Qt spams two
+    # "qt.qpa.theme.gnome: dbus reply error ... org.freedesktop.portal.Settings"
+    # lines while probing for the system color scheme. Silence just that category;
+    # the rules string is read when Qt's logging initializes at QApplication init.
+    _gnome_theme_rule = "qt.qpa.theme.gnome=false"
+    existing_rules = os.environ.get("QT_LOGGING_RULES")
+    os.environ["QT_LOGGING_RULES"] = f"{existing_rules};{_gnome_theme_rule}" if existing_rules else _gnome_theme_rule
 
     app = QApplication(sys.argv)
     # Force Fusion everywhere: native styles (e.g. windowsvista) draw standard
