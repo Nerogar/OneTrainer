@@ -30,15 +30,16 @@ def create_application() -> QApplication:
             "base": "#F9F9F9",
             "text": "#1C1C1C",
             "disabled": "#E0E0E0",
+            "disabled_text": "#7D7D7D",
             "window": "#CFCFCF",
             "window_section": "#DBDBDB",
             "window_text": "#1C1C1C",
             "button": "#36719F",
             "button_hover": "#3B8ED0",
             "button_disabled": "#A0A0A0",
-            "editbox_frame": "#999CA1",
             "progress_bar": "#939BA2",
             "checkbox": "#6AA5D2",
+            "checkbox_frame": "#3E4649",
             "checkbox_hover": "#75B6E5",
             "checkbox_glyph": "checkbox_light.png",
         },
@@ -46,15 +47,16 @@ def create_application() -> QApplication:
             "base": "#343638",
             "text": "#DCE4EE",
             "disabled": "#2D2D2D",
+            "disabled_text": "#9D9D9D",
             "window": "#333333",
             "window_text": "#DCE4EE",
             "window_section": "#2B2B2B",
             "button": "#144870",
             "button_hover": "#195A8C",
             "button_disabled": "#404040",
-            "editbox_frame": "#565B5E",
             "progress_bar": "#4A4D50",
             "checkbox": "#346185",
+            "checkbox_frame": "#656A6E",
             "checkbox_hover": "#3D739C",
             "checkbox_glyph": "checkbox_dark.png",
         },
@@ -64,21 +66,13 @@ def create_application() -> QApplication:
         palette = app.palette()
         colors = color_schemes[scheme]
         palette.setColor(QPalette.ColorRole.Base, QColor(colors["base"]))
-        palette.setColor(QPalette.ColorRole.Text, QColor(colors["text"]))
-        palette.setColor(QPalette.ColorRole.Highlight, QColor(colors["button_hover"]))
         palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Base, QColor(colors["disabled"]))
         palette.setColor(QPalette.ColorRole.Window, QColor(colors["window"]))
         palette.setColor(QPalette.ColorRole.WindowText, QColor(colors["window_text"]))
-        app.setPalette(palette)
 
         style_sheet = """
             QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit {{
                 padding: 2px 2px;
-                border: 2px solid {editbox_frame};
-                border-radius: 4px;
-            }}
-            QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QPlainTextEdit:focus {{
-                border: 2px solid palette(Highlight);
             }}
             QCheckBox::indicator {{
                 width: 18px;
@@ -105,7 +99,20 @@ def create_application() -> QApplication:
             }}
         """
         if scheme == Qt.ColorScheme.Dark:
+            palette.setColor(QPalette.ColorRole.Text, QColor(colors["text"]))
+            palette.setColor(QPalette.ColorRole.Highlight, QColor(colors["button_hover"]))
             style_sheet += """
+                QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit {{
+                    border: 1px solid {checkbox_frame};
+                    border-radius: 2px;
+                }}
+                QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QPlainTextEdit:focus {{
+                    border-color: palette(Highlight);
+                }}
+                QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QTextEdit:disabled, QPlainTextEdit:disabled {{
+                    background-color: transparent;
+                    color: {disabled_text};
+                }}
                 QToolButton, QPushButton, QComboBox {{
                     background: {button};
                 }}
@@ -126,7 +133,7 @@ def create_application() -> QApplication:
                     width: 16px;
                     height: 16px;
                     background-color: palette(Base);
-                    border: 1px solid {editbox_frame};
+                    border: 1px solid {checkbox_frame};
                     border-radius: 4px;
                 }}
                 QCheckBox::indicator:hover {{
@@ -150,6 +157,8 @@ def create_application() -> QApplication:
                     border-color: {button_disabled};
                 }}
             """
+
+        app.setPalette(palette)
         app.setStyleSheet(style_sheet.format(**colors))
 
     # Apply current color scheme
