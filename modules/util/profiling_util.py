@@ -10,7 +10,11 @@ class TorchMemoryRecorder:
 
     def __enter__(self):
         if self.enabled:
-            torch.cuda.memory._record_memory_history()
+            # stacks="python" attributes each allocation to the python call site and is far cheaper than the
+            # default C++ unwinding, which stalls badly under torch.compile. max_entries is a ring buffer: once
+            # full, new alloc/free events overwrite the oldest ones rather than stopping collection, so this
+            # keeps the most recent 100k events, bounding host RAM use on a long/heavy step.
+            torch.cuda.memory._record_memory_history(context="all", stacks="python", max_entries=100_000)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.enabled:
