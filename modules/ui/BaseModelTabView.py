@@ -40,6 +40,7 @@ class BaseModelTabView(ABC):
             has_text_encoder_4="text_encoder_4" in parts,
             allow_override_text_encoder_4="text_encoder_4" in parts,
             has_vae="vae" in parts,
+            supports_compression=model_type.supports_compression(),
         )
         if "effnet_encoder" in parts:
             row = self.__create_effnet_encoder_components(frame, row, ui_state)
@@ -77,6 +78,16 @@ class BaseModelTabView(ABC):
                 ]
 
         return options
+
+    def __compression_switch(self, frame, row: int, ui_state, var_name: str, supported: bool):
+        # sits next to a compressible Data Type dropdown (fp8 / W8A8 / GGUF+A8). Enabling it with a
+        # non-compressible dtype raises at setup time (guard in quantize_layers). Hidden entirely for
+        # model types whose setup isn't centralized yet (ModelType.supports_compression()).
+        if not supported:
+            return
+        self.components.label(frame, row, 5, "Compress",
+                         tooltip="Store the quantized weights nvCOMP-compressed in VRAM, decompressed on the fly. Only valid with a compressible data type (float8, W8A8, or GGUF A8).")
+        self.components.switch(frame, row, 6, ui_state, var_name)
 
     def __create_base_dtype_components(self, frame, row: int, ui_state) -> int:
         # huggingface token
@@ -124,6 +135,7 @@ class BaseModelTabView(ABC):
             has_text_encoder_3: bool = False,
             has_text_encoder_4: bool = False,
             has_vae: bool = False,
+            supports_compression: bool = False,
     ) -> int:
         if has_unet:
             # unet weight dtype
@@ -131,6 +143,7 @@ class BaseModelTabView(ABC):
                              tooltip="The unet weight data type")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True),
                                   ui_state, "unet.weight_dtype")
+            self.__compression_switch(frame, row, ui_state, "unet.compression", supports_compression)
 
             row += 1
 
@@ -167,6 +180,7 @@ class BaseModelTabView(ABC):
                              tooltip="The transformer weight data type")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_gguf=True, include_a8=True),
                                   ui_state, "transformer.weight_dtype")
+            self.__compression_switch(frame, row, ui_state, "transformer.compression", supports_compression)
 
             row += 1
 
@@ -176,6 +190,7 @@ class BaseModelTabView(ABC):
                              tooltip="The weight data type of the unconditional transformer, used for the negative branch of CFG during sampling")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True),
                                   ui_state, "unconditional_transformer.weight_dtype")
+            self.__compression_switch(frame, row, ui_state, "unconditional_transformer.compression", supports_compression)
 
             row += 1
 
@@ -210,6 +225,7 @@ class BaseModelTabView(ABC):
                              tooltip="The text encoder weight data type")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                                   ui_state, "text_encoder.weight_dtype")
+            self.__compression_switch(frame, row, ui_state, "text_encoder.compression", supports_compression)
 
             row += 1
 
@@ -219,6 +235,7 @@ class BaseModelTabView(ABC):
                              tooltip="The text encoder 1 weight data type")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                                   ui_state, "text_encoder.weight_dtype")
+            self.__compression_switch(frame, row, ui_state, "text_encoder.compression", supports_compression)
 
             row += 1
 
@@ -228,6 +245,7 @@ class BaseModelTabView(ABC):
                              tooltip="The text encoder 2 weight data type")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                                   ui_state, "text_encoder_2.weight_dtype")
+            self.__compression_switch(frame, row, ui_state, "text_encoder_2.compression", supports_compression)
 
             row += 1
 
@@ -237,6 +255,7 @@ class BaseModelTabView(ABC):
                              tooltip="The text encoder 3 weight data type")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                                   ui_state, "text_encoder_3.weight_dtype")
+            self.__compression_switch(frame, row, ui_state, "text_encoder_3.compression", supports_compression)
 
             row += 1
 
@@ -255,6 +274,7 @@ class BaseModelTabView(ABC):
                              tooltip="The text encoder 4 weight data type")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                                   ui_state, "text_encoder_4.weight_dtype")
+            self.__compression_switch(frame, row, ui_state, "text_encoder_4.compression", supports_compression)
 
             row += 1
 

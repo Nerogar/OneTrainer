@@ -1,4 +1,6 @@
 
+from modules.module.AutogradFunctionWrapper import AutogradFunctionWrapper
+from modules.module.quantized.mixin.CompressedWeightMixin import CompressedWeightMixin
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.mm_8bit import mm_8bit as mm_8bit
@@ -47,40 +49,13 @@ def fp8_backward_axiswise(output: Tensor, weight: Tensor, weight_scale: Tensor) 
     return mm_res.float().mul_(weight_scale * output_scale).to(output.dtype)
 
 
-class LinearInt8Function(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
-        ctx.save_for_backward(weight, weight_scale)
-        return int8_forward_tokenwise(x, weight, weight_scale, bias, compute_dtype)
-
-    @staticmethod
-    def backward(ctx, output: Tensor):
-        if ctx.needs_input_grad != (True, False, False, False, False):
-            raise NotImplementedError("Int A8W8 cannot be used for full finetuning")
-
-        weight, weight_scale = ctx.saved_tensors
-        return int8_backward_axiswise(output, weight, weight_scale), None, None, None, None
-
-class LinearFp8Function(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
-        ctx.save_for_backward(weight, weight_scale)
-        return fp8_forward_tokenwise(x, weight, weight_scale, bias, compute_dtype)
-
-    @staticmethod
-    def backward(ctx, output: Tensor):
-        if ctx.needs_input_grad != (True, False, False, False, False):
-            raise NotImplementedError("Float A8W8 cannot be used for full finetuning")
-
-        weight, weight_scale = ctx.saved_tensors
-        return fp8_backward_axiswise(output, weight, weight_scale), None, None, None, None
-
 class LinearW8A8(
     nn.Linear,
     QuantizedModuleMixin,
     QuantizedLinearMixin,
+    CompressedWeightMixin,
 ):
-    def __init__(self, dtype, *args, **kwargs):
+    def __init__(self, dtype: torch.dtype, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         assert dtype in [torch.int8, torch.float8_e4m3fn]
@@ -90,11 +65,16 @@ class LinearW8A8(
         self.compute_dtype = None
         self.register_buffer("scale", torch.tensor(1.0, dtype=torch.float32))
 
+        self._init_compressed_state()
+
     def original_weight_shape(self) -> tuple[int, ...]:
+        if self._compressed:
+            return self._weight_shape
         return self.weight.shape
 
     def unquantized_weight(self, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
-        return dequantize(self.weight.detach(), self.scale).to(dtype)
+        weight = self._decompress(self.weight.detach()) if self._compressed else self.weight.detach()
+        return dequantize(weight, self.scale).to(dtype)
 
     @torch.no_grad()
     def quantize(self, device: torch.device | None = None):
@@ -119,18 +99,32 @@ class LinearW8A8(
 
         self.scale.copy_(scale)
 
+        if self.compress:
+            self._compress_weight(device=device)
+
     def forward(self, x_orig: torch.Tensor) -> torch.Tensor:
         assert not self.weight.requires_grad
         assert self.__is_quantized
         x = x_orig.reshape(-1, x_orig.shape[-1])
 
-        if x.shape[0] > 16:
-            if self._dtype == torch.int8:
-                y = LinearInt8Function.apply(x, self.weight, self.scale, self.bias, self.compute_dtype)
-            else:
-                y = LinearFp8Function.apply(x, self.weight, self.scale, self.bias, self.compute_dtype)
+        # bind scale/bias/dtype so the Function sees a uniform (x, weight) / (grad, weight) math
+        # interface; the same closures serve the compressed (decode-in-both-passes) path
+        if self._dtype == torch.int8:
+            def forward_math(x, w):
+                return int8_forward_tokenwise(x, w, self.scale, self.bias, self.compute_dtype)
+            def backward_math(g, w):
+                return int8_backward_axiswise(g, w, self.scale)
         else:
-            w = dequantize(self.weight.detach(), self.scale)
+            def forward_math(x, w):
+                return fp8_forward_tokenwise(x, w, self.scale, self.bias, self.compute_dtype)
+            def backward_math(g, w):
+                return fp8_backward_axiswise(g, w, self.scale)
+
+        if x.shape[0] > 16:
+            y = AutogradFunctionWrapper.apply(x, self.weight, forward_math, backward_math, self._decompress if self._compressed else None)
+        else:
+            weight = self._decompress(self.weight.detach()) if self._compressed else self.weight.detach()
+            w = dequantize(weight, self.scale)
             y = torch.nn.functional.linear(x, w, self.bias)
 
         return y.reshape(x_orig.shape[:-1] + (y.shape[-1], ))

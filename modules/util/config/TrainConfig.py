@@ -263,6 +263,7 @@ class TrainModelPartConfig(BaseConfig):
     stop_training_after_unit: TimeUnit
     learning_rate: float
     weight_dtype: DataType
+    compression: bool
     dropout_probability: float #this is text encoder caption dropout!
     train_embedding: bool
     attention_mask: bool
@@ -303,6 +304,7 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
         data.append(("learning_rate", None, float, True))
         data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
+        data.append(("compression", False, bool, False))
         data.append(("dropout_probability", 0.0, float, False))
         data.append(("train_embedding", True, bool, False))
         data.append(("attention_mask", False, bool, False))

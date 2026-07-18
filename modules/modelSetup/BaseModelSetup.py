@@ -274,7 +274,7 @@ class BaseModelSetup(
         else:
             train_dtype = model.train_dtype
 
-        quantize_layers(module, self.train_device, train_dtype, config)
+        quantize_layers(module, self.train_device, train_dtype, config, compress=config_part.compression)
 
         if attention_mask is not None:
             self._set_attention_backend(module, config.attention_mechanism, mask=attention_mask)

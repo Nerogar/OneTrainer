@@ -1,3 +1,5 @@
+from modules.module.quantized.mixin.CompressedWeightMixin import CompressedWeightMixin
+from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.mm_8bit import mm_8bit as mm_8bit
 from modules.util.quantization_util import (
     quantize_fp8_axiswise,
@@ -7,7 +9,7 @@ from modules.util.quantization_util import (
 import torch
 from torch import Tensor
 
-from diffusers.quantizers.gguf.utils import GGUFLinear, dequantize_gguf_tensor
+from diffusers.quantizers.gguf.utils import GGUFLinear, GGUFParameter, dequantize_gguf_tensor
 
 import gguf
 
@@ -77,19 +79,45 @@ class LinearGGUFFpA8RequantFunction(torch.autograd.Function):
         weight, = ctx.saved_tensors
         return fp8_backward_axiswise(output, weight), None, None, None
 
-class LinearGGUFA8(GGUFLinear):
+class LinearGGUFA8(
+    GGUFLinear,
+    QuantizedModuleMixin,
+    CompressedWeightMixin,
+):
     def __init__(self, dtype: torch.dtype, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         assert dtype in [torch.int8, torch.float8_e4m3fn]
         self._dtype = dtype
+        self._quant_type = None
+
+        self._init_compressed_state()
+
+    @torch.no_grad()
+    def quantize(self, device: torch.device | None = None):
+        # the GGUF weight is already quantized (loaded pre-packed); "quantizing" this layer just
+        # means storing its packed bytes nvCOMP-compressed. quant_type is not recoverable from the
+        # raw blob, so capture it before _compress_weight() replaces the stored weight.
+        if not self.compress:
+            return
+        self._quant_type = self.weight.quant_type
+        self._compress_weight(device=device)
+
+    def _dequantized_weight(self) -> torch.Tensor:
+        if self._compressed:
+            # _decompress reinterprets the blob back to the packed bytes; re-wrap as a GGUFParameter
+            # so dequantize_gguf_tensor sees the quant_type again
+            packed = GGUFParameter(self._decompress(self.weight.detach().as_tensor()), quant_type=self._quant_type)
+            return dequantize_gguf_tensor(packed)
+        return dequantize_gguf_tensor(self.weight.detach())
 
     def forward(self, x_orig: torch.Tensor) -> torch.Tensor:
         assert not self.weight.requires_grad
         x = x_orig.reshape(-1, x_orig.shape[-1])
-        w = dequantize_gguf_tensor(self.weight.detach())
+        w = self._dequantized_weight()
+        quant_type = self._quant_type if self._compressed else self.weight.quant_type
 
-        if x.shape[0] > 16 and self.weight.quant_type not in UNQUANTIZED_TYPES:
+        if x.shape[0] > 16 and quant_type not in UNQUANTIZED_TYPES:
             if self._dtype == torch.int8:
                 y = LinearGGUFIntA8RequantFunction.apply(x, w, self.bias, self.compute_dtype)
             else:

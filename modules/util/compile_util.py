@@ -61,6 +61,11 @@ def Mod_patched_eval(cls, p, q):
     return None
 
 
+# set by CompressedWeightMixin._compress_weight() when a weight is stored nvCOMP-compressed;
+# gates the force_parameter_static_shapes relaxation in init_compile() below.
+needs_dynamic_parameter_shapes = False
+
+
 def init_compile():
     # cache_size_limit and recompile_limit are aliases for the same dynamo config value.
     # since torch 2.12, dynamo config overrides are stored in ContextVars (pytorch/pytorch#173568),
@@ -68,6 +73,13 @@ def init_compile():
     # trigger a compilation - including the autograd worker threads, which recompute checkpointed
     # modules during the backward pass.
     torch._dynamo.config.cache_size_limit = 8192
+
+    # same thread-local-config problem: force_parameter_static_shapes defaults to True and would
+    # override maybe_mark_dynamic on the compressed weight, so the reentrant-checkpoint backward
+    # (running on autograd worker threads that don't see _compress_weight()'s main-thread setting)
+    # recompiles per compressed length forever. only relax it when compression actually needs it.
+    if needs_dynamic_parameter_shapes:
+        torch._dynamo.config.force_parameter_static_shapes = False
 
 
 torch.utils._sympy.functions.Mod.eval = Mod_patched_eval
