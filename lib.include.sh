@@ -150,7 +150,7 @@ function get_platform {
             if ! can_exec "${smi}"; then
                 smi="/usr/lib/wsl/lib/nvidia-smi"
             fi
-            local driver_cuda="$("${smi}" 2>/dev/null | grep -oE 'CUDA Version: [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+' | head -n1)"
+            local driver_cuda="$("${smi}" 2>/dev/null | grep -oE 'CUDA.* Version: [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+' | head -n1)"
             if awk "BEGIN{exit !(${driver_cuda} >= 13.0)}"; then
                 platform="cuda13"
             else
