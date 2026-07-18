@@ -162,12 +162,15 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                     else:
                         value = value.to(dtype=dtype.torch_dtype())
 
-                new_value = old_type(value)
-
                 if is_buffer:
-                    module._buffers[tensor_name].data = new_value
+                    module._buffers[tensor_name].data = old_type(value)
+                elif torch.is_floating_point(value):
+                    module._parameters[tensor_name] = old_type(value)
                 else:
-                    module._parameters[tensor_name] = new_value
+                    # weights restored from a backup are already in their quantized storage dtype
+                    # (e.g. nf4's uint8 or int8 W8A8); an integer tensor can't back a grad-enabled
+                    # Parameter, and these weights are frozen anyway
+                    module._parameters[tensor_name] = old_type(value, requires_grad=False)
 
         del state_dict
 

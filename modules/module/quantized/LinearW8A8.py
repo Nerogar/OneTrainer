@@ -103,21 +103,24 @@ class LinearW8A8(
         self.__is_quantized = True
 
         weight = self.weight.detach()
-        orig_device = weight.device
-        if device is not None:
-            weight = weight.to(device=device)
-        if self._dtype == torch.int8:
-            weight, scale = quantize_int8_tensorwise(weight)
-        else:
-            weight, scale = quantize_fp8_tensorwise(weight)
+        # a backup restores the weight already in its quantized dtype together with its scale buffer;
+        # re-quantizing would recompute the scale from already-quantized values and corrupt the weight
+        if weight.dtype != self._dtype:
+            orig_device = weight.device
+            if device is not None:
+                weight = weight.to(device=device)
+            if self._dtype == torch.int8:
+                weight, scale = quantize_int8_tensorwise(weight)
+            else:
+                weight, scale = quantize_fp8_tensorwise(weight)
 
-        if device is not None:
-            weight = weight.to(device=orig_device)
+            if device is not None:
+                weight = weight.to(device=orig_device)
+
+            self.scale.copy_(scale)
 
         self.requires_grad_(False)
         self.weight.data = weight
-
-        self.scale.copy_(scale)
 
     def forward(self, x_orig: torch.Tensor) -> torch.Tensor:
         assert not self.weight.requires_grad

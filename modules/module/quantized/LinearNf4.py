@@ -69,7 +69,7 @@ class LinearNf4(
 
         weight = self.weight.data
         orig_device = weight.device
-        if weight.dtype != torch.int8:
+        if weight.dtype != torch.uint8:
             if device is not None:
                 weight = weight.to(device=device)
 
