@@ -80,13 +80,13 @@ class BaseModelTabView(ABC):
         return options
 
     def __compression_switch(self, frame, row: int, ui_state, var_name: str, supported: bool):
-        # sits next to a compressible Data Type dropdown (fp8 / W8A8 / GGUF+A8). Enabling it with a
+        # sits next to a compressible Data Type dropdown (fp8 / W8A8). Enabling it with a
         # non-compressible dtype raises at setup time (guard in quantize_layers). Hidden entirely for
         # model types whose setup isn't centralized yet (ModelType.supports_compression()).
         if not supported:
             return
         self.components.label(frame, row, 5, "Compress",
-                         tooltip="Store the quantized weights nvCOMP-compressed in VRAM, decompressed on the fly. Only valid with a compressible data type (float8, W8A8, or GGUF A8).")
+                         tooltip="Store the quantized weights nvCOMP-compressed in VRAM, decompressed on the fly. Only valid with float8 or W8A8.")
         self.components.switch(frame, row, 6, ui_state, var_name)
 
     def __create_base_dtype_components(self, frame, row: int, ui_state) -> int:
