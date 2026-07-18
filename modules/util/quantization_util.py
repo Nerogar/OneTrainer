@@ -106,6 +106,7 @@ def __replace_linear_layers(
         construct_fn,
         keep_in_fp32_modules: list[str] | None = None,
         filters: list[ModuleFilter] | None = None,
+        fallback_construct_fn = None,
         copy_parameters: bool = False,
         name_prefix: str = "",
         visited_modules: set[int] | None = None,
@@ -125,10 +126,12 @@ def __replace_linear_layers(
     if isinstance(parent_module, (nn.ModuleList, nn.Sequential, nn.ModuleDict)):
         for key, module in (parent_module.items() if isinstance(parent_module, nn.ModuleDict) else enumerate(parent_module)):
             if isinstance(module, convert_type):
-                if filters is not None and len(filters) > 0 and not any(f.matches(name_prefix) for f in filters):
+                matches = filters is None or len(filters) == 0 or any(f.matches(name_prefix) for f in filters)
+                fn = construct_fn if matches else fallback_construct_fn
+                if fn is None:
                     continue
 
-                quant_linear = __create_linear_layer(construct_fn, module, copy_parameters)
+                quant_linear = __create_linear_layer(fn, module, copy_parameters)
                 parent_module[key] = quant_linear
                 del module
             elif id(module) not in visited_modules:
@@ -137,6 +140,7 @@ def __replace_linear_layers(
                     construct_fn=construct_fn,
                     keep_in_fp32_modules=keep_in_fp32_modules,
                     filters=filters,
+                    fallback_construct_fn=fallback_construct_fn,
                     copy_parameters=copy_parameters,
                     name_prefix=f"{name_prefix}.{key}",
                     visited_modules=visited_modules,
@@ -149,10 +153,12 @@ def __replace_linear_layers(
             module = getattr(parent_module, attr_name)
             if isinstance(module, convert_type):
                 key_name = attr_name if name_prefix == "" else f"{name_prefix}.{attr_name}"
-                if filters is not None and len(filters) > 0 and not any(f.matches(key_name) for f in filters):
+                matches = filters is None or len(filters) == 0 or any(f.matches(key_name) for f in filters)
+                fn = construct_fn if matches else fallback_construct_fn
+                if fn is None:
                     continue
 
-                quant_linear = __create_linear_layer(construct_fn, module, copy_parameters)
+                quant_linear = __create_linear_layer(fn, module, copy_parameters)
                 setattr(parent_module, attr_name, quant_linear)
                 del module
             elif isinstance(module, nn.Module) and id(module) not in visited_modules:
@@ -161,10 +167,29 @@ def __replace_linear_layers(
                     construct_fn=construct_fn,
                     keep_in_fp32_modules=keep_in_fp32_modules,
                     filters=filters,
+                    fallback_construct_fn=fallback_construct_fn,
                     copy_parameters=copy_parameters,
                     name_prefix=attr_name if name_prefix == "" else f"{name_prefix}.{attr_name}",
                     visited_modules=visited_modules,
                 )
+
+def __quantized_linear_class_and_kwargs(dtype: DataType):
+    if dtype.quantize_nf4():
+        return LinearNf4, {}
+    elif dtype.quantize_int8():
+        return bnb.nn.Linear8bitLt, {'has_fp16_weights': False}
+    elif dtype.quantize_fp8():
+        return LinearFp8, {}
+    elif dtype.quantize_intW8A8():
+        return LinearW8A8, {'dtype': torch.int8}
+    elif dtype.quantize_fpW8A8():
+        return LinearW8A8, {'dtype': torch.float8_e4m3fn}
+    elif dtype == DataType.GGUF_A8_INT:
+        return LinearGGUFA8, {'dtype': torch.int8}
+    elif dtype == DataType.GGUF_A8_FLOAT:
+        return LinearGGUFA8, {'dtype': torch.float8_e4m3fn}
+    else:
+        return None, {}
 
 def replace_linear_with_quantized_layers(
         parent_module: nn.Module,
@@ -173,29 +198,11 @@ def replace_linear_with_quantized_layers(
         quantization: QuantizationConfig | None = None,
         copy_parameters: bool = False,
 ):
-    kwargs = {}
-    if dtype.quantize_nf4():
-        linear_class = LinearNf4
-    elif dtype.quantize_int8():
-        linear_class = bnb.nn.Linear8bitLt
-        kwargs = {'has_fp16_weights': False}
-    elif dtype.quantize_fp8():
-        linear_class = LinearFp8
-    elif dtype.quantize_intW8A8():
-        linear_class = LinearW8A8
-        kwargs = {'dtype': torch.int8}
-    elif dtype.quantize_fpW8A8():
-        linear_class=LinearW8A8
-        kwargs = {'dtype': torch.float8_e4m3fn}
-    elif dtype == DataType.GGUF_A8_INT:
-        linear_class=LinearGGUFA8
-        kwargs = {'dtype': torch.int8}
-    elif dtype == DataType.GGUF_A8_FLOAT:
-        linear_class=LinearGGUFA8
-        kwargs = {'dtype': torch.float8_e4m3fn}
-    else:
+    linear_class, kwargs = __quantized_linear_class_and_kwargs(dtype)
+    if linear_class is None:
         return
 
+    fallback_construct_fn = None
     if quantization is not None:
         if quantization.svd_dtype != DataType.NONE:
             if dtype.is_gguf():
@@ -209,6 +216,11 @@ def replace_linear_with_quantized_layers(
             ModuleFilter(pattern, use_regex=quantization.layer_filter_regex)
             for pattern in quantization.layer_filter.split(",")
         ]
+
+        if not dtype.is_gguf() and quantization.fallback_dtype.is_quantized():
+            fallback_linear_class, fallback_kwargs = __quantized_linear_class_and_kwargs(quantization.fallback_dtype)
+            if fallback_linear_class is not None:
+                fallback_construct_fn = partial(fallback_linear_class, **fallback_kwargs)
     else:
         quant_filters = None
 
@@ -218,6 +230,7 @@ def replace_linear_with_quantized_layers(
         construct_fn=partial(linear_class, **kwargs),
         keep_in_fp32_modules=keep_in_fp32_modules,
         filters=quant_filters,
+        fallback_construct_fn=fallback_construct_fn,
         copy_parameters=copy_parameters,
         convert_type=convert_type,
     )
