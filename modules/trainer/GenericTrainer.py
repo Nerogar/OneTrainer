@@ -30,7 +30,7 @@ from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.profiling_util import TorchMemoryRecorder, TorchProfiler
+from modules.util.profiling_util import PeakMemoryRecorder, TorchMemoryRecorder, TorchProfiler
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
@@ -201,8 +201,9 @@ class GenericTrainer(BaseTrainer):
         self.sample_queue.append(fun)
 
     def __execute_sample_during_training(self):
-        for fun in self.sample_queue:
-            fun()
+        with PeakMemoryRecorder("sampling", enabled=False):
+            for fun in self.sample_queue:
+                fun()
         self.sample_queue = []
 
     def __sample_loop(
