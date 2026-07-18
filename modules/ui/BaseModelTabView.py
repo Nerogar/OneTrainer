@@ -66,6 +66,7 @@ class BaseModelTabView(ABC):
             options += [
                 ("float W8A8", DataType.FLOAT_W8A8),
                 ("int W8A8", DataType.INT_W8A8),
+                ("int W8A8 ConvRot", DataType.INT_W8A8_CONVROT),
             ]
 
         if include_gguf:
