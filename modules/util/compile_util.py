@@ -75,10 +75,7 @@ def init_compile():
 def _on_compile_start(args: "torch._dynamo.callback.CallbackArgs") -> None:
     frame_id, _, frame_compile_id = args.compile_id.partition("/")
     direction = "backward" if args.callback_trigger == torch._dynamo.callback.CallbackTrigger.LAZY_BACKWARD else "forward"
-    if frame_compile_id in ("", "0"):
-        tqdm.write(f"[torch.compile] compiling kernel {frame_id} ({direction})...")
-    else:
-        tqdm.write(f"[torch.compile] recompiling kernel {frame_id} (compile #{int(frame_compile_id) + 1} {direction})...")
+    tqdm.write(f"[torch.compile] compiling kernel {frame_id} {direction} (variant #{frame_compile_id or 0})...")
 
 
 torch._dynamo.callback.on_compile_start(_on_compile_start)
