@@ -38,14 +38,16 @@ class CloudSecretsConfig(BaseConfig):
             return ""
         return str(Path(key_file).expanduser())
 
-    def connect_kwargs(self) -> dict[str, str]:
-        kwargs: dict[str, str] = {}
+    def connect_kwargs(self) -> dict:
+        kwargs = {}
         key_file = self.expanded_key_file()
         if key_file:
             kwargs["key_filename"] = key_file
         password = getattr(self, "password", "").strip()
         if password:
             kwargs["password"] = password
+        # Never query the ssh-agent: a broken agent can make paramiko's Agent() raise and abort the connect.
+        kwargs["allow_agent"] = False
         return kwargs
 
 
