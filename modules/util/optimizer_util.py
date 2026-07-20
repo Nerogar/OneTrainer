@@ -1,6 +1,5 @@
 import modules.util.multi_gpu_util as multi
 from modules.model.BaseModel import BaseModel
-from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
@@ -63,6 +62,8 @@ def init_model_parameters(
     if model.train_config.optimizer.MuonWithAuxAdam:
         print("INFO: Creating layer keys for MuonWithAuxAdam.")
         layer_key_fn = build_muon_adam_key_fn(model, model.train_config)
+
+    from modules.util import create
 
     model.optimizer = create.create_optimizer(
         parameters, model.optimizer_state_dict, model.train_config, layer_key_fn
