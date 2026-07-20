@@ -15,6 +15,7 @@ from PySide6.QtGui import QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDialog,
     QFileDialog,
     QFrame,
     QGridLayout,
@@ -25,6 +26,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QTextEdit,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -810,3 +812,28 @@ def set_label_text(label: QLabel, text: str) -> None:
 
 def call_after(widget: QWidget, delay_ms: int, func) -> None:
     QTimer.singleShot(delay_ms, widget, func)
+
+
+def bind_clickable(widget: QWidget, command: Callable[[], None]) -> None:
+    widget.setCursor(Qt.PointingHandCursor)
+    # QLabel has no clicked signal; route the raw press to the callback
+    widget.mousePressEvent = lambda _event: command()
+
+
+def show_text_popup(parent: QWidget, title: str, text: str) -> None:
+    dialog = QDialog(parent)
+    dialog.setWindowTitle(title)
+    dialog.resize(500, 500)
+
+    lo = QVBoxLayout(dialog)
+    box = QTextEdit(dialog)
+    box.setReadOnly(True)
+    box.setLineWrapMode(QTextEdit.NoWrap)
+    box.setPlainText(text)
+    lo.addWidget(box)
+
+    ok = QPushButton("ok", dialog)
+    ok.clicked.connect(dialog.accept)
+    lo.addWidget(ok)
+
+    dialog.exec()

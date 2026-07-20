@@ -618,3 +618,30 @@ def set_label_text(label, text: str) -> None:
 
 def call_after(widget, delay_ms: int, func) -> None:
     widget.after(delay_ms, func)
+
+
+def bind_clickable(widget, command: Callable[[], None]) -> None:
+    widget.configure(cursor="hand2")
+    widget.bind("<Button-1>", lambda _event: command())
+
+
+def show_text_popup(parent, title: str, text: str) -> None:
+    from modules.util.ui.ui_utils import set_window_icon
+
+    window = ctk.CTkToplevel(parent)
+    window.title(title)
+    window.geometry("500x500")
+    window.grid_rowconfigure(0, weight=1)
+    window.grid_columnconfigure(0, weight=1)
+
+    textbox = ctk.CTkTextbox(window, wrap="none")
+    textbox.grid(row=0, column=0, sticky="nsew", padx=PAD, pady=PAD)
+    textbox.insert("1.0", text)
+    textbox.configure(state="disabled")
+
+    ctk.CTkButton(window, text="ok", command=window.destroy).grid(row=1, column=0, padx=PAD, pady=PAD)
+
+    window.wait_visibility()
+    window.grab_set()
+    window.focus_set()
+    window.after(200, lambda: set_window_icon(window))
