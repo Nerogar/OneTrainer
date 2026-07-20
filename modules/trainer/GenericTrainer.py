@@ -635,7 +635,9 @@ class GenericTrainer(BaseTrainer):
         ema_loss_steps = 0
         epochs = range(train_progress.epoch, self.config.epochs, 1)
 
-        for _epoch in tqdm(epochs, desc="epoch") if multi.is_master() else epochs:
+        if multi.is_master():
+            epochs = tqdm(epochs, desc="epoch", initial=train_progress.epoch, total=self.config.epochs)
+        for _epoch in epochs:
             multi.sync_commands(self.commands)
             if self.commands.get_stop_command():
                 return
