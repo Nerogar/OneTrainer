@@ -19,6 +19,7 @@ from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.profiling_util import PeakMemoryRecorder
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ui.validation import flush_and_validate_all
@@ -214,6 +215,10 @@ class TrainUIController:
             self.view.on_update_status(f"Error generating debug package: {e}")
 
     def __training_thread_function(self):
+        with PeakMemoryRecorder("training run", enabled=False):
+            self.__training_thread_function_impl()
+
+    def __training_thread_function_impl(self):
         error_caught = False
 
         self.training_callbacks = TrainCallbacks(
