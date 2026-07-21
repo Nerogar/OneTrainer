@@ -116,13 +116,6 @@ class FluxModel(BaseModel):
         self.transformer_lora = None
         self.lora_state_dict = None
 
-    def adapters(self) -> list[LoRAModuleWrapper]:
-        return [a for a in [
-            self.text_encoder_1_lora,
-            self.text_encoder_2_lora,
-            self.transformer_lora,
-        ] if a is not None]
-
     def fusion_groups(self) -> list | None:
         # Flux fuses img qkv, txt qkv, and the single-block qkv+mlp (4 leaves -> linear1).
         return [
@@ -205,52 +198,6 @@ class FluxModel(BaseModel):
     def all_text_encoder_2_embeddings(self) -> list[BaseModelEmbedding]:
         return [embedding.text_encoder_2_embedding for embedding in self.additional_embeddings] \
                + ([self.embedding.text_encoder_2_embedding] if self.embedding is not None else [])
-
-    def vae_to(self, device: torch.device):
-        self.vae.to(device=device)
-
-    def text_encoder_to(self, device: torch.device):
-        self.text_encoder_1_to(device=device)
-        self.text_encoder_2_to(device=device)
-
-    def text_encoder_1_to(self, device: torch.device):
-        if self.text_encoder_1 is not None:
-            self.text_encoder_1.to(device=device)
-
-        if self.text_encoder_1_lora is not None:
-            self.text_encoder_1_lora.to(device)
-
-    def text_encoder_2_to(self, device: torch.device):
-        if self.text_encoder_2 is not None:
-            if self.text_encoder_2_offload_conductor is not None:
-                self.text_encoder_2_offload_conductor.to(device)
-            else:
-                self.text_encoder_2.to(device=device)
-
-        if self.text_encoder_2_lora is not None:
-            self.text_encoder_2_lora.to(device)
-
-    def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None:
-            self.transformer_offload_conductor.to(device)
-        else:
-            self.transformer.to(device=device)
-
-        if self.transformer_lora is not None:
-            self.transformer_lora.to(device)
-
-    def to(self, device: torch.device):
-        self.vae_to(device)
-        self.text_encoder_to(device)
-        self.transformer_to(device)
-
-    def eval(self):
-        self.vae.eval()
-        if self.text_encoder_1 is not None:
-            self.text_encoder_1.eval()
-        if self.text_encoder_2 is not None:
-            self.text_encoder_2.eval()
-        self.transformer.eval()
 
     def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
         return FluxPipeline(

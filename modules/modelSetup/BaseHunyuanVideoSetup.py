@@ -17,9 +17,6 @@ from modules.util.checkpointing_util import (
     enable_checkpointing_for_llama_encoder_layers,
 )
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
-from modules.util.quantization_util import quantize_layers
-from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -48,30 +45,13 @@ class BaseHunyuanVideoSetup(
             model: HunyuanVideoModel,
             config: TrainConfig,
     ):
-        model.transformer_offload_conductor = enable_checkpointing_for_hunyuan_video_transformer(model.transformer, config, config.transformer)
-        if model.text_encoder_1 is not None:
-            model.text_encoder_1_offload_conductor = enable_checkpointing_for_llama_encoder_layers(model.text_encoder_1, config, config.text_encoder)
-        if model.text_encoder_2 is not None:
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config, config.text_encoder_2)
-
-        model.autocast_context, model.train_dtype = create_autocast_context(
-            self.train_device, config.train_dtype, config.enable_autocast_cache)
-
-        model.transformer_autocast_context, model.transformer_train_dtype = \
-            disable_fp16_autocast_context(
-                self.train_device,
-                config.train_dtype,
-                config.fallback_train_dtype,
-                config.enable_autocast_cache,
-            )
-
-        quantize_layers(model.text_encoder_1, self.train_device, model.train_dtype, config)
-        quantize_layers(model.text_encoder_2, self.train_device, model.train_dtype, config)
-        quantize_layers(model.vae, self.train_device, model.train_dtype, config)
-        quantize_layers(model.transformer, self.train_device, model.transformer_train_dtype, config)
+        super().setup_optimizations(model, config)
+        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_hunyuan_video_transformer, disable_fp16_autocast=True, attention_mask=True)
+        self._setup_model_part(model, config, "text_encoder_1", config.text_encoder, enable_checkpointing_for_llama_encoder_layers)
+        self._setup_model_part(model, config, "text_encoder_2", config.text_encoder_2, enable_checkpointing_for_clip_encoder_layers)
+        self._setup_model_part(model, config, "vae", config.vae)
 
         model.vae.enable_tiling()
-        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=True)
 
     def _setup_embeddings(
             self,
@@ -294,13 +274,11 @@ class BaseHunyuanVideoSetup(
         ).mean()
 
     def prepare_text_caching(self, model: HunyuanVideoModel, config: TrainConfig):
-        model.to(self.temp_device)
-
+        parts = []
         if not config.train_text_encoder_or_embedding():
-            model.text_encoder_to(self.train_device)
-
+            parts.append("text_encoder")
         if not config.train_text_encoder_2_or_embedding():
-            model.text_encoder_2_to(self.train_device)
+            parts.append("text_encoder_2")
+        model.materialize_only(*parts)
 
         model.eval()
-        torch_gc()

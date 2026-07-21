@@ -17,18 +17,6 @@ import torch
 class HunyuanVideoFineTuneSetup(
     BaseHunyuanVideoSetup,
 ):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
-    ):
-        super().__init__(
-            train_device=train_device,
-            temp_device=temp_device,
-            debug_mode=debug_mode,
-        )
-
     def create_parameters(
             self,
             model: HunyuanVideoModel,
@@ -103,10 +91,14 @@ class HunyuanVideoFineTuneSetup(
             config.train_text_encoder_2_or_embedding() \
             or not config.latent_caching
 
-        model.text_encoder_1_to(self.train_device if text_encoder_1_on_train_device else self.temp_device)
-        model.text_encoder_2_to(self.train_device if text_encoder_2_on_train_device else self.temp_device)
-        model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
-        model.transformer_to(self.train_device)
+        parts = ["transformer"]
+        if text_encoder_1_on_train_device:
+            parts.append("text_encoder")
+        if text_encoder_2_on_train_device:
+            parts.append("text_encoder_2")
+        if vae_on_train_device:
+            parts.append("vae")
+        model.materialize_only(*parts)
 
         if model.text_encoder_1:
             if config.text_encoder.train:
