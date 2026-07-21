@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 from contextlib import nullcontext
 from uuid import uuid4
 
@@ -11,6 +11,7 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
+from modules.util.torch_util import create_mem_pool, mem_pool_context, supports_mem_pool, torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -96,17 +97,98 @@ class BaseModel(metaclass=ABCMeta):
         self.autocast_context = nullcontext()
         self.train_dtype = DataType.FLOAT_32
 
-    @abstractmethod
-    def to(self, device: torch.device):
-        pass
+        self._mem_pools = {}
 
-    @abstractmethod
+    @property
+    def train_device(self) -> torch.device:
+        return torch.device(self.train_config.train_device)
+
+    @property
+    def temp_device(self) -> torch.device:
+        return torch.device(self.train_config.temp_device)
+
+    def materialize(self, *parts: str):
+        # Move `parts` onto train_device.
+        for part in parts:
+            self._move_part(part, self.train_device)
+
+    def evict(self, *parts: str):
+        # Move `parts` onto temp_device. No parts given -> every component in ModelType.model_parts().
+        for part in parts or self.model_type.model_parts():
+            self._move_part(part, self.temp_device)
+        torch_gc()
+
+    def materialize_only(self, *parts: str):
+        # Materialize exactly `parts` on train_device; evict every other component in ModelType.model_parts()
+        # to temp_device. Lets a caller state what it needs now without tracking what to evict first.
+        # Evicts before materializing, so the two sets are never resident on train_device at once.
+        # Skipped (rather than passed as evict()) when empty, since evict() with no parts means "evict all".
+        to_evict = [part for part in self.model_type.model_parts() if part not in parts]
+        if to_evict:
+            self.evict(*to_evict)
+        self.materialize(*parts)
+
+    def materialize_only_text_encoders(self):
+        # Materialize all of this model's text encoders on train_device, evicting everything else. Samplers
+        # call this before encode_text, which reads every text encoder the model has.
+        self.materialize_only(*self.model_type.text_encoder_parts())
+
+    def _move_part(self, part: str, device: torch.device):
+        # The generic per-component move: `part` (or `part_1` for the first of several split text encoders),
+        # its LoRA (`{part}_lora`), and its layer-offload conductor (`{part}_offload_conductor`), if present.
+        stem = f"{part}_1" if hasattr(self, f"{part}_1") else part
+
+        conductor = getattr(self, f"{stem}_offload_conductor", None)
+        lora = getattr(self, f"{stem}_lora", None)
+        component = None if conductor is not None else getattr(self, stem)
+
+        if conductor is not None:
+            conductor.to(device)
+
+        if component is None and lora is None:
+            return
+
+        if supports_mem_pool(device):
+            # The component (when not conductor-managed) and its LoRA share a per-stem MemPool so both land
+            # contiguously and release together on evict. A conductor keeps its own pool, so the stem pool then
+            # holds only the LoRA, keeping its small tensors out of the default pool across the part's evict/reload.
+            pool = self._mem_pools.get(stem)
+            if pool is None:
+                pool = self._mem_pools[stem] = create_mem_pool(device)
+            with mem_pool_context(pool):
+                if component is not None:
+                    component.to(device=device)
+                if lora is not None:
+                    lora.to(device=device)
+        else:
+            # the target has no MemPool (CPU): move normally and drop this stem's pool from the earlier GPU move,
+            # so evict()'s torch_gc can release its segments
+            if component is not None:
+                component.to(device=device)
+            if lora is not None:
+                lora.to(device=device)
+            self._mem_pools.pop(stem, None)
+
     def eval(self):
-        pass
+        # Put every present component on eval(); driven by the same part registry as materialize()/evict().
+        # A model whose component names diverge (Wuerstchen) or that has a component outside model_parts()
+        # (SD's depth_estimator, Anima's text_conditioner) overrides this.
+        for part in self.model_type.model_parts():
+            stem = f"{part}_1" if hasattr(self, f"{part}_1") else part
+            component = getattr(self, stem)
+            if component is not None:
+                component.eval()
 
-    @abstractmethod
     def adapters(self) -> list[LoRAModuleWrapper]:
-        pass
+        # Every LoRA adapter present on a model part, in model_parts() order. Parts without a LoRA
+        # (e.g. the vae, or an untrained component) contribute nothing.
+        result = []
+        for part in self.model_type.model_parts():
+            stem = f"{part}_1" if hasattr(self, f"{part}_1") else part
+            lora = getattr(self, f"{stem}_lora", None)
+            if lora is not None:
+                result.append(lora)
+        return result
 
     def diffusers_to_original(self) -> list | None:
         # the canonical(diffusers) -> native key-conversion BODY (rename only) for this model's denoising

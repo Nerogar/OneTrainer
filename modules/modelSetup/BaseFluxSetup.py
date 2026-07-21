@@ -326,13 +326,12 @@ class BaseFluxSetup(
         ).mean()
 
     def prepare_text_caching(self, model: FluxModel, config: TrainConfig):
-        model.to(self.temp_device)
-
+        parts = []
         if not config.train_text_encoder_or_embedding():
-            model.text_encoder_to(self.train_device)
-
+            parts.append("text_encoder")
         if not config.train_text_encoder_2_or_embedding():
-            model.text_encoder_2_to(self.train_device)
+            parts.append("text_encoder_2")
+        model.materialize_only(*parts)
 
         model.eval()
         torch_gc()
