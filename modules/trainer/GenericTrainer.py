@@ -17,6 +17,7 @@ from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
 from modules.util import create, path_util
+from modules.util.async_tensor_exchange import AsyncTensorExchange
 from modules.util.bf16_stochastic_rounding import set_seed as bf16_stochastic_rounding_set_seed
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
@@ -631,9 +632,12 @@ class GenericTrainer(BaseTrainer):
         has_gradient = False
 
         lr_scheduler = None
-        accumulated_loss = torch.tensor(0.0, device=train_device)
+        accum_loss = torch.tensor(0.0, device=train_device)
         ema_loss = None
         ema_loss_steps = 0
+
+        accum_loss_exchange = AsyncTensorExchange(train_device)
+
         epochs = range(train_progress.epoch, self.config.epochs, 1)
 
         for _epoch in tqdm(epochs, desc="epoch") if multi.is_master() else epochs:
@@ -762,7 +766,7 @@ class GenericTrainer(BaseTrainer):
                     has_gradient = True
                     detached_loss = loss.detach()
                     multi.reduce_tensor_mean(detached_loss)
-                    accumulated_loss += detached_loss
+                    accum_loss += detached_loss
 
                     if self.__is_update_step(train_progress):
                         if self.config.fused_gradient_reduce:
@@ -793,22 +797,23 @@ class GenericTrainer(BaseTrainer):
                                 self.model, self.config, lr_scheduler, self.tensorboard
                             )
 
-                            accumulated_loss_cpu = accumulated_loss.item()
-                            if math.isnan(accumulated_loss_cpu):
-                                raise RuntimeError("Training loss became NaN. This may be due to invalid parameters, precision issues, or a bug in the loss computation.")
+                            accum_loss_cpu, accum_loss_step = accum_loss_exchange.exchange(accum_loss, train_progress.global_step)
+                            if accum_loss_cpu is not None:  # runs one step behind to avoid cuda sync
+                                if math.isnan(accum_loss_cpu.item()):
+                                    raise RuntimeError("Training loss became NaN. This may be due to invalid parameters, precision issues, or a bug in the loss computation.")
 
-                            self.tensorboard.add_scalar("loss/train_step",accumulated_loss_cpu , train_progress.global_step)
-                            ema_loss = ema_loss or accumulated_loss_cpu
-                            ema_loss_steps += 1
-                            ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
-                            ema_loss = (ema_loss * ema_loss_decay) + (accumulated_loss_cpu * (1 - ema_loss_decay))
-                            step_tqdm.set_postfix({
-                                'loss': accumulated_loss_cpu,
-                                'smooth loss': ema_loss,
-                            })
-                            self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, train_progress.global_step)
+                                self.tensorboard.add_scalar("loss/train_step", accum_loss_cpu.item(), accum_loss_step)
+                                ema_loss = ema_loss or accum_loss_cpu.item()
+                                ema_loss_steps += 1
+                                ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
+                                ema_loss = (ema_loss * ema_loss_decay) + (accum_loss_cpu.item() * (1 - ema_loss_decay))
+                                step_tqdm.set_postfix({
+                                    'loss': accum_loss_cpu.item(),
+                                    'smooth loss': ema_loss,
+                                })
+                                self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, accum_loss_step)
 
-                        accumulated_loss = 0.0
+                        accum_loss = 0.0
                         self.model_setup.after_optimizer_step(self.model, self.config, train_progress)
 
                         if self.model.ema:
