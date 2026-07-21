@@ -15,6 +15,21 @@ import torch
 
 import triton
 import triton.language as tl
+from tqdm import tqdm
+
+
+#Print a line when the autotuner actually benchmarks a kernel. bench_fn runs only on a
+#real tune, so memory- and disk-cache hits stay silent. String (dtype) key fields are dropped.
+def announce_autotuning(kernel, name=None):
+    prefix = f"[triton] Autotuning {name} " if name else "[triton] Autotuning "
+    orig_check_disk_cache = kernel.check_disk_cache
+    def check_disk_cache(tuning_key, configs, bench_fn):
+        def announced_bench():
+            shape = tuple(k for k in tuning_key if not isinstance(k, str))
+            tqdm.write(f"{prefix}{shape}...")
+            bench_fn()
+        return orig_check_disk_cache(tuning_key, configs, announced_bench)
+    kernel.check_disk_cache = check_disk_cache
 
 
 @triton.autotune(
@@ -44,6 +59,7 @@ import triton.language as tl
         'K',
         'stride_bk'    #use stride of b as key, to autotune again for a strided rhs matrix (backward pass)
     ],
+    cache_results=True,
 )
 
 @triton.jit
@@ -95,6 +111,14 @@ def _mm_kernel(
     c_mask = (offs_cm[:, None] < M) & (offs_cn[None, :] < N)
     tl.store(c_ptrs, accumulator, mask=c_mask)
 
+announce_autotuning(_mm_kernel, name="8-bit matmul")
+
+#Registered as an opaque custom op to work around pytorch#164124
+#(https://github.com/pytorch/pytorch/issues/164124): torch.compile absorbs traced
+#@triton.autotune kernels and freezes the config benchmarked for the first shape,
+#ignoring the autotune key. As a custom op the call stays a single opaque node in the
+#compiled graph and this body runs eagerly, so Triton's own autotuner selects per key.
+@torch.library.custom_op("onetrainer::mm_8bit", mutates_args=())
 def mm_8bit(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     assert a.shape[1] == b.shape[0], "Incompatible dimensions"
     assert a.is_contiguous(), "Matrix A must be contiguous"
@@ -119,3 +143,8 @@ def mm_8bit(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
         FLOAT = FLOAT
     )
     return c
+
+@mm_8bit.register_fake
+def _(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    FLOAT = (a.dtype == torch.float8_e4m3fn)
+    return torch.empty((a.shape[0], b.shape[1]), device=a.device, dtype=torch.float32 if FLOAT else torch.int32)
