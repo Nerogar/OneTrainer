@@ -166,9 +166,7 @@ class BaseAnimaSetup(
         ).mean()
 
     def prepare_text_caching(self, model: AnimaModel, config: TrainConfig):
-        model.to(self.temp_device)
-
-        model.text_encoder_to(self.train_device)
+        model.materialize_only("text_encoder")
 
         model.eval()
         torch_gc()

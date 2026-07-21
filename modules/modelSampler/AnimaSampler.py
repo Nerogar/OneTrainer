@@ -12,7 +12,6 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
-from modules.util.torch_util import torch_gc
 
 import torch
 
@@ -66,7 +65,7 @@ class AnimaSampler(BaseModelSampler):
             num_latent_channels = 16
 
             # prepare prompt
-            self.model.text_encoder_to(self.train_device)
+            self.model.materialize_only("text_encoder")
 
             batch_size = 2 if cfg_scale > 1.0 else 1
             combined_prompt_embedding = self.model.encode_text(
@@ -74,9 +73,6 @@ class AnimaSampler(BaseModelSampler):
                 batch_size=batch_size,
                 train_device=self.train_device,
             )
-
-            self.model.text_encoder_to(self.temp_device)
-            torch_gc()
 
             # prepare latent image
             latent_image = torch.randn(
@@ -99,7 +95,7 @@ class AnimaSampler(BaseModelSampler):
             if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
                 extra_step_kwargs["generator"] = generator
 
-            self.model.transformer_to(self.train_device)
+            self.model.materialize_only("transformer")
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 latent_model_input = torch.cat([latent_image] * batch_size)
                 expanded_timestep = timestep.expand(batch_size) / noise_scheduler.config.num_train_timesteps
@@ -121,11 +117,8 @@ class AnimaSampler(BaseModelSampler):
 
                 on_update_progress(i + 1, len(timesteps))
 
-            self.model.transformer_to(self.temp_device)
-            torch_gc()
-
             # decode
-            self.model.vae_to(self.train_device)
+            self.model.materialize_only("vae")
 
             latents = self.model.unscale_latents(latent_image)
             image = vae.decode(latents, return_dict=False)[0][:, :, 0]
@@ -133,8 +126,7 @@ class AnimaSampler(BaseModelSampler):
             do_denormalize = [True] * image.shape[0]
             image = self.image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
-            self.model.vae_to(self.temp_device)
-            torch_gc()
+            self.model.evict()
 
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,

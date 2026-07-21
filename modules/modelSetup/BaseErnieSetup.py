@@ -16,7 +16,6 @@ from modules.util.checkpointing_util import (
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.quantization_util import quantize_layers
-from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -160,7 +159,5 @@ class BaseErnieSetup(
         ).mean()
 
     def prepare_text_caching(self, model: ErnieModel, config: TrainConfig):
-        model.to(self.temp_device)
-        model.text_encoder_to(self.train_device)
+        model.materialize_only("text_encoder")
         model.eval()
-        torch_gc()

@@ -19,7 +19,6 @@ from modules.util.checkpointing_util import (
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.quantization_util import quantize_layers
-from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -294,13 +293,11 @@ class BaseHunyuanVideoSetup(
         ).mean()
 
     def prepare_text_caching(self, model: HunyuanVideoModel, config: TrainConfig):
-        model.to(self.temp_device)
-
+        parts = []
         if not config.train_text_encoder_or_embedding():
-            model.text_encoder_to(self.train_device)
-
+            parts.append("text_encoder")
         if not config.train_text_encoder_2_or_embedding():
-            model.text_encoder_2_to(self.train_device)
+            parts.append("text_encoder_2")
+        model.materialize_only(*parts)
 
         model.eval()
-        torch_gc()
