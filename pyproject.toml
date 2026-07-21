@@ -198,7 +198,7 @@ cxx-compiler = "*"
 tk = { version = "*", build = "xft_*" }
 libgl = "*"
 libglib = "*"
-xcb-util-cursor = "*"
+qt6-main = "*"
 
 [tool.pixi.pypi-options]
 index-strategy = "unsafe-best-match"
