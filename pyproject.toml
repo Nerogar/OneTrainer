@@ -59,6 +59,7 @@ dependencies = [
 
     # ui
     "customtkinter==5.2.2",
+    # Match `pyside6` below to this version
     "PySide6==6.11.1",
 
     # cloud
@@ -198,7 +199,7 @@ cxx-compiler = "*"
 tk = { version = "*", build = "xft_*" }
 libgl = "*"
 libglib = "*"
-qt6-main = "*"
+pyside6 = "==6.11.1"
 
 [tool.pixi.pypi-options]
 index-strategy = "unsafe-best-match"
