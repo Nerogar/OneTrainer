@@ -1,0 +1,22 @@
+name: Check Lockfile
+on:
+  push:
+    branches:
+      - master
+      - preview
+  pull_request:
+    branches:
+      - master
+      - preview
+jobs:
+  Check-Lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v6
+      - name: Install pixi
+        run: |
+          curl -fsSL https://pixi.sh/install.sh | bash
+      - name: Check lockfile
+        run: |
+          pixi lock --check

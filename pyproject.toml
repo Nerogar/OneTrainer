@@ -1,5 +1,113 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
 [project]
-requires-python = ">=3.10"
+name = "onetrainer"
+requires-python = ">=3.10,<3.14"
+version = "0.1.0"
+
+dependencies = [
+    # base requirements
+    "numpy==2.2.6",
+    "opencv-python==4.11.0.86",
+    "pillow==12.2.0",
+    "imagesize==1.4.1",
+    "tqdm==4.67.1",
+    "pyyaml==6.0.2",
+    "huggingface-hub==1.22.0",
+    "scipy==1.15.3",
+    "matplotlib==3.10.3",
+    "av==16.1.0",
+    "yt-dlp",
+    "scenedetect==0.7",
+    "parse==1.20.2",
+    "setuptools==81.0.0",
+
+    # pytorch
+    "accelerate==1.12.0",
+    "safetensors==0.8.0",
+    "tensorboard==2.20.0",
+
+    # diffusion models
+    "diffusers @ git+https://github.com/huggingface/diffusers.git@1ffa4236a48af8d1d2eaeed6c84027af19acfc39",
+    "gguf==0.17.1",
+    "transformers==5.5.4",
+    "sentencepiece==0.2.1",  # transitive dependency of transformers for tokenizer loading
+    "omegaconf==2.3.0", # needed to load stable diffusion from single ckpt files
+    "invisible-watermark==0.2.0", # needed for the SDXL pipeline
+
+    # other models
+    "pooch==1.8.2",
+    "open-clip-torch==2.32.0",
+
+    # data loader
+    "mgds @ git+https://github.com/Nerogar/mgds.git@3a6994ad18a490acc4f3876658167525b7d88da7",
+
+    # optimizers
+    "dadaptation==3.2",
+    "lion-pytorch==0.2.3",
+    "prodigyopt==1.1.2",
+    "schedulefree==1.4.1",
+    "pytorch-optimizer==3.6.0",
+    "prodigy-plus-schedule-free==2.0.1",
+    "adv-optm==2.2.3",
+    "muon-optimizer @ git+https://github.com/KellerJordan/Muon.git@f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd",
+
+    # profiling
+    "scalene==2.0.1",
+
+    # ui
+    "customtkinter==5.2.2",
+    # Match `pyside6` below to this version
+    "PySide6==6.11.1",
+
+    # cloud
+    "runpod==1.7.10",
+    "fabric==3.2.2",
+
+    # debug
+    "psutil==7.0.0",
+    "requests==2.33.0",
+    "deepdiff==8.6.2", # output easy to read diff for troublshooting
+]
+
+[project.optional-dependencies]
+cpu = [
+  "torch==2.12.0",
+  "torchvision==0.27.0",
+  "onnxruntime==1.23.2",
+]
+
+cuda13 = [
+  # pytorch
+  "torch==2.12.0",
+  "torchvision==0.27.0",
+  "onnxruntime-gpu==1.23.2",
+  "nvidia-nccl-cu13==2.29.7; sys_platform == 'linux'",
+  "triton-windows==3.7.0.post26; sys_platform == 'win32'",
+
+  # optimizers
+  "bitsandbytes==0.49.2",
+]
+
+# CUDA 12 has the same dependencies as CUDA 13.
+# However, CUDA 12 requires a different version of torch.
+# This is managed via the `extra-index-urls` options below.
+cuda12 = ["onetrainer[cuda13]"]
+
+rocm = [
+  # pytorch
+  "torch==2.12.0",
+  "torchvision==0.27.0",
+  "onnxruntime==1.23.2",
+
+  # optimizers
+  "bitsandbytes==0.49.2",
+]
+
+[tool.setuptools]
+packages = []
 
 [tool.ruff]
 extend-exclude = [
@@ -39,3 +147,65 @@ section-order = [
     "third-party",
     "local-folder",
 ]
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+# Order here matters, first match wins
+platforms = [
+    { name = "linux-cuda13", platform = "linux-64", glibc = "2.34", cuda = "13.0" },
+    { name = "linux-cuda12", platform = "linux-64", glibc = "2.34", cuda = "12.6" },
+    { name = "linux-generic", platform = "linux-64", glibc = "2.34" },
+    { name = "win-cuda13", platform = "win-64", cuda = "13.0" },
+    { name = "win-cuda12", platform = "win-64", cuda = "12.6" },
+    { name = "win-generic", platform = "win-64" },
+    { name = "macos-generic", platform = "osx-arm64", macos = "15.0" },
+]
+requires-pixi = ">=0.71.2"
+
+[tool.pixi.tasks]
+train = { cmd = "python scripts/train.py", cwd = "." }
+ui = { cmd = "python scripts/train_ui.py", cwd = "." }
+
+[tool.pixi.feature.cuda13]
+platforms = ["linux-cuda13", "win-cuda13"]
+
+[tool.pixi.feature.cuda13.pypi-options]
+extra-index-urls = ["https://download.pytorch.org/whl/cu130"]
+
+[tool.pixi.feature.cuda12]
+platforms = ["linux-cuda12", "win-cuda12"]
+
+[tool.pixi.feature.cuda12.pypi-options]
+extra-index-urls = ["https://download.pytorch.org/whl/cu126"]
+
+[tool.pixi.feature.rocm]
+platforms = ["linux-generic"]
+
+[tool.pixi.feature.rocm.pypi-options]
+extra-index-urls = ["https://download.pytorch.org/whl/rocm7.2"]
+
+[tool.pixi.feature.cpu]
+platforms = ["linux-generic", "win-generic", "macos-generic"]
+
+[tool.pixi.feature.cpu.pypi-options]
+extra-index-urls = ["https://download.pytorch.org/whl/cpu"]
+
+[tool.pixi.dependencies]
+python = "3.13.*"
+c-compiler = "*"
+cxx-compiler = "*"
+
+[tool.pixi.target.linux-64.dependencies]
+tk = { version = "*", build = "xft_*" }
+libgl = "*"
+libglib = "*"
+pyside6 = "==6.11.1"
+
+[tool.pixi.pypi-options]
+index-strategy = "unsafe-best-match"
+
+[tool.pixi.environments]
+cpu = ["cpu"]
+cuda13 = ["cuda13"]
+cuda12 = ["cuda12"]
+rocm = ["rocm"]
