@@ -9,8 +9,6 @@ from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
 
-import torch
-
 
 @factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15, TrainingMethod.EMBEDDING)
 @factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.EMBEDDING)
@@ -23,18 +21,6 @@ import torch
 class StableDiffusionEmbeddingSetup(
     BaseStableDiffusionSetup,
 ):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
-    ):
-        super().__init__(
-            train_device=train_device,
-            temp_device=temp_device,
-            debug_mode=debug_mode,
-        )
-
     def create_parameters(
             self,
             model: StableDiffusionModel,
@@ -84,10 +70,12 @@ class StableDiffusionEmbeddingSetup(
     ):
         vae_on_train_device = self.debug_mode or not config.latent_caching
 
-        model.text_encoder_to(self.train_device)
-        model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
-        model.unet_to(self.train_device)
-        model.depth_estimator_to(self.temp_device)
+        parts = ["unet", "text_encoder"]
+        if vae_on_train_device:
+            parts.append("vae")
+        model.materialize_only(*parts)
+        if model.depth_estimator is not None:
+            model.depth_estimator.to(self.temp_device)
 
         model.text_encoder.eval()
         model.vae.eval()

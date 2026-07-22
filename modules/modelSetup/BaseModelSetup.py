@@ -3,10 +3,12 @@ from contextlib import contextmanager
 
 from modules.model.BaseModel import BaseModel
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig, TrainModelPartConfig
+from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+from modules.util.quantization_util import quantize_layers
 from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
 
@@ -47,7 +49,10 @@ class BaseModelSetup(
             model: BaseModel,
             config: TrainConfig,
     ):
-        pass
+        # Model-wide dtype/autocast, shared by every leaf. Leaves call super() first so model.train_dtype is
+        # set before their first _setup_model_part, which reads it for the non-fp16 quantize path.
+        model.train_dtype = config.train_dtype
+        model.autocast_context = create_autocast_context(self.train_device, config.train_dtype, config.enable_autocast_cache)
 
     @abstractmethod
     def setup_model(
@@ -236,6 +241,43 @@ class BaseModelSetup(
             if unique_name in self.frozen_parameters:
                 for param in self.frozen_parameters[unique_name]:
                     param.requires_grad_(False)
+
+    def _setup_model_part(
+            self,
+            model,
+            config: TrainConfig,
+            attr: str,
+            config_part: TrainModelPartConfig,
+            checkpointing_fn=None,
+            *,
+            disable_fp16_autocast: bool = False,
+            attention_mask: bool | None = None,
+    ):
+        # Per-part optimization wiring, called once per model part from each leaf. The optional
+        # disable_fp16_autocast context and its dtype are stored per-part and can differ per part
+        # (e.g. HiDream disables fp16 for both text_encoder_3 and the transformer). checkpointing_fn returns
+        # None for non-offloadable parts (SD/SDXL UNet), so no conductor is stored for those.
+        module = getattr(model, attr)
+        if module is None:
+            return
+
+        if checkpointing_fn is not None:
+            conductor = checkpointing_fn(module, config, config_part)
+            if conductor is not None:
+                setattr(model, f"{attr}_offload_conductor", conductor)
+
+        if disable_fp16_autocast:
+            autocast_context, train_dtype = disable_fp16_autocast_context(
+                self.train_device, config.train_dtype, config.fallback_train_dtype, config.enable_autocast_cache)
+            setattr(model, f"{attr}_autocast_context", autocast_context)
+            setattr(model, f"{attr}_train_dtype", train_dtype)
+        else:
+            train_dtype = model.train_dtype
+
+        quantize_layers(module, self.train_device, train_dtype, config, compress=config_part.compression)
+
+        if attention_mask is not None:
+            self._set_attention_backend(module, config.attention_mechanism, mask=attention_mask)
 
     @staticmethod
     def _set_attention_backend(component, attn: AttentionMechanism, mask: bool):

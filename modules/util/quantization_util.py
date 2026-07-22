@@ -2,6 +2,8 @@ from collections.abc import Callable
 from functools import partial
 
 import modules.util.multi_gpu_util as multi
+import modules.util.nvcomp_util as nvcomp_util
+from modules.module.quantized.mixin.CompressedWeightMixin import CompressedWeightMixin
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.config.TrainConfig import QuantizationConfig, TrainConfig
@@ -260,16 +262,36 @@ def is_quantized_parameter(
     return False
 
 
-def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataType, config: TrainConfig):
+def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataType, config: TrainConfig, compress: bool = False):
     if module is None:
         return
     child_modules = list(module.modules())
+
+    # per-component weight compression: the caller passes the part's config.<part>.compression flag.
+    # the layers decide compress-or-not at quantize() time, so stamp it on before quantizing.
+    compressible = [m for m in child_modules if isinstance(m, CompressedWeightMixin)]
+    if compress:
+        if not compressible:
+            raise ValueError("compression is enabled for this component but its data type cannot be compressed")
+        if not nvcomp_util.available():
+            raise RuntimeError("compression is enabled but nvCOMP is not available")
+    for m in compressible:
+        m.compress = compress
+
     for _ in multi.master_first(): #avoid cache writing conflicts
         for child_module in tqdm(child_modules, desc="Quantizing model weights", total=len(child_modules), delay=5, smoothing=0.1):
             if isinstance(child_module, (QuantizedModuleMixin, GGUFLinear)):
                 child_module.compute_dtype = train_dtype.torch_dtype()
             if isinstance(child_module, QuantizedModuleMixin):
                 child_module.quantize(device=device)
+
+    if multi.is_master():
+        sizes = [m.compression_sizes() for m in child_modules if isinstance(m, CompressedWeightMixin)]
+        sizes = [s for s in sizes if s is not None]
+        if sizes:
+            uncompressed = sum(s[0] for s in sizes)
+            compressed = sum(s[1] for s in sizes)
+            tqdm.write(f"nvCOMP weight compression ({type(module).__name__}): {uncompressed / 2**20:.0f} -> {compressed / 2**20:.0f} MiB ({(1 - compressed / uncompressed) * 100:.0f}% saved)")
 
 def get_unquantized_weight(module: nn.Linear, dtype: torch.dtype, device: torch.device) -> Tensor:
     assert isinstance(module, nn.Linear)

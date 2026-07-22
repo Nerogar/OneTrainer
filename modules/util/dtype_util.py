@@ -20,7 +20,7 @@ def create_autocast_context(
         device: torch.device,
         train_dtype: DataType | None,
         enable_autocast_cache: bool,
-) -> tuple[torch.autocast | nullcontext, DataType]:
+) -> torch.autocast | nullcontext:
     torch_train_dtype = train_dtype.torch_dtype()
 
     if torch_train_dtype in (torch.float16, torch.bfloat16):
@@ -34,13 +34,13 @@ def create_autocast_context(
             # MPS additionally needs macOS >= 14.
             print(f"Warning: Mixed precision training is untested on device type '{device.type}'.")
         return torch.autocast(device_type=device.type, dtype=torch_train_dtype,
-                              cache_enabled=enable_autocast_cache), train_dtype
+                              cache_enabled=enable_autocast_cache)
     elif device.type == "cuda":
         # float32/tfloat32 on CUDA (and ROCm, which also reports device type "cuda"):
         # CUDA accepts float32 as an autocast dtype and upcasts lower-precision weights
         # on the fly (this is undocumented but works).
         return torch.autocast(device_type=device.type, dtype=torch_train_dtype,
-                              cache_enabled=enable_autocast_cache), train_dtype
+                              cache_enabled=enable_autocast_cache)
     else:
         # float32/tfloat32 on a non-CUDA backend (cpu, mps, xpu, ...): those backends
         # reject fp32 autocast, so disable autocast and let the model run at its weight
@@ -49,7 +49,7 @@ def create_autocast_context(
         print("Warning: float32 training does not upcast lower-precision weights on this device "
               "(only CUDA can autocast to float32); the model runs at its weight dtype. "
               "Set the weight data types to float32 for full precision.")
-        return torch.autocast(device_type=device.type, enabled=False), train_dtype
+        return torch.autocast(device_type=device.type, enabled=False)
 
 
 def disable_fp16_autocast_context(
