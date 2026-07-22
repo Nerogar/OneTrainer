@@ -28,16 +28,15 @@ class _Opts(ctypes.Structure):
 
 def _load_lib():
     # raises ImportError if the package or the shared library is missing, so importing this backend
-    # fails and nvcomp_util falls through to the next one
-    import glob
+    # fails and nvcomp_util falls through to the next one. The package's own loader handles the
+    # platform layout (libnvcomp.so.5 under lib64/ on Linux, nvcomp64_5.dll under bin/ on Windows,
+    # plus a system-install fallback) and returns a ready ctypes handle, or None on failure.
     import importlib
-    import os
 
     libnvcomp = importlib.import_module("nvidia.libnvcomp")
-    matches = glob.glob(os.path.join(os.path.dirname(libnvcomp.__file__), "lib64", "libnvcomp.so*"))
-    if not matches:
-        raise ImportError("nvidia.libnvcomp is installed but libnvcomp.so was not found")
-    lib = ctypes.CDLL(matches[0])
+    lib = libnvcomp.load_library()
+    if lib is None:
+        raise ImportError("nvidia.libnvcomp is installed but its shared library was not found")
     P, Z = ctypes.c_void_p, ctypes.c_size_t
     sigs = {
         "nvcompBatchedANSCompressGetMaxOutputChunkSize": [Z, _Opts, ctypes.POINTER(Z)],
