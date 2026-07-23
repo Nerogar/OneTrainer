@@ -889,6 +889,15 @@ class TrainConfig(BaseConfig):
             self.embedding_weight_dtype,
         )
 
+    def part_trained_in_place(self, part: TrainModelPartConfig) -> bool:
+        # True iff a FINE_TUNE run updates this part's base weights. 'train' defaults True even for parts the
+        # architecture can't train (e.g. a frozen text encoder), so also require the model type to list the part as
+        # trainable. Gates the offload/streaming modes that would silently discard in-place weight updates.
+        if self.training_method != TrainingMethod.FINE_TUNE or not part.train:
+            return False
+        name = next((p for p in self.model_type.model_parts() if getattr(self, p) is part), None)
+        return name in self.model_type.trainable_parts()
+
     def model_names(self) -> ModelNames:
         return ModelNames(
             base_model=self.base_model_name,
