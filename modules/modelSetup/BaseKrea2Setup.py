@@ -162,7 +162,5 @@ class BaseKrea2Setup(
     def prepare_text_caching(self, model: Krea2Model, config: TrainConfig):
         if not config.train_text_encoder_or_embedding():
             model.materialize_only("text_encoder")
-        else:
-            model.evict()
 
         model.eval()

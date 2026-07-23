@@ -335,8 +335,6 @@ class BaseStableDiffusionSetup(
     def prepare_text_caching(self, model: StableDiffusionModel, config: TrainConfig):
         if not config.train_text_encoder_or_embedding():
             model.materialize_only("text_encoder")
-        else:
-            model.evict()
         if model.depth_estimator is not None:
             model.depth_estimator.to(self.temp_device)
 

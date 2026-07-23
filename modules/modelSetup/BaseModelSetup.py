@@ -236,6 +236,13 @@ class BaseModelSetup(
                                not self.__stop_model_part_training_elapsed(unique_name, config, train_progress)
             model.requires_grad_(train_model_part)
 
+            # a streamed part (loaded as a meta skeleton) with cache-in-ram off is dropped to meta and re-streamed from
+            # the checkpoint on every reload, so training it would discard the update. Refuse the combination early.
+            if train_model_part and not config.cache_in_ram and any(p.is_meta for p in model.parameters()):
+                raise ValueError(
+                    f"'{unique_name}' is trained with 'stream from disk' on and 'cache in ram' off -- the trained "
+                    f"weights would be re-streamed from the checkpoint and lost. Enable 'cache in ram' for this part.")
+
             #even if frozen parameters are not passed to the optimizer, required_grad has to be False.
             #otherwise, gradients accumulate in param.grad and waste vram
             if unique_name in self.frozen_parameters:
@@ -253,18 +260,16 @@ class BaseModelSetup(
             disable_fp16_autocast: bool = False,
             attention_mask: bool | None = None,
     ):
-        # Per-part optimization wiring, called once per model part from each leaf. The optional
-        # disable_fp16_autocast context and its dtype are stored per-part and can differ per part
-        # (e.g. HiDream disables fp16 for both text_encoder_3 and the transformer). checkpointing_fn returns
-        # None for non-offloadable parts (SD/SDXL UNet), so no conductor is stored for those.
         module = getattr(model, attr)
         if module is None:
             return
 
+        materialize_fn = model.materialize_fn.get(attr)
+
         if checkpointing_fn is not None:
             conductor = checkpointing_fn(module, config, config_part)
             if conductor is not None:
-                setattr(model, f"{attr}_offload_conductor", conductor)
+                model.offload_conductor[attr] = conductor
 
         if disable_fp16_autocast:
             autocast_context, train_dtype = disable_fp16_autocast_context(
@@ -274,7 +279,10 @@ class BaseModelSetup(
         else:
             train_dtype = model.train_dtype
 
-        quantize_layers(module, self.train_device, train_dtype, config)
+        # a streamed module (materialize_fn set) stays on meta until materialized and is quantized per-materialize,
+        # so there is nothing to quantize here; a non-streamed module is quantized now.
+        if materialize_fn is None:
+            quantize_layers(module, self.train_device, train_dtype, config)
 
         if attention_mask is not None:
             self._set_attention_backend(module, config.attention_mechanism, mask=attention_mask)

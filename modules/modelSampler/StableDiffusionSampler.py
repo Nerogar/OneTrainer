@@ -160,8 +160,6 @@ class StableDiffusionSampler(BaseModelSampler):
             do_denormalize = [True] * image.shape[0]
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
-            self.model.evict()
-
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,
                 data=image[0],
@@ -359,8 +357,6 @@ class StableDiffusionSampler(BaseModelSampler):
 
             do_denormalize = [True] * image.shape[0]
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
-
-            self.model.evict()
 
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,

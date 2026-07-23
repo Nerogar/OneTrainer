@@ -10,7 +10,6 @@ from modules.util.convert_util import chunk_swap
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
-from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 import torch
 from torch import Tensor
@@ -77,8 +76,6 @@ class StableDiffusion3Model(BaseModel):
 
     text_encoder_3_train_dtype: DataType
 
-    text_encoder_3_offload_conductor: LayerOffloadConductor | None
-    transformer_offload_conductor: LayerOffloadConductor | None
 
     # persistent embedding training data
     embedding: StableDiffusion3ModelEmbedding | None
@@ -119,8 +116,6 @@ class StableDiffusion3Model(BaseModel):
 
         self.text_encoder_3_train_dtype = DataType.FLOAT_32
 
-        self.text_encoder_3_offload_conductor = None
-        self.transformer_offload_conductor = None
 
         self.embedding = None
         self.additional_embeddings = []

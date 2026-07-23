@@ -34,9 +34,12 @@ class IdeogramModelLoader(
             vae_model_name: str,
             include_unconditional_transformer: bool,
             quantization: QuantizationConfig,
+            stream_from_disk: bool,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
-            self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name, include_unconditional_transformer, quantization)
+            self.__load_diffusers(
+                model, model_type, weight_dtypes, base_model_name, vae_model_name, include_unconditional_transformer,
+                quantization, stream_from_disk)
         else:
             raise Exception("not an internal model")
 
@@ -49,20 +52,33 @@ class IdeogramModelLoader(
             vae_model_name: str,
             include_unconditional_transformer: bool,
             quantization: QuantizationConfig,
+            stream_from_disk: bool,
     ):
-        transformer = self._load_diffusers_sub_module(
+        model.transformer, model.materialize_fn["transformer"] = self._load_transformer(
             Ideogram4Transformer2DModel,
-            weight_dtypes.transformer,
-            weight_dtypes.train_dtype,
+            weight_dtypes,
             base_model_name,
-            "transformer",
+            "",
             quantization,
+            stream_from_disk=stream_from_disk,
         )
         # the unconditional transformer is frozen and only used for the negative branch of the dual-network CFG at
-        # sampling, so it has its own weight dtype independent of the trainable transformer's. It is optional: if not
-        # loaded, only cfg_scale<=1 sampling is possible.
-        if include_unconditional_transformer:
-            unconditional_transformer = self._load_diffusers_sub_module(
+        # sampling, so it has its own weight dtype independent of the trainable transformer's. It is optional. It uses
+        # _load_diffusers_sub_module directly (not _load_transformer) because of its own subfolder and dtype; in
+        # streaming mode that returns a materialize closure, otherwise a plain module.
+        if include_unconditional_transformer and stream_from_disk:
+            model.unconditional_transformer, model.materialize_fn["unconditional_transformer"] = \
+                self._load_diffusers_sub_module(
+                    Ideogram4Transformer2DModel,
+                    weight_dtypes.unconditional_transformer,
+                    weight_dtypes.train_dtype,
+                    base_model_name,
+                    "unconditional_transformer",
+                    quantization,
+                    stream_from_disk=True,
+                )
+        elif include_unconditional_transformer:
+            model.unconditional_transformer = self._load_diffusers_sub_module(
                 Ideogram4Transformer2DModel,
                 weight_dtypes.unconditional_transformer,
                 weight_dtypes.train_dtype,
@@ -71,41 +87,34 @@ class IdeogramModelLoader(
                 quantization,
             )
         else:
-            unconditional_transformer = None
+            model.unconditional_transformer = None
 
-        text_encoder = self._load_text_encoder(
+        model.text_encoder, model.materialize_fn["text_encoder"] = self._load_text_encoder(
             Qwen3VLModel,
             weight_dtypes.text_encoder,
             weight_dtypes.fallback_train_dtype,
             base_model_name,
             "text_encoder",
+            stream_from_disk=stream_from_disk,
         )
 
-        tokenizer = AutoTokenizer.from_pretrained(
+        model.tokenizer = AutoTokenizer.from_pretrained(
             base_model_name,
             subfolder="tokenizer",
         )
 
-        noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
+        model.noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
             base_model_name,
             subfolder="scheduler",
         )
 
-        vae = self._load_vae(
+        model.vae = self._load_vae(
             AutoencoderKLFlux2,
             weight_dtypes.vae,
             weight_dtypes.train_dtype,
             base_model_name,
             vae_model_name,
         )
-
-        model.model_type = model_type
-        model.tokenizer = tokenizer
-        model.noise_scheduler = noise_scheduler
-        model.text_encoder = text_encoder
-        model.vae = vae
-        model.transformer = transformer
-        model.unconditional_transformer = unconditional_transformer
 
     def __load_safetensors(
             self,
@@ -126,13 +135,14 @@ class IdeogramModelLoader(
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
             quantization: QuantizationConfig,
+            stream_from_disk: bool = False,
     ):
         stacktraces = []
 
         try:
             self.__load_internal(
                 model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
-                model_names.include_unconditional_transformer, quantization,
+                model_names.include_unconditional_transformer, quantization, stream_from_disk,
             )
             return
         except Exception:
@@ -141,7 +151,7 @@ class IdeogramModelLoader(
         try:
             self.__load_diffusers(
                 model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
-                model_names.include_unconditional_transformer, quantization,
+                model_names.include_unconditional_transformer, quantization, stream_from_disk,
             )
             return
         except Exception:

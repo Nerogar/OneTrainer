@@ -90,13 +90,14 @@ class SampleWindowController:
             model_names=model_names,
             weight_dtypes=self.initial_train_config.weight_dtypes(),
             quantization=self.initial_train_config.quantization,
+            stream_from_disk=self.initial_train_config.stream_from_disk,
+            cache_in_ram=self.initial_train_config.cache_in_ram(),
         )
         model.train_config = self.initial_train_config
 
         model_setup.setup_optimizations(model, self.initial_train_config)
         model_setup.setup_train_device(model, self.initial_train_config)
         model_setup.setup_model(model, self.initial_train_config)
-        model.evict()
 
         return model
 
@@ -145,3 +146,7 @@ class SampleWindowController:
                 on_sample=on_sample,
                 on_update_progress=on_update_progress,
             )
+
+            # the sampler materializes parts on demand and no longer self-evicts;
+            # release VRAM now that this standalone sample window is idle again
+            self.model.evict()

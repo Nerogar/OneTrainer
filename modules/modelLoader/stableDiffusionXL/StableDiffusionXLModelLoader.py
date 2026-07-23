@@ -49,9 +49,11 @@ class StableDiffusionXLModelLoader(
             base_model_name: str,
             vae_model_name: str,
             quantization: QuantizationConfig,
+            stream_from_disk: bool,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
-            self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name, quantization)
+            self.__load_diffusers(
+                model, model_type, weight_dtypes, base_model_name, vae_model_name, quantization, stream_from_disk)
         else:
             raise Exception("not an internal model")
 
@@ -63,43 +65,48 @@ class StableDiffusionXLModelLoader(
             base_model_name: str,
             vae_model_name: str,
             quantization: QuantizationConfig,
+            stream_from_disk: bool,
     ):
-        tokenizer_1 = CLIPTokenizer.from_pretrained(
+        model.tokenizer_1 = CLIPTokenizer.from_pretrained(
             base_model_name,
             subfolder="tokenizer",
         )
+        model.orig_tokenizer_1 = copy.deepcopy(model.tokenizer_1)
 
-        tokenizer_2 = CLIPTokenizer.from_pretrained(
+        model.tokenizer_2 = CLIPTokenizer.from_pretrained(
             base_model_name,
             subfolder="tokenizer_2",
         )
+        model.orig_tokenizer_2 = copy.deepcopy(model.tokenizer_2)
 
         noise_scheduler = DDIMScheduler.from_pretrained(
             base_model_name,
             subfolder="scheduler",
         )
-        noise_scheduler = create.create_noise_scheduler(
+        model.noise_scheduler = create.create_noise_scheduler(
             noise_scheduler=NoiseScheduler.DDIM,
             original_noise_scheduler=noise_scheduler,
         )
 
-        text_encoder_1 = self._load_text_encoder(
+        model.text_encoder_1, model.materialize_fn["text_encoder_1"] = self._load_text_encoder(
             CLIPTextModel,
             weight_dtypes.text_encoder,
             weight_dtypes.train_dtype,
             base_model_name,
             "text_encoder",
+            stream_from_disk=stream_from_disk,
         )
 
-        text_encoder_2 = self._load_text_encoder(
+        model.text_encoder_2, model.materialize_fn["text_encoder_2"] = self._load_text_encoder(
             CLIPTextModelWithProjection,
             weight_dtypes.text_encoder_2,
             weight_dtypes.train_dtype,
             base_model_name,
             "text_encoder_2",
+            stream_from_disk=stream_from_disk,
         )
 
-        vae = self._load_vae(
+        model.vae = self._load_vae(
             AutoencoderKL,
             weight_dtypes.vae,
             weight_dtypes.fallback_train_dtype,
@@ -107,25 +114,28 @@ class StableDiffusionXLModelLoader(
             vae_model_name,
         )
 
-        unet = self._load_diffusers_sub_module(
-            UNet2DConditionModel,
-            weight_dtypes.unet,
-            weight_dtypes.train_dtype,
-            base_model_name,
-            "unet",
-            quantization,
-        )
-
-        model.model_type = model_type
-        model.tokenizer_1 = tokenizer_1
-        model.orig_tokenizer_1 = copy.deepcopy(tokenizer_1)
-        model.tokenizer_2 = tokenizer_2
-        model.orig_tokenizer_2 = copy.deepcopy(tokenizer_2)
-        model.noise_scheduler = noise_scheduler
-        model.text_encoder_1 = text_encoder_1
-        model.text_encoder_2 = text_encoder_2
-        model.vae = vae
-        model.unet = unet
+        # the SDXL UNet has no single-file transformer helper and lives in the "unet" subfolder, so it streams via
+        # _load_diffusers_sub_module directly, which returns a (module, materialize_fn) pair only when streaming and a
+        # bare module otherwise (train_dtype is applied per-materialize when streaming, so pass None there).
+        if stream_from_disk:
+            model.unet, model.materialize_fn["unet"] = self._load_diffusers_sub_module(
+                UNet2DConditionModel,
+                weight_dtypes.unet,
+                None,
+                base_model_name,
+                "unet",
+                quantization,
+                stream_from_disk=True,
+            )
+        else:
+            model.unet = self._load_diffusers_sub_module(
+                UNet2DConditionModel,
+                weight_dtypes.unet,
+                weight_dtypes.train_dtype,
+                base_model_name,
+                "unet",
+                quantization,
+            )
 
     def __load_ckpt(
             self,
@@ -240,6 +250,7 @@ class StableDiffusionXLModelLoader(
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
             quantization: QuantizationConfig,
+            stream_from_disk: bool = False,
     ):
         stacktraces = []
 
@@ -247,16 +258,25 @@ class StableDiffusionXLModelLoader(
         model.sd_config_filename = self._get_sd_config_name(model_type, model_names.base_model)
 
         try:
-            self.__load_internal(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)
+            self.__load_internal(
+                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization,
+                stream_from_disk)
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
-            self.__load_diffusers(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)
+            self.__load_diffusers(
+                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization,
+                stream_from_disk)
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
+
+        if stream_from_disk:
+            # the single-file loaders below build a full pipeline via from_single_file, which can't stream; fall
+            # back to loading it fully into RAM.
+            print(f"Warning: 'stream from disk' is not supported for single-file {model_type}; loading fully into RAM.")
 
         try:
             self.__load_safetensors(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)

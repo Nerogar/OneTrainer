@@ -37,10 +37,12 @@ class AnimaModelLoader(
             transformer_model_name: str,
             vae_model_name: str,
             quantization: QuantizationConfig,
+            stream_from_disk: bool,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(
                 model, model_type, weight_dtypes, base_model_name, transformer_model_name, vae_model_name, quantization,
+                stream_from_disk,
             )
         else:
             raise Exception("not an internal model")
@@ -54,38 +56,40 @@ class AnimaModelLoader(
             transformer_model_name: str,
             vae_model_name: str,
             quantization: QuantizationConfig,
+            stream_from_disk: bool,
     ):
-        tokenizer = Qwen2Tokenizer.from_pretrained(
+        model.tokenizer = Qwen2Tokenizer.from_pretrained(
             base_model_name,
             subfolder="tokenizer",
         )
 
-        t5_tokenizer = T5TokenizerFast.from_pretrained(
+        model.t5_tokenizer = T5TokenizerFast.from_pretrained(
             base_model_name,
             subfolder="t5_tokenizer",
         )
 
-        noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
+        model.noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
             base_model_name,
             subfolder="scheduler",
         )
 
-        text_encoder = self._load_text_encoder(
+        model.text_encoder, model.materialize_fn["text_encoder"] = self._load_text_encoder(
             Qwen3Model,
             weight_dtypes.text_encoder,
             weight_dtypes.fallback_train_dtype,
             base_model_name,
             "text_encoder",
+            stream_from_disk=stream_from_disk,
         )
 
         # conditioner is always bfloat16 — small adapter, no user dtype control
-        text_conditioner = AnimaTextConditioner.from_pretrained(
+        model.text_conditioner = AnimaTextConditioner.from_pretrained(
             base_model_name,
             subfolder="text_conditioner",
             torch_dtype=torch.bfloat16,
         )
 
-        vae = self._load_vae(
+        model.vae = self._load_vae(
             AutoencoderKLQwenImage,
             weight_dtypes.vae,
             weight_dtypes.train_dtype,
@@ -93,23 +97,15 @@ class AnimaModelLoader(
             vae_model_name,
         )
 
-        transformer = self._load_transformer(
+        model.transformer, model.materialize_fn["transformer"] = self._load_transformer(
             CosmosTransformer3DModel,
             weight_dtypes,
             base_model_name,
             transformer_model_name,
             quantization,
             config=base_model_name,
+            stream_from_disk=stream_from_disk,
         )
-
-        model.model_type = model_type
-        model.tokenizer = tokenizer
-        model.t5_tokenizer = t5_tokenizer
-        model.noise_scheduler = noise_scheduler
-        model.text_encoder = text_encoder
-        model.text_conditioner = text_conditioner
-        model.vae = vae
-        model.transformer = transformer
 
     def load( #TODO share code between models
             self,
@@ -118,12 +114,14 @@ class AnimaModelLoader(
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
             quantization: QuantizationConfig,
+            stream_from_disk: bool = False,
     ):
         stacktraces = []
 
         try:
             self.__load_internal(
                 model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model, quantization,
+                stream_from_disk,
             )
             return
         except Exception:
@@ -132,6 +130,7 @@ class AnimaModelLoader(
         try:
             self.__load_diffusers(
                 model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model, quantization,
+                stream_from_disk,
             )
             return
         except Exception:

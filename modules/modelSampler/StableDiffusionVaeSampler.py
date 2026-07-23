@@ -69,8 +69,6 @@ class StableDiffusionVaeSampler(BaseModelSampler):
             latent_image_tensor = self.model.vae.encode(image_tensor.unsqueeze(0)).latent_dist.mean
             image_tensor = self.model.vae.decode(latent_image_tensor).sample.squeeze()
 
-        self.model.evict()
-
         image_tensor = (image_tensor + 1) * 0.5
         image_tensor = image_tensor.clamp(0, 1)
 

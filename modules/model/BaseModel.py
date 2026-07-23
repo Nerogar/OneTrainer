@@ -1,4 +1,5 @@
 from abc import ABCMeta
+from collections.abc import Callable
 from contextlib import nullcontext
 from uuid import uuid4
 
@@ -6,12 +7,14 @@ from modules.module.EMAModule import EMAModuleWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.convert_util import qkv_fusion
+from modules.util.disk_stream import stream_module_to
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
+from modules.util.LayerOffloadConductor import LayerOffloadConductor
 from modules.util.modelSpec.ModelSpec import ModelSpec
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
-from modules.util.torch_util import create_mem_pool, mem_pool_context, supports_mem_pool, torch_gc
+from modules.util.torch_util import create_mem_pool, device_equals, mem_pool_context, supports_mem_pool, torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -79,6 +82,9 @@ class BaseModel(metaclass=ABCMeta):
     embedding_state_dicts: dict[str, dict[str, Tensor]] | None
     autocast_context: torch.autocast | nullcontext
     train_dtype: DataType
+    cache_in_ram: dict[str, bool]
+    offload_conductor: dict[str, LayerOffloadConductor]
+    materialize_fn: dict[str, Callable]
 
     def __init__(
             self,
@@ -86,6 +92,9 @@ class BaseModel(metaclass=ABCMeta):
     ):
         self.model_type = model_type
         self.parameters = None
+        self.cache_in_ram = {}
+        self.offload_conductor = {}
+        self.materialize_fn = {}
         self.optimizer = None
         self.optimizer_state_dict = None
         self.param_group_mapping = None
@@ -134,39 +143,57 @@ class BaseModel(metaclass=ABCMeta):
         self.materialize_only(*self.model_type.text_encoder_parts())
 
     def _move_part(self, part: str, device: torch.device):
-        # The generic per-component move: `part` (or `part_1` for the first of several split text encoders),
-        # its LoRA (`{part}_lora`), and its layer-offload conductor (`{part}_offload_conductor`), if present.
+        # Move a component (`part`, or `part_1` for the first of several split text encoders) and its LoRA. The
+        # dispatch below routes through an offload conductor and/or a disk-stream materialize closure if present.
         stem = f"{part}_1" if hasattr(self, f"{part}_1") else part
 
-        conductor = getattr(self, f"{stem}_offload_conductor", None)
-        lora = getattr(self, f"{stem}_lora", None)
-        component = None if conductor is not None else getattr(self, stem)
+        conductor = self.offload_conductor.get(stem)
+        materialize_fn = self.materialize_fn.get(stem)
+        cache_in_ram = self.cache_in_ram.get(stem, True)
 
         if conductor is not None:
-            conductor.to(device)
+            if device_equals(device, self.train_device):
+                train_dtype = getattr(self, f"{stem}_train_dtype", self.train_dtype)
+                conductor.materialize(
+                    train_dtype, name=part, materialize_fn=materialize_fn,
+                    cache_in_ram=cache_in_ram)
+            else:
+                to_meta = materialize_fn is not None and not cache_in_ram
+                conductor.evict(to_meta=to_meta)
+        elif materialize_fn is not None:
+            streamed_component = getattr(self, stem)
+            train_dtype = getattr(self, f"{stem}_train_dtype", self.train_dtype)
+            stream_module_to(
+                streamed_component, device, materialize_fn, train_dtype,
+                cache_in_ram=cache_in_ram, name=part, temp_device=self.temp_device)
 
-        if component is None and lora is None:
+        # move into the shared stem pool: the base component itself (unless a conductor or stream owns its move) plus
+        # the LoRA. getattr(self, stem) is None for a part in model_parts() that was never populated (e.g. an omitted
+        # text encoder), so it drops out below.
+        to_move = []
+        if conductor is None and materialize_fn is None:
+            to_move.append(getattr(self, stem))
+        lora = getattr(self, f"{stem}_lora", None)
+        to_move.append(lora)
+        to_move = [module for module in to_move if module is not None]
+        if not to_move:
             return
 
         if supports_mem_pool(device):
-            # The component (when not conductor-managed) and its LoRA share a per-stem MemPool so both land
-            # contiguously and release together on evict. A conductor keeps its own pool, so the stem pool then
-            # holds only the LoRA, keeping its small tensors out of the default pool across the part's evict/reload.
+            # The component (when not conductor/stream-managed) and its LoRA share a per-stem MemPool so both release
+            # together on evict, keeping the LoRA's small tensors from pinning freed default-pool segments across the
+            # part's evict/reload cycle. A conductor keeps its own pool, so the stem pool then holds only the LoRA.
             pool = self._mem_pools.get(stem)
             if pool is None:
                 pool = self._mem_pools[stem] = create_mem_pool(device)
             with mem_pool_context(pool):
-                if component is not None:
-                    component.to(device=device)
-                if lora is not None:
-                    lora.to(device=device)
+                for module in to_move:
+                    module.to(device=device)
         else:
             # the target has no MemPool (CPU): move normally and drop this stem's pool from the earlier GPU move,
             # so evict()'s torch_gc can release its segments
-            if component is not None:
-                component.to(device=device)
-            if lora is not None:
-                lora.to(device=device)
+            for module in to_move:
+                module.to(device=device)
             self._mem_pools.pop(stem, None)
 
     def eval(self):

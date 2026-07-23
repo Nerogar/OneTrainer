@@ -121,8 +121,6 @@ class ZImageSampler(BaseModelSampler):
 
             image = image_processor.postprocess(image, output_type='pil')
 
-            self.model.evict()
-
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,
                 data=image[0],

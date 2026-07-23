@@ -30,11 +30,13 @@ class StableDiffusion3ModelLoader(
             include_text_encoder_2: bool,
             include_text_encoder_3: bool,
             quantization: QuantizationConfig,
+            stream_from_disk: bool,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(
                 model, model_type, weight_dtypes, base_model_name, vae_model_name,
                 include_text_encoder_1, include_text_encoder_2, include_text_encoder_3, quantization,
+                stream_from_disk,
             )
         else:
             raise Exception("not an internal model")
@@ -50,70 +52,77 @@ class StableDiffusion3ModelLoader(
             include_text_encoder_2: bool,
             include_text_encoder_3: bool,
             quantization: QuantizationConfig,
+            stream_from_disk: bool,
     ):
         if include_text_encoder_1:
-            tokenizer_1 = CLIPTokenizer.from_pretrained(
+            model.tokenizer_1 = CLIPTokenizer.from_pretrained(
                 base_model_name,
                 subfolder="tokenizer",
             )
         else:
-            tokenizer_1 = None
+            model.tokenizer_1 = None
+        model.orig_tokenizer_1 = copy.deepcopy(model.tokenizer_1)
 
         if include_text_encoder_2:
-            tokenizer_2 = CLIPTokenizer.from_pretrained(
+            model.tokenizer_2 = CLIPTokenizer.from_pretrained(
                 base_model_name,
                 subfolder="tokenizer_2",
             )
         else:
-            tokenizer_2 = None
+            model.tokenizer_2 = None
+        model.orig_tokenizer_2 = copy.deepcopy(model.tokenizer_2)
 
         if include_text_encoder_3:
-            tokenizer_3 = T5Tokenizer.from_pretrained(
+            model.tokenizer_3 = T5Tokenizer.from_pretrained(
                 base_model_name,
                 subfolder="tokenizer_3",
             )
         else:
-            tokenizer_3 = None
+            model.tokenizer_3 = None
+        model.orig_tokenizer_3 = copy.deepcopy(model.tokenizer_3)
 
-        noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
+        model.noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
             base_model_name,
             subfolder="scheduler",
         )
 
         if include_text_encoder_1:
-            text_encoder_1 = self._load_text_encoder(
+            model.text_encoder_1, model.materialize_fn["text_encoder_1"] = self._load_text_encoder(
                 CLIPTextModelWithProjection,
                 weight_dtypes.text_encoder,
                 weight_dtypes.train_dtype,
                 base_model_name,
                 "text_encoder",
+                stream_from_disk=stream_from_disk,
             )
         else:
-            text_encoder_1 = None
+            model.text_encoder_1 = None
 
         if include_text_encoder_2:
-            text_encoder_2 = self._load_text_encoder(
+            model.text_encoder_2, model.materialize_fn["text_encoder_2"] = self._load_text_encoder(
                 CLIPTextModelWithProjection,
                 weight_dtypes.text_encoder_2,
                 weight_dtypes.train_dtype,
                 base_model_name,
                 "text_encoder_2",
+                stream_from_disk=stream_from_disk,
             )
         else:
-            text_encoder_2 = None
+            model.text_encoder_2 = None
 
         if include_text_encoder_3:
-            text_encoder_3 = self._load_text_encoder(
+            model.text_encoder_3, model.materialize_fn["text_encoder_3"] = self._load_text_encoder(
                 T5EncoderModel,
                 weight_dtypes.text_encoder_3,
                 weight_dtypes.fallback_train_dtype,
                 base_model_name,
                 "text_encoder_3",
+                stream_from_disk=stream_from_disk,
             )
         else:
-            text_encoder_3 = None
+            model.text_encoder_3 = None
 
-        vae = self._load_vae(
+        model.vae = self._load_vae(
             AutoencoderKL,
             weight_dtypes.vae,
             weight_dtypes.train_dtype,
@@ -121,28 +130,14 @@ class StableDiffusion3ModelLoader(
             vae_model_name,
         )
 
-        transformer = self._load_diffusers_sub_module(
+        model.transformer, model.materialize_fn["transformer"] = self._load_transformer(
             SD3Transformer2DModel,
-            weight_dtypes.transformer,
-            weight_dtypes.train_dtype,
+            weight_dtypes,
             base_model_name,
-            "transformer",
+            "",
             quantization,
+            stream_from_disk=stream_from_disk,
         )
-
-        model.model_type = model_type
-        model.tokenizer_1 = tokenizer_1
-        model.orig_tokenizer_1 = copy.deepcopy(tokenizer_1)
-        model.tokenizer_2 = tokenizer_2
-        model.orig_tokenizer_2 = copy.deepcopy(tokenizer_2)
-        model.tokenizer_3 = tokenizer_3
-        model.orig_tokenizer_3 = copy.deepcopy(tokenizer_3)
-        model.noise_scheduler = noise_scheduler
-        model.text_encoder_1 = text_encoder_1
-        model.text_encoder_2 = text_encoder_2
-        model.text_encoder_3 = text_encoder_3
-        model.vae = vae
-        model.transformer = transformer
 
     def __load_safetensors(
             self,
@@ -243,6 +238,7 @@ class StableDiffusion3ModelLoader(
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
             quantization: QuantizationConfig,
+            stream_from_disk: bool = False,
     ):
         stacktraces = []
 
@@ -250,7 +246,7 @@ class StableDiffusion3ModelLoader(
             self.__load_internal(
                 model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2,
-                 model_names.include_text_encoder_3, quantization,
+                 model_names.include_text_encoder_3, quantization, stream_from_disk,
             )
             return
         except Exception:
@@ -260,11 +256,16 @@ class StableDiffusion3ModelLoader(
             self.__load_diffusers(
                 model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
                 model_names.include_text_encoder, model_names.include_text_encoder_2,
-                model_names.include_text_encoder_3, quantization,
+                model_names.include_text_encoder_3, quantization, stream_from_disk,
             )
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
+
+        if stream_from_disk:
+            # the single-file loader below builds a full pipeline via from_single_file, which can't stream; fall
+            # back to loading it fully into RAM.
+            print(f"Warning: 'stream from disk' is not supported for single-file {model_type}; loading fully into RAM.")
 
         try:
             self.__load_safetensors(
