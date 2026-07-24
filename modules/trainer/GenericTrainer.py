@@ -1,4 +1,3 @@
-import contextlib
 import copy
 import json
 import math
@@ -16,7 +15,7 @@ from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
-from modules.util import create, path_util
+from modules.util import create, huggingface_util, path_util
 from modules.util.bf16_stochastic_rounding import set_seed as bf16_stochastic_rounding_set_seed
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
@@ -42,8 +41,6 @@ from torch.utils.hooks import RemovableHandle
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
 
-import huggingface_hub
-from requests.exceptions import ConnectionError
 from tqdm import tqdm
 
 
@@ -115,10 +112,12 @@ class GenericTrainer(BaseTrainer):
             else:
                 print("No backup found, continuing without backup...")
 
-        if self.config.secrets.huggingface_token != "":
-            self.callbacks.on_update_status("logging into Hugging Face")
-            with contextlib.suppress(ConnectionError):
-                huggingface_hub.login(token=self.config.secrets.huggingface_token)
+        huggingface_util.configure_hub(
+            self.config.secrets.huggingface_token,
+            offline_mode=self.config.offline_mode,
+            cache_dir=self.config.huggingface_cache_dir,
+            on_status=self.callbacks.on_update_status,
+        )
 
         self.callbacks.on_update_status("loading the model")
 

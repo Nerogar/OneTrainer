@@ -2,24 +2,19 @@ from util.import_util import script_imports
 
 script_imports()
 
-import contextlib
 from uuid import uuid4
 
-from modules.util import create
+from modules.util import create, huggingface_util
 from modules.util.args.ConvertModelArgs import ConvertModelArgs
 from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModelNames import EmbeddingName, ModelNames
 
-import huggingface_hub
-
 
 def main():
     args = ConvertModelArgs.parse_args()
 
-    if args.huggingface_token != "":
-        with contextlib.suppress(ConnectionError):
-            huggingface_hub.login(token=args.huggingface_token)
+    huggingface_util.configure_hub(args.huggingface_token)
 
     model_loader = create.create_model_loader(model_type=args.model_type, training_method=args.training_method)
     model_saver = create.create_model_saver(model_type=args.model_type, training_method=args.training_method)
