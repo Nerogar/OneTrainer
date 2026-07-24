@@ -107,6 +107,8 @@ class LinearW8A8(
         return weight_bytes + bias_bytes
 
     def unquantized_weight(self, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
+        if not self.is_quantized:
+            return self.weight.detach().to(dtype)
         return dequantize(self.weight.detach(), self.scale).to(dtype)
 
     @torch.no_grad()
