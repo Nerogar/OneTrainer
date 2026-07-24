@@ -104,12 +104,6 @@ class StableDiffusionModel(BaseModel):
         self.sd_config = None
         self.sd_config_filename = None
 
-    def adapters(self) -> list[LoRAModuleWrapper]:
-        return [a for a in [
-            self.text_encoder_lora,
-            self.unet_lora,
-        ] if a is not None]
-
     def diffusers_to_original(self) -> list | None:
         # SD1.5/2.x UNet diffusers -> original/sgm key map, convert()-native (bare sgm names, no top prefix).
         # SD has NO qkv fusion and NO add_embedding, so this is a pure key rename. Spatial-transformer
@@ -181,37 +175,11 @@ class StableDiffusionModel(BaseModel):
         return [embedding.text_encoder_embedding for embedding in self.additional_embeddings] \
                + ([self.embedding.text_encoder_embedding] if self.embedding is not None else [])
 
-    def vae_to(self, device: torch.device):
-        self.vae.to(device=device)
-
-    def depth_estimator_to(self, device: torch.device):
-        if self.depth_estimator is not None:
-            self.depth_estimator.to(device=device)
-
-    def text_encoder_to(self, device: torch.device):
-        self.text_encoder.to(device=device)
-
-        if self.text_encoder_lora is not None:
-            self.text_encoder_lora.to(device)
-
-    def unet_to(self, device: torch.device):
-        self.unet.to(device=device)
-
-        if self.unet_lora is not None:
-            self.unet_lora.to(device)
-
-    def to(self, device: torch.device):
-        self.vae_to(device)
-        self.depth_estimator_to(device)
-        self.text_encoder_to(device)
-        self.unet_to(device)
-
     def eval(self):
-        self.vae.eval()
+        super().eval()
+        # depth_estimator isn't in ModelType.model_parts(); only the depth model variants have it.
         if self.depth_estimator is not None:
             self.depth_estimator.eval()
-        self.text_encoder.eval()
-        self.unet.eval()
 
     def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
         tokenizer = self.orig_tokenizer if use_original_tokenizers else self.tokenizer

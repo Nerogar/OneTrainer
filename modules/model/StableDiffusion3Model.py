@@ -10,7 +10,6 @@ from modules.util.convert_util import chunk_swap
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
-from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 import torch
 from torch import Tensor
@@ -77,8 +76,6 @@ class StableDiffusion3Model(BaseModel):
 
     text_encoder_3_train_dtype: DataType
 
-    text_encoder_3_offload_conductor: LayerOffloadConductor | None
-    transformer_offload_conductor: LayerOffloadConductor | None
 
     # persistent embedding training data
     embedding: StableDiffusion3ModelEmbedding | None
@@ -119,8 +116,6 @@ class StableDiffusion3Model(BaseModel):
 
         self.text_encoder_3_train_dtype = DataType.FLOAT_32
 
-        self.text_encoder_3_offload_conductor = None
-        self.transformer_offload_conductor = None
 
         self.embedding = None
         self.additional_embeddings = []
@@ -133,14 +128,6 @@ class StableDiffusion3Model(BaseModel):
         self.text_encoder_3_lora = None
         self.transformer_lora = None
         self.lora_state_dict = None
-
-    def adapters(self) -> list[LoRAModuleWrapper]:
-        return [a for a in [
-            self.text_encoder_1_lora,
-            self.text_encoder_2_lora,
-            self.text_encoder_3_lora,
-            self.transformer_lora,
-        ] if a is not None]
 
     def fusion_groups(self) -> list | None:
         # SD3 fuses TWO joint streams (x_block + context_block) plus a dual-attention attn2 that only exists
@@ -230,62 +217,6 @@ class StableDiffusion3Model(BaseModel):
     def all_text_encoder_3_embeddings(self) -> list[BaseModelEmbedding]:
         return [embedding.text_encoder_3_embedding for embedding in self.additional_embeddings] \
                + ([self.embedding.text_encoder_3_embedding] if self.embedding is not None else [])
-
-    def vae_to(self, device: torch.device):
-        self.vae.to(device=device)
-
-    def text_encoder_to(self, device: torch.device):
-        self.text_encoder_1_to(device=device)
-        self.text_encoder_2_to(device=device)
-        self.text_encoder_3_to(device=device)
-
-    def text_encoder_1_to(self, device: torch.device):
-        if self.text_encoder_1 is not None:
-            self.text_encoder_1.to(device=device)
-
-        if self.text_encoder_1_lora is not None:
-            self.text_encoder_1_lora.to(device)
-
-    def text_encoder_2_to(self, device: torch.device):
-        if self.text_encoder_2 is not None:
-            self.text_encoder_2.to(device=device)
-
-        if self.text_encoder_2_lora is not None:
-            self.text_encoder_2_lora.to(device)
-
-    def text_encoder_3_to(self, device: torch.device):
-        if self.text_encoder_3 is not None:
-            if self.text_encoder_3_offload_conductor is not None:
-                self.text_encoder_3_offload_conductor.to(device)
-            else:
-                self.text_encoder_3.to(device=device)
-
-        if self.text_encoder_3_lora is not None:
-            self.text_encoder_3_lora.to(device)
-
-    def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None:
-            self.transformer_offload_conductor.to(device)
-        else:
-            self.transformer.to(device=device)
-
-        if self.transformer_lora is not None:
-            self.transformer_lora.to(device)
-
-    def to(self, device: torch.device):
-        self.vae_to(device)
-        self.text_encoder_to(device)
-        self.transformer_to(device)
-
-    def eval(self):
-        self.vae.eval()
-        if self.text_encoder_1 is not None:
-            self.text_encoder_1.eval()
-        if self.text_encoder_2 is not None:
-            self.text_encoder_2.eval()
-        if self.text_encoder_3 is not None:
-            self.text_encoder_3.eval()
-        self.transformer.eval()
 
     def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
         return StableDiffusion3Pipeline(

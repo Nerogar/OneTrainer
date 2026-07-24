@@ -8,7 +8,6 @@ from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
-from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 import torch
 from torch import Tensor
@@ -55,8 +54,6 @@ class SanaModel(BaseModel):
     text_encoder_train_dtype: DataType
     vae_train_dtype: DataType
 
-    text_encoder_offload_conductor: LayerOffloadConductor | None
-    transformer_offload_conductor: LayerOffloadConductor | None
 
     # persistent embedding training data
     embedding: SanaModelEmbedding | None
@@ -88,8 +85,6 @@ class SanaModel(BaseModel):
         self.text_encoder_train_dtype = DataType.FLOAT_32
         self.vae_train_dtype = DataType.FLOAT_32
 
-        self.text_encoder_offload_conductor = None
-        self.transformer_offload_conductor = None
 
         self.embedding = None
         self.additional_embeddings = []
@@ -98,12 +93,6 @@ class SanaModel(BaseModel):
         self.text_encoder_lora = None
         self.transformer_lora = None
         self.lora_state_dict = None
-
-    def adapters(self) -> list[LoRAModuleWrapper]:
-        return [a for a in [
-            self.text_encoder_lora,
-            self.transformer_lora,
-        ] if a is not None]
 
     def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
         # Single Gemma2 TE. No COMFY_LORA name -- ComfyUI cannot load Sana, so the COMFY format refuses to
@@ -122,37 +111,6 @@ class SanaModel(BaseModel):
     def all_text_encoder_embeddings(self) -> list[BaseModelEmbedding]:
         return [embedding.text_encoder_embedding for embedding in self.additional_embeddings] \
                + ([self.embedding.text_encoder_embedding] if self.embedding is not None else [])
-
-    def vae_to(self, device: torch.device):
-        self.vae.to(device=device)
-
-    def text_encoder_to(self, device: torch.device):
-        if self.text_encoder_offload_conductor is not None:
-            self.text_encoder_offload_conductor.to(device)
-        else:
-            self.text_encoder.to(device=device)
-
-        if self.text_encoder_lora is not None:
-            self.text_encoder_lora.to(device)
-
-    def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None:
-            self.transformer_offload_conductor.to(device)
-        else:
-            self.transformer.to(device=device)
-
-        if self.transformer_lora is not None:
-            self.transformer_lora.to(device)
-
-    def to(self, device: torch.device):
-        self.vae_to(device)
-        self.text_encoder_to(device)
-        self.transformer_to(device)
-
-    def eval(self):
-        self.vae.eval()
-        self.text_encoder.eval()
-        self.transformer.eval()
 
     def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
         return SanaPipeline(
