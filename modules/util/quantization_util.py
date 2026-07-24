@@ -320,15 +320,13 @@ def offload_quantized(
         module: nn.Module,
         device: torch.device,
         non_blocking: bool = False,
-        allocator: Callable[[torch.tensor], torch.tensor] | None = None,
+        place: Callable[[torch.Tensor, bool], torch.Tensor] | None = None,
 ):
     tensors = get_offload_tensors(module)
 
-    if allocator is None:
+    if place is None:
         for tensor in tensors:
             tensor.data = tensor.data.to(device=device, non_blocking=non_blocking)
     else:
         for tensor in tensors:
-            new_tensor = allocator(tensor)
-            new_tensor.copy_(tensor.data, non_blocking=non_blocking)
-            tensor.data = new_tensor
+            tensor.data = place(tensor, non_blocking)

@@ -41,7 +41,7 @@ def log(msg: str = ''):
     # MESSAGES.append(msg)
 
 
-def clone_tensor_allocator(tensor: torch.Tensor) -> torch.Tensor:
+def clone_tensor_allocator(tensor: torch.Tensor, non_blocking: bool = False) -> torch.Tensor:
     # clones a tensor into a new memory location to remove all memory dependencies between tensors
     return tensor.clone()
 
@@ -136,6 +136,12 @@ class StaticLayerTensorAllocator:
             self.__layer_allocator.allocation_start = self.__allocation_start
 
         return allocated_tensor.view(dtype=source_tensor.dtype).view(size=source_tensor.shape)
+
+    def place(self, source_tensor: torch.Tensor, non_blocking: bool = False) -> torch.Tensor:
+        # place functor: allocate a fresh cache slot and copy the source into it.
+        new_tensor = self.allocate_like(source_tensor)
+        new_tensor.copy_(source_tensor.data, non_blocking=non_blocking)
+        return new_tensor
 
     def deallocate(self, deallocate_forward):
         if deallocate_forward:
@@ -254,7 +260,7 @@ class StaticLayerAllocator:
             if self.__is_pinned:
                 pin_tensor_(self.cache_tensors[cache_tensor_index])
 
-    def deallocate_cache(self):
+    def deactivate_cache(self):
         if not self.__allocate_statically:
             return
 
@@ -274,11 +280,14 @@ class StaticLayerAllocator:
             self.__mem_pool = None
             torch_gc()
 
+    def free(self):
+        self.deactivate_cache()
+
     @property
     def mem_pool(self):
         # the MemPool holding this allocator's cache tensor(s); also used to keep the conductor's resident non-layer
         # remainder out of the default pool. allocate_cache creates it before the materialize layer loop; create it
-        # here too in case a caller reaches for it first. deallocate_cache drops it (static allocators only).
+        # here too in case a caller reaches for it first. deactivate_cache drops it (static allocators only).
         if self.__mem_pool is None:
             self.__mem_pool = create_mem_pool(self.device)
         return self.__mem_pool
@@ -295,6 +304,97 @@ class StaticLayerAllocator:
         if self.__tensor_allocators[layer_index] is not None:
             self.__tensor_allocators[layer_index].deallocate(deallocate_forward)
             self.__tensor_allocators[layer_index] = None
+
+
+class FullModelTensorAllocator:
+    # sibling of StaticLayerTensorAllocator: place() returns the tensor's permanent CPU slot with no copy, so an
+    # offload is a pure pointer swap. deallocate is a no-op -- the slot is permanent.
+    def __init__(self, layer_allocator: 'FullModelLayerAllocator'):
+        self.__layer_allocator = layer_allocator
+
+    def place(self, source_tensor: torch.Tensor, non_blocking: bool = False) -> torch.Tensor:
+        return self.__layer_allocator.slot_for(source_tensor)
+
+    def deallocate(self, deallocate_forward: bool):
+        pass
+
+
+class FullModelLayerAllocator:
+    # Temp/CPU-side sibling of StaticLayerAllocator, selected in simplex mode. A single flat, permanent pinned
+    # buffer holds every layer's packed weights for the model's lifetime; offload is a pointer swap into that
+    # buffer, so no device->host copy ever runs on the hot path. The buffer is filled once, at materialize, by
+    # an explicit GPU->CPU copy.
+    device: torch.device
+
+    def __init__(self, device: torch.device):
+        assert device.type == "cpu", "FullModelLayerAllocator is CPU-only"
+        self.device = device
+        self.__buffer = None            # single flat int8 buffer holding every layer's packed weights
+        self.__fill_offset = 0          # running fill cursor into __buffer (advances only during materialize)
+        self.__slots = {}               # frozen param tensor -> its permanent view into __buffer
+        self.__is_buffer_pinned = False
+
+    @property
+    def filled(self) -> bool:
+        # True once the buffer holds the model's weights -- distinguishes a cold materialize from a warm re-activate.
+        return len(self.__slots) > 0
+
+    def allocate_cache(self, layers: list[nn.Module], target_bytes: int, streaming: bool, cache_in_ram: bool):
+        # create the full-model buffer once; (re)pin on every activate. target_bytes is ignored -- every layer is
+        # permanently resident, so the buffer is sized to the exact packed-weight footprint plus alignment.
+        if self.__buffer is None:
+            total_tensors = 0
+            total_bytes = 0
+            for layer in layers:
+                for module in layer.modules():
+                    total_bytes += get_offload_tensor_bytes(module)
+                    total_tensors += len(get_offload_tensors(module))
+            buffer_bytes = total_bytes + TENSOR_ALIGNMENT_BYTES * total_tensors
+            torch_gc()
+            self.__buffer = torch.zeros((buffer_bytes,), dtype=torch.int8, device=self.device)
+            self.__fill_offset = 0
+
+        if not self.__is_buffer_pinned:
+            pin_tensor_(self.__buffer)
+            self.__is_buffer_pinned = True
+
+    def fill(self, tensor: torch.Tensor) -> torch.Tensor:
+        # carve this tensor's permanent slot out of the flat buffer and copy its quantized weight into it.
+        num_bytes = tensor.numel() * tensor.element_size()
+        slot = self.__buffer[self.__fill_offset:self.__fill_offset + num_bytes] \
+            .view(dtype=tensor.dtype).view(size=tensor.shape)
+        self.__fill_offset = align_up(self.__fill_offset + num_bytes)
+        slot.copy_(tensor.data)
+        self.__slots[tensor] = slot
+        return slot
+
+    def slot_for(self, tensor: torch.Tensor) -> torch.Tensor:
+        return self.__slots[tensor]
+
+    def repoint_all(self):
+        # point every frozen weight at its permanent CPU slot -- rescues the layers whose .data viewed the
+        # now-freed GPU ring.
+        for tensor, slot in self.__slots.items():
+            tensor.data = slot
+
+    def get_allocator(self, layer_index: int, allocate_forward: bool) -> FullModelTensorAllocator:
+        return FullModelTensorAllocator(self)
+
+    def deallocate_layer(self, layer_index: int, deallocate_forward: bool):
+        pass  # slots are permanent -- an offloaded layer's weight stays in the buffer for the next onload
+
+    def deactivate_cache(self):
+        # unpins but keeps the buffer and its data resident, so the frozen weights survive to re-activate.
+        if self.__is_buffer_pinned:
+            unpin_tensor_(self.__buffer)
+            self.__is_buffer_pinned = False
+
+    def free(self):
+        # releases the buffer and every slot. Reached only on the error rollback to meta.
+        self.deactivate_cache()
+        self.__buffer = None
+        self.__fill_offset = 0
+        self.__slots = {}
 
 
 class StaticActivationAllocator:
@@ -618,7 +718,7 @@ class LayerOffloadConductor:
     __activations_transfer_stream: torch.Stream | None
 
     __train_device_layer_allocator: StaticLayerAllocator
-    __temp_device_layer_allocator: StaticLayerAllocator
+    __temp_device_layer_allocator: StaticLayerAllocator | FullModelLayerAllocator
     __temp_device_activations_allocator: StaticActivationAllocator
 
     __layer_train_event_map: list[SyncEvent]
@@ -634,6 +734,8 @@ class LayerOffloadConductor:
 
     __materialized: bool
 
+    __simplex_active: bool
+
     __deferred_layers: list[int]
 
     __config: TrainConfig
@@ -647,6 +749,7 @@ class LayerOffloadConductor:
             module: nn.Module,
             config: TrainConfig,
             part: TrainModelPartConfig,
+            simplex: bool = False,
     ):
         super().__init__()
 
@@ -674,8 +777,13 @@ class LayerOffloadConductor:
             self.__layer_transfer_stream = None
             self.__activations_transfer_stream = None
 
+        self.__simplex_active = simplex
+        if self.__simplex_active:
+            print(f"simplex full-model-buffer offload activated for {type(self.__module).__name__}")
+
         self.__train_device_layer_allocator = StaticLayerAllocator(self.__train_device)
-        self.__temp_device_layer_allocator = StaticLayerAllocator(self.__temp_device)
+        self.__temp_device_layer_allocator = FullModelLayerAllocator(self.__temp_device) \
+            if self.__simplex_active else StaticLayerAllocator(self.__temp_device)
         self.__temp_device_activations_allocator = StaticActivationAllocator(self.__temp_device)
 
         self.__layer_train_event_map = []
@@ -720,16 +828,23 @@ class LayerOffloadConductor:
         # move every layer and the non-layer remainder back to the temp device and free the static caches (the
         # non-disk eviction path). Also the rollback for a resident conductor whose materialize() raised partway.
         # deallocate the cache before to take advantage of the gc
-        self.__train_device_layer_allocator.deallocate_cache()
-        self.__temp_device_layer_allocator.deallocate_cache()
+        self.__train_device_layer_allocator.deactivate_cache()
+        self.__temp_device_layer_allocator.deactivate_cache()
         self.__temp_device_activations_allocator.deallocate_cache()
 
         self.__module_to_device_except_layers(self.__temp_device)
-        for layer_index, layer in enumerate(self.__layers):
-            self.__layers[layer_index].to(self.__temp_device)
-            for module in layer.modules():
-                offload_quantized(module, self.__temp_device, allocator=clone_tensor_allocator)
-            self.__layer_device_map[layer_index] = None
+        if self.__simplex_active:
+            # every frozen weight already lives in the permanent CPU buffer; repoint the layers that were
+            # resident in the now-freed GPU ring back to their dormant CPU slots.
+            self.__temp_device_layer_allocator.repoint_all()
+            for layer_index in range(len(self.__layers)):
+                self.__layer_device_map[layer_index] = None
+        else:
+            for layer_index, layer in enumerate(self.__layers):
+                self.__layers[layer_index].to(self.__temp_device)
+                for module in layer.modules():
+                    offload_quantized(module, self.__temp_device, place=clone_tensor_allocator)
+                self.__layer_device_map[layer_index] = None
 
         self.__materialized = False
 
@@ -748,6 +863,11 @@ class LayerOffloadConductor:
         try:
             self.__offload_strategy = LayerOffloadStrategy(self.__layers, self.__layer_offload_fraction)
 
+            if self.__simplex_active and not streaming:
+                raise NotImplementedError(
+                    "the simplex full-model-buffer offload requires a disk-streamed component; a single-file override "
+                    "with 'Stream From Disk' enabled is not supported yet")
+
             self.__train_device_layer_allocator.allocate_cache(
                 self.__layers, self.__offload_strategy.max_loaded_bytes, streaming=streaming, cache_in_ram=cache_in_ram)
             self.__temp_device_layer_allocator.allocate_cache(
@@ -764,38 +884,68 @@ class LayerOffloadConductor:
             disk_bar = tqdm(total=cold_layers, unit="layer", desc=f"streaming {name}", leave=False) \
                 if cold_layers > 0 else None
 
-            # bring each layer to the train device (streaming it if cold), then place it in its cache slot -- the GPU
-            # cache for an initially-loaded layer, the temp-device cache for an offloaded one
+            already_filled = self.__temp_device_layer_allocator.filled if self.__simplex_active else False
+
+            # per-layer materialize helpers, shared by the simplex and static paths below
+            def bring_to_train_device(layer, layer_index):
+                # get the layer's weights onto the train device: stream+quantize from the checkpoint if the layer
+                # was evicted to disk, otherwise a plain device move of the still-resident weights.
+                if streaming and _is_evicted(layer):
+                    materialize_fn(
+                        layer, self.__train_device, train_dtype, self.__disk_layer_key_prefixes[layer_index])
+                    if disk_bar is not None:
+                        disk_bar.update(1)
+                else:
+                    layer.to(self.__train_device)
+
+            def copy_into_gpu_ring(layer, layer_index):
+                # copy the layer's weights into its GPU ring cache slot and mark it train-device resident
+                allocator = self.__train_device_layer_allocator.get_allocator(layer_index, allocate_forward=True)
+                for module in layer.modules():
+                    offload_quantized(module, self.__train_device, place=allocator.place)
+                self.__layer_device_map[layer_index] = self.__train_device
+
             for layer_index, layer in enumerate(self.__layers):
-                if self.__layer_device_map[layer_index] is None:
-                    log(f"layer {layer_index} to train device")
-                    if streaming and _is_evicted(layer):
-                        # cold materialize from the checkpoint: stream+quantize this layer onto the train device
-                        # (per tensor, quantized inline). The offload_quantized below then copies it into its
-                        # static cache slot -- GPU cache for a loaded layer, pinned CPU cache for an offloaded one.
-                        materialize_fn(
-                            layer, self.__train_device, train_dtype,
-                            self.__disk_layer_key_prefixes[layer_index])
-                        if disk_bar is not None:
-                            disk_bar.update(1)
+                if self.__layer_device_map[layer_index] is not None:
+                    continue
+                log(f"layer {layer_index} to train device")
+
+                if self.__simplex_active:
+                    if not already_filled:
+                        # first materialize: bring the layer in, then copy each weight into its permanent slot in
+                        # the full-model CPU buffer -- a GPU->CPU copy that runs exactly once for the model's life.
+                        bring_to_train_device(layer, layer_index)
+                        for module in layer.modules():
+                            for tensor in get_offload_tensors(module):
+                                tensor.data = self.__temp_device_layer_allocator.fill(tensor)
                     else:
-                        layer.to(self.__train_device)
+                        # re-activate: the weights still live in the permanent CPU buffer; the evict only freed the
+                        # GPU ring their .data viewed, so re-point each weight at its surviving slot -- no copy, no
+                        # stream.
+                        for module in layer.modules():
+                            for tensor in get_offload_tensors(module):
+                                tensor.data = self.__temp_device_layer_allocator.slot_for(tensor)
 
                     if layer_index in self.__offload_strategy.initial_loaded_layers:
-                        allocator = self.__train_device_layer_allocator.get_allocator(
-                            layer_index, allocate_forward=True)
-                        for module in layer.modules():
-                            offload_quantized(module, self.__train_device, allocator=allocator.allocate_like)
-                        self.__layer_device_map[layer_index] = self.__train_device
+                        # dual residency: also copy the CPU slot into the GPU ring; the CPU slot stays filled but
+                        # dormant until this layer is offloaded again.
+                        copy_into_gpu_ring(layer, layer_index)
                     else:
+                        self.__layer_device_map[layer_index] = self.__temp_device
+                else:
+                    bring_to_train_device(layer, layer_index)
+                    if layer_index in self.__offload_strategy.initial_loaded_layers:
+                        copy_into_gpu_ring(layer, layer_index)
+                    else:
+                        # copy into the pinned CPU cache slot for an offloaded layer
                         allocator = self.__temp_device_layer_allocator.get_allocator(layer_index, allocate_forward=True)
                         for module in layer.modules():
-                            offload_quantized(module, self.__temp_device, allocator=allocator.allocate_like)
+                            offload_quantized(module, self.__temp_device, place=allocator.place)
                         self.__layer_device_map[layer_index] = self.__temp_device
 
-                    if self.__async_transfer:
-                        event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
-                        self.__layer_train_event_map[layer_index] = event
+                if self.__async_transfer:
+                    event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
+                    self.__layer_train_event_map[layer_index] = event
 
             if disk_bar is not None:
                 disk_bar.close()
@@ -944,8 +1094,8 @@ class LayerOffloadConductor:
         for layer_index in range(len(self.__layers)):
             self.__layer_device_map[layer_index] = None
         self.__disk_remainder_materialized = False
-        self.__train_device_layer_allocator.deallocate_cache()
-        self.__temp_device_layer_allocator.deallocate_cache()
+        self.__train_device_layer_allocator.free()
+        self.__temp_device_layer_allocator.free()
         self.__temp_device_activations_allocator.deallocate_cache()
         self.__materialized = False
 
@@ -982,14 +1132,14 @@ class LayerOffloadConductor:
         # excluded -- they own their static cache slots -- matching __module_to_device_except_layers' scope.
         pool = self.__train_device_layer_allocator.mem_pool
 
-        def pool_clone(tensor):
+        def pool_clone(tensor, non_blocking=False):
             with mem_pool_context(pool):
                 return tensor.clone()
 
         layer_modules = {module for layer in self.__layers for module in layer.modules()}
         for module in self.__module.modules():
             if module not in layer_modules and is_quantized_module(module):
-                offload_quantized(module, self.__train_device, allocator=pool_clone)
+                offload_quantized(module, self.__train_device, place=pool_clone)
 
     def __clear_activations(self):
         self.__activations_map.clear()
@@ -1047,7 +1197,7 @@ class LayerOffloadConductor:
             else self.__temp_device_layer_allocator
         allocator = layer_allocator.get_allocator(layer_index, is_forward)
 
-        allocator_fn = allocator.allocate_like if allocator is not None else None
+        place_fn = allocator.place if allocator is not None else None
 
         if not is_forward and device_equals(device, self.__temp_device):
             layer = self.__layers[layer_index]
@@ -1072,7 +1222,7 @@ class LayerOffloadConductor:
             self.__wait_layer_train(layer_index)
             layer = self.__layers[layer_index]
             for module in layer.modules():
-                offload_quantized(module, device, non_blocking=self.__async_transfer, allocator=allocator_fn)
+                offload_quantized(module, device, non_blocking=self.__async_transfer, place=place_fn)
 
             layer_deallocator.deallocate_layer(layer_index, deallocate_forward=is_forward)
 
