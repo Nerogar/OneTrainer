@@ -595,15 +595,19 @@ class OFTModule(PeftBase):
     oft_block_size: int
     block_share: bool
     oft_scaled: bool
+    oft_clipped_norm: float | None
+    oft_cans: bool
     dropout_probability: float
     adjustment_info: tuple[int, int] | None # for reporting
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, block_share: bool, oft_scaled: bool, **kwargs):
+    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, block_share: bool, oft_scaled: bool, oft_clipped_norm: float | None, oft_cans: bool, **kwargs):
         super().__init__(prefix, orig_module)
         self.oft_block_size = oft_block_size
         self.rank = 0
         self.block_share = block_share
         self.oft_scaled = oft_scaled
+        self.oft_clipped_norm = oft_clipped_norm
+        self.oft_cans = oft_cans
         self.dropout_probability = kwargs.pop('dropout_probability', 0.0)
         self.oft_R = None
         self.adjustment_info = None
@@ -673,6 +677,8 @@ class OFTModule(PeftBase):
             use_cayley_neumann=True,
             num_cayley_neumann_terms=5,
             dropout_probability=self.dropout_probability,
+            oft_clipped_norm=self.oft_clipped_norm,
+            oft_cans=self.oft_cans,
         )
 
         nn.init.zeros_(self.oft_R.weight)
@@ -690,7 +696,7 @@ class OFTModule(PeftBase):
 
         # For Conv2d, we must rotate the weights, not the input, to preserve spatial information.
         orth_rotate = self.oft_R._cayley_batch(
-            effective_weight, self.oft_R.block_size, self.oft_R.use_cayley_neumann, self.oft_R.num_cayley_neumann_terms
+            effective_weight, self.oft_R.block_size, self.oft_R.use_cayley_neumann, self.oft_R.num_cayley_neumann_terms, self.oft_R.oft_cans
         )
         orth_rotate = self.oft_R.dropout(orth_rotate)
 
@@ -721,6 +727,60 @@ class OFTModule(PeftBase):
     def dropout(self):
         return self.oft_R.dropout
 
+class DoRAOFTModule(OFTModule):
+    """
+    DoRA applied to OFT.
+    Since OFT (Orthogonal Finetuning) applies a rotation R such that W_new = W_orig @ R^T,
+    and R is orthogonal, the norm of the weight rows (output features) is preserved.
+    ||W_new|| = ||W_orig||.
+    """
+    dora_log_multiplier: nn.Parameter | None
+
+    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, block_share: bool, oft_scaled: bool, oft_clipped_norm: float | None, oft_cans: bool, **kwargs):
+        self.dora_log_multiplier = None
+        super().__init__(prefix, orig_module, oft_block_size, block_share, oft_scaled, oft_clipped_norm, oft_cans, **kwargs)
+
+    def initialize_weights(self):
+        super().initialize_weights()
+
+        # Calculate multiplier shape
+        multiplier_shape = (self.orig_module.weight.shape[0],)
+
+        # Initialize dora_log_multiplier to 0.0 (exp(0) = 1.0 multiplier)
+        self.dora_log_multiplier = nn.Parameter(
+            torch.zeros(
+                multiplier_shape,
+                device=self.orig_module.weight.device
+            )
+        )
+
+    def check_initialized(self):
+        super().check_initialized()
+        assert self.dora_log_multiplier is not None
+
+    def forward(self, x, *args, **kwargs):
+        # Get the standard OFT output
+        # result = W_orig @ R^T @ x + bias
+        result = super().forward(x, *args, **kwargs)
+
+        # Apply Exponential DoRA Scale (exp(0) = Multiplies by 1.0 at step 0)
+        multiplier = torch.exp(self.dora_log_multiplier).to(result.dtype)
+        if isinstance(self.orig_module, nn.Conv2d):
+            multiplier = multiplier.view(1, -1, 1, 1)
+
+        bias = self.orig_module.bias
+        if bias is not None:
+            bias_view = bias.view(1, -1, 1, 1) if isinstance(self.orig_module, nn.Conv2d) else bias
+
+            # This equivalent to (result - bias) * m + bias, but
+            # eliminates VRAM overhead by calculating the bias shift on the tiny bias tensor.
+            # y_{dora} = y * m + b * (1 - m)
+            bias_term = bias_view * (1.0 - multiplier)
+            result = result * multiplier + bias_term
+        else:
+            result = result * multiplier
+
+        return result
 
 class DoRAModule(LoRAModule):
     """Weight-decomposed low rank adaptation.
@@ -823,6 +883,7 @@ DummyLoRAModule = LoRAModule.make_dummy()
 DummyDoRAModule = DoRAModule.make_dummy()
 DummyLoHaModule = LoHaModule.make_dummy()
 DummyOFTModule = OFTModule.make_dummy()
+DummyDoRAOFTModule = DoRAOFTModule.make_dummy()
 DummyLoKrModule = LoKrModule.make_dummy()
 
 
@@ -849,6 +910,7 @@ class LoRAModuleWrapper:
         self.peft_type = config.peft_type
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
+        dora_oft = config.dora_oft
         self.lokr_dim = config.lokr_dim
         # per-model qkv fusion groups (group_pattern, [leaf_suffixes], fused_suffix, original_suffix).
         self.fusion_spec = fusion_spec
@@ -888,12 +950,19 @@ class LoRAModuleWrapper:
             self.additional_args = [self.rank, self.alpha]
             self.additional_kwargs = {}
         elif self.peft_type == PeftType.OFT_2:
-            self.klass = OFTModule
-            self.dummy_klass = DummyOFTModule
+            if dora_oft:
+                 self.klass = DoRAOFTModule
+                 self.dummy_klass = DummyDoRAOFTModule
+            else:
+                 self.klass = OFTModule
+                 self.dummy_klass = DummyOFTModule
+
             self.additional_args = [
                 config.oft_block_size,
                 config.oft_block_share,
                 config.oft_scaled,
+                config.oft_clipped_norm,
+                config.oft_cans,
             ]
             self.additional_kwargs = {
                 'dropout_probability': config.dropout_probability,

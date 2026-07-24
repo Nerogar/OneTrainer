@@ -30,6 +30,7 @@ from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.PrefetchIterator import PrefetchIterator
 from modules.util.profiling_util import PeakMemoryRecorder, TorchMemoryRecorder, TorchProfiler
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
@@ -85,7 +86,7 @@ class GenericTrainer(BaseTrainer):
         if multi.is_master():
             self.__save_config_to_workspace()
 
-            if self.config.clear_cache_before_training and self.config.latent_caching:
+            if self.config.clear_cache_before_training and (self.config.image_caching or self.config.text_caching):
                 self.__clear_cache()
 
         if self.config.train_dtype.enable_tf():
@@ -644,7 +645,7 @@ class GenericTrainer(BaseTrainer):
 
             #call start_next_epoch with only one process at first, because it might write to the cache. All subsequent processes can read in parallel:
             for _ in multi.master_first():
-                if self.config.latent_caching:
+                if self.config.image_caching or self.config.text_caching:
                     self.data_loader.get_data_set().start_next_epoch()
                     self.model_setup.setup_train_device(self.model, self.config)
                 else:
@@ -680,11 +681,12 @@ class GenericTrainer(BaseTrainer):
 
             current_epoch_length = self.data_loader.get_data_set().approximate_length()
 
+            batches = self.data_loader.get_data_loader()
+            if self.config.prefetch_next_batch:
+                batches = PrefetchIterator(batches)
             if multi.is_master():
-                batches = step_tqdm = tqdm(self.data_loader.get_data_loader(), desc="step", total=current_epoch_length,
+                batches = step_tqdm = tqdm(batches, desc="step", total=current_epoch_length,
                                  initial=train_progress.epoch_step)
-            else:
-                batches = self.data_loader.get_data_loader()
             for batch in batches:
                 multi.sync_commands(self.commands)
                 if self.commands.get_stop_command():

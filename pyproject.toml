@@ -51,7 +51,7 @@ dependencies = [
     "schedulefree==1.4.1",
     "pytorch-optimizer==3.6.0",
     "prodigy-plus-schedule-free==2.0.1",
-    "adv-optm==2.2.3",
+    "adv-optm==2.5.12",
     "muon-optimizer @ git+https://github.com/KellerJordan/Muon.git@f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd",
 
     # profiling

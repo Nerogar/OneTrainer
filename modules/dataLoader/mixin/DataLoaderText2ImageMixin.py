@@ -301,7 +301,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
         )
 
         world_size = multi.world_size() if config.multi_gpu else 1  #world_size can be 1 for validation dataloader, even if multi.world_size() returns > 1
-        if config.latent_caching:
+        if config.image_caching:
             batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size * world_size)
             distributed_sampler = DistributedSampler(names=sort_names, world_size=world_size, rank=multi.rank())
         else:
@@ -358,15 +358,15 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
 
         modules = []
 
-        if config.latent_caching:
+        if config.image_caching:
             modules.append(image_disk_cache)
 
             sort_names = [x for x in sort_names if x not in image_aggregate_names]
             sort_names = [x for x in sort_names if x not in image_split_names]
 
-            if text_caching:
-                modules.append(text_disk_cache)
-                sort_names = [x for x in sort_names if x not in text_split_names]
+        if text_caching:
+            modules.append(text_disk_cache)
+            sort_names = [x for x in sort_names if x not in text_split_names]
 
         if len(sort_names) > 0:
             variation_sorting = VariationSorting(names=sort_names, balancing_in_name='concept.balancing', balancing_strategy_in_name='concept.balancing_strategy',

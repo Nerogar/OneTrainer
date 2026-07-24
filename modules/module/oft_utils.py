@@ -47,7 +47,9 @@ class OFTRotationModule(nn.Module):
         oft_scaled=False,
         use_cayley_neumann=True,
         num_cayley_neumann_terms=5,
+        oft_cans=False,
         dropout_probability=0.0,
+        oft_clipped_norm: float | None = 0.95,
     ):
         super().__init__()
         self.r = r
@@ -62,14 +64,30 @@ class OFTRotationModule(nn.Module):
             # allowing inference tools to automatically detect scaled oft.
             self.register_buffer("scaled_oft", torch.tensor(True))
         self.oft_scaled = oft_scaled
-        self.use_cayley_neumann = use_cayley_neumann
+        self.use_cayley_neumann = use_cayley_neumann and not oft_cans
         self.num_cayley_neumann_terms = num_cayley_neumann_terms
+        self.oft_cans = oft_cans
+        if oft_cans:
+            self.register_buffer("cans_oft", torch.tensor(True))
         # Create indices for upper triangle (excluding diagonal)
         rows, cols = torch.triu_indices(block_size, block_size, 1)
         self.register_buffer("rows", rows, persistent=False)
         self.register_buffer("cols", cols, persistent=False)
         self.dropout = MultiplicativeDropoutLayer(p=dropout_probability)
+        self.oft_clipped_norm = oft_clipped_norm
+        if oft_clipped_norm is not None:
+            self.register_buffer("clipped_oft", torch.tensor(self.oft_clipped_norm))
+            # Initialize states for Spectral Normalization via Power Iteration
+            u = torch.randn(r, block_size)
+            u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            self.register_buffer("u_state", u, persistent=False)
+            v = torch.randn(r, block_size)
+            v = v / v.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            self.register_buffer("v_state", v, persistent=False)
 
+        if not self.use_cayley_neumann:
+            id_mat = (torch.eye(block_size).unsqueeze(0).expand(r, block_size, block_size))
+            self.register_buffer("id_mat", id_mat, persistent=False)
 
     def _pytorch_skew_symmetric(self, vec, block_size):
         batch_size = vec.shape[0]
@@ -88,8 +106,76 @@ class OFTRotationModule(nn.Module):
         vec = matrix[:, self.rows, self.cols]
         return vec
 
+    @torch.no_grad()
+    def _spectral_norm(self, Q_skew):
+        u = self.u_state.unsqueeze(-1).to(Q_skew.dtype)
+        v = self.v_state.unsqueeze(-1).to(Q_skew.dtype)
+        # Update v (Right Singular Vector)
+        v_raw = torch.bmm(Q_skew.mT, u)
+        v_norm = torch.linalg.vector_norm(v_raw, dim=1, keepdim=True)
+        candidate_v = v_raw / v_norm.clamp_min(1e-8)
+        next_v = torch.where(v_norm >= 1e-6, candidate_v, v)
+        # Update u (Left Singular Vector)
+        u_raw = torch.bmm(Q_skew, next_v)
+        u_norm = torch.linalg.vector_norm(u_raw, dim=1, keepdim=True)
+        candidate_u = u_raw / u_norm.clamp_min(1e-8)
+        next_u = torch.where(u_norm >= 1e-6, candidate_u, u)
+        if self.training:
+            self.v_state.copy_(next_v.squeeze(-1))
+            self.u_state.copy_(next_u.squeeze(-1))
+        return next_v, next_u
+
+    def _cans_newton_schulz_iteration(
+        self,
+        G: torch.Tensor,
+        steps: int = 7,
+        eps: float = 1e-7,
+    ) -> torch.Tensor:
+        """
+        Chebyshev-Optimized Newton-Schulz iteration with a dynamically computed Chebyshev lower bound.
+        Optimized for G = I + Q (where Q is skew-symmetric).
+        """
+        original_dtype = G.dtype
+        X = G
+
+        # Max row sum is guaranteed to be >= the maximum singular value of X.
+        g_norm = X.abs().sum(dim=-1, keepdim=True).amax(dim=-2, keepdim=True).clamp_min(eps).detach()
+        X = X / g_norm
+
+        # Since min_singular_value(I + Q) >= 1, the min_singular_value of normalized X
+        # is guaranteed to be >= 1 / ||G||_F.
+        lower_bound = (1.0 / g_norm)
+        upper_bound = 1
+
+        for _ in range(steps):
+            lb, ub = lower_bound, upper_bound
+            lb_ub = lb * ub
+            e_sq = (lb**2 + lb_ub + ub**2) / 3.0
+            K = 2.0 * e_sq**1.5
+            L = lb_ub * (lb + ub)
+            denom = K + L
+            alpha = 6.0 / denom
+            c1 = alpha * e_sq
+            c3 = -alpha / 3.0
+
+            A = torch.bmm(X, X.mT)
+            X = c1 * X + c3 * torch.bmm(A, X)
+
+            # Dynamically update bounds for the next step
+            eps_val = (K - L) / denom
+
+            # bmm acts as an opaque boundary, forcing Inductor to
+            # materialize eps_val and severing the exponential AST tree.
+            # Shape is (B, 1, 1), so ones_like acts as an identity.
+            eps_val = torch.bmm(eps_val, torch.ones_like(eps_val))
+
+            lower_bound = 1 - eps_val
+            upper_bound = 1 + eps_val
+
+        return X.to(original_dtype)
+
     def _cayley_batch(
-        self, Q: torch.Tensor, block_size: int, use_cayley_neumann: bool = True, num_neumann_terms: int = 5
+        self, Q: torch.Tensor, block_size: int, use_cayley_neumann: bool = True, num_neumann_terms: int = 5, oft_cans: bool = False,
     ) -> torch.Tensor:
         """
         Perform the Cayley parametrization on a batch of skew-symmetric matrices.
@@ -98,6 +184,16 @@ class OFTRotationModule(nn.Module):
         previous_dtype = Q.dtype
 
         Q_skew = self._pytorch_skew_symmetric(Q, block_size)
+
+        if self.oft_clipped_norm is not None:
+            # The Neumann series only converges if the spectral norm ||Q||_2 < 1.
+            # We estimate the spectral norm using a single step of Power Iteration.
+            v_norm, u_norm = self._spectral_norm(Q_skew)
+            # Estimate sigma (The spectral norm)
+            u_raw_grad = torch.bmm(Q_skew, v_norm)
+            sigma = torch.sum(u_norm * u_raw_grad, dim=1, keepdim=True)
+            max_norm = self.oft_clipped_norm
+            Q_skew = Q_skew * (max_norm / torch.clamp(sigma, min=max_norm))
 
         if use_cayley_neumann:
             R = torch.eye(block_size, device=Q.device, dtype=Q.dtype).repeat(b, 1, 1)
@@ -113,13 +209,17 @@ class OFTRotationModule(nn.Module):
                         R.add_(Q_power, alpha=2.0)
                     Q_power = torch.bmm(Q_power, Q_skew)
                     R.add_(Q_power)
+        elif oft_cans:
+            # Compute G = (I + Q)^2 = I + 2Q + Q^2
+            # Squaring the matrix doubles the rotation range and matches Cayley (I + 2Q).
+            Q_squared = torch.bmm(Q_skew, Q_skew)
+            G = self.id_mat + 2 * Q_skew + Q_squared
+            # Empirically, BF16 requires 5 steps to converge to ortho error ~1e-2 (its limit)
+            # While FP32 takes 7 steps to converge to ortho error ~1e-6
+            steps = 5 if G.dtype == torch.bfloat16 else 7
+            R = self._cans_newton_schulz_iteration(G=G, steps=steps)
         else:
-            id_mat = (
-                torch.eye(Q_skew.shape[-1], device=Q_skew.device)
-                .unsqueeze(0)
-                .expand(b, Q_skew.shape[-1], Q_skew.shape[-1])
-            )
-            R = torch.linalg.solve(id_mat + Q_skew, id_mat - Q_skew, left=False)
+            R = torch.linalg.solve(self.id_mat + Q_skew, self.id_mat - Q_skew, left=False)
 
         return R.to(previous_dtype)
 
@@ -134,7 +234,7 @@ class OFTRotationModule(nn.Module):
         effective_weight = self.weight / scaling_factor
 
         orth_rotate = self._cayley_batch(
-            effective_weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms
+            effective_weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms, self.oft_cans
         )
         orth_rotate = self.dropout(orth_rotate)
 

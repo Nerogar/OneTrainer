@@ -62,7 +62,7 @@ class Krea2BaseDataLoader(
         if not config.train_text_encoder_or_embedding():
             modules.append(encode_prompt)
 
-        if config.latent_caching and not config.train_text_encoder_or_embedding():
+        if config.text_caching and not config.train_text_encoder_or_embedding():
             modules.append(prune_masked_tokens)
 
         return modules
@@ -92,7 +92,7 @@ class Krea2BaseDataLoader(
             text_split_names=text_split_names,
             sort_names=sort_names,
             config=config,
-            text_caching=not config.train_text_encoder_or_embedding(),
+            text_caching=config.text_caching and not config.train_text_encoder_or_embedding(),
         )
 
     def _output_modules(self, config: TrainConfig, model: Krea2Model, model_setup: BaseKrea2Setup):
@@ -122,7 +122,7 @@ class Krea2BaseDataLoader(
             train_dtype=model.train_dtype,
         )
 
-        if config.latent_caching and not config.train_text_encoder_or_embedding():
+        if config.text_caching and not config.train_text_encoder_or_embedding():
             output_module_list = [pad_masked_tokens] + output_module_list
 
         return output_module_list
