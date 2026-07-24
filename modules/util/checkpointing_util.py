@@ -259,7 +259,11 @@ def enable_checkpointing(
     # a conductor exists iff this part actually offloads: the user enabled it (part.offloading_enabled()) and the
     # architecture can be driven by the conductor (supports_offloading).
     offload = supports_offloading and part.offloading_enabled()
-    conductor = LayerOffloadConductor(model, config, part) if offload else None
+    # the full-model-buffer offload (simplex) needs a never-changing base (part not trained in place), a disk-streamed
+    # part, and cache_in_ram to keep it resident. Compute the full condition here rather than passing a value the
+    # conductor would only AND away.
+    simplex = not config.part_trained_in_place(part) and config.stream_from_disk and part.cache_in_ram
+    conductor = LayerOffloadConductor(model, config, part, simplex=simplex) if offload else None
     checkpointing = part.checkpointing_enabled()
 
     # a trained part always has grad flowing through it, so offloading without checkpointing is guaranteed to hit
