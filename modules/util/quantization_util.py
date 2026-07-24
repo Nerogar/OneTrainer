@@ -174,6 +174,8 @@ def replace_linear_with_quantized_layers(
         quantization: QuantizationConfig | None = None,
         copy_parameters: bool = False,
 ):
+    from modules.module.quantized.LinearW8A8 import LinearW8A8
+
     kwargs = {}
     if dtype.quantize_nf4():
         linear_class = LinearNf4
@@ -242,6 +244,8 @@ def is_quantized_parameter(
         module: nn.Module,
         parameter_name: str,
 ) -> bool:
+    from modules.module.quantized.LinearSVD import BaseLinearSVD
+
     if isinstance(module, BaseLinearSVD):
         if parameter_name in ["svd_up", "svd_down"]:
             return True
@@ -290,6 +294,7 @@ def get_weight_shape(module: nn.Linear) -> torch.Size:
     return torch.Size((module.out_features, module.in_features))
 
 def get_offload_tensors(module: nn.Module) -> list[torch.Tensor]:
+
     tensors = []
 
     if bnb is not None:
