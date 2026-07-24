@@ -216,6 +216,9 @@ class ModelType(Enum):
         # the text encoder components, named "text_encoder"/"text_encoder_2"/... by convention (see below).
         return tuple(part for part in _MODEL_PARTS[self] if part.startswith("text_encoder"))
 
+    def trainable_parts(self) -> tuple[str, ...]:
+        return _TRAINABLE_PARTS[self]
+
     def supported_lora_formats(self) -> list[ModelFormat]:
         formats = [
             ModelFormat.DIFFUSERS_LORA,
@@ -311,6 +314,41 @@ _MODEL_PARTS: dict[ModelType, tuple[str, ...]] = {
     ModelType.Z_IMAGE: ("transformer", "text_encoder", "vae"),
     ModelType.ERNIE: ("transformer", "text_encoder", "vae"),
     ModelType.IDEOGRAM_4: ("transformer", "text_encoder", "unconditional_transformer", "vae"),
+}
+
+# subset of _MODEL_PARTS the architecture allows a run to train, for both LoRA and fine-tuning -- the parts each setup
+# routes through _setup_model_part_requires_grad. Parts omitted here (VAE everywhere; the text encoder on the newer
+# transformer models; Ideogram's unconditional_transformer; Wuerstchen's decoder stack) are architecture-frozen.
+_TRAINABLE_PARTS: dict[ModelType, tuple[str, ...]] = {
+    ModelType.STABLE_DIFFUSION_15: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_15_INPAINTING: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_20: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_20_BASE: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_20_INPAINTING: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_20_DEPTH: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_21: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_21_BASE: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_3: ("transformer", "text_encoder", "text_encoder_2", "text_encoder_3"),
+    ModelType.STABLE_DIFFUSION_35: ("transformer", "text_encoder", "text_encoder_2", "text_encoder_3"),
+    ModelType.STABLE_DIFFUSION_XL_10_BASE: ("unet", "text_encoder", "text_encoder_2"),
+    ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING: ("unet", "text_encoder", "text_encoder_2"),
+    ModelType.WUERSTCHEN_2: ("prior", "text_encoder"),
+    ModelType.STABLE_CASCADE_1: ("prior", "text_encoder"),
+    ModelType.PIXART_ALPHA: ("transformer", "text_encoder"),
+    ModelType.PIXART_SIGMA: ("transformer", "text_encoder"),
+    ModelType.FLUX_DEV_1: ("transformer", "text_encoder", "text_encoder_2"),
+    ModelType.FLUX_FILL_DEV_1: ("transformer", "text_encoder", "text_encoder_2"),
+    ModelType.FLUX_2: ("transformer",),
+    ModelType.ANIMA: ("transformer",),
+    ModelType.SANA: ("transformer", "text_encoder"),
+    ModelType.HUNYUAN_VIDEO: ("transformer", "text_encoder", "text_encoder_2"),
+    ModelType.HI_DREAM_FULL: ("transformer", "text_encoder", "text_encoder_2", "text_encoder_3", "text_encoder_4"),
+    ModelType.CHROMA_1: ("transformer", "text_encoder"),
+    ModelType.QWEN: ("transformer", "text_encoder"),
+    ModelType.KREA_2: ("transformer",),
+    ModelType.Z_IMAGE: ("transformer",),
+    ModelType.ERNIE: ("transformer",),
+    ModelType.IDEOGRAM_4: ("transformer",),
 }
 
 

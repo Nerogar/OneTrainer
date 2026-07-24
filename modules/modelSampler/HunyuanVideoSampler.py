@@ -12,7 +12,6 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
-from modules.util.torch_util import torch_gc
 
 import torch
 
@@ -69,7 +68,7 @@ class HunyuanVideoSampler(BaseModelSampler):
             num_latent_channels = 16
 
             # prepare prompt
-            self.model.text_encoder_to(self.train_device)
+            self.model.materialize_only_text_encoders()
 
             prompt_embedding, pooled_prompt_embedding, prompt_attention_mask = self.model.encode_text(
                 text=prompt,
@@ -77,9 +76,6 @@ class HunyuanVideoSampler(BaseModelSampler):
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
             )
-
-            self.model.text_encoder_to(self.temp_device)
-            torch_gc()
 
             # prepare latent image
             num_latent_frames = (num_frames - 1) // vae_temporal_scale_factor + 1
@@ -108,7 +104,7 @@ class HunyuanVideoSampler(BaseModelSampler):
             if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
                 extra_step_kwargs["generator"] = generator
 
-            self.model.transformer_to(self.train_device)
+            self.model.materialize_only("transformer")
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 latent_model_input = torch.cat([latent_image])
                 expanded_timestep = timestep.expand(latent_model_input.shape[0])
@@ -139,19 +135,13 @@ class HunyuanVideoSampler(BaseModelSampler):
 
                 on_update_progress(i + 1, len(timesteps))
 
-            self.model.transformer_to(self.temp_device)
-            torch_gc()
-
             # decode
-            self.model.vae_to(self.train_device)
+            self.model.materialize_only("vae")
 
             latents = latent_image / vae.config.scaling_factor
             image = vae.decode(latents, return_dict=False)[0]
 
             image = video_processor.postprocess(image, output_type='pt')
-
-            self.model.vae_to(self.temp_device)
-            torch_gc()
 
             is_image = image.shape[2] == 1
             if is_image:

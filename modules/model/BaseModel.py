@@ -1,4 +1,5 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
+from collections.abc import Callable
 from contextlib import nullcontext
 from uuid import uuid4
 
@@ -6,11 +7,14 @@ from modules.module.EMAModule import EMAModuleWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.convert_util import qkv_fusion
+from modules.util.disk_stream import stream_module_to
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
+from modules.util.LayerOffloadConductor import LayerOffloadConductor
 from modules.util.modelSpec.ModelSpec import ModelSpec
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
+from modules.util.torch_util import create_mem_pool, device_equals, mem_pool_context, supports_mem_pool, torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -78,6 +82,9 @@ class BaseModel(metaclass=ABCMeta):
     embedding_state_dicts: dict[str, dict[str, Tensor]] | None
     autocast_context: torch.autocast | nullcontext
     train_dtype: DataType
+    cache_in_ram: dict[str, bool]
+    offload_conductor: dict[str, LayerOffloadConductor]
+    materialize_fn: dict[str, Callable]
 
     def __init__(
             self,
@@ -85,6 +92,9 @@ class BaseModel(metaclass=ABCMeta):
     ):
         self.model_type = model_type
         self.parameters = None
+        self.cache_in_ram = {}
+        self.offload_conductor = {}
+        self.materialize_fn = {}
         self.optimizer = None
         self.optimizer_state_dict = None
         self.param_group_mapping = None
@@ -96,17 +106,116 @@ class BaseModel(metaclass=ABCMeta):
         self.autocast_context = nullcontext()
         self.train_dtype = DataType.FLOAT_32
 
-    @abstractmethod
-    def to(self, device: torch.device):
-        pass
+        self._mem_pools = {}
 
-    @abstractmethod
+    @property
+    def train_device(self) -> torch.device:
+        return torch.device(self.train_config.train_device)
+
+    @property
+    def temp_device(self) -> torch.device:
+        return torch.device(self.train_config.temp_device)
+
+    def materialize(self, *parts: str):
+        # Move `parts` onto train_device.
+        for part in parts:
+            self._move_part(part, self.train_device)
+
+    def evict(self, *parts: str):
+        # Move `parts` onto temp_device. No parts given -> every component in ModelType.model_parts().
+        for part in parts or self.model_type.model_parts():
+            self._move_part(part, self.temp_device)
+        torch_gc()
+
+    def materialize_only(self, *parts: str):
+        # Materialize exactly `parts` on train_device; evict every other component in ModelType.model_parts()
+        # to temp_device. Lets a caller state what it needs now without tracking what to evict first.
+        # Evicts before materializing, so the two sets are never resident on train_device at once.
+        # Skipped (rather than passed as evict()) when empty, since evict() with no parts means "evict all".
+        to_evict = [part for part in self.model_type.model_parts() if part not in parts]
+        if to_evict:
+            self.evict(*to_evict)
+        self.materialize(*parts)
+
+    def materialize_only_text_encoders(self):
+        # Materialize all of this model's text encoders on train_device, evicting everything else. Samplers
+        # call this before encode_text, which reads every text encoder the model has.
+        self.materialize_only(*self.model_type.text_encoder_parts())
+
+    def _move_part(self, part: str, device: torch.device):
+        # Move a component (`part`, or `part_1` for the first of several split text encoders) and its LoRA. The
+        # dispatch below routes through an offload conductor and/or a disk-stream materialize closure if present.
+        stem = f"{part}_1" if hasattr(self, f"{part}_1") else part
+
+        conductor = self.offload_conductor.get(stem)
+        materialize_fn = self.materialize_fn.get(stem)
+        cache_in_ram = self.cache_in_ram.get(stem, True)
+
+        if conductor is not None:
+            if device_equals(device, self.train_device):
+                train_dtype = getattr(self, f"{stem}_train_dtype", self.train_dtype)
+                conductor.materialize(
+                    train_dtype, name=part, materialize_fn=materialize_fn,
+                    cache_in_ram=cache_in_ram)
+            else:
+                to_meta = materialize_fn is not None and not cache_in_ram
+                conductor.evict(to_meta=to_meta)
+        elif materialize_fn is not None:
+            streamed_component = getattr(self, stem)
+            train_dtype = getattr(self, f"{stem}_train_dtype", self.train_dtype)
+            stream_module_to(
+                streamed_component, device, materialize_fn, train_dtype,
+                cache_in_ram=cache_in_ram, name=part, temp_device=self.temp_device)
+
+        # move into the shared stem pool: the base component itself (unless a conductor or stream owns its move) plus
+        # the LoRA. getattr(self, stem) is None for a part in model_parts() that was never populated (e.g. an omitted
+        # text encoder), so it drops out below.
+        to_move = []
+        if conductor is None and materialize_fn is None:
+            to_move.append(getattr(self, stem))
+        lora = getattr(self, f"{stem}_lora", None)
+        to_move.append(lora)
+        to_move = [module for module in to_move if module is not None]
+        if not to_move:
+            return
+
+        if supports_mem_pool(device):
+            # The component (when not conductor/stream-managed) and its LoRA share a per-stem MemPool so both release
+            # together on evict, keeping the LoRA's small tensors from pinning freed default-pool segments across the
+            # part's evict/reload cycle. A conductor keeps its own pool, so the stem pool then holds only the LoRA.
+            pool = self._mem_pools.get(stem)
+            if pool is None:
+                pool = self._mem_pools[stem] = create_mem_pool(device)
+            with mem_pool_context(pool):
+                for module in to_move:
+                    module.to(device=device)
+        else:
+            # the target has no MemPool (CPU): move normally and drop this stem's pool from the earlier GPU move,
+            # so evict()'s torch_gc can release its segments
+            for module in to_move:
+                module.to(device=device)
+            self._mem_pools.pop(stem, None)
+
     def eval(self):
-        pass
+        # Put every present component on eval(); driven by the same part registry as materialize()/evict().
+        # A model whose component names diverge (Wuerstchen) or that has a component outside model_parts()
+        # (SD's depth_estimator, Anima's text_conditioner) overrides this.
+        for part in self.model_type.model_parts():
+            stem = f"{part}_1" if hasattr(self, f"{part}_1") else part
+            component = getattr(self, stem)
+            if component is not None:
+                component.eval()
 
-    @abstractmethod
     def adapters(self) -> list[LoRAModuleWrapper]:
-        pass
+        # Every LoRA adapter present on a model part, in model_parts() order. Parts without a LoRA
+        # (e.g. the vae, or an untrained component) contribute nothing.
+        result = []
+        for part in self.model_type.model_parts():
+            stem = f"{part}_1" if hasattr(self, f"{part}_1") else part
+            lora = getattr(self, f"{stem}_lora", None)
+            if lora is not None:
+                result.append(lora)
+        return result
 
     def diffusers_to_original(self) -> list | None:
         # the canonical(diffusers) -> native key-conversion BODY (rename only) for this model's denoising

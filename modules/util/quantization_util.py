@@ -1,7 +1,6 @@
 from collections.abc import Callable
 from functools import partial
 
-import modules.util.multi_gpu_util as multi
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.config.TrainConfig import QuantizationConfig, TrainConfig
@@ -260,16 +259,20 @@ def is_quantized_parameter(
     return False
 
 
+def is_quantized_module(module: nn.Module) -> bool:
+    return any(is_quantized_parameter(module, name)
+               for name, _ in module.named_parameters(recurse=False))
+
+
 def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataType, config: TrainConfig):
     if module is None:
         return
     child_modules = list(module.modules())
-    for _ in multi.master_first(): #avoid cache writing conflicts
-        for child_module in tqdm(child_modules, desc="Quantizing model weights", total=len(child_modules), delay=5, smoothing=0.1):
-            if isinstance(child_module, (QuantizedModuleMixin, GGUFLinear)):
-                child_module.compute_dtype = train_dtype.torch_dtype()
-            if isinstance(child_module, QuantizedModuleMixin):
-                child_module.quantize(device=device)
+    for child_module in tqdm(child_modules, desc="Quantizing model weights", total=len(child_modules), delay=5, smoothing=0.1):
+        if isinstance(child_module, (QuantizedModuleMixin, GGUFLinear)):
+            child_module.compute_dtype = train_dtype.torch_dtype()
+        if isinstance(child_module, QuantizedModuleMixin):
+            child_module.quantize(device=device)
 
 def get_unquantized_weight(module: nn.Linear, dtype: torch.dtype, device: torch.device) -> Tensor:
     assert isinstance(module, nn.Linear)
@@ -305,6 +308,9 @@ def get_offload_tensors(module: nn.Module) -> list[torch.Tensor]:
 
 
 def get_offload_tensor_bytes(module: nn.Module) -> int:
+    if isinstance(module, QuantizedLinearMixin) and module.weight.is_meta:
+        return module.predict_offload_bytes()
+
     tensors = get_offload_tensors(module)
 
     return sum(t.element_size() * t.numel() for t in tensors)

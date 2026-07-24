@@ -3,10 +3,12 @@ from contextlib import contextmanager
 
 from modules.model.BaseModel import BaseModel
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig, TrainModelPartConfig
+from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+from modules.util.quantization_util import quantize_layers
 from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
 
@@ -47,7 +49,10 @@ class BaseModelSetup(
             model: BaseModel,
             config: TrainConfig,
     ):
-        pass
+        # Model-wide dtype/autocast, shared by every leaf. Leaves call super() first so model.train_dtype is
+        # set before their first _setup_model_part, which reads it for the non-fp16 quantize path.
+        model.train_dtype = config.train_dtype
+        model.autocast_context = create_autocast_context(self.train_device, config.train_dtype, config.enable_autocast_cache)
 
     @abstractmethod
     def setup_model(
@@ -231,11 +236,56 @@ class BaseModelSetup(
                                not self.__stop_model_part_training_elapsed(unique_name, config, train_progress)
             model.requires_grad_(train_model_part)
 
+            # a streamed part (loaded as a meta skeleton) with cache-in-ram off is dropped to meta and re-streamed from
+            # the checkpoint on every reload, so training it would discard the update. Refuse the combination early.
+            if train_model_part and not config.cache_in_ram and any(p.is_meta for p in model.parameters()):
+                raise ValueError(
+                    f"'{unique_name}' is trained with 'stream from disk' on and 'cache in ram' off -- the trained "
+                    f"weights would be re-streamed from the checkpoint and lost. Enable 'cache in ram' for this part.")
+
             #even if frozen parameters are not passed to the optimizer, required_grad has to be False.
             #otherwise, gradients accumulate in param.grad and waste vram
             if unique_name in self.frozen_parameters:
                 for param in self.frozen_parameters[unique_name]:
                     param.requires_grad_(False)
+
+    def _setup_model_part(
+            self,
+            model,
+            config: TrainConfig,
+            attr: str,
+            config_part: TrainModelPartConfig,
+            checkpointing_fn=None,
+            *,
+            disable_fp16_autocast: bool = False,
+            attention_mask: bool | None = None,
+    ):
+        module = getattr(model, attr)
+        if module is None:
+            return
+
+        materialize_fn = model.materialize_fn.get(attr)
+
+        if checkpointing_fn is not None:
+            conductor = checkpointing_fn(module, config, config_part)
+            if conductor is not None:
+                model.offload_conductor[attr] = conductor
+
+        if disable_fp16_autocast:
+            autocast_context, train_dtype = disable_fp16_autocast_context(
+                self.train_device, config.train_dtype, config.fallback_train_dtype, config.enable_autocast_cache)
+            setattr(model, f"{attr}_autocast_context", autocast_context)
+            setattr(model, f"{attr}_train_dtype", train_dtype)
+        else:
+            train_dtype = model.train_dtype
+
+        # a streamed module (materialize_fn set) stays on meta until materialized and is quantized per-materialize,
+        # so there is nothing to quantize here; a non-streamed module is quantized now.
+        if materialize_fn is None:
+            quantize_layers(module, self.train_device, train_dtype, config)
+
+        if attention_mask is not None:
+            self._set_attention_backend(module, config.attention_mechanism, mask=attention_mask)
 
     @staticmethod
     def _set_attention_backend(component, attn: AttentionMechanism, mask: bool):

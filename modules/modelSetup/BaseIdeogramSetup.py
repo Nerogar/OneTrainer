@@ -14,9 +14,6 @@ from modules.util.checkpointing_util import (
     enable_checkpointing_for_qwen3vl_encoder_layers,
 )
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
-from modules.util.quantization_util import quantize_layers
-from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -44,37 +41,13 @@ class BaseIdeogramSetup(
             model: IdeogramModel,
             config: TrainConfig,
     ):
-        # Only the conditional transformer is trained, so gradient checkpointing applies there.
-        model.transformer_offload_conductor = \
-            enable_checkpointing_for_ideogram_transformer(model.transformer, config, config.transformer)
-
-        # The unconditional transformer is frozen, but it still benefits from layer offloading
-        # since both transformers need to fit in VRAM during sampling. It is optional, so may be unloaded.
-        if model.unconditional_transformer is not None:
-            model.unconditional_transformer_offload_conductor = \
-                enable_checkpointing_for_ideogram_transformer(model.unconditional_transformer, config, config.unconditional_transformer)
-
-        model.text_encoder_offload_conductor = enable_checkpointing_for_qwen3vl_encoder_layers(model.text_encoder, config, config.text_encoder)
-
-        model.autocast_context, model.train_dtype = create_autocast_context(
-            self.train_device, config.train_dtype, config.enable_autocast_cache)
-
-        model.text_encoder_autocast_context, model.text_encoder_train_dtype = \
-            disable_fp16_autocast_context(
-                self.train_device,
-                config.train_dtype,
-                config.fallback_train_dtype,
-                config.enable_autocast_cache,
-            )
-
-        quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype, config)
-        quantize_layers(model.vae, self.train_device, model.train_dtype, config)
-        quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
-        quantize_layers(model.unconditional_transformer, self.train_device, model.train_dtype, config)
-
-        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=False)
-        if model.unconditional_transformer is not None:
-            self._set_attention_backend(model.unconditional_transformer, config.attention_mechanism, mask=False)
+        super().setup_optimizations(model, config)
+        # The unconditional transformer is frozen but still layer-offloaded so both transformers fit in VRAM
+        # during sampling; it is optional, so _setup_model_part skips it when unloaded.
+        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_ideogram_transformer, attention_mask=False)
+        self._setup_model_part(model, config, "unconditional_transformer", config.unconditional_transformer, enable_checkpointing_for_ideogram_transformer, attention_mask=False)
+        self._setup_model_part(model, config, "text_encoder", config.text_encoder, enable_checkpointing_for_qwen3vl_encoder_layers, disable_fp16_autocast=True)
+        self._setup_model_part(model, config, "vae", config.vae)
 
     def predict(
             self,
@@ -204,7 +177,5 @@ class BaseIdeogramSetup(
         ).mean()
 
     def prepare_text_caching(self, model: IdeogramModel, config: TrainConfig):
-        model.to(self.temp_device)
-        model.text_encoder_to(self.train_device)
+        model.materialize_only("text_encoder")
         model.eval()
-        torch_gc()
