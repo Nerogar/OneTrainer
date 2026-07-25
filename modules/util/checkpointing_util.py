@@ -6,7 +6,6 @@ from typing import Any
 from modules.util.compile_util import init_compile
 from modules.util.config.TrainConfig import TrainConfig, TrainModelPartConfig
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
-from modules.util.torch_util import add_dummy_grad_fn_, has_grad_fn
 
 import torch
 from torch import nn
@@ -45,6 +44,13 @@ def _kwargs_to_args(fun: Callable, args: tuple[Any, ...], kwargs: dict[str, Any]
     return tuple(parameters)
 
 
+def _view_key(tensor: torch.Tensor) -> tuple:
+    # Identifies a tensor by the memory it reads: first-element address, extents, steps, element type.
+    # Two tensors agreeing on all four are the same view of the same data, since live storages cannot
+    # overlap. Used instead of identity because autograd hands back aliases, not the original objects.
+    return tensor.data_ptr(), tensor.shape, tensor.stride(), tensor.dtype
+
+
 def __get_args_indices(fun: Callable, arg_names: list[str]) -> list[int]:
     signature = dict(inspect.signature(fun).parameters)
     indices = []
@@ -56,22 +62,13 @@ def __get_args_indices(fun: Callable, arg_names: list[str]) -> list[int]:
     return indices
 
 
-__current_call_index = 0
-
-
-def _generate_call_index() -> int:
-    global __current_call_index
-    __current_call_index += 1
-    return __current_call_index
-
-
 class BaseCheckpointLayer(torch.nn.Module):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
 
 class CheckpointLayer(BaseCheckpointLayer):
-    def __init__(self, orig_module: nn.Module, orig_forward, train_device: torch.device, checkpointing: bool = True):
+    def __init__(self, orig_module: nn.Module, orig_forward, checkpointing: bool = True):
         super().__init__()
 
         assert (orig_module is None or orig_forward is None) and not (orig_module is None and orig_forward is None)
@@ -79,20 +76,13 @@ class CheckpointLayer(BaseCheckpointLayer):
         self.orig_forward = orig_forward
         self.checkpointing = checkpointing
 
-        # dummy tensor that requires grad is needed for checkpointing to work when training a LoRA
-        self.dummy = torch.zeros((1,), device=train_device, requires_grad=True)
-
     def __orig(self, *args, **kwargs):
         return self.orig_forward(*args, **kwargs) if self.checkpoint is None else self.checkpoint(*args, **kwargs)
-
-    def __checkpointing_forward(self, dummy: torch.Tensor, *args, **kwargs):
-        return self.__orig(*args, **kwargs)
 
     def forward(self, *args, **kwargs):
         if self.checkpointing and torch.is_grad_enabled():
             return torch.utils.checkpoint.checkpoint(
-                self.__checkpointing_forward,
-                self.dummy,
+                self.__orig,
                 *args,
                 **kwargs,
                 use_reentrant=False
@@ -100,18 +90,80 @@ class CheckpointLayer(BaseCheckpointLayer):
         else:
             return self.__orig(*args, **kwargs)
 
-class OffloadCheckpointLayer(BaseCheckpointLayer):
-    def __init__(self, orig_module: nn.Module, orig_forward, train_device: torch.device, conductor: LayerOffloadConductor, layer_index: int, checkpointing: bool):
+
+class LoadBoundary(torch.autograd.Function):
+    # Identity op on a block's grad-carrying INPUT tensors, driving the conductor only: forward calls
+    # before_layer, backward calls after_layer. Sitting on the input makes its backward fire LAST in
+    # the block's backward.
+    @staticmethod
+    def forward(ctx, conductor, layer_index, *tensors):
+        ctx.conductor = conductor
+        ctx.layer_index = layer_index
+        conductor.before_layer(layer_index, is_forward=True)
+        return tensors
+    @staticmethod
+    def backward(ctx, *grads):
+        # calling after_layer here, rather than after the forward, makes the train event cover the block's
+        # backward kernels, so this layer's offload transfer cannot overlap them.
+        ctx.conductor.after_layer(ctx.layer_index, list(grads))
+        return (None, None, *grads)
+
+
+class EvictBoundary(torch.autograd.Function):
+    # Identity op on a block's grad-carrying OUTPUT tensors: forward calls after_layer, backward calls
+    # before_layer. Sitting on the output makes its backward fire FIRST - before the checkpoint
+    # rematerializes the block, so the weights are in by then.
+    @staticmethod
+    def forward(ctx, conductor, layer_index, *tensors):
+        ctx.conductor = conductor
+        ctx.layer_index = layer_index
+        conductor.after_layer(layer_index, list(tensors))
+        return tensors
+    @staticmethod
+    def backward(ctx, *grads):
+        # workaround for https://github.com/pytorch/pytorch/issues/186537. This is the block's first
+        # backward node, and it runs on the autograd worker thread - which is where AOTAutograd
+        # compiles the backward graph, and which does not inherit the main thread's dynamo config.
+        init_compile()
+        ctx.conductor.before_layer(ctx.layer_index, is_forward=False)
+        ctx.conductor.prefetch_activations(ctx.layer_index - 1)
+        return (None, None, *grads)
+
+
+def _apply_boundary(boundary, conductor, layer_index, values: tuple) -> tuple:
+    # Wrap all grad-requiring tensors in `values` in a single boundary Function, so its backward fires
+    # exactly once around the checkpoint's recompute and no gradient can reach the checkpoint without
+    # crossing the boundary. Non-tensor and grad-free entries pass through untouched.
+    indices = [i for i, v in enumerate(values) if isinstance(v, torch.Tensor) and v.requires_grad]
+    if not indices:
+        return values
+    wrapped = boundary.apply(conductor, layer_index, *(values[i] for i in indices))
+    values = list(values)
+    for j, i in enumerate(indices):
+        values[i] = wrapped[j]
+    return tuple(values)
+
+
+class BoundaryOffloadCheckpointLayer(BaseCheckpointLayer):
+    # Weight movement driven by the LoadBoundary / EvictBoundary autograd Functions, which run eagerly
+    # outside the compiled region. The block's forward and backward each stay a single traced graph, which
+    # is what makes this path compatible with torch.compile's cudagraph trees. Activation offloading, when
+    # enabled, rides on saved_tensors_hooks around the block.
+    def __init__(self, orig_module: nn.Module, orig_forward, conductor: LayerOffloadConductor, layer_index: int, checkpointing: bool, included_offload_param_indices: list[int], compile: bool):
         super().__init__()
 
         assert (orig_module is None or orig_forward is None) and not (orig_module is None and orig_forward is None)
         self.checkpoint = orig_module
         self.orig_forward = orig_forward
-
-        self.dummy = torch.zeros((1,), device=train_device, requires_grad=True)
         self.conductor = conductor
         self.layer_index = layer_index
         self.checkpointing = checkpointing
+        self.included_offload_param_indices = included_offload_param_indices
+        # compile the block together with its checkpoint, not the bare block: dynamo then traces the
+        # checkpoint as a higher-order op and the min-cut partitioner prunes the recompute to what the
+        # backward needs. With the checkpoint outside the compiled region the backward re-runs the whole
+        # block. Traceable at all only because no conductor call happens in here.
+        self.run_block = torch.compile(self.__checkpointed_block, fullgraph=True) if compile else self.__checkpointed_block
 
     def __deepcopy__(self, memo):
         # conductor holds torch.cuda.Stream/Event objects that cannot be deep-copied or pickled.
@@ -120,57 +172,71 @@ class OffloadCheckpointLayer(BaseCheckpointLayer):
         cls = self.__class__
         result = cls.__new__(cls)
         memo[id(self)] = result
+        # run_block is shared for the same reason as conductor: it closes over this instance, and
+        # deepcopy is only used at save time where it is never invoked.
         for key, value in self.__dict__.items():
-            result.__dict__[key] = value if key == "conductor" else copy.deepcopy(value, memo)
+            result.__dict__[key] = value if key in ("conductor", "run_block") else copy.deepcopy(value, memo)
         return result
 
-    def __checkpointing_forward(self, dummy: torch.Tensor, call_id: int, *args):
-        init_compile()  # workaround for https://github.com/pytorch/pytorch/issues/186537
-        if self.layer_index == 0 and not torch.is_grad_enabled():
-            self.conductor.start_forward(True)
+    def __orig(self, *args):
+        return self.orig_forward(*args) if self.checkpoint is None else self.checkpoint(*args)
 
-        args = self.conductor.before_layer(self.layer_index, call_id, args)
-        output = self.orig_forward(*args) if self.checkpoint is None else self.checkpoint(*args)
+    def __checkpointed_block(self, *args):
+        if self.checkpointing:
+            # recompute the block in the backward, pruned by the min-cut partitioner when compiled
+            return torch.utils.checkpoint.checkpoint(self.__orig, *args, use_reentrant=False)
+        # no checkpointing: run once, autograd keeps every activation the backward needs
+        return self.__orig(*args)
 
-        self.conductor.after_layer(self.layer_index, call_id, args)
+    def __run_block(self, args):
+        def run():
+            return self.run_block(*args)
 
-        # make sure at least one of the output tensors has a grad_fn so the output of the checkpoint has a grad_fn.
-        # this can only happen if a checkpointed block has no trainable parameters, because of a layer filter
-        # was used. Adding a dummy grad function is a workaround required by use_reentrant==True checkpointing:
-        if torch.is_grad_enabled() and not has_grad_fn(output):
-            output = add_dummy_grad_fn_(output)
-
-        return output
+        if not self.conductor.offloads_activations():
+            return run()
+        # Offload only the declared activation args. The declaration carries cross-block knowledge the
+        # min-cut partitioner cannot have, seeing one block at a time: a tensor shared by every block
+        # (rotary embeddings, masks) is saved once per block, and offloading those copies frees nothing
+        # because the original stays live for the remaining blocks.
+        #
+        # Matched by view rather than by identity, because autograd saves an alias of the arg rather than
+        # the arg object, so id() misses. Grad-agnostic: a LoRA layer filter can leave an offloaded
+        # activation grad-free.
+        layer_index = self.layer_index
+        targets = {_view_key(args[i]) for i in self.included_offload_param_indices
+                   if i < len(args) and isinstance(args[i], torch.Tensor)}
+        with torch.autograd.graph.saved_tensors_hooks(
+                lambda t: self.conductor.pack_activation(layer_index, t) if _view_key(t) in targets else t,
+                self.conductor.unpack_activation):
+            return run()
 
     def forward(self, *args, **kwargs):
-        call_id = _generate_call_index()
         args = _kwargs_to_args(self.orig_forward if self.checkpoint is None else self.checkpoint.forward, args, kwargs)
-        if torch.is_grad_enabled():
-            # a backward will flow through this layer (grad enabled), so offloading needs use_reentrant=True
-            # checkpointing to move the offloaded tensors back during recompute. Fail loud rather than silently
-            # enabling checkpointing the part disabled. Under no_grad (e.g. sampling a frozen part) the branch
-            # below offloads without checkpointing.
-            if not self.checkpointing:
-                raise NotImplementedError("offloading requires gradient checkpointing")
-            return torch.utils.checkpoint.checkpoint(
-                self.__checkpointing_forward,
-                self.dummy,
-                call_id,
-                *args,
-                use_reentrant=True
-            )
-        else:
-            if self.layer_index == 0:
-                self.conductor.start_forward(False)
 
-            args = self.conductor.before_layer(self.layer_index, call_id, args)
-            output = self.orig_forward(*args) if self.checkpoint is None else self.checkpoint(*args)
-            self.conductor.after_layer(self.layer_index, call_id, args)
+        if not torch.is_grad_enabled():
+            # inference / frozen: no backward flows, so no boundaries are needed. Schedule, run
+            # and record inline.
+            if self.layer_index == 0:
+                self.conductor.start_forward(backward_follows=False)
+            self.conductor.before_layer(self.layer_index, is_forward=True)
+            # still through run_block: under no_grad the checkpoint inside it is a passthrough, and this
+            # keeps sampling on the compiled path (dynamo traces a separate inference variant)
+            output = self.run_block(*args)
+            self.conductor.after_layer(self.layer_index, list(args))
             return output
+
+        if self.layer_index == 0:
+            self.conductor.start_forward(backward_follows=True)
+
+        args = _apply_boundary(LoadBoundary, self.conductor, self.layer_index, args)
+        output = self.__run_block(args)
+        output_tuple = output if isinstance(output, tuple) else (output,)
+        output_tuple = _apply_boundary(EvictBoundary, self.conductor, self.layer_index, output_tuple)
+        return output_tuple if isinstance(output, tuple) else output_tuple[0]
+
 
 def create_checkpoint(
         orig_module: nn.Module,
-        train_device: torch.device,
         include_from_offload_param_names: list[str] = None,
         conductor: LayerOffloadConductor | None = None,
         checkpointing: bool = True,
@@ -182,32 +248,43 @@ def create_checkpoint(
     included_offload_param_indices = __get_args_indices(orig_module.forward, include_from_offload_param_names)
 
     if conductor is not None:
-        conductor.add_layer(orig_module, included_offload_param_indices)
+        conductor.add_layer(orig_module)
 
     if conductor is not None and conductor.offload_activated():
-        # offloading is structurally coupled to use_reentrant=True checkpointing during the back pass: the
-        # recompute is the only thing firing before_layer/after_layer in the backward direction, so both layer
-        # and activation offloading need checkpointing to move tensors back for backward. That coupling only
-        # matters when a backward actually flows, so OffloadCheckpointLayer.forward enforces it per call (fail
-        # loud under grad, offload freely under no_grad) instead of rejecting the frozen/inference case here.
+        # Compiled, the boundary layer compiles the block together with its checkpoint, so orig_module must
+        # not be compiled separately here - that would put the checkpoint back outside the compiled region
+        # and force a full recompute.
         if compile:
-            layer = OffloadCheckpointLayer(orig_module=orig_module, orig_forward=None, train_device=train_device, conductor=conductor, layer_index=layer_index, checkpointing=checkpointing)
-            #don't compile the checkpointing layer - offloading cannot be compiled:
-            orig_module.compile(fullgraph=True)
-            return layer
+            return BoundaryOffloadCheckpointLayer(
+                orig_module=orig_module,
+                orig_forward=None,
+                conductor=conductor,
+                layer_index=layer_index,
+                checkpointing=checkpointing,
+                included_offload_param_indices=included_offload_param_indices,
+                compile=True,
+            )
         else:
             #only patch forward() if possible. Inserting layers is necessary for torch.compile, but causes issues with at least 1 text encoder model. we don't compile text encoders
-            layer = OffloadCheckpointLayer(orig_module=None, orig_forward=orig_module.forward, train_device=train_device, conductor=conductor, layer_index=layer_index, checkpointing=checkpointing)
+            layer = BoundaryOffloadCheckpointLayer(
+                orig_module=None,
+                orig_forward=orig_module.forward,
+                conductor=conductor,
+                layer_index=layer_index,
+                checkpointing=checkpointing,
+                included_offload_param_indices=included_offload_param_indices,
+                compile=False,
+            )
             orig_module.forward = layer.forward
             return orig_module
     else:
         if compile:
-            layer = CheckpointLayer(orig_module=orig_module, orig_forward=None, train_device=train_device, checkpointing=checkpointing)
+            layer = CheckpointLayer(orig_module=orig_module, orig_forward=None, checkpointing=checkpointing)
             #do compile the checkpointing layer - slightly faster
             layer.compile(fullgraph=True)
             return layer
         else:
-            layer = CheckpointLayer(orig_module=None, orig_forward=orig_module.forward, train_device=train_device, checkpointing=checkpointing)
+            layer = CheckpointLayer(orig_module=None, orig_forward=orig_module.forward, checkpointing=checkpointing)
             orig_module.forward = layer.forward
             return orig_module
 
@@ -216,7 +293,6 @@ def _create_checkpoints_for_module_list(
         include_from_offload_param_names: list[str],
         conductor: LayerOffloadConductor,
         checkpointing: bool,
-        train_device: torch.device,
         layer_index: int,
         compile: bool,
 ) -> int:
@@ -225,7 +301,7 @@ def _create_checkpoints_for_module_list(
         if isinstance(module_list[i], BaseCheckpointLayer):
             continue
         module_list[i] = create_checkpoint(
-                layer, train_device,
+                layer,
                 include_from_offload_param_names,
                 conductor, checkpointing, layer_index, compile=compile,
             )
@@ -253,11 +329,13 @@ def enable_checkpointing(
     conductor = LayerOffloadConductor(model, config, part) if offload else None
     checkpointing = part.checkpointing_enabled()
 
-    # a trained part always has grad flowing through it, so offloading without checkpointing is guaranteed to hit
-    # OffloadCheckpointLayer.forward's fail-loud path. Reject it here so the misconfiguration surfaces at setup
-    # instead of the first training step. Frozen parts (part.train == False) are left to the per-call check: e.g.
-    # Ideogram's unconditional transformer runs only under no_grad during sampling, so it offloads without
-    # checkpointing there, while a frozen denoiser/TE still fails loud when a trained embedding routes grad through it.
+    # Offloading requires checkpointing. A block's backward reads its weights through SavedVariables taken
+    # during the forward, which hold a shallow copy - repointing param.data at a reloaded buffer never
+    # redirects them - while the conductor recycles weight buffers between layers, so by then that buffer
+    # can already hold a different layer's weights: plausible but wrong gradients, not an error. The
+    # recompute re-reads the weights after the layer has been loaded back in. Compiled blocks escape this
+    # today (AOTAutograd passes parameters as graph inputs, read at call time), but that is a calling
+    # convention and not a guarantee. Frozen parts run no backward through the block and are exempt.
     if offload and not checkpointing and part.train:
         raise NotImplementedError("offloading requires gradient checkpointing")
 
@@ -272,7 +350,6 @@ def enable_checkpointing(
                 param_names,
                 conductor,
                 checkpointing,
-                torch.device(config.train_device),
                 layer_index,
                 compile = compile,
             )
@@ -287,7 +364,6 @@ def enable_checkpointing(
                         param_names,
                         conductor,
                         checkpointing,
-                        torch.device(config.train_device),
                         layer_index,
                         compile = compile,
                     )
