@@ -21,7 +21,8 @@
         "model_name": "warp-ai/EfficientNetEncoder",
         "weight_dtype": "FLOAT_16"
     },
-    "latent_caching": false,
+    "image_caching": false,
+    "text_caching": false,
     "learning_rate": 0.0003,
     "learning_rate_warmup_steps": 20,
     "model_type": "WUERSTCHEN_2",

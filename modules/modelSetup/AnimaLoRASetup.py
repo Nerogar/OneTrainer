@@ -81,9 +81,9 @@ class AnimaLoRASetup(
             model: AnimaModel,
             config: TrainConfig,
     ):
-        vae_on_train_device = not config.latent_caching
+        vae_on_train_device = not config.image_caching
 
-        model.text_encoder_to(self.temp_device if config.latent_caching else self.train_device)
+        model.text_encoder_to(self.train_device if not config.text_caching else self.temp_device)
         model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
         model.transformer_to(self.train_device)
 

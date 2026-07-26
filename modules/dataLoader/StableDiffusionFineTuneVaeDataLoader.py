@@ -205,7 +205,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         modules = []
 
-        if config.latent_caching:
+        if config.image_caching:
             modules.append(disk_cache)
             modules.append(variation_sorting)
 
@@ -229,7 +229,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
 
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
 
-        if config.latent_caching:
+        if config.image_caching:
             batch_sorting = AspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size)
         else:
             batch_sorting = InlineAspectBatchSorting(resolution_in_name='crop_resolution', names=sort_names, batch_size=config.batch_size)

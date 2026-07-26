@@ -86,7 +86,7 @@ class Flux2BaseDataLoader(
             text_split_names=text_split_names,
             sort_names=sort_names,
             config=config,
-            text_caching=True,
+            text_caching=config.text_caching,
         )
 
     def _output_modules(self, config: TrainConfig, model: Flux2Model, model_setup: BaseFlux2Setup):
