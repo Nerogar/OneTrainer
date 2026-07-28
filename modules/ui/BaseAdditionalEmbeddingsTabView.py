@@ -34,7 +34,7 @@ class BaseEmbeddingWidgetView:
 
         # embedding model names
         self.components.label(top_frame, 0, 2, "base embedding:",
-                              tooltip="The base embedding to train on. Leave empty to create a new embedding")
+                              tooltip="训练的基础嵌入，留空创建新嵌入")
         self.components.path_entry(
             top_frame, 0, 3, self.ui_state, "model_name",
             mode="file", path_modifier=path_util.json_path_modifier
@@ -42,12 +42,12 @@ class BaseEmbeddingWidgetView:
 
         # placeholder
         self.components.label(top_frame, 0, 4, "placeholder:",
-                              tooltip="The placeholder used when using the embedding in a prompt")
+                              tooltip="在提示词中使用嵌入的占位符")
         self.components.entry(top_frame, 0, 5, self.ui_state, "placeholder")
 
         # token count
         self.components.label(top_frame, 0, 6, "token count:",
-                              tooltip="The token count used when creating a new embedding. Leave empty to auto detect from the initial embedding text.")
+                              tooltip="新嵌入的Token数，留空自动检测")
         self.components.entry(top_frame, 0, 7, self.ui_state, "token_count", width=40)
 
         # trainable
@@ -56,17 +56,17 @@ class BaseEmbeddingWidgetView:
 
         # output embedding
         self.components.label(bottom_frame, 0, 2, "output embedding:",
-                              tooltip="Output embeddings are calculated at the output of the text encoder, not the input. This can improve results for larger text encoders and lower VRAM usage.")
+                              tooltip="在文本编码器输出处计算嵌入，可改善大文本编码器效果并降低显存")
         self.components.switch(bottom_frame, 0, 3, self.ui_state, "is_output_embedding", width=40)
 
         # stop training after
         self.components.label(bottom_frame, 0, 4, "stop training after:",
-                              tooltip="When to stop training the embedding")
+                              tooltip="何时停止训练嵌入")
         self.components.time_entry(bottom_frame, 0, 5, self.ui_state, "stop_training_after", "stop_training_after_unit")
 
         # initial embedding text
         self.components.label(bottom_frame, 0, 6, "initial embedding text:",
-                              tooltip="The initial embedding text used when creating a new embedding")
+                              tooltip="创建新嵌入时的初始文本")
         self.components.entry(bottom_frame, 0, 7, self.ui_state, "initial_embedding_text")
 
     def configure_element(self):

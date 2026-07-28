@@ -18,24 +18,24 @@ class CtkGenerateCaptionsWindowView(BaseGenerateCaptionsWindowView, ctk.CTkTople
 
         self.controller = controller
 
-        self.mode_var = ctk.StringVar(self, "Create if absent")
-        self.modes = ["Replace all captions", "Create if absent", "Add as new line"]
+        self.mode_var = ctk.StringVar(self, "不存在则创建")
+        self.modes = ["替换所有标签", "不存在则创建", "添加为新行"]
         self.model_var = ctk.StringVar(self, "Blip")
         self.models = ["Blip", "Blip2", "WD14 VIT v2"]
 
-        self.title("Batch generate captions")
+        self.title("批量生成标签")
         self.geometry("360x360")
         self.resizable(True, True)
 
         self.frame = ctk.CTkFrame(self, width=600, height=300)
         self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
-        self.model_label = ctk.CTkLabel(self.frame, text="Model", width=100)
+        self.model_label = ctk.CTkLabel(self.frame, text="模型", width=100)
         self.model_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.model_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.model_var, values=self.models, dynamic_resizing=False, width=200)
         self.model_dropdown.grid(row=0, column=1, sticky="w", padx=5, pady=5)
 
-        self.path_label = ctk.CTkLabel(self.frame, text="Folder", width=100)
+        self.path_label = ctk.CTkLabel(self.frame, text="文件夹", width=100)
         self.path_label.grid(row=1, column=0, sticky="w",padx=5, pady=5)
         self.path_entry = ctk.CTkEntry(self.frame, width=150)
         self.path_entry.insert(0, path)
@@ -43,7 +43,7 @@ class CtkGenerateCaptionsWindowView(BaseGenerateCaptionsWindowView, ctk.CTkTople
         self.path_button = ctk.CTkButton(self.frame, width=30, text="...", command=lambda: self.browse_for_path(self.path_entry))
         self.path_button.grid(row=1, column=1, sticky="e", padx=5, pady=5)
 
-        self.caption_label = ctk.CTkLabel(self.frame, text="Initial Caption", width=100)
+        self.caption_label = ctk.CTkLabel(self.frame, text="初始标签", width=100)
         self.caption_label.grid(row=2, column=0, sticky="w", padx=5, pady=5)
         self.caption_entry = ctk.CTkEntry(self.frame, width=200)
         self.caption_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
@@ -74,7 +74,7 @@ class CtkGenerateCaptionsWindowView(BaseGenerateCaptionsWindowView, ctk.CTkTople
         self.progress = ctk.CTkProgressBar(self.frame, orientation="horizontal", mode="determinate", width=200)
         self.progress.grid(row=7, column=1, sticky="w", padx=5, pady=5)
 
-        self.create_captions_button = ctk.CTkButton(self.frame, text="Create Captions", width=310, command=self._on_create_captions)
+        self.create_captions_button = ctk.CTkButton(self.frame, text="创建标签", width=310, command=self._on_create_captions)
         self.create_captions_button.grid(row=8, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
         self.frame.pack(fill="both", expand=True)

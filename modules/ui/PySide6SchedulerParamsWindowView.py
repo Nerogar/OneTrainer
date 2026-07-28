@@ -41,13 +41,13 @@ class PySide6KvWidget(QWidget):
 
         # Key
         self.key = pyside6_components.entry(self, 0, 1, self.ui_state, "key",
-                                            tooltip="Key name for an argument in your scheduler",
+                                            tooltip="调度器参数键名",
                                             wide_tooltip=True, width=50)
         self.key.editingFinished.connect(save_command)
 
         # Value
         self.value = pyside6_components.entry(self, 0, 2, self.ui_state, "value",
-                                              tooltip="Value for an argument in your scheduler. Some special values can be used, wrapped in percent signs: LR, EPOCHS, STEPS_PER_EPOCH, TOTAL_STEPS, SCHEDULER_STEPS. Note that OneTrainer calls step() after every individual learning step, not every epoch, so what Torch calls 'epoch' you should treat as 'step'.",
+                                              tooltip="调度器参数值，可用特殊值：LR, EPOCHS, TOTAL_STEPS等",
                                               wide_tooltip=True, width=50)
         self.value.editingFinished.connect(save_command)
 
@@ -67,7 +67,7 @@ class PySide6SchedulerParamsWindowView(BaseSchedulerParamsWindowView, QDialog):
         # delete on close so entry widgets and the field validators they register globally are freed, not leaked
         self.finished.connect(self.deleteLater)
 
-        self.setWindowTitle("Learning Rate Scheduler Settings")
+        self.setWindowTitle("学习率调度器设置")
         self.resize(800, 500)
 
         outer = QGridLayout(self)

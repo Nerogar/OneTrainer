@@ -22,7 +22,7 @@ class PySide6SampleWindowView(BaseSampleWindowView, QDialog):
         QDialog.__init__(self, parent)
         BaseSampleWindowView.__init__(self, pyside6_components)
 
-        self.setWindowTitle("Sample")
+        self.setWindowTitle("采样")
         self.resize(1200, 800)
 
         self.ui_state = PySide6UIState(controller.sample)

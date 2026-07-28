@@ -15,34 +15,34 @@ class BaseConceptWindowView:
 
     def build_general_tab(self, frame, controller, ui_state, text_ui_state):
         # name
-        self.components.label(frame, 0, 0, "Name",
-                         tooltip="Name of the concept")
+        self.components.label(frame, 0, 0, "名称",
+                         tooltip="数据集名称")
         self.components.entry(frame, 0, 1, ui_state, "name")
 
         # enabled
-        self.components.label(frame, 1, 0, "Enabled",
-                         tooltip="Enable or disable this concept")
+        self.components.label(frame, 1, 0, "启用",
+                         tooltip="启用或禁用此数据集")
         self.components.switch(frame, 1, 1, ui_state, "enabled")
 
         # concept type
-        self.components.label(frame, 2, 0, "Concept Type",
+        self.components.label(frame, 2, 0, "数据集类型",
                          tooltip="STANDARD: Standard finetuning with the sample as training target\n"
                                  "VALIDATION: Use concept for validation instead of training\n"
                                  "PRIOR_PREDICTION: Use the sample to make a prediction using the model as it was before training. This prediction is then used as the training target "
                                  "for the model in training. This can be used as regularisation and to preserve prior model knowledge while finetuning the model on other concepts. "
-                                 "Only implemented for LoRA.",
+                                 "仅对LoRA实现",
                          wide_tooltip=True)
         self.components.options(frame, 2, 1, [str(x) for x in list(ConceptType)], ui_state, "type")
 
         # path
-        self.components.label(frame, 3, 0, "Path",
-                         tooltip="Path where the training data is located")
+        self.components.label(frame, 3, 0, "路径",
+                         tooltip="训练数据所在路径")
         self.components.path_entry(frame, 3, 1, ui_state, "path", mode="dir")
         self.components.button(frame, 3, 2, text="download now", command=controller.download_dataset_threaded,
-                          tooltip="Download dataset from Huggingface now, for the purpose of previewing and statistics. Otherwise, it will be downloaded when you start training. Path must be a Huggingface repository.")
+                          tooltip="从Huggingface下载数据集用于预览和统计")
 
         # prompt source
-        self.components.label(frame, 4, 0, "Prompt Source",
+        self.components.label(frame, 4, 0, "提示词来源",
                          tooltip="The source for prompts used during training. When selecting \"From single text file\", select a text file that contains a list of prompts")
         prompt_path_entry = self.components.path_entry(frame, 4, 2, text_ui_state, "prompt_path", mode="file")
 
@@ -50,162 +50,162 @@ class BaseConceptWindowView:
             self.components.set_widget_enabled(prompt_path_entry, option == 'concept')
 
         self.components.options_kv(frame, 4, 1, [
-            ("From text file per sample", 'sample'),
-            ("From single text file", 'concept'),
-            ("From image file name", 'filename'),
+            ("从每样本文本文件", 'sample'),
+            ("从单个文本文件", 'concept'),
+            ("从图像文件名", 'filename'),
         ], text_ui_state, "prompt_source", command=set_prompt_path_entry_enabled)
         set_prompt_path_entry_enabled(controller.concept.text.prompt_source)
 
         # include subdirectories
-        self.components.label(frame, 5, 0, "Include Subdirectories",
-                         tooltip="Includes images from subdirectories into the dataset")
+        self.components.label(frame, 5, 0, "包含子目录",
+                         tooltip="将子目录中的图像包含到数据集中")
         self.components.switch(frame, 5, 1, ui_state, "include_subdirectories")
 
         # image variations
-        self.components.label(frame, 6, 0, "Image Variations",
-                         tooltip="The number of different image versions to cache if latent caching is enabled.")
+        self.components.label(frame, 6, 0, "图像变体",
+                         tooltip="潜在缓存的图像版本数")
         self.components.entry(frame, 6, 1, ui_state, "image_variations")
 
         # text variations
-        self.components.label(frame, 7, 0, "Text Variations",
-                         tooltip="The number of different text versions to cache if latent caching is enabled.")
+        self.components.label(frame, 7, 0, "文本变体",
+                         tooltip="潜在缓存的文本版本数")
         self.components.entry(frame, 7, 1, ui_state, "text_variations")
 
         # balancing
-        self.components.label(frame, 8, 0, "Balancing",
-                         tooltip="The number of samples used during training. Use repeats to multiply the concept, or samples to specify an exact number of samples used in each epoch.")
+        self.components.label(frame, 8, 0, "平衡策略",
+                         tooltip="训练使用的样本数，用repeats倍乘或samples指定精确数")
         self.components.entry(frame, 8, 1, ui_state, "balancing")
         self.components.options(frame, 8, 2, [str(x) for x in list(BalancingStrategy)], ui_state, "balancing_strategy")
 
         # loss weight
-        self.components.label(frame, 9, 0, "Loss Weight",
-                         tooltip="The loss multiplyer for this concept.")
+        self.components.label(frame, 9, 0, "损失权重",
+                         tooltip="此数据集的损失乘数")
         self.components.entry(frame, 9, 1, ui_state, "loss_weight")
 
     def build_image_augmentation_tab(self, frame, controller, image_ui_state):
         # header
-        self.components.label(frame, 0, 1, "Random",
-                         tooltip="Enable this augmentation with random values")
-        self.components.label(frame, 0, 2, "Fixed",
-                         tooltip="Enable this augmentation with fixed values")
+        self.components.label(frame, 0, 1, "随机",
+                         tooltip="以随机值启用此增强")
+        self.components.label(frame, 0, 2, "固定",
+                         tooltip="以固定值启用此增强")
 
         # crop jitter
-        self.components.label(frame, 1, 0, "Crop Jitter",
-                         tooltip="Enables random cropping of samples")
+        self.components.label(frame, 1, 0, "裁剪抖动",
+                         tooltip="启用样本随机裁剪")
         self.components.switch(frame, 1, 1, image_ui_state, "enable_crop_jitter")
 
         # random flip
-        self.components.label(frame, 2, 0, "Random Flip",
-                         tooltip="Randomly flip the sample during training")
+        self.components.label(frame, 2, 0, "随机翻转",
+                         tooltip="训练时随机翻转样本")
         self.components.switch(frame, 2, 1, image_ui_state, "enable_random_flip")
         self.components.switch(frame, 2, 2, image_ui_state, "enable_fixed_flip")
 
         # random rotation
-        self.components.label(frame, 3, 0, "Random Rotation",
-                         tooltip="Randomly rotates the sample during training")
+        self.components.label(frame, 3, 0, "随机旋转",
+                         tooltip="训练时随机旋转样本")
         self.components.switch(frame, 3, 1, image_ui_state, "enable_random_rotate")
         self.components.switch(frame, 3, 2, image_ui_state, "enable_fixed_rotate")
         self.components.entry(frame, 3, 3, image_ui_state, "random_rotate_max_angle")
 
         # random brightness
-        self.components.label(frame, 4, 0, "Random Brightness",
-                         tooltip="Randomly adjusts the brightness of the sample during training")
+        self.components.label(frame, 4, 0, "随机亮度",
+                         tooltip="训练时随机调整样本亮度")
         self.components.switch(frame, 4, 1, image_ui_state, "enable_random_brightness")
         self.components.switch(frame, 4, 2, image_ui_state, "enable_fixed_brightness")
         self.components.entry(frame, 4, 3, image_ui_state, "random_brightness_max_strength")
 
         # random contrast
-        self.components.label(frame, 5, 0, "Random Contrast",
-                         tooltip="Randomly adjusts the contrast of the sample during training")
+        self.components.label(frame, 5, 0, "随机对比度",
+                         tooltip="训练时随机调整样本对比度")
         self.components.switch(frame, 5, 1, image_ui_state, "enable_random_contrast")
         self.components.switch(frame, 5, 2, image_ui_state, "enable_fixed_contrast")
         self.components.entry(frame, 5, 3, image_ui_state, "random_contrast_max_strength")
 
         # random saturation
-        self.components.label(frame, 6, 0, "Random Saturation",
-                         tooltip="Randomly adjusts the saturation of the sample during training")
+        self.components.label(frame, 6, 0, "随机饱和度",
+                         tooltip="训练时随机调整样本饱和度")
         self.components.switch(frame, 6, 1, image_ui_state, "enable_random_saturation")
         self.components.switch(frame, 6, 2, image_ui_state, "enable_fixed_saturation")
         self.components.entry(frame, 6, 3, image_ui_state, "random_saturation_max_strength")
 
         # random hue
-        self.components.label(frame, 7, 0, "Random Hue",
-                         tooltip="Randomly adjusts the hue of the sample during training")
+        self.components.label(frame, 7, 0, "随机色相",
+                         tooltip="训练时随机调整样本色相")
         self.components.switch(frame, 7, 1, image_ui_state, "enable_random_hue")
         self.components.switch(frame, 7, 2, image_ui_state, "enable_fixed_hue")
         self.components.entry(frame, 7, 3, image_ui_state, "random_hue_max_strength")
 
         # random circular mask shrink
-        self.components.label(frame, 8, 0, "Circular Mask Generation",
-                         tooltip="Automatically create circular masks for masked training")
+        self.components.label(frame, 8, 0, "圆形遮罩生成",
+                         tooltip="自动为遮罩训练创建圆形遮罩")
         self.components.switch(frame, 8, 1, image_ui_state, "enable_random_circular_mask_shrink")
 
         # random rotate and crop
-        self.components.label(frame, 9, 0, "Random Rotate and Crop",
+        self.components.label(frame, 9, 0, "随机旋转裁剪",
                          tooltip="Randomly rotate the training samples and crop to the masked region")
         self.components.switch(frame, 9, 1, image_ui_state, "enable_random_mask_rotate_crop")
 
         # circular mask generation
-        self.components.label(frame, 10, 0, "Resolution Override",
+        self.components.label(frame, 10, 0, "分辨率覆盖",
                          tooltip="Override the resolution for this concept. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format <width>x<height>")
         self.components.switch(frame, 10, 2, image_ui_state, "enable_resolution_override")
         self.components.entry(frame, 10, 3, image_ui_state, "resolution_override")
 
     def build_text_augmentation_tab(self, frame, controller, text_ui_state):
         # tag shuffling
-        self.components.label(frame, 0, 0, "Tag Shuffling",
-                         tooltip="Enables tag shuffling")
+        self.components.label(frame, 0, 0, "标签打乱",
+                         tooltip="启用标签打乱")
         self.components.switch(frame, 0, 1, text_ui_state, "enable_tag_shuffling")
 
         # keep tag count
-        self.components.label(frame, 1, 0, "Tag Delimiter",
-                         tooltip="The delimiter between tags")
+        self.components.label(frame, 1, 0, "标签分隔符",
+                         tooltip="标签之间的分隔符")
         self.components.entry(frame, 1, 1, text_ui_state, "tag_delimiter")
 
         # keep tag count
-        self.components.label(frame, 2, 0, "Keep Tag Count",
-                         tooltip="The number of tags at the start of the caption that are not shuffled or dropped")
+        self.components.label(frame, 2, 0, "保留标签数",
+                         tooltip="标签开头不打乱不丢弃的标签数")
         self.components.entry(frame, 2, 1, text_ui_state, "keep_tags_count")
 
         # tag dropout
-        self.components.label(frame, 3, 0, "Tag Dropout",
-                         tooltip="Enables random dropout for tags in the captions.")
+        self.components.label(frame, 3, 0, "标签丢弃",
+                         tooltip="启用标签随机丢弃")
         self.components.switch(frame, 3, 1, text_ui_state, "tag_dropout_enable")
-        self.components.label(frame, 4, 0, "Dropout Mode",
-                         tooltip="Method used to drop captions. 'Full' will drop the entire caption past the 'kept' tags with a certain probability, 'Random' will drop individual tags with the set probability, and 'Random Weighted' will linearly increase the probability of dropping tags, more likely to preseve tags near the front with full probability to drop at the end.")
+        self.components.label(frame, 4, 0, "丢弃模式",
+                         tooltip="标签丢弃方式：Full整体丢弃，Random随机丢弃，Random Weighted加权丢弃")
         self.components.options_kv(frame, 4, 1, [
-            ("Full", 'FULL'),
-            ("Random", 'RANDOM'),
-            ("Random Weighted", 'RANDOM WEIGHTED'),
+            ("全部", 'FULL'),
+            ("随机", 'RANDOM'),
+            ("随机加权", 'RANDOM WEIGHTED'),
         ], text_ui_state, "tag_dropout_mode", None)
-        self.components.label(frame, 4, 2, "Probability",
-                         tooltip="Probability to drop tags, from 0 to 1.")
+        self.components.label(frame, 4, 2, "概率",
+                         tooltip="标签丢弃概率，0到1")
         self.components.entry(frame, 4, 3, text_ui_state, "tag_dropout_probability")
 
-        self.components.label(frame, 5, 0, "Special Dropout Tags",
-                         tooltip="List of tags which will be whitelisted/blacklisted by dropout. 'Whitelist' tags will never be dropped but all others may be, 'Blacklist' tags may be dropped but all others will never be, 'None' may drop any tags. Can specify either a delimiter-separated list in the field, or a file path to a .txt or .csv file with entries separated by newlines.")
+        self.components.label(frame, 5, 0, "特殊丢弃标签",
+                         tooltip="丢弃白/黑名单标签列表，可输入分隔列表或文件路径")
         self.components.options_kv(frame, 5, 1, [
-            ("None", 'NONE'),
-            ("Blacklist", 'BLACKLIST'),
-            ("Whitelist", 'WHITELIST'),
+            ("无", 'NONE'),
+            ("黑名单", 'BLACKLIST'),
+            ("白名单", 'WHITELIST'),
         ], text_ui_state, "tag_dropout_special_tags_mode", None)
         self.components.entry(frame, 5, 2, text_ui_state, "tag_dropout_special_tags")
-        self.components.label(frame, 6, 0, "Special Tags Regex",
-                         tooltip="Interpret special tags with regex, such as 'photo.*' to match 'photo, photograph, photon' but not 'telephoto'. Includes exception for '/(' and '/)' syntax found in many booru/e6 tags.")
+        self.components.label(frame, 6, 0, "特殊标签正则",
+                         tooltip="使用正则匹配特殊标签，如'photo.*'匹配'photo, photograph'")
         self.components.switch(frame, 6, 1, text_ui_state, "tag_dropout_special_tags_regex")
 
         #capitalization randomization
-        self.components.label(frame, 7, 0, "Randomize Capitalization",
-                         tooltip="Enables randomization of capitalization for tags in the caption.")
+        self.components.label(frame, 7, 0, "随机大小写",
+                         tooltip="启用标签大小写随机化")
         self.components.switch(frame, 7, 1, text_ui_state, "caps_randomize_enable")
-        self.components.label(frame, 7, 2, "Force Lowercase",
-                         tooltip="If enabled, converts the caption to lowercase before any further processing.")
+        self.components.label(frame, 7, 2, "强制小写",
+                         tooltip="启用后，将标签转为小写后再处理")
         self.components.switch(frame, 7, 3, text_ui_state, "caps_randomize_lowercase")
 
-        self.components.label(frame, 8, 0, "Captialization Mode",
-                         tooltip="Comma-separated list of types of capitalization randomization to perform. 'capslock' for ALL CAPS, 'title' for First Letter Of Every Word, 'first' for First word only, 'random' for rAndOMiZeD lEtTERs.")
+        self.components.label(frame, 8, 0, "大小写模式",
+                         tooltip="大小写随机化类型：capslock全大写，title首字母大写，first首词大写，random随机")
         self.components.entry(frame, 8, 1, text_ui_state, "caps_randomize_mode")
-        self.components.label(frame, 8, 2, "Probability",
+        self.components.label(frame, 8, 2, "概率",
                          tooltip="Probability to randomize capitialization of each tag, from 0 to 1.")
         self.components.entry(frame, 8, 3, text_ui_state, "caps_randomize_probability")
 
@@ -213,91 +213,91 @@ class BaseConceptWindowView:
         self.concept_stats_tab = frame
 
         #file size
-        self.file_size_label = self.components.label(frame, 1, 0, "Total Size", pad=0,
-                         tooltip="Total size of all image, mask, and caption files in MB", underline=True)
+        self.file_size_label = self.components.label(frame, 1, 0, "总大小", pad=0,
+                         tooltip="图像、遮罩和标签文件总大小(MB)", underline=True)
         self.file_size_preview = self.components.label(frame, 2, 0, pad=0, text="-")
 
         #subdirectory count
-        self.dir_count_label = self.components.label(frame, 1, 1, "Directories", pad=0,
-                         tooltip="Total number of directories including and under (if 'include subdirectories' is enabled) the main concept directory", underline=True)
+        self.dir_count_label = self.components.label(frame, 1, 1, "目录数", pad=0,
+                         tooltip="数据集目录及子目录总数", underline=True)
         self.dir_count_preview = self.components.label(frame, 2, 1, pad=0, text="-")
 
         #basic img/vid stats - count of each type in the concept
         #the \n at the start of the label gives it better vertical spacing with other rows
         self.image_count_label = self.components.label(frame, 3, 0, "\nTotal Images", pad=0,
-                         tooltip="Total number of image files, any of the extensions " + str(path_util.SUPPORTED_IMAGE_EXTENSIONS) + ", excluding '-masklabel.png and -condlabel.png'", underline=True)
+                         tooltip="图像文件总数，扩展名：" + str(path_util.SUPPORTED_IMAGE_EXTENSIONS) + ", excluding '-masklabel.png and -condlabel.png'", underline=True)
         self.image_count_preview = self.components.label(frame, 4, 0, pad=0, text="-")
         self.video_count_label = self.components.label(frame, 3, 1, "\nTotal Videos", pad=0,
-                         tooltip="Total number of video files, any of the extensions " + str(path_util.SUPPORTED_VIDEO_EXTENSIONS), underline=True)
+                         tooltip="视频文件总数，扩展名：" + str(path_util.SUPPORTED_VIDEO_EXTENSIONS), underline=True)
         self.video_count_preview = self.components.label(frame, 4, 1, pad=0, text="-")
         self.mask_count_label = self.components.label(frame, 3, 2, "\nTotal Masks", pad=0,
-                         tooltip="Total number of mask files, any file ending in '-masklabel.png'", underline=True)
+                         tooltip="遮罩文件总数（-masklabel.png结尾）", underline=True)
         self.mask_count_preview = self.components.label(frame, 4, 2, pad=0, text="-")
         self.caption_count_label = self.components.label(frame, 3, 3, "\nTotal Captions", pad=0,
-                         tooltip="Total number of caption files, any .txt file. With advanced scan, includes the total number of captions on separate lines across all files in parentheses.", underline=True)
+                         tooltip="标签文件总数（.txt文件）", underline=True)
         self.caption_count_preview = self.components.label(frame, 4, 3, pad=0, text="-")
 
         #advanced img/vid stats - how many img/vid files have a mask or caption of the same name
         self.image_count_mask_label = self.components.label(frame, 5, 0, "\nImages with Masks", pad=0,
-                         tooltip="Total number of image files with an associated mask", underline=True)
+                         tooltip="有关联遮罩的图像文件总数", underline=True)
         self.image_count_mask_preview = self.components.label(frame, 6, 0, pad=0, text="-")
         self.mask_count_label_unpaired = self.components.label(frame, 5, 1, "\nUnpaired Masks", pad=0,
-                         tooltip="Total number of mask files which lack a corresponding image file - if >0, check your data set!", underline=True)
+                         tooltip="缺少对应图像的遮罩文件数，>0请检查数据集", underline=True)
         self.mask_count_preview_unpaired = self.components.label(frame, 6, 1, pad=0, text="-")
         #currently no masks for videos?
 
         self.image_count_caption_label = self.components.label(frame, 7, 0, "\nImages with Captions", pad=0,
-                         tooltip="Total number of image files with an associated caption", underline=True)
+                         tooltip="有关联标签的图像文件总数", underline=True)
         self.image_count_caption_preview = self.components.label(frame, 8, 0, pad=0, text="-")
         self.video_count_caption_label = self.components.label(frame, 7, 1, "\nVideos with Captions", pad=0,
-                         tooltip="Total number of video files with an associated caption", underline=True)
+                         tooltip="有关联标签的视频文件总数", underline=True)
         self.video_count_caption_preview = self.components.label(frame, 8, 1, pad=0, text="-")
         self.caption_count_label_unpaired = self.components.label(frame, 7, 2, "\nUnpaired Captions", pad=0,
-                         tooltip="Total number of caption files which lack a corresponding image file - if >0, check your data set! If using 'from file name' or 'from single text file' then this can be ignored.", underline=True)
+                         tooltip="缺少对应图像的标签文件数，>0请检查数据集", underline=True)
         self.caption_count_preview_unpaired = self.components.label(frame, 8, 2, pad=0, text="-")
 
         #resolution info
         self.pixel_max_label = self.components.label(frame, 9, 0, "\nMax Pixels", pad=0,
-                         tooltip="Largest image in the concept by number of pixels (width * height)", underline=True)
+                         tooltip="最大图像尺寸（宽x高像素）", underline=True)
         self.pixel_max_preview = self.components.label(frame, 10, 0, pad=0, text="-", wraplength=150)
         self.pixel_avg_label = self.components.label(frame, 9, 1, "\nAvg Pixels", pad=0,
-                         tooltip="Average size of images in the concept by number of pixels (width * height)", underline=True)
+                         tooltip="图像平均尺寸（宽x高像素）", underline=True)
         self.pixel_avg_preview = self.components.label(frame, 10, 1, pad=0, text="-", wraplength=150)
         self.pixel_min_label = self.components.label(frame, 9, 2, "\nMin Pixels", pad=0,
-                         tooltip="Smallest image in the concept by number of pixels (width * height)", underline=True)
+                         tooltip="最小图像尺寸（宽x高像素）", underline=True)
         self.pixel_min_preview = self.components.label(frame, 10, 2, pad=0, text="-", wraplength=150)
 
         #video length info
         self.length_max_label = self.components.label(frame, 11, 0, "\nMax Length", pad=0,
-                         tooltip="Longest video in the concept by number of frames", underline=True)
+                         tooltip="数据集中帧数最多的视频", underline=True)
         self.length_max_preview = self.components.label(frame, 12, 0, pad=0, text="-", wraplength=150)
         self.length_avg_label = self.components.label(frame, 11, 1, "\nAvg Length", pad=0,
-                         tooltip="Average length of videos in the concept by number of frames", underline=True)
+                         tooltip="视频平均帧数", underline=True)
         self.length_avg_preview = self.components.label(frame, 12, 1, pad=0, text="-", wraplength=150)
         self.length_min_label = self.components.label(frame, 11, 2, "\nMin Length", pad=0,
-                         tooltip="Shortest video in the concept by number of frames", underline=True)
+                         tooltip="数据集中帧数最少的视频", underline=True)
         self.length_min_preview = self.components.label(frame, 12, 2, pad=0, text="-", wraplength=150)
 
         #video fps info
         self.fps_max_label = self.components.label(frame, 13, 0, "\nMax FPS", pad=0,
-                         tooltip="Video in concept with highest fps", underline=True)
+                         tooltip="数据集中最高帧率视频", underline=True)
         self.fps_max_preview = self.components.label(frame, 14, 0, pad=0, text="-", wraplength=150)
         self.fps_avg_label = self.components.label(frame, 13, 1, "\nAvg FPS", pad=0,
-                         tooltip="Average fps of videos in the concept", underline=True)
+                         tooltip="数据集中视频平均帧率", underline=True)
         self.fps_avg_preview = self.components.label(frame, 14, 1, pad=0, text="-", wraplength=150)
         self.fps_min_label = self.components.label(frame, 13, 2, "\nMin FPS", pad=0,
-                         tooltip="Video in concept with the lowest fps", underline=True)
+                         tooltip="数据集中最低帧率视频", underline=True)
         self.fps_min_preview = self.components.label(frame, 14, 2, pad=0, text="-", wraplength=150)
 
         #caption info
         self.caption_max_label = self.components.label(frame, 15, 0, "\nMax Caption Length", pad=0,
-                         tooltip="Largest caption in concept by character count. For token count, assume ~2 tokens/word", underline=True)
+                         tooltip="最长标签（字符数），Token数约2/词", underline=True)
         self.caption_max_preview = self.components.label(frame, 16, 0, pad=0, text="-", wraplength=150)
         self.caption_avg_label = self.components.label(frame, 15, 1, "\nAvg Caption Length", pad=0,
-                         tooltip="Average length of caption in concept by character count. For token count, assume ~2 tokens/word", underline=True)
+                         tooltip="标签平均长度（字符数），Token数约2/词", underline=True)
         self.caption_avg_preview = self.components.label(frame, 16, 1, pad=0, text="-", wraplength=150)
         self.caption_min_label = self.components.label(frame, 15, 2, "\nMin Caption Length", pad=0,
-                         tooltip="Smallest caption in concept by character count. For token count, assume ~2 tokens/word", underline=True)
+                         tooltip="最短标签（字符数），Token数约2/词", underline=True)
         self.caption_min_preview = self.components.label(frame, 16, 2, pad=0, text="-", wraplength=150)
 
         #aspect bucket info
@@ -305,17 +305,17 @@ class BaseConceptWindowView:
                          tooltip="Graph of all possible buckets and the number of images in each one, defined as height/width. Buckets range from 0.25 (4:1 extremely wide) to 4 (1:4 extremely tall). \
                             Images which don't match a bucket exactly are cropped to the nearest one.", underline=True)
         self.small_bucket_label = self.components.label(frame, 17, 1, "\nSmallest Buckets", pad=0,
-                         tooltip="Image buckets with the least nonzero total images - if 'batch size' is larger than this, these images will be ignored during training! See the wiki for more details.", underline=True)
+                         tooltip="非零图像最少的桶，批次大小超过此值时这些图像将被忽略", underline=True)
         self.small_bucket_preview = self.components.label(frame, 18, 1, pad=0, text="-")
 
         #refresh stats - must be after all labels are defined or will give error
-        self.refresh_basic_stats_button = self.components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: controller.get_concept_stats_threaded(self, False, 9999),
-                          tooltip="Reload basic statistics for the concept directory")
-        self.refresh_advanced_stats_button = self.components.button(master=frame, row=0, column=1, text="Refresh Advanced", command=lambda: controller.get_concept_stats_threaded(self, True, 9999),
-                          tooltip="Reload advanced statistics for the concept directory")       #run "basic" scan first before "advanced", seems to help the system cache the directories and run faster
-        self.cancel_stats_button = self.components.button(master=frame, row=0, column=2, text="Abort Scan", command=lambda: self._cancel_concept_stats(controller),
-                          tooltip="Stop the currently running scan if it's taking a long time - advanced scan will be slow on large folders and on HDDs")
-        self.processing_time = self.components.label(frame, 0, 3, text="-", tooltip="Time taken to process concept directory")
+        self.refresh_basic_stats_button = self.components.button(master=frame, row=0, column=0, text="刷新基本", command=lambda: controller.get_concept_stats_threaded(self, False, 9999),
+                          tooltip="重新加载数据集目录的基本统计")
+        self.refresh_advanced_stats_button = self.components.button(master=frame, row=0, column=1, text="刷新高级", command=lambda: controller.get_concept_stats_threaded(self, True, 9999),
+                          tooltip="重新加载数据集目录的高级统计")       #run "basic" scan first before "advanced", seems to help the system cache the directories and run faster
+        self.cancel_stats_button = self.components.button(master=frame, row=0, column=2, text="中止扫描", command=lambda: self._cancel_concept_stats(controller),
+                          tooltip="如果扫描时间过长则中止——高级扫描对大文件夹和HDD较慢")
+        self.processing_time = self.components.label(frame, 0, 3, text="-", tooltip="处理数据集目录耗时")
 
     def _update_concept_stats(self, controller):
         #file size
@@ -424,7 +424,7 @@ class BaseConceptWindowView:
         self.bucket_ax.bar_label(b, color=self.text_color)
         sec = self.bucket_ax.secondary_xaxis(location=-0.1)
         sec.spines["bottom"].set_linewidth(0)
-        sec.set_xticks([0, (len(aspects)-1)/2, len(aspects)-1], labels=["Wide", "Square", "Tall"])
+        sec.set_xticks([0, (len(aspects)-1)/2, len(aspects)-1], labels=["宽图", "方形", "长图"])
         sec.tick_params('x', length=0)
         self.canvas.draw()
 

@@ -24,7 +24,7 @@ class PySide6OptimizerParamsWindowView(BaseOptimizerParamsWindowView, QDialog):
         self.muon_adam_button = None
         self._dynamic_frame = None
 
-        self.setWindowTitle("Optimizer Settings")
+        self.setWindowTitle("优化器设置")
         self.resize(800, 500)
 
         outer = QGridLayout(self)

@@ -9,8 +9,8 @@ class BaseLoraTabView:
         self.components = components
 
     def build(self, frame, controller, ui_state, setup_lora_callback):
-        self.components.label(frame, 0, 0, "Type",
-                              tooltip="The type of low-parameter finetuning method.")
+        self.components.label(frame, 0, 0, "类型",
+                              tooltip="低参数微调方法类型")
         self.components.options_kv(frame, 0, 1, controller.get_peft_types(),
                                    ui_state, "peft_type", command=setup_lora_callback)
 
@@ -36,14 +36,14 @@ class BaseLoraTabView:
         # LoRA decomposition
         if peft_type == PeftType.LORA:
             self.components.label(master, 1, 3, "Decompose Weights (DoRA)",
-                                  tooltip="Decompose LoRA Weights (aka, DoRA).")
+                                  tooltip="分解LoRA权重（即DoRA）")
             self.components.switch(master, 1, 4, ui_state, "lora_decompose")
 
             self.components.label(master, 2, 3, "Use Norm Epsilon (DoRA Only)",
-                                  tooltip="Add an epsilon to the norm divison calculation in DoRA. Can aid in training stability, and also acts as regularization.")
+                                  tooltip="在DoRA范数除法中添加epsilon，有助于训练稳定性")
             self.components.switch(master, 2, 4, ui_state, "lora_decompose_norm_epsilon")
-            self.components.label(master, 3, 3, "Apply on output axis (DoRA Only)",
-                                  tooltip="Apply the weight decomposition on the output axis instead of the input axis.")
+            self.components.label(master, 3, 3, "在输出轴应用（仅DoRA）",
+                                  tooltip="在输出轴而非输入轴应用权重分解")
             self.components.switch(master, 3, 4, ui_state, "lora_decompose_output_axis")
 
         # LoRA and LoHA shared settings
@@ -59,8 +59,8 @@ class BaseLoraTabView:
             self.components.entry(master, 2, 1, ui_state, "lora_alpha", required=True)
 
             # Dropout Percentage
-            self.components.label(master, 3, 0, "Dropout Probability",
-                                  tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
+            self.components.label(master, 3, 0, "丢弃概率",
+                                  tooltip="丢弃概率，每步随机忽略此比例的模型节点，0=禁用")
             self.components.entry(master, 3, 1, ui_state, "dropout_probability")
 
             # weight dtype
@@ -69,7 +69,7 @@ class BaseLoraTabView:
             self.components.options_kv(master, 4, 1, controller.get_lora_weight_dtypes(), ui_state, "lora_weight_dtype")
 
             # For use with additional embeddings.
-            self.components.label(master, 5, 0, "Bundle Embeddings",
+            self.components.label(master, 5, 0, "捆绑嵌入",
                                   tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
             self.components.switch(master, 5, 1, ui_state, "bundle_additional_embeddings")
 
@@ -81,17 +81,17 @@ class BaseLoraTabView:
             self.components.entry(master, 1, 1, ui_state, "oft_block_size", required=True)
 
             # Block Share
-            self.components.label(master, 1, 3, "Block Share",
-                                  tooltip="Share the OFT parameters between blocks. A single rotation matrix is shared across all blocks within a layer, drastically cutting the number of trainable parameters and yielding very compact adapter files, potentially improving generalization but at the cost of significant expressiveness, which can lead to underfitting on more complex or diverse tasks.")
+            self.components.label(master, 1, 3, "块共享",
+                                  tooltip="块间共享OFT参数，大幅减少可训练参数，但可能降低表达能力")
             self.components.switch(master, 1, 4, ui_state, "oft_block_share")
 
             # Scaled OFT (SOFT)
             self.components.label(master, 2, 3, "Scaled OFT (SOFT)",
-                                  tooltip="Applies a scaling factor to the learned weights. This ensures that the effective learning rate remains consistent across different block sizes. Without this, different block sizes require significantly different learning rates.")
+                                  tooltip="学习权重缩放因子，确保不同块大小下有效学习率一致")
             self.components.switch(master, 2, 4, ui_state, "oft_scaled")
 
             # Dropout Percentage
-            self.components.label(master, 2, 0, "Dropout Probability",
+            self.components.label(master, 2, 0, "丢弃概率",
                                   tooltip="Dropout probability. This percentage of the rotated adapter nodes that will be randomly restored to the base model initial statue. Helps with overfitting. 0 disables, 1 maximum.")
             self.components.entry(master, 2, 1, ui_state, "dropout_probability")
 
@@ -101,7 +101,7 @@ class BaseLoraTabView:
             self.components.options_kv(master, 3, 1, controller.get_lora_weight_dtypes(), ui_state, "lora_weight_dtype")
 
             # For use with additional embeddings.
-            self.components.label(master, 4, 0, "Bundle Embeddings",
+            self.components.label(master, 4, 0, "捆绑嵌入",
                                   tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
             self.components.switch(master, 4, 1, ui_state, "bundle_additional_embeddings")
 
@@ -109,11 +109,11 @@ class BaseLoraTabView:
         elif peft_type == PeftType.LOKR:
             # LoKr Main Settings
             self.components.label(master, 1, 0, f"{name} dimension",
-                                  tooltip="The dimension parameter used for the secondary decomposition. Analogous to rank in LoRA.")
+                                  tooltip="二次分解的维度参数，类似于LoRA的秩")
             self.components.entry(master, 1, 1, ui_state, "lokr_dim")
 
-            self.components.label(master, 2, 0, "Decomposition Factor",
-                                  tooltip="Factor for Kronecker product decomposition. -1 for auto, which is recommended. Changing this drastically affects parameter count.")
+            self.components.label(master, 2, 0, "分解因子",
+                                  tooltip="Kronecker积分解因子，-1为自动（推荐）")
             self.components.entry(master, 2, 1, ui_state, "lokr_decompose_factor")
 
             # alpha
@@ -122,8 +122,8 @@ class BaseLoraTabView:
             self.components.entry(master, 3, 1, ui_state, "lora_alpha")
 
             # Dropout Percentage
-            self.components.label(master, 4, 0, "Dropout Probability",
-                                  tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
+            self.components.label(master, 4, 0, "丢弃概率",
+                                  tooltip="丢弃概率，每步随机忽略此比例的模型节点，0=禁用")
             self.components.entry(master, 4, 1, ui_state, "dropout_probability")
 
             # LoKr weight dtype
@@ -133,32 +133,32 @@ class BaseLoraTabView:
 
             # LoKr Vectorization trick
             self.components.label(master, 6, 0, "Kronecker-Vec Trick",
-                                  tooltip="Uses an accelerated path that bypasses the materialization of the full Kronecker product. This delivers a massive speedup to the LoKr without sacrificing precision. Highly recommended.")
+                                  tooltip="使用加速路径绕过完整Kronecker积的实现，大幅加速LoKr")
             self.components.switch(master, 6, 1, ui_state, "lokr_vec_trick")
 
             # LoKr Decomposition Settings
-            self.components.label(master, 1, 3, "Decompose Both Matrices",
-                                  tooltip="Perform rank decomposition on both Kronecker product matrices (W1 and W2). Only effective for very small dimensions.")
+            self.components.label(master, 1, 3, "分解两个矩阵",
+                                  tooltip="对两个Kronecker积矩阵进行秩分解，仅对极小维度有效")
             self.components.switch(master, 1, 4, ui_state, "lokr_decompose_both")
 
             self.components.label(master, 2, 3, "Use Tucker Decomposition (Conv)",
-                                  tooltip="Use Tucker decomposition for convolutional layers. Can be more efficient for some architectures.")
+                                  tooltip="对卷积层使用Tucker分解，某些架构更高效")
             self.components.switch(master, 2, 4, ui_state, "lokr_use_tucker")
 
             self.components.label(master, 3, 3, "Force Full Matrix (W2)",
-                                  tooltip="Forces the second Kronecker matrix (W2) to be a full matrix, ignoring the dimension setting. For expert use.")
+                                  tooltip="强制第二个Kronecker矩阵为全矩阵，忽略维度设置")
             self.components.switch(master, 3, 4, ui_state, "lokr_full_matrix")
 
             # LoKr DoRA Settings
             self.components.label(master, 4, 3, "Decompose Weights (DoRA)",
-                                  tooltip="Apply weight decomposition (DoRA) on top of the LoKr update.")
+                                  tooltip="在LoKr更新上应用权重分解（DoRA）")
             self.components.switch(master, 4, 4, ui_state, "lokr_weight_decompose")
 
-            self.components.label(master, 5, 3, "Apply DoRA on Output Axis",
-                                  tooltip="Apply the DoRA weight decomposition on the output axis instead of the input axis.")
+            self.components.label(master, 5, 3, "在输出轴应用DoRA",
+                                  tooltip="在输出轴而非输入轴应用DoRA权重分解")
             self.components.switch(master, 5, 4, ui_state, "lokr_dora_on_output")
 
             # Additional embeddings
-            self.components.label(master, 6, 3, "Bundle Embeddings",
+            self.components.label(master, 6, 3, "捆绑嵌入",
                                   tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
             self.components.switch(master, 6, 4, ui_state, "bundle_additional_embeddings")

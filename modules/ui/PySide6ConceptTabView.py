@@ -26,8 +26,8 @@ class PySide6ConceptTabView(PySide6ConfigListView, BaseConceptTabView):
             attr_name="concept_file_name",
             config_dir="training_concepts",
             default_config_name="concepts.json",
-            add_button_text="Add Concept",
-            add_button_tooltip="Adds a new concept to the current config.",
+            add_button_text="添加数据集",
+            add_button_tooltip="向当前配置添加新数据集",
             is_full_width=False,
             show_toggle_button=True,
         )
@@ -72,7 +72,7 @@ class PySide6ConceptTabView(PySide6ConfigListView, BaseConceptTabView):
         self.filter_var._bind_widget(lambda v: filter_combo.setCurrentText(v))
 
         self.show_disabled_var = QtVar(True)
-        show_disabled_cb = QCheckBox("Show Disabled", toolbar)
+        show_disabled_cb = QCheckBox("显示禁用项", toolbar)
         show_disabled_cb.setChecked(True)
         row_lo.addWidget(show_disabled_cb)
 
@@ -82,7 +82,7 @@ class PySide6ConceptTabView(PySide6ConfigListView, BaseConceptTabView):
         show_disabled_cb.stateChanged.connect(_on_show_disabled)
         self.show_disabled_var._bind_widget(lambda v: show_disabled_cb.setChecked(bool(v)))
 
-        clear_btn = QPushButton("Clear", toolbar)
+        clear_btn = QPushButton("清除", toolbar)
         clear_btn.setFixedWidth(50)
         clear_btn.clicked.connect(self._reset_filters)
         row_lo.addWidget(clear_btn)

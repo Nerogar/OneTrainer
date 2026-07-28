@@ -15,7 +15,7 @@ class PySide6TimestepDistributionWindowView(BaseTimestepDistributionWindowView, 
         # delete on close so entry widgets and the field validators they register globally are freed, not leaked
         self.finished.connect(self.deleteLater)
 
-        self.setWindowTitle("Timestep Distribution")
+        self.setWindowTitle("时间步分布")
         self.resize(900, 600)
         self._controller = controller
 
@@ -34,7 +34,7 @@ class PySide6TimestepDistributionWindowView(BaseTimestepDistributionWindowView, 
         lo.addWidget(self._canvas, 0, 3, 8, 1)
         self._update_preview()
 
-        update_btn = QPushButton("Update Preview", frame)
+        update_btn = QPushButton("更新预览", frame)
         update_btn.clicked.connect(self._update_preview)
         lo.addWidget(update_btn, 8, 3)
 

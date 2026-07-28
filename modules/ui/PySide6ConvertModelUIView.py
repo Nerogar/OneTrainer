@@ -15,7 +15,7 @@ class PySide6ConvertModelUIView(BaseConvertModelUIView, QDialog):
         self.ui_state = PySide6UIState(controller.convert_model_args)
         self._dynamic_frame = None
 
-        self.setWindowTitle("Convert models")
+        self.setWindowTitle("转换模型")
         self.resize(600, 380)
 
         _pad = pyside6_components.PAD

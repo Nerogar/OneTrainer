@@ -12,7 +12,7 @@ class PySide6SampleParamsWindowView(BaseSampleParamsWindowView, QDialog):
         QDialog.__init__(self, parent if isinstance(parent, QWidget) else None)
         BaseSampleParamsWindowView.__init__(self, pyside6_components)
 
-        self.setWindowTitle("Sample")
+        self.setWindowTitle("采样")
         self.resize(800, 500)
 
         outer = QGridLayout(self)

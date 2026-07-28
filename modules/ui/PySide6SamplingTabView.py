@@ -17,8 +17,8 @@ class PySide6SamplingTabView(PySide6ConfigListView, BaseSamplingTabView):
             attr_name="sample_definition_file_name",
             config_dir="training_samples",
             default_config_name="samples.json",
-            add_button_text="Add Sample",
-            add_button_tooltip="Add a new sample configuration.",
+            add_button_text="添加采样",
+            add_button_tooltip="添加新的采样配置",
             is_full_width=True,
             show_toggle_button=True,
         )

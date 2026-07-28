@@ -31,12 +31,12 @@ class BaseSampleFrameView:
             if is_video_model:
                 # frames
                 self.components.label(bottom_frame, 1, 0, "frames:",
-                                      tooltip="Number of frames to generate. Only used when generating videos.")
+                                      tooltip="生成帧数，仅视频生成时使用")
                 self.components.entry(bottom_frame, 1, 1, ui_state, "frames")
 
                 # length
                 self.components.label(bottom_frame, 1, 2, "length:",
-                                      tooltip="Length in seconds of audio output.")
+                                      tooltip="音频输出长度（秒）")
                 self.components.entry(bottom_frame, 1, 3, ui_state, "length")
 
             # seed
@@ -74,12 +74,12 @@ class BaseSampleFrameView:
             # inpainting
             if is_inpainting_model:
                 self.components.label(bottom_frame, 5, 0, "inpainting:",
-                                      tooltip="Enables inpainting sampling. Only available when sampling from an inpainting model.")
+                                      tooltip="启用修复采样，仅修复模型可用")
                 self.components.switch(bottom_frame, 5, 1, ui_state, "sample_inpainting")
 
                 # base image path
                 self.components.label(bottom_frame, 6, 0, "base image path:",
-                                      tooltip="The base image used when inpainting.")
+                                      tooltip="修复使用的基础图像")
                 self.components.path_entry(bottom_frame, 6, 1, ui_state, "base_image_path",
                                            mode="file",
                                            allow_model_files=False,
@@ -88,7 +88,7 @@ class BaseSampleFrameView:
 
                 # mask image path
                 self.components.label(bottom_frame, 6, 2, "mask image path:",
-                                      tooltip="The mask used when inpainting.")
+                                      tooltip="修复使用的遮罩")
                 self.components.path_entry(bottom_frame, 6, 3, ui_state, "mask_image_path",
                                            mode="file",
                                            allow_model_files=False,

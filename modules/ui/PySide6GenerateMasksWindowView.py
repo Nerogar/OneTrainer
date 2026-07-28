@@ -25,24 +25,24 @@ class CtkGenerateMasksWindowView(BaseGenerateMasksWindowView, ctk.CTkToplevel):
         if path is None:
             path = ""
 
-        self.mode_var = ctk.StringVar(self, "Create if absent")
-        self.modes = ["Replace all masks", "Create if absent", "Add to existing", "Subtract from existing", "Blend with existing"]
+        self.mode_var = ctk.StringVar(self, "不存在则创建")
+        self.modes = ["替换所有遮罩", "不存在则创建", "添加到现有", "从现有减去", "与现有混合"]
         self.model_var = ctk.StringVar(self, "ClipSeg")
-        self.models = ["ClipSeg", "Rembg", "Rembg-Human", "Hex Color"]
+        self.models = ["ClipSeg", "Rembg", "Rembg-Human", "十六进制颜色"]
 
-        self.title("Batch generate masks")
+        self.title("批量生成遮罩")
         self.geometry("360x430")
         self.resizable(True, True)
 
         self.frame = ctk.CTkFrame(self, width=600, height=300)
         self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
-        self.model_label = ctk.CTkLabel(self.frame, text="Model", width=100)
+        self.model_label = ctk.CTkLabel(self.frame, text="模型", width=100)
         self.model_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.model_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.model_var, values=self.models, dynamic_resizing=False, width=200)
         self.model_dropdown.grid(row=0, column=1, sticky="w", padx=5, pady=5)
 
-        self.path_label = ctk.CTkLabel(self.frame, text="Folder", width=100)
+        self.path_label = ctk.CTkLabel(self.frame, text="文件夹", width=100)
         self.path_label.grid(row=1, column=0, sticky="w",padx=5, pady=5)
         self.path_entry = ctk.CTkEntry(self.frame, width=150)
         self.path_entry.insert(0, path)
@@ -50,7 +50,7 @@ class CtkGenerateMasksWindowView(BaseGenerateMasksWindowView, ctk.CTkToplevel):
         self.path_button = ctk.CTkButton(self.frame, width=30, text="...", command=lambda: self.browse_for_path(self.path_entry))
         self.path_button.grid(row=1, column=1, sticky="e", padx=5, pady=5)
 
-        self.prompt_label = ctk.CTkLabel(self.frame, text="Prompt", width=100)
+        self.prompt_label = ctk.CTkLabel(self.frame, text="提示词", width=100)
         self.prompt_label.grid(row=2, column=0, sticky="w",padx=5, pady=5)
         self.prompt_entry = ctk.CTkEntry(self.frame, width=200)
         self.prompt_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
@@ -60,19 +60,19 @@ class CtkGenerateMasksWindowView(BaseGenerateMasksWindowView, ctk.CTkToplevel):
         self.mode_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.mode_var, values=self.modes, dynamic_resizing=False, width=200)
         self.mode_dropdown.grid(row=3, column=1, sticky="w", padx=5, pady=5)
 
-        self.threshold_label = ctk.CTkLabel(self.frame, text="Threshold", width=100)
+        self.threshold_label = ctk.CTkLabel(self.frame, text="阈值", width=100)
         self.threshold_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
         self.threshold_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="0.0 - 1.0")
         self.threshold_entry.insert(0, "0.3")
         self.threshold_entry.grid(row=4, column=1, sticky="w", padx=5, pady=5)
 
-        self.smooth_label = ctk.CTkLabel(self.frame, text="Smooth", width=100)
+        self.smooth_label = ctk.CTkLabel(self.frame, text="平滑", width=100)
         self.smooth_label.grid(row=5, column=0, sticky="w", padx=5, pady=5)
         self.smooth_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="5")
         self.smooth_entry.insert(0, 5)
         self.smooth_entry.grid(row=5, column=1, sticky="w", padx=5, pady=5)
 
-        self.expand_label = ctk.CTkLabel(self.frame, text="Expand", width=100)
+        self.expand_label = ctk.CTkLabel(self.frame, text="展开", width=100)
         self.expand_label.grid(row=6, column=0, sticky="w", padx=5, pady=5)
         self.expand_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="10")
         self.expand_entry.insert(0, 10)
@@ -95,7 +95,7 @@ class CtkGenerateMasksWindowView(BaseGenerateMasksWindowView, ctk.CTkToplevel):
         self.progress = ctk.CTkProgressBar(self.frame, orientation="horizontal", mode="determinate", width=200)
         self.progress.grid(row=9, column=1, sticky="w", padx=5, pady=5)
 
-        self.create_masks_button = ctk.CTkButton(self.frame, text="Create Masks", width=310, command=self._on_create_masks)
+        self.create_masks_button = ctk.CTkButton(self.frame, text="创建遮罩", width=310, command=self._on_create_masks)
         self.create_masks_button.grid(row=10, column=0, columnspan=2, sticky="w", padx=5, pady=5)
 
         self.frame.pack(fill="both", expand=True)

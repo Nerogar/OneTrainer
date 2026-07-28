@@ -8,11 +8,11 @@ class BaseVideoToolUIView(ABC):
 
     def build_clip_extract_tab(self, frame, controller, ui_state):
         # single video
-        self.components.label(frame, 0, 0, "Single Video",
-                         tooltip="Link to single video file to process.")
+        self.components.label(frame, 0, 0, "单个视频",
+                         tooltip="单个视频文件链接")
         self.components.path_entry(frame, 0, 1, ui_state, "clip_single",
                                mode="file", allow_model_files=False, allow_video_files=True)
-        self.components.button(frame, 0, 2, "Extract Single",
+        self.components.button(frame, 0, 2, "提取单个",
                           command=lambda: self._extract_clips(False, controller))
 
         # time range
@@ -24,14 +24,14 @@ class BaseVideoToolUIView(ABC):
 
         # directory of videos
         self.components.label(frame, 2, 0, "Directory",
-                         tooltip="Path to directory with multiple videos to process, including in subdirectories.")
+                         tooltip="包含子目录的多视频处理目录")
         self.components.path_entry(frame, 2, 1, ui_state, "clip_list", mode="dir")
-        self.components.button(frame, 2, 2, "Extract Directory",
+        self.components.button(frame, 2, 2, "提取目录",
                           command=lambda: self._extract_clips(True, controller))
 
         # output directory
-        self.components.label(frame, 3, 0, "Output",
-                         tooltip="Path to folder where extracted clips will be saved.")
+        self.components.label(frame, 3, 0, "输出",
+                         tooltip="提取片段保存目录")
         self.components.path_entry(frame, 3, 1, ui_state, "clip_output", mode="dir")
 
         # output to subdirectories
@@ -41,39 +41,39 @@ class BaseVideoToolUIView(ABC):
         self.components.switch(frame, 4, 1, ui_state, "output_subdir_clip")
 
         # split at cuts
-        self.components.label(frame, 5, 0, "Split at Cuts",
+        self.components.label(frame, 5, 0, "按剪辑分割",
                          tooltip="If enabled, detect cuts in the input video and split at those points. \
                             Otherwise will split at any point, and clips may contain cuts.")
         self.components.switch(frame, 5, 1, ui_state, "split_cuts")
 
         # maximum length
         self.components.label(frame, 6, 0, "Max Length (s)",
-                         tooltip="Maximum length in seconds for saved clips, larger clips will be broken into multiple small clips.")
+                         tooltip="保存片段最大长度(秒)，超出则分割")
         self.components.entry(frame, 6, 1, ui_state, "clip_length", width=220)
 
         # Set FPS
-        self.components.label(frame, 7, 0, "Set FPS",
-                         tooltip="FPS to convert output videos to, set to 0 to keep original rate.")
+        self.components.label(frame, 7, 0, "设置FPS",
+                         tooltip="输出视频帧率，0保持原始")
         self.components.entry(frame, 7, 1, ui_state, "clip_fps", width=220)
 
         # Remove borders
-        self.components.label(frame, 8, 0, "Remove Borders",
-                         tooltip="Remove black borders from output clip")
+        self.components.label(frame, 8, 0, "移除边框",
+                         tooltip="移除输出片段的黑色边框")
         self.components.switch(frame, 8, 1, ui_state, "clip_bordercrop")
 
         # Crop Variation
-        self.components.label(frame, 9, 0, "Crop Variation",
+        self.components.label(frame, 9, 0, "裁剪变化",
                          tooltip="Output clips will be randomly cropped to +- the base aspect ratio, \
                               somewhat biased towards making square videos. Set to 0 to use only base aspect.")
         self.components.entry(frame, 9, 1, ui_state, "clip_crop", width=220)
 
     def build_image_extract_tab(self, frame, controller, ui_state):
         # single video
-        self.components.label(frame, 0, 0, "Single Video",
-                         tooltip="Link to single video file to process.")
+        self.components.label(frame, 0, 0, "单个视频",
+                         tooltip="单个视频文件链接")
         self.components.path_entry(frame, 0, 1, ui_state, "image_single",
                                mode="file", allow_model_files=False, allow_video_files=True)
-        self.components.button(frame, 0, 2, "Extract Single",
+        self.components.button(frame, 0, 2, "提取单个",
                           command=lambda: self._extract_images(False, controller))
 
         # time range
@@ -85,14 +85,14 @@ class BaseVideoToolUIView(ABC):
 
         # directory of videos
         self.components.label(frame, 2, 0, "Directory",
-                         tooltip="Path to directory with multiple videos to process, including in subdirectories.")
+                         tooltip="包含子目录的多视频处理目录")
         self.components.path_entry(frame, 2, 1, ui_state, "image_list", mode="dir")
-        self.components.button(frame, 2, 2, "Extract Directory",
+        self.components.button(frame, 2, 2, "提取目录",
                           command=lambda: self._extract_images(True, controller))
 
         # output directory
-        self.components.label(frame, 3, 0, "Output",
-                         tooltip="Path to folder where extracted images will be saved.")
+        self.components.label(frame, 3, 0, "输出",
+                         tooltip="提取图像保存目录")
         self.components.path_entry(frame, 3, 1, ui_state, "image_output", mode="dir")
 
         # output to subdirectories
@@ -108,45 +108,45 @@ class BaseVideoToolUIView(ABC):
         self.components.entry(frame, 5, 1, ui_state, "capture_rate", width=220)
 
         # blur removal
-        self.components.label(frame, 6, 0, "Blur Removal",
+        self.components.label(frame, 6, 0, "模糊移除",
                          tooltip="Threshold for removal of blurry images, relative to all others. \
                             For example at 0.2, the blurriest 20%% of the final selected frames will not be saved.")
         self.components.entry(frame, 6, 1, ui_state, "blur_threshold", width=220)
 
         # Remove borders
-        self.components.label(frame, 7, 0, "Remove Borders",
-                         tooltip="Remove black borders from output image")
+        self.components.label(frame, 7, 0, "移除边框",
+                         tooltip="移除输出图像的黑色边框")
         self.components.switch(frame, 7, 1, ui_state, "image_bordercrop")
 
         # Crop Variation
-        self.components.label(frame, 8, 0, "Crop Variation",
+        self.components.label(frame, 8, 0, "裁剪变化",
                          tooltip="Output images will be randomly cropped to +- the base aspect ratio, \
                             somewhat biased towards making square images. Set to 0 to use only base sapect.")
         self.components.entry(frame, 8, 1, ui_state, "image_crop", width=220)
 
     def build_video_download_tab(self, frame, controller, ui_state):
         # link
-        self.components.label(frame, 0, 0, "Single Link",
-                         tooltip="Link to video/playlist to download. Uses yt-dlp, supports youtube, twitch, instagram, and many other sites.")
+        self.components.label(frame, 0, 0, "单个链接",
+                         tooltip="视频/播放列表下载链接，支持YouTube等")
         self.components.entry(frame, 0, 1, ui_state, "download_link", width=220)
-        self.components.button(frame, 0, 2, "Download Link",
+        self.components.button(frame, 0, 2, "下载链接",
                           command=lambda: self._download(False, controller))
 
         # link list
-        self.components.label(frame, 1, 0, "Link List",
-                         tooltip="Path to txt file with list of links separated by newlines.")
+        self.components.label(frame, 1, 0, "链接列表",
+                         tooltip="链接列表txt文件路径")
         self.components.path_entry(frame, 1, 1, ui_state, "download_list",
                                mode="file", allow_model_files=False)
-        self.components.button(frame, 1, 2, "Download List",
+        self.components.button(frame, 1, 2, "下载列表",
                           command=lambda: self._download(True, controller))
 
         # output directory
-        self.components.label(frame, 2, 0, "Output",
-                         tooltip="Path to folder where downloaded videos will be saved.")
+        self.components.label(frame, 2, 0, "输出",
+                         tooltip="下载视频保存目录")
         self.components.path_entry(frame, 2, 1, ui_state, "download_output", mode="dir")
 
         # additional args
-        self.components.label(frame, 3, 0, "Additional Args",
+        self.components.label(frame, 3, 0, "附加参数",
                          tooltip="Any additional arguments to pass to yt-dlp, for example '--restrict-filenames --force-overwrite'. \
                             Default args will hide most terminal outputs.")
         self._create_textbox(frame, 3, 1, 220, 90, ui_state, "download_args")

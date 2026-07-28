@@ -33,7 +33,7 @@ class PySide6VideoToolUIView(BaseVideoToolUIView, QDialog, metaclass=QtABCMeta):
 
         ui_state = PySide6UIState(controller.args)
 
-        self.setWindowTitle("Video Tools")
+        self.setWindowTitle("视频工具")
         self.resize(700, 750)
 
         outer = QGridLayout(self)
@@ -79,7 +79,7 @@ class PySide6VideoToolUIView(BaseVideoToolUIView, QDialog, metaclass=QtABCMeta):
                 150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
         )
-        self._preview_caption_label = QLabel("Preview image", frame)
+        self._preview_caption_label = QLabel("预览图", frame)
         self._preview_caption_label.setWordWrap(True)
 
         preview_col = QWidget(frame)
@@ -93,7 +93,7 @@ class PySide6VideoToolUIView(BaseVideoToolUIView, QDialog, metaclass=QtABCMeta):
         self._status_box.setReadOnly(True)
         self._status_box.setFixedHeight(160)
         self._status_box.setMinimumWidth(300)
-        self._status_box.setPlainText("Current status")
+        self._status_box.setPlainText("当前状态")
         lo.addWidget(self._status_box, 0, 1, Qt.AlignTop)
 
         return frame
