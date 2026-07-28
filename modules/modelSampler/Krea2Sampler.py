@@ -70,7 +70,7 @@ class Krea2Sampler(BaseModelSampler):
             self.model.text_encoder_to(self.train_device)
 
             batch_size = 2 if cfg_scale > 1.0 else 1
-            combined_prompt_embedding, text_attention_mask = self.model.encode_text(
+            combined_prompt_embedding, _ = self.model.encode_text(
                 text=[prompt, negative_prompt] if cfg_scale > 1.0 else prompt,
                 batch_size=batch_size,
                 train_device=self.train_device,
@@ -113,7 +113,11 @@ class Krea2Sampler(BaseModelSampler):
                     encoder_hidden_states=combined_prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
                     timestep=expanded_timestep / 1000,
                     position_ids=position_ids,
-                    encoder_attention_mask=text_attention_mask,
+                    # deliberately no encoder_attention_mask: a mask forces SDPA's math fallback,
+                    # materializing (batch*heads, seq, seq) attention matrices in every block.
+                    # Padding embeddings are zeros and attending them is a close approximation -
+                    # and keeps sampling consistent with training (see BaseKrea2Setup.predict()).
+                    encoder_attention_mask=None,
                     return_dict=False,
                 )[0]
 

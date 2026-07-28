@@ -123,8 +123,15 @@ class BaseKrea2Setup(
                 text_seq_len, grid_height, grid_width, self.train_device
             )
 
-            if torch.all(text_attention_mask):
-                text_attention_mask = None
+            # Never pass the text padding mask to the transformer. With any attn_mask present,
+            # torch's scaled_dot_product_attention rejects the fused flash/cuDNN/efficient
+            # kernels and falls back to the math backend, which materializes the full
+            # (batch*heads, seq, seq) attention matrix in every block - several GiB per block
+            # at batch_size > 1, enough to OOM even 96GB cards. The padded positions hold
+            # zero embeddings, so letting them be attended is a close approximation (the same
+            # trade-off kohya-family trainers make), and it matches what the model already
+            # sees whenever a batch has uniform caption lengths (always true at batch size 1).
+            text_attention_mask = None
 
             packed_predicted_flow = model.transformer(
                 hidden_states=packed_latent_input.to(dtype=model.train_dtype.torch_dtype()),
