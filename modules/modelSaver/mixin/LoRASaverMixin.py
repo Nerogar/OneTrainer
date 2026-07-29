@@ -37,6 +37,20 @@ class LoRASaverMixin(
     ):
         self._save(model, output_model_format, output_model_destination, dtype)
 
+    def save_state_dict(self, model: BaseModel, state_dict: dict[str, Tensor], output_model_format: ModelFormat,
+                        output_model_destination: str, dtype: torch.dtype | None):
+        """Save a canonical LoRA state dict without a live LoRA wrapper."""
+        self._provided_state_dict = state_dict
+        try:
+            self._save(model, output_model_format, output_model_destination, dtype)
+        finally:
+            del self._provided_state_dict
+
+    def _state_dict(self, model: BaseModel) -> dict[str, Tensor]:
+        if hasattr(self, "_provided_state_dict"):
+            return self._provided_state_dict
+        return self._get_state_dict(model)
+
     @abstractmethod
     def _get_state_dict(
             self,
@@ -61,7 +75,7 @@ class LoRASaverMixin(
     def _save_diffusers(self, model: BaseModel, destination: str, dtype: torch.dtype | None):
         # DIFFUSERS format: HF diffusers convention (not the peft library's native layout).
         # Key-set-free (canonical == diffusers namespace).
-        state_dict = self._get_state_dict(model)
+        state_dict = self._state_dict(model)
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
         save_state_dict = convert_to_diffusers(save_state_dict)
         self._write_lora_file(model, destination, save_state_dict)
@@ -76,7 +90,7 @@ class LoRASaverMixin(
         return kohya_flatten(state_dict)
 
     def _save_kohya(self, model: BaseModel, destination: str, dtype: torch.dtype | None):
-        state_dict = self._get_state_dict(model)
+        state_dict = self._state_dict(model)
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
         save_state_dict = self._convert_kohya(model, save_state_dict)
         self._write_lora_file(model, destination, save_state_dict)
@@ -91,13 +105,13 @@ class LoRASaverMixin(
             f"The LEGACY LoRA output format is not supported for {model.model_type}.")
 
     def _save_legacy(self, model: BaseModel, destination: str, dtype: torch.dtype | None):
-        state_dict = self._get_state_dict(model)
+        state_dict = self._state_dict(model)
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
         save_state_dict = self._convert_legacy(model, save_state_dict)
         self._write_lora_file(model, destination, save_state_dict)
 
     def _save_original(self, model: BaseModel, destination: str, dtype: torch.dtype | None):
-        state_dict = self._get_state_dict(model)
+        state_dict = self._state_dict(model)
         # ORIGINAL puts the denoising model at the top level with no prefix, which leaves no namespace for a
         # second component: a trained text encoder (or bundled embeddings) would have to sit under its own
         # prefix alongside the unprefixed denoising keys, an asymmetric layout no external tool reads. Refuse
@@ -121,7 +135,7 @@ class LoRASaverMixin(
 
     def _save_comfy(self, model: BaseModel, destination: str, dtype: torch.dtype | None):
         conversion = lora_original_conversion(model, model.lora_diffusers_to_comfy())
-        state_dict = self._get_state_dict(model)
+        state_dict = self._state_dict(model)
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
         save_state_dict = convert(save_state_dict, conversion, strict=True)
         # COMFY needs a Comfy-native "text_encoders.<prefix>" name for every trained text encoder, or Comfy
@@ -151,7 +165,7 @@ class LoRASaverMixin(
     def _save_internal(self, model: BaseModel, destination: str):
         # INTERNAL backup: the raw canonical in-memory dict (no conversion).
         os.makedirs(destination, exist_ok=True)
-        state_dict = self._get_state_dict(model)
+        state_dict = self._state_dict(model)
         save_state_dict = self._convert_state_dict_dtype(state_dict, None)
         self._write_lora_file(model, os.path.join(destination, "lora", "lora.safetensors"), save_state_dict)
 
@@ -164,7 +178,7 @@ class LoRASaverMixin(
     ):
         # INTERNAL is the raw canonical dict, not a foreign format with a fixed fused/split shape -- exempt.
         if output_model_format != ModelFormat.INTERNAL:
-            state_dict = self._get_state_dict(model)
+            state_dict = self._state_dict(model)
             check_fusion_match(state_dict.keys(), output_model_format.needs_qkv_fusion(), model.fusion_groups())
 
         match output_model_format:

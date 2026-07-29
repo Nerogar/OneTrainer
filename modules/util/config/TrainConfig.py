@@ -542,6 +542,11 @@ class TrainConfig(BaseConfig):
     lora_weight_dtype: DataType
     bundle_additional_embeddings: bool
 
+    # full fine-tune LoRA export
+    full_fine_tune_export_lora: bool
+    full_fine_tune_lora_rank: int
+    full_fine_tune_lora_format: ModelFormat
+
     # oft
     oft_block_size: int
     oft_block_share: bool
@@ -1235,6 +1240,9 @@ class TrainConfig(BaseConfig):
         data.append(("lora_decompose_output_axis", False, bool, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("bundle_additional_embeddings", True, bool, False))
+        data.append(("full_fine_tune_export_lora", False, bool, False))
+        data.append(("full_fine_tune_lora_rank", 64, int, False))
+        data.append(("full_fine_tune_lora_format", ModelFormat.DIFFUSERS_LORA, ModelFormat, False))
 
         # oft
         data.append(("oft_block_size", 32, int, False))

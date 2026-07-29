@@ -13,6 +13,7 @@ from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
+from modules.modelSaver.krea2.Krea2FineTuneLoRAExporter import Krea2FineTuneLoRAExporter
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
 from modules.util import create, huggingface_util, path_util
@@ -483,7 +484,7 @@ class GenericTrainer(BaseTrainer):
         save_path = os.path.join(
             self.config.workspace_dir,
             "save",
-            f"{self.config.save_filename_prefix}{get_string_timestamp()}-save-{train_progress.filename_string()}{self.config.output_model_format.file_extension()}"
+            f"{self.config.save_filename_prefix}{get_string_timestamp()}-save-{train_progress.filename_string()}{self.__output_file_extension()}"
         )
         if print_msg:
             tqdm.write("Saving " + save_path)
@@ -496,13 +497,7 @@ class GenericTrainer(BaseTrainer):
             if self.config.optimizer.optimizer.is_schedule_free:
                 torch.clear_autocast_cache()
                 self.model.optimizer.eval()
-            self.model_saver.save(
-                model=self.model,
-                model_type=self.config.model_type,
-                output_model_format=self.config.output_model_format,
-                output_model_destination=save_path,
-                dtype=self.config.output_dtype.torch_dtype()
-            )
+            self.__save_model(save_path)
             if self.config.optimizer.optimizer.is_schedule_free:
                 torch.clear_autocast_cache()
                 self.model.optimizer.train()
@@ -520,6 +515,25 @@ class GenericTrainer(BaseTrainer):
                 self.model.ema.copy_temp_to(self.parameters)
 
         torch_gc()
+
+    def __save_model(self, save_path: str):
+        if (self.config.full_fine_tune_export_lora
+                and self.config.training_method == TrainingMethod.FINE_TUNE
+                and self.config.model_type.name == "KREA_2"):
+            Krea2FineTuneLoRAExporter().export(self.model, self.config, save_path)
+        else:
+            self.model_saver.save(
+                model=self.model,
+                model_type=self.config.model_type,
+                output_model_format=self.config.output_model_format,
+                output_model_destination=save_path,
+                dtype=self.config.output_dtype.torch_dtype(),
+            )
+
+    def __output_file_extension(self) -> str:
+        if self.config.full_fine_tune_export_lora and self.config.model_type.name == "KREA_2":
+            return self.config.full_fine_tune_lora_format.file_extension()
+        return self.config.output_model_format.file_extension()
 
     def __needs_sample(self, train_progress: TrainProgress):
         return self.single_action_elapsed(
@@ -857,22 +871,18 @@ class GenericTrainer(BaseTrainer):
 
                 if self.model.ema:
                     self.model.ema.copy_ema_to(self.parameters, store_temp=False)
-                if os.path.isdir(self.config.output_model_destination) and self.config.output_model_format.is_single_file():
+                is_single_file = (self.config.full_fine_tune_export_lora and self.config.model_type.name == "KREA_2") \
+                    or self.config.output_model_format.is_single_file()
+                if os.path.isdir(self.config.output_model_destination) and is_single_file:
                     save_path = os.path.join(
                         self.config.output_model_destination,
-                        f"{self.config.save_filename_prefix}{get_string_timestamp()}{self.config.output_model_format.file_extension()}"
+                        f"{self.config.save_filename_prefix}{get_string_timestamp()}{self.__output_file_extension()}"
                     )
                 else:
                     save_path = self.config.output_model_destination
                 print("Saving " + save_path)
 
-                self.model_saver.save(
-                    model=self.model,
-                    model_type=self.config.model_type,
-                    output_model_format=self.config.output_model_format,
-                    output_model_destination=save_path,
-                    dtype=self.config.output_dtype.torch_dtype()
-                )
+                self.__save_model(save_path)
 
         if self.model is not None:
             self.model.to(self.temp_device)

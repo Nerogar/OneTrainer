@@ -409,4 +409,19 @@ class BaseModelTabView(ABC):
 
         row += 1
 
+        if (controller.train_config.model_type.name == "KREA_2"
+                and controller.train_config.training_method.name == "FINE_TUNE"):
+            self.components.label(frame, row, 0, "Export Full Fine Tune as LoRA",
+                                  tooltip="Approximate the full fine-tune delta as a LoRA when saving. No full checkpoint is written; higher rank preserves more of the delta.")
+            self.components.switch(frame, row, 1, ui_state, "full_fine_tune_export_lora")
+            self.components.label(frame, row, 3, "Export LoRA Rank",
+                                  tooltip="Rank used to approximate each trained linear weight delta.")
+            self.components.entry(frame, row, 4, ui_state, "full_fine_tune_lora_rank")
+            row += 1
+            self.components.label(frame, row, 0, "Export LoRA Format",
+                                  tooltip="Format used only when exporting a full fine-tune as a LoRA.")
+            self.components.options_kv(frame, row, 1, controller.get_lora_output_formats(),
+                                       ui_state, "full_fine_tune_lora_format")
+            row += 1
+
         return row

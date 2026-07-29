@@ -44,3 +44,13 @@ class ModelTabController:
         }
         formats = self.train_config.model_type.supported_output_formats(self.train_config.training_method)
         return [(labels[fmt], fmt) for fmt in formats]
+
+    def get_lora_output_formats(self) -> list[tuple[str, ModelFormat]]:
+        labels = {
+            ModelFormat.DIFFUSERS_LORA: "Diffusers",
+            ModelFormat.KOHYA_LORA: "Kohya",
+            ModelFormat.ORIGINAL_LORA: "Original",
+            ModelFormat.COMFY_LORA: "Comfy",
+            ModelFormat.LEGACY_LORA: "Legacy",
+        }
+        return [(labels[fmt], fmt) for fmt in self.train_config.model_type.supported_lora_formats()]
