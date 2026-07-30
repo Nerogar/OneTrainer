@@ -12,18 +12,18 @@ class BaseOptimizerParamsWindowView:
     def build_content(self, frame, controller, ui_state, optimizer_ui_state,
                       on_optimizer_change_cb, load_defaults_cb):
         # Optimizer
-        self.components.label(frame, 0, 0, "Optimizer",
-                              tooltip="The type of optimizer")
+        self.components.label(frame, 0, 0, "优化器",
+                              tooltip="优化器类型")
 
         # Create the optimizer dropdown menu and set the command
         self.components.options(frame, 0, 1, [str(x) for x in list(Optimizer)], optimizer_ui_state, "optimizer",
                                 command=on_optimizer_change_cb)
 
         # Defaults Button
-        self.components.label(frame, 0, 3, "Optimizer Defaults",
-                              tooltip="Load default settings for the selected optimizer")
-        self.components.button(frame, 0, 4, "Load Defaults", load_defaults_cb,
-                               tooltip="Load default settings for the selected optimizer")
+        self.components.label(frame, 0, 3, "优化器默认值",
+                              tooltip="加载所选优化器的默认设置")
+        self.components.button(frame, 0, 4, "加载默认值", load_defaults_cb,
+                               tooltip="加载所选优化器的默认设置")
 
     def build_dynamic_content(self, master, controller, optimizer_ui_state,
                               update_user_pref_cb, open_muon_adam_cb):
@@ -159,7 +159,7 @@ class BaseOptimizerParamsWindowView:
 
                 self.muon_adam_button = self.components.button(
                     frame, 0, 1, "...", open_muon_adam_cb,
-                    tooltip="Configure the auxiliary AdamW_adv optimizer",
+                    tooltip="配置辅助AdamW_adv优化器",
                     width=20, padx=5)
             elif type != 'bool':
                 self.components.entry(master, row, col + 1, optimizer_ui_state, key,

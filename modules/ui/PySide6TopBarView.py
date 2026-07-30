@@ -43,7 +43,7 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
         widget.deleteLater()
 
     def _show_save_dialog(self, initial_dir: str, callback):
-        path, _ = QFileDialog.getSaveFileName(self, "Save config", initial_dir, "JSON (*.json)")
+        path, _ = QFileDialog.getSaveFileName(self, "保存配置", initial_dir, "JSON (*.json)")
         if path:
             # the native dialog doesn't reliably append the filter's extension on every platform
             if not path.endswith(".json"):
@@ -51,6 +51,6 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
             callback(path)
 
     def _show_open_dialog(self, initial_dir: str, callback):
-        path, _ = QFileDialog.getOpenFileName(self, "Load config", initial_dir, "JSON (*.json)")
+        path, _ = QFileDialog.getOpenFileName(self, "加载配置", initial_dir, "JSON (*.json)")
         if path:
             callback(path)

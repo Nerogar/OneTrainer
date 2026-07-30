@@ -100,8 +100,8 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         if self.controller.training_thread is not None and self.controller.training_thread.is_alive():
             QMessageBox.warning(
                 self,
-                "Training in progress",
-                "A training is currently running. Stop the training before closing the window.",
+                "训练进行中",
+                "训练正在运行中，关闭窗口前请先停止训练",
             )
             event.ignore()
             return
@@ -151,7 +151,7 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
 
     def show_validation_errors(self, errors: list[str]):
         bullet_list = "\n".join(f"• {e}" for e in errors)
-        QMessageBox.critical(self, "Cannot Start Training",
+        QMessageBox.critical(self, "无法开始训练",
                              f"Please fix the following errors before training:\n\n{bullet_list}")
 
     def open_dataset_tool(self):
@@ -247,35 +247,43 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
     def _create_tabs(self):
         general_page = self._create_scrollable_tab(self._configure_general_frame)
         self.tabview.addTab(general_page, "general")
+        self.tabview.setTabText(self.tabview.indexOf(general_page), "常规")
         self._tab_widgets["general"] = general_page
 
         self.model_tab = PySide6ModelTabView(None, ModelTabController(self.controller.train_config), self.ui_state)
         self.tabview.addTab(self.model_tab, "model")
+        self.tabview.setTabText(self.tabview.indexOf(self.model_tab), "模型")
         self._tab_widgets["model"] = self.model_tab
 
         data_page = self._create_scrollable_tab(self._configure_data_frame)
         self.tabview.addTab(data_page, "data")
+        self.tabview.setTabText(self.tabview.indexOf(data_page), "数据")
         self._tab_widgets["data"] = data_page
 
         concepts_page = QWidget()
         self.concepts_tab = PySide6ConceptTabView(concepts_page, ConceptTabController(self.controller.train_config), self.ui_state)
         self.tabview.addTab(concepts_page, "concepts")
+        self.tabview.setTabText(self.tabview.indexOf(concepts_page), "数据集")
         self._tab_widgets["concepts"] = concepts_page
 
         self.training_tab = PySide6TrainingTabView(None, TrainingTabController(self.controller.train_config), self.ui_state)
         self.tabview.addTab(self.training_tab, "training")
+        self.tabview.setTabText(self.tabview.indexOf(self.training_tab), "训练")
         self._tab_widgets["training"] = self.training_tab
 
         sampling_page = self.create_sampling_tab()
         self.tabview.addTab(sampling_page, "sampling")
+        self.tabview.setTabText(self.tabview.indexOf(sampling_page), "采样")
         self._tab_widgets["sampling"] = sampling_page
 
         backup_page = self._create_scrollable_tab(self._configure_backup_frame)
         self.tabview.addTab(backup_page, "backup")
+        self.tabview.setTabText(self.tabview.indexOf(backup_page), "备份")
         self._tab_widgets["backup"] = backup_page
 
         tools_page = self._create_scrollable_tab(self._configure_tools_frame)
         self.tabview.addTab(tools_page, "tools")
+        self.tabview.setTabText(self.tabview.indexOf(tools_page), "工具")
         self._tab_widgets["tools"] = tools_page
 
         additional_embeddings_page = QWidget()
@@ -285,10 +293,12 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
             self.ui_state,
         )
         self.tabview.addTab(additional_embeddings_page, "additional embeddings")
+        self.tabview.setTabText(self.tabview.indexOf(additional_embeddings_page), "附加嵌入")
         self._tab_widgets["additional embeddings"] = additional_embeddings_page
 
         self.cloud_tab = PySide6CloudTabView(None, CloudTabController(self.controller.train_config, self), self.ui_state)
         self.tabview.addTab(self.cloud_tab, "cloud")
+        self.tabview.setTabText(self.tabview.indexOf(self.cloud_tab), "云端")
         self._tab_widgets["cloud"] = self.cloud_tab
 
     def create_sampling_tab(self):
@@ -357,10 +367,12 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         if training_method == TrainingMethod.LORA and 'LoRA' not in self._tab_widgets:
             self.lora_tab = PySide6LoraTabView(None, LoraTabController(self.controller.train_config), self.ui_state)
             self.tabview.addTab(self.lora_tab, 'LoRA')
+            self.tabview.setTabText(self.tabview.indexOf(self.lora_tab), 'LoRA')
             self._tab_widgets['LoRA'] = self.lora_tab
         if training_method == TrainingMethod.EMBEDDING and 'embedding' not in self._tab_widgets:
             tab_page = self._create_scrollable_tab(self._configure_embedding_frame)
             self.tabview.addTab(tab_page, 'embedding')
+            self.tabview.setTabText(self.tabview.indexOf(tab_page), '嵌入')
             self._tab_widgets['embedding'] = tab_page
 
     def load_preset(self):
@@ -371,11 +383,11 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         if not self.training_button:
             return
         styles = {
-            "idle":     ("Start Training", True,  "#198754", "white"),
-            "running":  ("Stop Training",  True,  "#dc3545", "white"),
+            "idle":     ("开始训练", True,  "#198754", "white"),
+            "running":  ("停止训练",  True,  "#dc3545", "white"),
             "stopping": ("Stopping...",    False, "#dc3545", "white"),
         }
-        text, enabled, bg, fg = styles.get(mode, ("Start Training", True, "#198754", "white"))
+        text, enabled, bg, fg = styles.get(mode, ("开始训练", True, "#198754", "white"))
         self.training_button.setText(text)
         self.training_button.setEnabled(enabled)
         self.training_button.setStyleSheet(
@@ -385,14 +397,14 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
 
     def export_training(self):
         file_path, _ = QFileDialog.getSaveFileName(
-            self, "Export Training Config", "config.json",
+            self, "导出训练配置", "config.json",
             "JSON Files (*.json);;All Files (*.*)"
         )
         if file_path:
             self.controller.export_training(file_path)
 
     def generate_debug_package(self):
-        dir_path = QFileDialog.getExistingDirectory(self, "Select Directory to Save Debug Package", ".")
+        dir_path = QFileDialog.getExistingDirectory(self, "选择调试包保存目录", ".")
         if not dir_path:
             return
         self.controller.generate_debug_package(Path(dir_path) / "OneTrainer_debug_report.zip")

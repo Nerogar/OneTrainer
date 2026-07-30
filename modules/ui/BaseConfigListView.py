@@ -102,7 +102,7 @@ class BaseConfigListView(ABC):
             self.__load_current_config(getattr(self.controller.train_config, self.attr_name))
 
             self.__create_configs_dropdown()
-            self.components.button(self.top_frame, 0, 1, "Add Config", self.__add_config, tooltip="Adds a new config, which are containers for concepts, which themselves contain your dataset", width=20, padx=5)
+            self.components.button(self.top_frame, 0, 1, "添加配置", self.__add_config, tooltip="添加新配置，配置是数据集的容器", width=20, padx=5)
             self.components.button(self.top_frame, 0, 2, add_button_text, self.__add_element, tooltip=add_button_tooltip, width=30, padx=5)
         else:
             self.top_frame = self._create_top_frame(master)
@@ -115,7 +115,7 @@ class BaseConfigListView(ABC):
 
         if show_toggle_button:
             # tooltips break if you initialize with an empty string, default to a single space
-            self.toggle_button = self.components.button(self.top_frame, 0, 3, " ", self._toggle, tooltip="Disables/Enables all visible items in the current view", width=30, padx=5)
+            self.toggle_button = self.components.button(self.top_frame, 0, 3, " ", self._toggle, tooltip="禁用/启用当前视图中的所有可见项", width=30, padx=5)
             self._update_toggle_button_text()
 
     def _update_item_enabled_state(self):
@@ -131,7 +131,7 @@ class BaseConfigListView(ABC):
             return
         self._update_item_enabled_state()
         if self.toggle_button is not None:
-            self.toggle_button.configure(text="Disable" if self._is_current_item_enabled else "Enable")
+            self.toggle_button.configure(text="禁用" if self._is_current_item_enabled else "启用")
 
     def _toggle(self):
         self._toggle_items()

@@ -103,105 +103,105 @@ class BaseTrainUIView(ABC):
         self.set_step_progress, self.set_epoch_progress = self.components.double_progress(frame, 0, 0, "step", "epoch")
 
         self.status_label = self.components.label(status_frame, 0, 0, "", pad=0,
-                                             tooltip="Current status of the training run")
+                                             tooltip="训练运行当前状态")
         self.eta_label = self.components.label(status_frame, 1, 0, "", pad=0)
 
-        self.export_button = self.components.button(frame, 0, 3, "Export", self.export_training,
+        self.export_button = self.components.button(frame, 0, 3, "导出", self.export_training,
                                              width=60, padx=5, pady=(15, 0),
-                                             tooltip="Export the current configuration as a script to run without a UI")
+                                             tooltip="导出当前配置为无UI运行脚本")
 
-        self.components.button(frame, 0, 4, "Debug", self.generate_debug_package,
+        self.components.button(frame, 0, 4, "调试", self.generate_debug_package,
                                            width=60, padx=(5, 25), pady=(15, 0),
-                                           tooltip="Generate a zip file with config.json, debug_report.log and settings diff, use this to report bugs or issues")
+                                           tooltip="生成包含配置和调试报告的zip文件，用于报告问题")
 
         self.components.button(frame, 0, 5, "Tensorboard", self.open_tensorboard,
                                            width=100, padx=(0, 5), pady=(15, 0))
 
-        self.training_button = self.components.button(frame, 0, 6, "Start Training", self.start_training,
+        self.training_button = self.components.button(frame, 0, 6, "开始训练", self.start_training,
                                                  padx=(5, 20), pady=(15, 0))
 
     def build_general_tab_content(self, frame, controller, ui_state):
         # workspace dir
-        self.components.label(frame, 0, 0, "Workspace Directory",
-                         tooltip="The directory where all files of this training run are saved")
+        self.components.label(frame, 0, 0, "工作空间目录",
+                         tooltip="此训练运行所有文件保存的目录")
         self.components.path_entry(frame, 0, 1, ui_state, "workspace_dir", mode="dir", command=controller._on_workspace_dir_change)
 
         # cache dir
-        self.components.label(frame, 0, 2, "Cache Directory",
-                         tooltip="The directory where cached data is saved")
+        self.components.label(frame, 0, 2, "缓存目录",
+                         tooltip="缓存数据保存的目录")
         self.components.path_entry(frame, 0, 3, ui_state, "cache_dir", mode="dir")
 
         # continue from previous backup
-        self.components.label(frame, 2, 0, "Continue from last backup",
-                         tooltip="Automatically continues training from the last backup saved in <workspace>/backup")
+        self.components.label(frame, 2, 0, "从上次备份继续",
+                         tooltip="自动从<workspace>/backup中的上次备份继续训练")
         self.components.switch(frame, 2, 1, ui_state, "continue_last_backup")
 
         # only cache
-        self.components.label(frame, 2, 2, "Only Cache",
-                         tooltip="Only populate the cache, without any training")
+        self.components.label(frame, 2, 2, "仅缓存",
+                         tooltip="仅填充缓存，不进行训练")
         self.components.switch(frame, 2, 3, ui_state, "only_cache")
 
         # TODO: In Phase 4 rework the general tab.
         # prevent overwrites
-        self.components.label(frame, 3, 0, "Prevent Overwrites",
-                         tooltip="When enabled, output paths that already exist on disk will be flagged as invalid to avoid accidental overwrites")
+        self.components.label(frame, 3, 0, "防止覆盖",
+                         tooltip="启用后，已存在的输出路径将被标记为无效以防止意外覆盖")
         self.components.switch(frame, 3, 1, ui_state, "prevent_overwrites")
 
         # debug
-        self.components.label(frame, 4, 0, "Debug mode",
-                         tooltip="Save debug information during the training into the debug directory")
+        self.components.label(frame, 4, 0, "调试模式",
+                         tooltip="训练时将调试信息保存到调试目录")
         self.components.switch(frame, 4, 1, ui_state, "debug_mode")
 
-        self.components.label(frame, 4, 2, "Debug Directory",
-                         tooltip="The directory where debug data is saved")
+        self.components.label(frame, 4, 2, "调试目录",
+                         tooltip="调试数据保存的目录")
         self.components.path_entry(frame, 4, 3, ui_state, "debug_dir", mode="dir", io_type=PathIOType.OUTPUT)
 
         # tensorboard
         self.components.label(frame, 6, 0, "Tensorboard",
-                         tooltip="Starts the Tensorboard Web UI during training")
+                         tooltip="训练时启动Tensorboard Web UI")
         self.components.switch(frame, 6, 1, ui_state, "tensorboard")
 
-        self.components.label(frame, 6, 2, "Always-On Tensorboard",
-                         tooltip="Keep Tensorboard accessible even when not training. Useful for monitoring completed training sessions.")
+        self.components.label(frame, 6, 2, "常驻Tensorboard",
+                         tooltip="非训练时也保持Tensorboard可访问")
         self.components.switch(frame, 6, 3, ui_state, "tensorboard_always_on", command=controller._on_always_on_tensorboard_toggle)
 
-        self.components.label(frame, 7, 0, "Expose Tensorboard",
-                         tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)")
+        self.components.label(frame, 7, 0, "暴露Tensorboard",
+                         tooltip="将Tensorboard暴露到所有网络接口")
         self.components.switch(frame, 7, 1, ui_state, "tensorboard_expose")
-        self.components.label(frame, 7, 2, "Tensorboard Port",
-                         tooltip="Port to use for Tensorboard link")
+        self.components.label(frame, 7, 2, "Tensorboard端口",
+                         tooltip="Tensorboard链接端口")
         self.components.entry(frame, 7, 3, ui_state, "tensorboard_port")
 
         # validation
-        self.components.label(frame, 8, 0, "Validation",
-                         tooltip="Enable validation steps and add new graph in tensorboard")
+        self.components.label(frame, 8, 0, "验证",
+                         tooltip="启用验证步骤并在Tensorboard添加图表")
         self.components.switch(frame, 8, 1, ui_state, "validation")
 
-        self.components.label(frame, 8, 2, "Validate after",
-                         tooltip="The interval used when validate training")
+        self.components.label(frame, 8, 2, "验证间隔",
+                         tooltip="训练验证间隔")
         self.components.time_entry(frame, 8, 3, ui_state, "validate_after", "validate_after_unit")
 
         # device
-        self.components.label(frame, 10, 0, "Dataloader Threads",
-                         tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
+        self.components.label(frame, 10, 0, "数据加载线程",
+                         tooltip="数据加载线程数，缓存时GPU有余量可增加")
         self.components.entry(frame, 10, 1, ui_state, "dataloader_threads", required=True)
 
-        self.components.label(frame, 11, 0, "Train Device",
+        self.components.label(frame, 11, 0, "训练设备",
                          tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\". Must be \"cuda\" for multi-GPU training.")
         self.components.entry(frame, 11, 1, ui_state, "train_device", required=True)
 
-        self.components.label(frame, 11, 2, "Async Offloading",
-                         tooltip="Overlaps CPU<->GPU transfers with computation using CUDA streams. Applies to every offloaded component")
+        self.components.label(frame, 11, 2, "异步卸载",
+                         tooltip="使用CUDA流重叠CPU<->GPU传输与计算")
         self.components.switch(frame, 11, 3, ui_state, "async_offloading")
 
         self.components.label(frame, 12, 0, "Multi-GPU",
-                         tooltip="Enable multi-GPU training")
+                         tooltip="启用多GPU训练")
         self.components.switch(frame, 12, 1, ui_state, "multi_gpu")
-        self.components.label(frame, 12, 2, "Device Indexes",
-                         tooltip="Multi-GPU: A comma-separated list of device indexes. If empty, all your GPUs are used. With a list such as \"0,1,3,4\" you can omit a GPU, for example an on-board graphics GPU.")
+        self.components.label(frame, 12, 2, "设备索引",
+                         tooltip="多GPU：逗号分隔的设备索引列表，留空使用所有GPU")
         self.components.entry(frame, 12, 3, ui_state, "device_indexes")
 
-        self.components.label(frame, 13, 0, "Gradient Reduce Precision",
+        self.components.label(frame, 13, 0, "梯度归约精度",
                          tooltip="WEIGHT_DTYPE: Reduce gradients between GPUs in your weight data type; can be imprecise, but more efficient than float32\n"
                                  "WEIGHT_DTYPE_STOCHASTIC: Sum up the gradients in your weight data type, but average them in float32 and stochastically round if your weight data type is bfloat16\n"
                                  "FLOAT_32: Reduce gradients in float32\n"
@@ -210,48 +210,48 @@ class BaseTrainUIView(ABC):
         self.components.options(frame, 13, 1, [str(x) for x in list(GradientReducePrecision)], ui_state,
                            "gradient_reduce_precision")
 
-        self.components.label(frame, 13, 2, "Fused Gradient Reduce",
-                         tooltip="Multi-GPU: Gradient synchronisation during the backward pass. Can be more efficient, especially with Async Gradient Reduce")
+        self.components.label(frame, 13, 2, "融合梯度归约",
+                         tooltip="多GPU：反向传播时的梯度同步，配合异步梯度归约更高效")
         self.components.switch(frame, 13, 3, ui_state, "fused_gradient_reduce")
 
-        self.components.label(frame, 14, 0, "Async Gradient Reduce",
-                         tooltip="Multi-GPU: Asynchroniously start the gradient reduce operations during the backward pass. Can be more efficient, but requires some VRAM.")
+        self.components.label(frame, 14, 0, "异步梯度归约",
+                         tooltip="多GPU：反向传播时异步启动梯度归约，更高效但占用显存")
         self.components.switch(frame, 14, 1, ui_state, "async_gradient_reduce")
         self.components.label(frame, 14, 2, "Buffer size (MB)",
                          tooltip="Multi-GPU: Maximum VRAM for \"Async Gradient Reduce\", in megabytes. A multiple of this value can be needed if combined with \"Fused Back Pass\" and/or \"Layer offload fraction\"")
         self.components.entry(frame, 14, 3, ui_state, "async_gradient_reduce_buffer")
 
-        self.components.label(frame, 15, 0, "Temp Device",
+        self.components.label(frame, 15, 0, "临时设备",
                          tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
         self.components.entry(frame, 15, 1, ui_state, "temp_device")
 
     def build_data_tab_content(self, frame, controller, ui_state):
         # aspect ratio bucketing
-        self.components.label(frame, 0, 0, "Aspect Ratio Bucketing",
-                         tooltip="Aspect ratio bucketing enables training on images with different aspect ratios")
+        self.components.label(frame, 0, 0, "宽高比分桶",
+                         tooltip="宽高比分桶允许在不同宽高比的图像上训练")
         self.components.switch(frame, 0, 1, ui_state, "aspect_ratio_bucketing")
 
         # latent caching
-        self.components.label(frame, 1, 0, "Latent Caching",
-                         tooltip="Caching of intermediate training data that can be re-used between epochs")
+        self.components.label(frame, 1, 0, "潜在缓存",
+                         tooltip="缓存可在轮次间复用的中间训练数据")
         self.components.switch(frame, 1, 1, ui_state, "latent_caching")
 
         # clear cache before training
-        self.components.label(frame, 2, 0, "Clear cache before training",
-                         tooltip="Clears the cache directory before starting to train. Only disable this if you want to continue using the same cached data. Disabling this can lead to errors, if other settings are changed during a restart")
+        self.components.label(frame, 2, 0, "训练前清除缓存",
+                         tooltip="训练前清除缓存目录，仅在使用相同缓存数据时禁用")
         self.components.switch(frame, 2, 1, ui_state, "clear_cache_before_training")
 
     def build_sampling_tab_header(self, top_frame, sub_frame, controller, ui_state):
-        self.components.label(top_frame, 0, 0, "Sample After",
-                         tooltip="The interval used when automatically sampling from the model during training")
+        self.components.label(top_frame, 0, 0, "采样间隔",
+                         tooltip="训练时自动采样的间隔")
         self.components.time_entry(top_frame, 0, 1, ui_state, "sample_after", "sample_after_unit")
 
-        self.components.label(top_frame, 0, 2, "Skip First",
-                         tooltip="Start sampling automatically after this interval has elapsed.")
+        self.components.label(top_frame, 0, 2, "跳过首个",
+                         tooltip="经过此间隔后自动开始采样")
         self.components.entry(top_frame, 0, 3, ui_state, "sample_skip_first", width=50, sticky="nw")
 
         self.components.label(top_frame, 0, 4, "Format",
-                         tooltip="File Format used when saving samples")
+                         tooltip="保存样本的文件格式")
         self.components.options_kv(top_frame, 0, 5, [
             ("PNG", ImageFormat.PNG),
             ("JPG", ImageFormat.JPG),
@@ -262,113 +262,113 @@ class BaseTrainUIView(ABC):
         self.components.button(top_frame, 0, 7, "manual sample", self.open_manual_sample_window)
 
         self.components.label(sub_frame, 0, 0, "Non-EMA Sampling",
-                         tooltip="Whether to include non-ema sampling when using ema.")
+                         tooltip="使用EMA时是否包含非EMA采样")
         self.components.switch(sub_frame, 0, 1, ui_state, "non_ema_sampling")
 
-        self.components.label(sub_frame, 0, 2, "Samples to Tensorboard",
-                         tooltip="Whether to include sample images in the Tensorboard output.")
+        self.components.label(sub_frame, 0, 2, "采样到Tensorboard",
+                         tooltip="是否在Tensorboard输出中包含采样图像")
         self.components.switch(sub_frame, 0, 3, ui_state, "samples_to_tensorboard")
 
     def build_backup_tab_content(self, frame, controller, ui_state):
         # backup after
-        self.components.label(frame, 0, 0, "Backup After",
-                         tooltip="The interval used when automatically creating model backups during training")
+        self.components.label(frame, 0, 0, "备份间隔",
+                         tooltip="训练时自动创建模型备份的间隔")
         self.components.time_entry(frame, 0, 1, ui_state, "backup_after", "backup_after_unit")
 
         # backup now
         self.components.button(frame, 0, 3, "backup now", self.backup_now)
 
         # rolling backup
-        self.components.label(frame, 1, 0, "Rolling Backup",
-                         tooltip="If rolling backups are enabled, older backups are deleted automatically")
+        self.components.label(frame, 1, 0, "滚动备份",
+                         tooltip="启用滚动备份后自动删除旧备份")
         self.components.switch(frame, 1, 1, ui_state, "rolling_backup")
 
         # rolling backup count
-        self.components.label(frame, 2, 0, "Rolling Backup Count",
-                         tooltip="Defines the number of backups to keep if rolling backups are enabled")
+        self.components.label(frame, 2, 0, "滚动备份数量",
+                         tooltip="滚动备份保留的数量")
         self.components.entry(frame, 2, 1, ui_state, "rolling_backup_count")
 
         # backup before save
-        self.components.label(frame, 3, 0, "Backup Before Save",
-                         tooltip="Create a full backup before saving the final model")
+        self.components.label(frame, 3, 0, "保存前备份",
+                         tooltip="保存最终模型前创建完整备份")
         self.components.switch(frame, 3, 1, ui_state, "backup_before_save")
 
         # save after
-        self.components.label(frame, 4, 0, "Save Every",
-                         tooltip="The interval used when automatically saving the model during training")
+        self.components.label(frame, 4, 0, "保存间隔",
+                         tooltip="训练时自动保存模型的间隔")
         self.components.time_entry(frame, 4, 1, ui_state, "save_every", "save_every_unit")
 
         # save now
         self.components.button(frame, 4, 3, "save now", self.save_now)
 
         # skip save
-        self.components.label(frame, 5, 0, "Skip First",
+        self.components.label(frame, 5, 0, "跳过首个",
                          tooltip="Start saving automatically after this interval has elapsed")
         self.components.entry(frame, 5, 1, ui_state, "save_skip_first", width=50, sticky="nw")
 
         # save filename prefix
-        self.components.label(frame, 6, 0, "Save Filename Prefix",
-                         tooltip="The prefix for filenames used when saving the model during training")
+        self.components.label(frame, 6, 0, "保存文件名前缀",
+                         tooltip="训练时保存模型的文件名前缀")
         self.components.entry(frame, 6, 1, ui_state, "save_filename_prefix")
 
     def build_embedding_tab_content(self, frame, controller, ui_state):
         # embedding model name
-        self.components.label(frame, 0, 0, "Base embedding",
-                         tooltip="The base embedding to train on. Leave empty to create a new embedding")
+        self.components.label(frame, 0, 0, "基础嵌入",
+                         tooltip="训练的基础嵌入，留空创建新嵌入")
         self.components.path_entry(
             frame, 0, 1, ui_state, "embedding.model_name",
             mode="file", path_modifier=path_util.json_path_modifier
         )
 
         # token count
-        self.components.label(frame, 1, 0, "Token count",
-                         tooltip="The token count used when creating a new embedding. Leave empty to auto detect from the initial embedding text.")
+        self.components.label(frame, 1, 0, "Token数",
+                         tooltip="新嵌入的Token数，留空自动检测")
         self.components.entry(frame, 1, 1, ui_state, "embedding.token_count")
 
         # initial embedding text
-        self.components.label(frame, 2, 0, "Initial embedding text",
-                         tooltip="The initial embedding text used when creating a new embedding")
+        self.components.label(frame, 2, 0, "初始嵌入文本",
+                         tooltip="创建新嵌入时的初始文本")
         self.components.entry(frame, 2, 1, ui_state, "embedding.initial_embedding_text")
 
         # embedding weight dtype
-        self.components.label(frame, 3, 0, "Embedding Weight Data Type",
-                         tooltip="The Embedding weight data type used for training. This can reduce memory consumption, but reduces precision")
+        self.components.label(frame, 3, 0, "嵌入权重数据类型",
+                         tooltip="嵌入权重数据类型，可减少内存但降低精度")
         self.components.options_kv(frame, 3, 1, [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
         ], ui_state, "embedding_weight_dtype")
 
         # placeholder
-        self.components.label(frame, 4, 0, "Placeholder",
-                         tooltip="The placeholder used when using the embedding in a prompt")
+        self.components.label(frame, 4, 0, "占位符",
+                         tooltip="在提示词中使用嵌入的占位符")
         self.components.entry(frame, 4, 1, ui_state, "embedding.placeholder")
 
         # output embedding
-        self.components.label(frame, 5, 0, "Output embedding",
-                         tooltip="Output embeddings are calculated at the output of the text encoder, not the input. This can improve results for larger text encoders and lower VRAM usage.")
+        self.components.label(frame, 5, 0, "输出嵌入",
+                         tooltip="在文本编码器输出处计算嵌入，可改善大文本编码器效果并降低显存")
         self.components.switch(frame, 5, 1, ui_state, "embedding.is_output_embedding")
 
     def build_tools_tab_content(self, frame, controller, ui_state):
         # dataset
-        self.components.label(frame, 0, 0, "Dataset Tools",
-                         tooltip="Open the captioning tool")
-        self.components.button(frame, 0, 1, "Open", self.open_dataset_tool)
+        self.components.label(frame, 0, 0, "数据集工具",
+                         tooltip="打开标签工具")
+        self.components.button(frame, 0, 1, "打开", self.open_dataset_tool)
 
         # video tools
-        self.components.label(frame, 1, 0, "Video Tools",
-                         tooltip="Open the video tools")
-        self.components.button(frame, 1, 1, "Open", self.open_video_tool)
+        self.components.label(frame, 1, 0, "视频工具",
+                         tooltip="打开视频工具")
+        self.components.button(frame, 1, 1, "打开", self.open_video_tool)
 
         # convert model
-        self.components.label(frame, 2, 0, "Convert Model Tools",
-                         tooltip="Open the model conversion tool")
-        self.components.button(frame, 2, 1, "Open", self.open_convert_model_tool)
+        self.components.label(frame, 2, 0, "模型转换工具",
+                         tooltip="打开模型转换工具")
+        self.components.button(frame, 2, 1, "打开", self.open_convert_model_tool)
 
         # sample
-        self.components.label(frame, 3, 0, "Sampling Tool",
-                         tooltip="Open the model sampling tool")
-        self.components.button(frame, 3, 1, "Open", self.open_sampling_tool)
+        self.components.label(frame, 3, 0, "采样工具",
+                         tooltip="打开模型采样工具")
+        self.components.button(frame, 3, 1, "打开", self.open_sampling_tool)
 
-        self.components.label(frame, 4, 0, "Profiling Tool",
-                         tooltip="Open the profiling tools.")
-        self.components.button(frame, 4, 1, "Open", self.open_profiling_tool)
+        self.components.label(frame, 4, 0, "性能分析工具",
+                         tooltip="打开性能分析工具")
+        self.components.button(frame, 4, 1, "打开", self.open_profiling_tool)

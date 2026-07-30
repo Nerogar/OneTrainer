@@ -44,7 +44,7 @@ class PySide6ConceptWindowView(BaseConceptWindowView, QDialog):
         self._preview_augmentations = True
         self.bucket_fig = None
 
-        self.setWindowTitle("Concept")
+        self.setWindowTitle("数据集")
         self.resize(800, 700)
 
         outer = QGridLayout(self)
@@ -65,7 +65,7 @@ class PySide6ConceptWindowView(BaseConceptWindowView, QDialog):
         pyside6_components._layout(gen_frame).setColumnStretch(2, 1)
         self.build_general_tab(gen_frame, controller, ui_state, text_ui_state)
         pyside6_components._pack_form(gen_frame)
-        tabs.addTab(gen_scroll, "general")
+        tabs.addTab(gen_scroll, "常规")
 
         # --- image augmentation tab ---
         img_scroll = QScrollArea()
@@ -99,12 +99,12 @@ class PySide6ConceptWindowView(BaseConceptWindowView, QDialog):
         prev_btn = QPushButton("<", preview_panel)
         prev_btn.setFixedWidth(40)
         prev_btn.clicked.connect(self._prev_image_preview)
-        update_btn = QPushButton("Update Preview", preview_panel)
+        update_btn = QPushButton("更新预览", preview_panel)
         update_btn.clicked.connect(self._update_image_preview)
         next_btn = QPushButton(">", preview_panel)
         next_btn.setFixedWidth(40)
         next_btn.clicked.connect(self._next_image_preview)
-        self._aug_checkbox = QCheckBox("Show Augmentations", preview_panel)
+        self._aug_checkbox = QCheckBox("显示增强", preview_panel)
         self._aug_checkbox.setChecked(True)
         self._aug_checkbox.toggled.connect(lambda checked: self._on_aug_toggle(checked))
         pb_lo.addWidget(prev_btn, 1, 0)
@@ -124,7 +124,7 @@ class PySide6ConceptWindowView(BaseConceptWindowView, QDialog):
         pb_lo.addWidget(self._caption_box, 4, 0, 1, 3)
 
         lo_img_outer.addWidget(preview_panel, 0, 1, Qt.AlignTop)
-        tabs.addTab(img_scroll, "image augmentation")
+        tabs.addTab(img_scroll, "图像增强")
 
         # --- text augmentation tab ---
         text_scroll = QScrollArea()
@@ -137,7 +137,7 @@ class PySide6ConceptWindowView(BaseConceptWindowView, QDialog):
         pyside6_components._layout(text_frame).setColumnStretch(3, 1)
         self.build_text_augmentation_tab(text_frame, controller, text_ui_state)
         pyside6_components._pack_form(text_frame)
-        tabs.addTab(text_scroll, "text augmentation")
+        tabs.addTab(text_scroll, "文本增强")
 
         # --- statistics tab ---
         stats_scroll = QScrollArea()
@@ -174,7 +174,7 @@ class PySide6ConceptWindowView(BaseConceptWindowView, QDialog):
 
         stats_lo.addWidget(self.canvas, 19, 0, 2, 4)
 
-        tabs.addTab(stats_scroll, "statistics")
+        tabs.addTab(stats_scroll, "统计")
 
         ok = QPushButton("ok", self)
         ok.clicked.connect(self._ok)

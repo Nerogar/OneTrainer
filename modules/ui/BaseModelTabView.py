@@ -82,14 +82,14 @@ class BaseModelTabView(ABC):
 
     def __create_base_dtype_components(self, frame, row: int, ui_state) -> int:
         # huggingface token
-        self.components.label(frame, row, 0, "Hugging Face Token",
+        self.components.label(frame, row, 0, "Hugging Face令牌",
                          tooltip="Enter your Hugging Face access token if you have used a protected Hugging Face repository below.\nThis value is stored separately, not saved to your configuration file. "
                                  "Go to https://huggingface.co/settings/tokens to create an access token.",
                          wide_tooltip=True)
         self.components.entry(frame, row, 1, ui_state, "secrets.huggingface_token")
 
         # offline mode
-        self.components.label(frame, row, 3, "Offline Mode",
+        self.components.label(frame, row, 3, "离线模式",
                          tooltip="Skip the Hugging Face login and resolve every model from the local cache only. "
                                  "Enable this when you have no internet connection; only already-downloaded models can be loaded.",
                          wide_tooltip=True)
@@ -98,7 +98,7 @@ class BaseModelTabView(ABC):
         row += 1
 
         # huggingface cache directory
-        self.components.label(frame, row, 0, "Hugging Face Cache Directory",
+        self.components.label(frame, row, 0, "Hugging Face缓存目录",
                          tooltip="Directory used to cache Hugging Face model downloads. "
                                  "Leave empty to use the default Hugging Face cache directory shown as the placeholder.",
                          wide_tooltip=True)
@@ -110,16 +110,16 @@ class BaseModelTabView(ABC):
         row += 1
 
         # base model
-        self.components.label(frame, row, 0, "Base Model",
-                         tooltip="Filename, directory or Hugging Face repository of the base model")
+        self.components.label(frame, row, 0, "基础模型",
+                         tooltip="基础模型文件名、目录或Hugging Face仓库")
         self.components.path_entry(
             frame, row, 1, ui_state, "base_model_name",
             mode="file", path_modifier=path_util.json_path_modifier
         )
 
         # compile
-        self.components.label(frame, row, 3, "Compile transformer blocks",
-                         tooltip="Uses torch.compile and Triton to significantly speed up training. Only applies to transformer/unet. Disable in case of compatibility issues.")
+        self.components.label(frame, row, 3, "编译Transformer块",
+                         tooltip="使用torch.compile和Triton加速训练，如有兼容问题请禁用")
         self.components.switch(frame, row, 4, ui_state, "compile")
 
         row += 1
@@ -148,8 +148,8 @@ class BaseModelTabView(ABC):
     ) -> int:
         if has_unet:
             # unet weight dtype
-            self.components.label(frame, row, 3, "UNet Data Type",
-                             tooltip="The unet weight data type")
+            self.components.label(frame, row, 3, "UNet数据类型",
+                             tooltip="UNet权重数据类型")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True),
                                   ui_state, "unet.weight_dtype")
 
@@ -158,16 +158,16 @@ class BaseModelTabView(ABC):
         if has_prior:
             if allow_override_prior:
                 # prior model
-                self.components.label(frame, row, 0, "Prior Model",
-                                 tooltip="Filename, directory or Hugging Face repository of the prior model")
+                self.components.label(frame, row, 0, "Prior模型",
+                                 tooltip="Prior模型路径")
                 self.components.path_entry(
                     frame, row, 1, ui_state, "prior.model_name",
                     mode="file", path_modifier=path_util.json_path_modifier
                 )
 
             # prior weight dtype
-            self.components.label(frame, row, 3, "Prior Data Type",
-                             tooltip="The prior weight data type")
+            self.components.label(frame, row, 3, "Prior数据类型",
+                             tooltip="Prior权重数据类型")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                                   ui_state, "prior.weight_dtype")
 
@@ -177,15 +177,15 @@ class BaseModelTabView(ABC):
             if allow_override_transformer:
                 # transformer model
                 self.components.label(frame, row, 0, "Override Transformer / GGUF",
-                                 tooltip="Can be used to override the transformer in the base model. Safetensors and GGUF files are supported, local and on Huggingface. If a GGUF file is used, the DataType must also be set to GGUF")
+                                 tooltip="覆盖基础模型的Transformer，支持safetensors和GGUF")
                 self.components.path_entry(
                     frame, row, 1, ui_state, "transformer.model_name",
                     mode="file", path_modifier=path_util.json_path_modifier
                 )
 
             # transformer weight dtype
-            self.components.label(frame, row, 3, "Transformer Data Type",
-                             tooltip="The transformer weight data type")
+            self.components.label(frame, row, 3, "Transformer数据类型",
+                             tooltip="Transformer权重数据类型")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_gguf=True, include_a8=True),
                                   ui_state, "transformer.weight_dtype")
 
@@ -193,8 +193,8 @@ class BaseModelTabView(ABC):
 
         if has_unconditional_transformer:
             # unconditional transformer weight dtype
-            self.components.label(frame, row, 3, "Unconditional Transformer Data Type",
-                             tooltip="The weight data type of the unconditional transformer, used for the negative branch of CFG during sampling")
+            self.components.label(frame, row, 3, "无条件Transformer数据类型",
+                             tooltip="无条件Transformer权重数据类型，用于CFG负分支")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True),
                                   ui_state, "unconditional_transformer.weight_dtype")
 
@@ -202,33 +202,33 @@ class BaseModelTabView(ABC):
 
         presets = controller.get_presets()
 
-        self.components.label(frame, row, 0, "Quantization")
+        self.components.label(frame, row, 0, "量化")
         self.components.layer_filter_entry(frame, row, 1, ui_state,
             preset_var_name="quantization.layer_filter_preset", presets=presets,
-            preset_label="Quantization Layer Filter",
-            preset_tooltip="Select a preset defining which layers to quantize. Quantization of certain layers can decrease model quality. Only applies to the transformer/unet",
+            preset_label="量化层过滤器",
+            preset_tooltip="选择量化层预设，量化某些层可能降低模型质量",
             entry_var_name="quantization.layer_filter",
-            entry_tooltip="Comma-separated list of layers to quantize. Regular expressions (if toggled) are supported. Any model layer with a matching name will be quantized",
+            entry_tooltip="逗号分隔的量化层列表，支持正则表达式",
             regex_var_name="quantization.layer_filter_regex",
-            regex_tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used.",
+            regex_tooltip="启用后层过滤器使用正则匹配，否则使用子串匹配",
             frame_color="transparent",
         )
 
         # SVDQuant - create vertical grids to match the size of layer_filter_entry
         svd_label_frame, svd_entry_frame = self._make_svd_frames(frame, row)
         self.components.label(svd_label_frame, 0, 0, "SVDQuant",
-                         tooltip="What datatype to use for SVDQuant weights decomposition.")
+                         tooltip="SVDQuant权重分解的数据类型")
         self.components.options_kv(svd_entry_frame, 0, 0, [("disabled", DataType.NONE), ("float32", DataType.FLOAT_32), ("bfloat16", DataType.BFLOAT_16)],
                               ui_state, "quantization.svd_dtype")
-        self.components.label(svd_label_frame, 1, 0, "SVDQuant Rank",
-                         tooltip="Rank for SVDQuant weights decomposition")
+        self.components.label(svd_label_frame, 1, 0, "SVDQuant秩",
+                         tooltip="SVDQuant权重分解的秩")
         self.components.entry(svd_entry_frame, 1, 0, ui_state, "quantization.svd_rank")
         row += 1
 
         if has_text_encoder:
             # text encoder weight dtype
-            self.components.label(frame, row, 3, "Text Encoder Data Type",
-                             tooltip="The text encoder weight data type")
+            self.components.label(frame, row, 3, "文本编码器数据类型",
+                             tooltip="文本编码器权重数据类型")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                                   ui_state, "text_encoder.weight_dtype")
 
@@ -237,7 +237,7 @@ class BaseModelTabView(ABC):
         if has_text_encoder_1:
             # text encoder 1 weight dtype
             self.components.label(frame, row, 3, "Text Encoder 1 Data Type",
-                             tooltip="The text encoder 1 weight data type")
+                             tooltip="文本编码器1权重数据类型")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                                   ui_state, "text_encoder.weight_dtype")
 
@@ -246,7 +246,7 @@ class BaseModelTabView(ABC):
         if has_text_encoder_2:
             # text encoder 2 weight dtype
             self.components.label(frame, row, 3, "Text Encoder 2 Data Type",
-                             tooltip="The text encoder 2 weight data type")
+                             tooltip="文本编码器2权重数据类型")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                                   ui_state, "text_encoder_2.weight_dtype")
 
@@ -255,7 +255,7 @@ class BaseModelTabView(ABC):
         if has_text_encoder_3:
             # text encoder 3 weight dtype
             self.components.label(frame, row, 3, "Text Encoder 3 Data Type",
-                             tooltip="The text encoder 3 weight data type")
+                             tooltip="文本编码器3权重数据类型")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                                   ui_state, "text_encoder_3.weight_dtype")
 
@@ -265,7 +265,7 @@ class BaseModelTabView(ABC):
             if allow_override_text_encoder_4:
                 # text encoder 4 weight dtype
                 self.components.label(frame, row, 0, "Text Encoder 4 Override",
-                                 tooltip="Filename, directory or Hugging Face repository of the text encoder 4 model")
+                                 tooltip="文本编码器4模型路径")
                 self.components.path_entry(
                     frame, row, 1, ui_state, "text_encoder_4.model_name",
                     mode="file", path_modifier=path_util.json_path_modifier
@@ -273,7 +273,7 @@ class BaseModelTabView(ABC):
 
             # text encoder 4 weight dtype
             self.components.label(frame, row, 3, "Text Encoder 4 Data Type",
-                             tooltip="The text encoder 4 weight data type")
+                             tooltip="文本编码器4权重数据类型")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                                   ui_state, "text_encoder_4.weight_dtype")
 
@@ -281,16 +281,16 @@ class BaseModelTabView(ABC):
 
         if has_vae:
             # base model
-            self.components.label(frame, row, 0, "VAE Override",
-                             tooltip="Directory or Hugging Face repository of a VAE model in diffusers format. Can be used to override the VAE included in the base model. Using a safetensor VAE file will cause an error that the model cannot be loaded.")
+            self.components.label(frame, row, 0, "VAE覆盖",
+                             tooltip="diffusers格式的VAE模型目录或Hugging Face仓库，用于覆盖基础模型的VAE")
             self.components.path_entry(
                 frame, row, 1, ui_state, "vae.model_name",
                 mode="file", path_modifier=path_util.json_path_modifier
             )
 
             # vae weight dtype
-            self.components.label(frame, row, 3, "VAE Data Type",
-                             tooltip="The vae weight data type")
+            self.components.label(frame, row, 3, "VAE数据类型",
+                             tooltip="VAE权重数据类型")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                                   ui_state, "vae.weight_dtype")
 
@@ -300,16 +300,16 @@ class BaseModelTabView(ABC):
 
     def __create_effnet_encoder_components(self, frame, row: int, ui_state) -> int:
         # effnet encoder model
-        self.components.label(frame, row, 0, "Effnet Encoder Model",
-                         tooltip="Filename, directory or Hugging Face repository of the effnet encoder model")
+        self.components.label(frame, row, 0, "Effnet编码器模型",
+                         tooltip="Effnet编码器模型路径")
         self.components.path_entry(
             frame, row, 1, ui_state, "effnet_encoder.model_name",
             mode="file", path_modifier=path_util.json_path_modifier
         )
 
         # effnet encoder weight dtype
-        self.components.label(frame, row, 3, "Effnet Encoder Data Type",
-                         tooltip="The effnet encoder weight data type")
+        self.components.label(frame, row, 3, "Effnet编码器数据类型",
+                         tooltip="Effnet编码器权重数据类型")
         self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                               ui_state, "effnet_encoder.weight_dtype")
 
@@ -325,16 +325,16 @@ class BaseModelTabView(ABC):
             has_text_encoder: bool,
     ) -> int:
         # decoder model
-        self.components.label(frame, row, 0, "Decoder Model",
-                         tooltip="Filename, directory or Hugging Face repository of the decoder model")
+        self.components.label(frame, row, 0, "解码器模型",
+                         tooltip="解码器模型路径")
         self.components.path_entry(
             frame, row, 1, ui_state, "decoder.model_name",
             mode="file", path_modifier=path_util.json_path_modifier
         )
 
         # decoder weight dtype
-        self.components.label(frame, row, 3, "Decoder Data Type",
-                         tooltip="The decoder weight data type")
+        self.components.label(frame, row, 3, "解码器数据类型",
+                         tooltip="解码器权重数据类型")
         self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                               ui_state, "decoder.weight_dtype")
 
@@ -342,16 +342,16 @@ class BaseModelTabView(ABC):
 
         if has_text_encoder:
             # decoder text encoder weight dtype
-            self.components.label(frame, row, 3, "Decoder Text Encoder Data Type",
-                             tooltip="The decoder text encoder weight data type")
+            self.components.label(frame, row, 3, "解码器文本编码器数据类型",
+                             tooltip="解码器文本编码器权重数据类型")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                                   ui_state, "decoder_text_encoder.weight_dtype")
 
             row += 1
 
         # decoder vqgan weight dtype
-        self.components.label(frame, row, 3, "Decoder VQGAN Data Type",
-                         tooltip="The decoder vqgan weight data type")
+        self.components.label(frame, row, 3, "解码器VQGAN数据类型",
+                         tooltip="解码器VQGAN权重数据类型")
         self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                               ui_state, "decoder_vqgan.weight_dtype")
 
@@ -367,8 +367,8 @@ class BaseModelTabView(ABC):
             ui_state,
     ) -> int:
         # output model destination
-        self.components.label(frame, row, 0, "Model Output Destination",
-                         tooltip="Filename or directory where the output model is saved")
+        self.components.label(frame, row, 0, "模型输出目标",
+                         tooltip="输出模型保存的文件名或目录")
         self.components.path_entry(
             frame, row, 1, ui_state, "output_model_destination",
             mode="file",
@@ -376,7 +376,7 @@ class BaseModelTabView(ABC):
         )
 
         # output data type
-        self.components.label(frame, row, 3, "Output Data Type",
+        self.components.label(frame, row, 3, "输出数据类型",
                          tooltip="Precision to use when saving the output model")
         self.components.options_kv(frame, row, 4, [
             ("float16", DataType.FLOAT_16),
@@ -391,19 +391,19 @@ class BaseModelTabView(ABC):
         # output format
         formats = controller.get_output_formats()
 
-        self.components.label(frame, row, 0, "Output Format",
-                         tooltip="Format to use when saving the output model")
+        self.components.label(frame, row, 0, "输出格式",
+                         tooltip="保存输出模型的格式")
         self.components.options_kv(frame, row, 1, formats, ui_state, "output_model_format")
 
         # include config
-        self.components.label(frame, row, 3, "Include Config",
+        self.components.label(frame, row, 3, "包含配置",
                          tooltip="Include the training configuration in the final model. Only supported for safetensors files. "
                                  "None: No config is included. "
                                  "Settings: All training settings are included. "
-                                 "All: All settings, including the samples and concepts are included.")
+                                 "全部：包含所有设置、采样和数据集")
         self.components.options_kv(frame, row, 4, [
-            ("None", ConfigPart.NONE),
-            ("Settings", ConfigPart.SETTINGS),
+            ("无", ConfigPart.NONE),
+            ("设置", ConfigPart.SETTINGS),
             ("All", ConfigPart.ALL),
         ], ui_state, "include_train_config")
 

@@ -58,18 +58,18 @@ class BaseTopBarView:
 
         # preset picker: model type -> presets for that type
         self.components.preset_menu_button(
-            self.frame, 0, 1, "Load Preset", self.preset_tree, self.__load_current_config, sticky="vew",
+            self.frame, 0, 1, "加载预设", self.preset_tree, self.__load_current_config, sticky="vew",
         )
 
         # load config button
-        self.components.button(self.frame, 0, 2, "Load config", self.__load_config,
+        self.components.button(self.frame, 0, 2, "加载配置", self.__load_config,
                                tooltip="Load one of your own saved configs", width=90, sticky="vew")
 
         # Wiki button
         self.components.button(self.frame, 0, 4, "Wiki", self.open_wiki, width=50, sticky="vew")
 
         # save button
-        self.components.button(self.frame, 0, 3, "Save config", self.__save_config,
+        self.components.button(self.frame, 0, 3, "保存配置", self.__save_config,
                                tooltip="Save the current configuration in a custom preset", width=90, sticky="vew")
 
         # padding

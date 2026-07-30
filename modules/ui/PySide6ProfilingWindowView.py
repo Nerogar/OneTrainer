@@ -15,7 +15,7 @@ class PySide6ProfilingWindowView(BaseProfilingWindowView, QWidget):
 
         self._controller = controller
 
-        self.setWindowTitle("Profiling")
+        self.setWindowTitle("性能分析")
         self.resize(512, 512)
 
         outer = QGridLayout(self)
@@ -33,13 +33,13 @@ class PySide6ProfilingWindowView(BaseProfilingWindowView, QWidget):
     def set_profiling_active(self, active: bool):
         if active:
             self._message_label.setText("Profiling active...")
-            self._profile_button.setText("End Profiling")
+            self._profile_button.setText("结束分析")
             with contextlib.suppress(RuntimeError):
                 self._profile_button.clicked.disconnect()
             self._profile_button.clicked.connect(self._controller.end_profiler)
         else:
-            self._message_label.setText("Inactive")
-            self._profile_button.setText("Start Profiling")
+            self._message_label.setText("未激活")
+            self._profile_button.setText("开始分析")
             with contextlib.suppress(RuntimeError):
                 self._profile_button.clicked.disconnect()
             self._profile_button.clicked.connect(self._controller.start_profiler)

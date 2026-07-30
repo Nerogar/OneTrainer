@@ -90,9 +90,9 @@ class PySide6ConfigListView(BaseConfigListView, ABC):
             return
         self._update_item_enabled_state()
         if self.toggle_button is not None:
-            self.toggle_button.setText("Disable" if self._is_current_item_enabled else "Enable")
+            self.toggle_button.setText("禁用" if self._is_current_item_enabled else "启用")
 
     def _show_name_dialog(self, callback):
-        text, ok = QInputDialog.getText(self.master, "name", "Name")
+        text, ok = QInputDialog.getText(self.master, "name", "名称")
         if ok and text:
             callback(text)
