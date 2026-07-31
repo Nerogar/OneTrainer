@@ -120,8 +120,6 @@ class ErnieSampler(BaseModelSampler):
             image = image.cpu().permute(0, 2, 3, 1).float().numpy()
             image = [PILImage.fromarray((img * 255).astype(np.uint8)) for img in image]
 
-            self.model.evict()
-
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,
                 data=image[0],
