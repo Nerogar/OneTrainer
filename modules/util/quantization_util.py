@@ -25,17 +25,31 @@ except ImportError:
     LinearNf4 = None
 
 def quantize_int8(x: Tensor, scale: float | Tensor) -> Tensor:
-    q = x.float().mul(1.0 / scale).round_().clamp_(-128.0, 127.0).to(torch.int8)
-    return q
+    xf = x.to(torch.float32, copy=True)
+    return xf.mul_(1.0 / scale).round_().clamp_(-128.0, 127.0).to(torch.int8)
 
-def quantize_int8_tensorwise_get_scale(x: Tensor) -> float:
-    abs_max = x.abs().max()
-    scale = (abs_max.float() / 127.0).clamp(min=1e-30)
-    return scale
+def quantize_int8_tensorwise_get_scale(x: Tensor) -> Tensor:
+    # max|x| == max(max x, -min x): one pass over x, no full-tensor abs() copy
+    min_val, max_val = torch.aminmax(x)
+    abs_max = torch.maximum(max_val, min_val.neg())
+    return (abs_max.float() / 127.0).clamp(min=1e-30)
 
-def quantize_int8_tensorwise(x: Tensor) -> tuple[Tensor, float]:
+def quantize_int8_tensorwise(x: Tensor) -> tuple[Tensor, Tensor]:
     scale = quantize_int8_tensorwise_get_scale(x)
     q = quantize_int8(x, scale)
+    return q, scale
+
+# Quantizing a whole weight at once allocates a full-size fp32 intermediary, which spikes VRAM on small
+# GPUs. The chunked variants work in row-blocks, bounding that transient to one block. Load-time only,
+# so the Python loop costs nothing.
+_QUANTIZE_CHUNK_ELEMENTS = 16 * 1024 * 1024
+
+def quantize_int8_tensorwise_chunked(x: Tensor) -> tuple[Tensor, Tensor]:
+    scale = quantize_int8_tensorwise_get_scale(x)
+    q = torch.empty_like(x, dtype=torch.int8)
+    rows = max(1, _QUANTIZE_CHUNK_ELEMENTS // x[0].numel())
+    for i in range(0, x.shape[0], rows):
+        q[i:i + rows] = quantize_int8(x[i:i + rows], scale)
     return q, scale
 
 def quantize_int8_axiswise_get_scale(x: Tensor, dim: int) -> Tensor:
@@ -49,23 +63,32 @@ def quantize_int8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
     return q, scale
 
 def quantize_fp8(x: Tensor, scale: float | Tensor) -> Tensor:
-    q = x.float().mul(1.0 / scale).clamp_(-448.0, 448.0).to(torch.float8_e4m3fn)
-    return q
+    xf = x.to(torch.float32, copy=True)
+    return xf.mul_(1.0 / scale).clamp_(-448.0, 448.0).to(torch.float8_e4m3fn)
 
-def quantize_fp8_tensorwise_get_scale(x: Tensor) -> float:
-    abs_max = x.abs().max()
-    scale = (abs_max.float() / 448.0).clamp(min=1e-30)
-    return scale
+def quantize_fp8_tensorwise_get_scale(x: Tensor) -> Tensor:
+    # max|x| == max(max x, -min x): one pass over x, no full-tensor abs() copy
+    min_val, max_val = torch.aminmax(x)
+    abs_max = torch.maximum(max_val, min_val.neg())
+    return (abs_max.float() / 448.0).clamp(min=1e-30)
+
+def quantize_fp8_tensorwise(x: Tensor) -> tuple[Tensor, Tensor]:
+    scale = quantize_fp8_tensorwise_get_scale(x)
+    q = quantize_fp8(x, scale)
+    return q, scale
+
+def quantize_fp8_tensorwise_chunked(x: Tensor) -> tuple[Tensor, Tensor]:
+    scale = quantize_fp8_tensorwise_get_scale(x)
+    q = torch.empty_like(x, dtype=torch.float8_e4m3fn)
+    rows = max(1, _QUANTIZE_CHUNK_ELEMENTS // x[0].numel())
+    for i in range(0, x.shape[0], rows):
+        q[i:i + rows] = quantize_fp8(x[i:i + rows], scale)
+    return q, scale
 
 def quantize_fp8_axiswise_get_scale(x: Tensor, dim: int) -> Tensor:
     abs_max = x.abs().amax(dim=dim, keepdim=True)
     scale = (abs_max.float() / 448.0).clamp(min=1e-30)
     return scale
-
-def quantize_fp8_tensorwise(x: Tensor) -> tuple[Tensor, float]:
-    scale = quantize_fp8_tensorwise_get_scale(x)
-    q = quantize_fp8(x, scale)
-    return q, scale
 
 def quantize_fp8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
     scale = quantize_fp8_axiswise_get_scale(x, dim)
