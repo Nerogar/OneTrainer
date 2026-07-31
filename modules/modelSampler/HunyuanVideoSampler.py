@@ -143,8 +143,6 @@ class HunyuanVideoSampler(BaseModelSampler):
 
             image = video_processor.postprocess(image, output_type='pt')
 
-            self.model.evict()
-
             is_image = image.shape[2] == 1
             if is_image:
                 image = image.view((image.shape[0], image.shape[1], image.shape[3], image.shape[4]))

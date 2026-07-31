@@ -313,8 +313,6 @@ class WuerstchenSampler(BaseModelSampler):
             image_array = image_tensor.permute(0, 2, 3, 1).cpu().squeeze().float().numpy()
             image_array = (image_array * 255).round().astype("uint8")
 
-            self.model.evict()
-
         return ModelSamplerOutput(
             file_type=FileType.IMAGE,
             data=Image.fromarray(image_array),

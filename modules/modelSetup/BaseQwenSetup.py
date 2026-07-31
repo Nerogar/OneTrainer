@@ -161,7 +161,5 @@ class BaseQwenSetup(
     def prepare_text_caching(self, model: QwenModel, config: TrainConfig):
         if not config.train_text_encoder_or_embedding():
             model.materialize_only("text_encoder")
-        else:
-            model.evict()
 
         model.eval()

@@ -11,7 +11,7 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
-from modules.util.torch_util import torch_gc
+from modules.util.torch_util import device_equals, torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -138,7 +138,10 @@ class BaseModel(metaclass=ABCMeta):
 
         conductor = getattr(self, f"{stem}_offload_conductor", None)
         if conductor is not None:
-            conductor.to(device)
+            if device_equals(device, self.train_device):
+                conductor.materialize()
+            else:
+                conductor.evict()
         else:
             component = getattr(self, stem)  # raises if `part` doesn't name a real attribute
             # None when the part is excluded from training (e.g. a text encoder with include_text_encoder off):

@@ -139,7 +139,6 @@ class GenericTrainer(BaseTrainer):
         self.model_setup.setup_optimizations(self.model, self.config)
         self.model_setup.setup_train_device(self.model, self.config)
         self.model_setup.setup_model(self.model, self.config)
-        self.model.evict()
         self.model.eval()
 
         self.callbacks.on_update_status("creating the data loader/caching")
@@ -252,7 +251,6 @@ class GenericTrainer(BaseTrainer):
                 on_sample = on_sample_custom if is_custom_sample else on_sample_default
                 on_update_progress = self.callbacks.on_update_sample_custom_progress if is_custom_sample else self.callbacks.on_update_sample_default_progress
 
-                self.model.evict()
                 self.model.eval()
 
                 sample_config = copy.copy(sample_config)
