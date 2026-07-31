@@ -40,6 +40,10 @@ class TrainUIController:
         self.start_time: float | None = None
         self.start_total_steps: int | None = None
 
+        # the currently open sample window, or None. Tracked so a second click doesn't spawn a
+        # second (non-modal) window - the sample tool isn't designed to run two instances at once.
+        self.sample_window = None
+
     def on_update_train_progress(self, train_progress: TrainProgress, max_step: int, max_epoch: int):
         # capture session start on first progress update
         if self.start_total_steps is None:
@@ -161,16 +165,25 @@ class TrainUIController:
         ).create_window(parent, view_cls)
 
     def open_sampling_tool(self, parent, view_cls):
+        if self.sample_window is not None:
+            parent.show_window(self.sample_window)  # re-focus the one already open
+            return
         if not self.training_callbacks and not self.training_commands:
             controller = SampleWindowController(
                 self.train_config,
                 use_external_model=False,
             )
-            window = view_cls(parent, controller)
-            parent.show_window(window)
-            parent.connect_window_closed(window, torch_gc)
+            self.sample_window = view_cls(parent, controller)
+            parent.show_window(self.sample_window)
+            def on_closed():
+                self.sample_window = None
+                torch_gc()
+            parent.connect_window_closed(self.sample_window, on_closed)
 
     def open_manual_sample_window(self, parent, view_cls):
+        if self.sample_window is not None:
+            parent.show_window(self.sample_window)  # re-focus the one already open
+            return
         training_callbacks = self.training_callbacks
         training_commands = self.training_commands
 
@@ -181,9 +194,12 @@ class TrainUIController:
                 callbacks=training_callbacks,
                 commands=training_commands,
             )
-            window = view_cls(parent, controller)
-            parent.show_window(window)
-            parent.connect_window_closed(window, lambda: training_callbacks.set_on_sample_custom())
+            self.sample_window = view_cls(parent, controller)
+            parent.show_window(self.sample_window)
+            def on_closed():
+                self.sample_window = None
+                training_callbacks.set_on_sample_custom()
+            parent.connect_window_closed(self.sample_window, on_closed)
 
     def sample_now(self):
         train_commands = self.training_commands
