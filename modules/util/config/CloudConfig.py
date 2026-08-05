@@ -91,7 +91,7 @@ class CloudConfig(BaseConfig):
         data.append(("enabled", False, bool, False))
         data.append(("type", CloudType.RUNPOD, CloudType, False))
         data.append(("file_sync", CloudFileSync.NATIVE_SCP, CloudFileSync, False))
-        data.append(("create", True, bool, False))
+        data.append(("create", False, bool, False))
         data.append(("name", "OneTrainer", str, False))
         data.append(("tensorboard_tunnel", True, bool, False))
         data.append(("sub_type", "", str, False))
