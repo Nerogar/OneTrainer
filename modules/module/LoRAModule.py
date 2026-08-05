@@ -1045,8 +1045,10 @@ class LoRAModuleWrapper:
             state_dict: the state dict
             strict: whether to strictly enforce that the keys in state_dict match the module's parameters
         """
-        # create a copy, so the modules can pop states
-        state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(self.prefix)}
+        # create a copy, so the modules can pop states. the trailing dot keeps the "text_encoder"
+        # wrapper from also matching the "text_encoder_2" keys
+        prefix = self.prefix + "." if self.prefix else ""
+        state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(prefix)}
 
         check_fusion_match(state_dict.keys(), self.fuse, self.fusion_spec)
         # FIXME: disabled rank check, false positive on Flux2 LoHA loading
