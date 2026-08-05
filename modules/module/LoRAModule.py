@@ -777,6 +777,10 @@ class DoRAModule(LoRAModule):
         super().check_initialized()
         assert self.dora_scale is not None
 
+    def delta_forward(self, x, *args, **kwargs) -> Tensor | None:
+        # DoRA scales the recomposed weight, so there is no delta term; back to None from LoRAModule's.
+        return None
+
     def forward(self, x, *args, **kwargs):
         self.check_initialized()
         A = self.lora_down.weight
