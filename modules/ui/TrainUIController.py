@@ -288,6 +288,10 @@ class TrainUIController:
                 self.view.show_validation_errors(errors)
                 return
 
+            if self.train_config.clear_cache_before_training and self.train_config.latent_caching \
+                    and not self.view.confirm("Clear Cache Before Training", "Clear cache?"):
+                return
+
             self.view.on_training_started()
 
             if self.train_config.tensorboard and not self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
