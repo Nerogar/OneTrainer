@@ -437,7 +437,7 @@ class LoKrModule(PeftBase):
                 dora_scale_val = torch.norm(orig_weight.transpose(1, 0).reshape(orig_weight.shape[1], -1), dim=1, keepdim=True).reshape(orig_weight.shape[1], *[1] * dora_num_dims).transpose(0, 1)
 
             self.dora_scale = Parameter(
-                dora_scale_val.to(device=self.orig_module.weight.device, dtype=self.orig_module.weight.dtype)
+                dora_scale_val.to(device=self.orig_module.weight.device)
             )
             del orig_weight
 
