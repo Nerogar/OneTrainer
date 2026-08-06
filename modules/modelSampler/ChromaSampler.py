@@ -12,7 +12,6 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
-from modules.util.torch_util import torch_gc
 
 import torch
 
@@ -64,7 +63,7 @@ class ChromaSampler(BaseModelSampler):
             num_latent_channels = 16
 
             # prepare prompt
-            self.model.text_encoder_to(self.train_device)
+            self.model.materialize_only("text_encoder")
 
             combined_prompt_embedding, text_attention_mask = self.model.encode_text(
                 text=[prompt, negative_prompt],
@@ -72,9 +71,6 @@ class ChromaSampler(BaseModelSampler):
                 train_device=self.train_device,
                 text_encoder_layer_skip=text_encoder_layer_skip,
             )
-
-            self.model.text_encoder_to(self.temp_device)
-            torch_gc()
 
             # prepare latent image
             latent_image = torch.randn(
@@ -109,7 +105,7 @@ class ChromaSampler(BaseModelSampler):
             image_attention_mask = torch.full((2, image_seq_len), True, dtype=torch.bool, device=text_attention_mask.device)
             attention_mask = torch.cat([text_attention_mask, image_attention_mask], dim=1)
 
-            self.model.transformer_to(self.train_device)
+            self.model.materialize_only("transformer")
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 latent_model_input = torch.cat([latent_image] * 2)
                 expanded_timestep = timestep.expand(2)
@@ -134,9 +130,6 @@ class ChromaSampler(BaseModelSampler):
 
                 on_update_progress(i + 1, len(timesteps))
 
-            self.model.transformer_to(self.temp_device)
-            torch_gc()
-
             latent_image = self.model.unpack_latents(
                 latent_image,
                 height // vae_scale_factor,
@@ -144,7 +137,7 @@ class ChromaSampler(BaseModelSampler):
             )
 
             # decode
-            self.model.vae_to(self.train_device)
+            self.model.materialize_only("vae")
 
             latents = (latent_image / vae.config.scaling_factor) + vae.config.shift_factor
             image = vae.decode(latents, return_dict=False)[0]
@@ -152,8 +145,7 @@ class ChromaSampler(BaseModelSampler):
             do_denormalize = [True] * image.shape[0]
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
-            self.model.vae_to(self.temp_device)
-            torch_gc()
+            self.model.evict()
 
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,

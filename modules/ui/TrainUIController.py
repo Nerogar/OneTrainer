@@ -257,6 +257,9 @@ class TrainUIController:
                 self.view.sync_cloud_secrets()
             error_caught = True
             traceback.print_exc()
+        finally:
+            # print_fragmentation("training run, at stop")
+            pass
 
         trainer.end()
 
@@ -267,6 +270,9 @@ class TrainUIController:
         self.training_commands = None
         torch.clear_autocast_cache()
         torch_gc()
+
+        # after trainer.end() + torch_gc: quantifies the reserved-but-unallocated that persists through unload
+        # print_fragmentation("training run, after unload")
 
         if error_caught:
             self.on_update_status("Error: check the console for details")

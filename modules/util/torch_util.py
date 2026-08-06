@@ -233,6 +233,26 @@ def torch_gc():
         torch.mps.empty_cache()
 
 
+def print_fragmentation(label: str):
+    # Live (not peak) snapshot of allocator fragmentation for the current device. reserved-allocated is the total free
+    # memory the allocator holds but hasn't handed out; ext_frag is how shattered that free space is -- the fraction
+    # NOT in the single largest contiguous hole. An OOM is about contiguity, not total free bytes, so ext_frag near 1
+    # (free memory in many small holes) is the fragmentation that blocks a large allocation even when free > request.
+    if not torch.cuda.is_available():
+        return
+    segments = torch.cuda.memory_snapshot()
+    reserved = sum(s["total_size"] for s in segments)
+    allocated = sum(b["size"] for s in segments for b in s["blocks"] if b["state"] == "active_allocated")
+    free_total = reserved - allocated
+    largest_free = max(
+        (b["size"] for s in segments for b in s["blocks"] if b["state"] != "active_allocated"),
+        default=0)
+    ext_frag = 1 - largest_free / free_total if free_total > 0 else 0.0
+    gib = 1024 ** 3
+    print(f"[fragmentation] {label}: allocated={allocated / gib:.2f} GiB reserved={reserved / gib:.2f} GiB "
+          f"free={free_total / gib:.2f} GiB largest_free={largest_free / gib:.2f} GiB ext_frag={ext_frag:.1%}")
+
+
 def torch_sync():
     if torch.cuda.is_available():
         torch.cuda.synchronize()

@@ -12,7 +12,6 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
-from modules.util.torch_util import torch_gc
 
 import torch
 
@@ -67,7 +66,7 @@ class StableDiffusion3Sampler(BaseModelSampler):
             vae_scale_factor = self.pipeline.vae_scale_factor
 
             # prepare prompt
-            self.model.text_encoder_to(self.train_device)
+            self.model.materialize_only_text_encoders()
 
             prompt_embedding, pooled_prompt_embedding = self.model.combine_text_encoder_output(
                 *self.model.encode_text(
@@ -93,9 +92,6 @@ class StableDiffusion3Sampler(BaseModelSampler):
             combined_pooled_prompt_embedding = torch.cat(
                 [negative_pooled_prompt_embedding, pooled_prompt_embedding], dim=0)
 
-            self.model.text_encoder_to(self.temp_device)
-            torch_gc()
-
             # prepare timesteps
             noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
             timesteps = noise_scheduler.timesteps
@@ -114,7 +110,7 @@ class StableDiffusion3Sampler(BaseModelSampler):
             if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
                 extra_step_kwargs["generator"] = generator
 
-            self.model.transformer_to(self.train_device)
+            self.model.materialize_only("transformer")
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 latent_model_input = torch.cat([latent_image] * 2)
                 expanded_timestep = timestep.expand(latent_model_input.shape[0])
@@ -140,11 +136,8 @@ class StableDiffusion3Sampler(BaseModelSampler):
 
                 on_update_progress(i + 1, len(timesteps))
 
-            self.model.transformer_to(self.temp_device)
-            torch_gc()
-
             # decode
-            self.model.vae_to(self.train_device)
+            self.model.materialize_only("vae")
 
             latents = (latent_image / vae.config.scaling_factor) + vae.config.shift_factor
             image = vae.decode(latents, return_dict=False)[0]
@@ -152,8 +145,7 @@ class StableDiffusion3Sampler(BaseModelSampler):
             do_denormalize = [True] * image.shape[0]
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
-            self.model.vae_to(self.temp_device)
-            torch_gc()
+            self.model.evict()
 
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,

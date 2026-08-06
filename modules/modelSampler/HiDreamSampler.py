@@ -12,7 +12,6 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
-from modules.util.torch_util import torch_gc
 
 import torch
 
@@ -65,7 +64,7 @@ class HiDreamSampler(BaseModelSampler):
             num_latent_channels = 16
 
             # prepare prompt
-            self.model.text_encoder_to(self.train_device)
+            self.model.materialize_only_text_encoders()
 
             text_encoder_3_prompt_embedding, text_encoder_4_prompt_embedding, pooled_prompt_embedding = \
                 self.model.combine_text_encoder_output(
@@ -92,9 +91,6 @@ class HiDreamSampler(BaseModelSampler):
             combined_pooled_prompt_embedding = torch.cat(
                 [negative_pooled_prompt_embedding, pooled_prompt_embedding], dim=0)
 
-            self.model.text_encoder_to(self.temp_device)
-            torch_gc()
-
             # prepare latent image
             latent_image = torch.randn(
                 size=(1, num_latent_channels, height // vae_scale_factor, width // vae_scale_factor),
@@ -111,7 +107,7 @@ class HiDreamSampler(BaseModelSampler):
             if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
                 extra_step_kwargs["generator"] = generator
 
-            self.model.transformer_to(self.train_device)
+            self.model.materialize_only("transformer")
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 latent_model_input = torch.cat([latent_image] * 2)
                 expanded_timestep = timestep.expand(latent_model_input.shape[0])
@@ -142,11 +138,8 @@ class HiDreamSampler(BaseModelSampler):
 
                 on_update_progress(i + 1, len(timesteps))
 
-            self.model.transformer_to(self.temp_device)
-            torch_gc()
-
             # decode
-            self.model.vae_to(self.train_device)
+            self.model.materialize_only("vae")
 
             latents = (latent_image / vae.config.scaling_factor) + vae.config.shift_factor
             image = vae.decode(latents, return_dict=False)[0]
@@ -154,8 +147,7 @@ class HiDreamSampler(BaseModelSampler):
             do_denormalize = [True] * image.shape[0]
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
 
-            self.model.vae_to(self.temp_device)
-            torch_gc()
+            self.model.evict()
 
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,

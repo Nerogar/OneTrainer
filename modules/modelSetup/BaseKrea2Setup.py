@@ -16,7 +16,6 @@ from modules.util.checkpointing_util import (
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.quantization_util import quantize_layers
-from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -178,10 +177,9 @@ class BaseKrea2Setup(
         ).mean()
 
     def prepare_text_caching(self, model: Krea2Model, config: TrainConfig):
-        model.to(self.temp_device)
-
         if not config.train_text_encoder_or_embedding():
-            model.text_encoder_to(self.train_device)
+            model.materialize_only("text_encoder")
+        else:
+            model.evict()
 
         model.eval()
-        torch_gc()
