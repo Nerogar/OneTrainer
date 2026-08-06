@@ -1,4 +1,3 @@
-import os
 import platform
 
 from PySide6.QtCore import Qt
@@ -6,9 +5,6 @@ from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
 IS_WINDOWS = platform.system() == "Windows"
-
-# Lets reviewers whose OS never reports dark still see the dark theme, by pretending it did.
-OT_FORCE_DARK = os.environ.get("OT_FORCE_DARK") == "1"
 
 _BASE_STYLESHEET = """
     QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit {
@@ -35,15 +31,38 @@ _BASE_STYLESHEET = """
     }
 """
 
-def apply_theme(app: QApplication) -> None:
-    is_dark =  app.palette().color(QPalette.ColorRole.Window).lightness() < 128
-    palette = app.palette()
-    if OT_FORCE_DARK:
-        app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
-        palette = app.palette()
-    elif not IS_WINDOWS or not is_dark:
-        app.styleHints().setColorScheme(Qt.ColorScheme.Light)
-        palette = app.palette()
+# A scheme change regenerates only the palette roles nobody set explicitly. Base is set below
+# for light mode, so it would keep that white through every later switch; each scheme is applied
+# from a pristine copy taken before the first override instead.
+_scheme_palettes = {}
+
+# Whether the dark palette is the one currently applied.
+is_dark_theme = False
+
+
+def _capture_scheme_palettes(app: QApplication) -> None:
+    original_scheme = app.styleHints().colorScheme()
+    for scheme in (Qt.ColorScheme.Light, Qt.ColorScheme.Dark):
+        app.styleHints().setColorScheme(scheme)
+        _scheme_palettes[scheme] = QPalette(app.palette())
+    app.styleHints().setColorScheme(original_scheme)
+
+
+def apply_theme(app: QApplication, dark: bool | None = None) -> None:
+    global is_dark_theme
+
+    if not _scheme_palettes:
+        _capture_scheme_palettes(app)
+
+    if dark is None:
+        is_dark =  app.palette().color(QPalette.ColorRole.Window).lightness() < 128
+        dark = IS_WINDOWS and is_dark
+    is_dark_theme = dark
+
+    scheme = Qt.ColorScheme.Dark if dark else Qt.ColorScheme.Light
+    app.styleHints().setColorScheme(scheme)
+    palette = QPalette(_scheme_palettes[scheme])
+    if not dark:
         palette.setColor(QPalette.ColorRole.Base, QColor("white"))
         palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Base, QColor("#e0e0e0"))
     app.setPalette(palette)
