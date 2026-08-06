@@ -1,0 +1,4 @@
+# Optional extra for the REST API server (scripts/train_rest_server.py).
+# Not required for training, the desktop UI, or the CLI.
+fastapi
+uvicorn[standard]
