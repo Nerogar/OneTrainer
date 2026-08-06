@@ -94,7 +94,8 @@ class LinearW8A8(
         return self.weight.shape
 
     def unquantized_weight(self, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
-        return dequantize(self.weight.detach(), self.scale).to(dtype)
+        # 'scale' is not offloaded, so it can sit on the train device while 'weight' is parked on the temp device
+        return dequantize(self.weight.detach(), self.scale.to(device=self.weight.device)).to(dtype)
 
     @torch.no_grad()
     def quantize(self, device: torch.device | None = None):
