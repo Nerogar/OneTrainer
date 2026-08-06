@@ -1,9 +1,9 @@
 #To build, run
-#    docker build -t <image-name> . -f resources/docker/Dockerfile --build-arg OT_PLATFORM=[cpu|cuda12|cuda13|rocm]
+#    docker build -t <image-name> . -f resources/docker/Dockerfile --build-arg OT_PLATFORM=[cpu|cuda12|cuda13|rocm] --no-cache-filter=final
 #    docker tag <image-name> <dockerhub-username>/<repository-name>:<tag>
 #    docker push <dockerhub-username>/<repository-name>:<tag>
 
-FROM ubuntu:latest
+FROM ubuntu:latest AS base
 
 ARG OT_PLATFORM
 ARG OT_REPO="https://github.com/Nerogar/OneTrainer.git"
@@ -15,6 +15,7 @@ RUN apt-get update && \
     git \
     curl \
     ssh \
+    jupyterlab \
     && apt-get autoremove -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -35,6 +36,8 @@ ENV OT_SCRIPT_DEBUG="true"
 RUN --mount=type=cache,target=/root/.cache/rattler/cache <<EOF
 pixi install --locked -v -e ${OT_PLATFORM} --skip OneTrainer
 EOF
+
+FROM base AS final
 
 RUN git init \
     && git remote add origin ${OT_REPO} \
