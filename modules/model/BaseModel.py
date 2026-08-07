@@ -138,10 +138,11 @@ class BaseModel(metaclass=ABCMeta):
 
         conductor = getattr(self, f"{stem}_offload_conductor", None)
         if conductor is not None:
-            if device_equals(device, self.train_device):
-                conductor.materialize()
-            else:
+            if device_equals(device, self.temp_device):
                 conductor.evict()
+            else:
+                assert device_equals(device, self.train_device), f"unexpected device {device} for part {part}"
+                conductor.materialize()
         else:
             component = getattr(self, stem)  # raises if `part` doesn't name a real attribute
             # None when the part is excluded from training (e.g. a text encoder with include_text_encoder off):
