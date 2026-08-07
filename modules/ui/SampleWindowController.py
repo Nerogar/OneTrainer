@@ -96,7 +96,6 @@ class SampleWindowController:
         model_setup.setup_optimizations(model, self.initial_train_config)
         model_setup.setup_train_device(model, self.initial_train_config)
         model_setup.setup_model(model, self.initial_train_config)
-        model.to(torch.device(self.initial_train_config.temp_device))
 
         return model
 
@@ -136,12 +135,17 @@ class SampleWindowController:
 
             self.model.eval()
 
-            self.model_sampler.sample(
-                sample_config=sample,
-                destination=sample_path,
-                image_format=self.current_train_config.sample_image_format,
-                video_format=self.current_train_config.sample_video_format,
-                audio_format=self.current_train_config.sample_audio_format,
-                on_sample=on_sample,
-                on_update_progress=on_update_progress,
-            )
+            try:
+                self.model_sampler.sample(
+                    sample_config=sample,
+                    destination=sample_path,
+                    image_format=self.current_train_config.sample_image_format,
+                    video_format=self.current_train_config.sample_video_format,
+                    audio_format=self.current_train_config.sample_audio_format,
+                    on_sample=on_sample,
+                    on_update_progress=on_update_progress,
+                )
+            finally:
+                # the sampler materializes parts on demand; release VRAM now that this
+                # standalone sample window is idle again
+                self.model.evict()
