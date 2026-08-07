@@ -51,10 +51,9 @@ class BaseWuerstchenSetup(
             model: WuerstchenModel,
             config: TrainConfig,
     ):
-        # Not routed through _setup_model_part: Wuerstchen's parts (prior_prior, decoder_*, effnet_encoder,
-        # prior_text_encoder) don't match the transformer/text_encoder/vae shape _setup_model_part assumes and
-        # take bespoke per-part contexts (stable-cascade prior fp16-disable, effnet bf16-on-fp16), so this
-        # setup is fully hand-rolled.
+        # Hand-wired rather than via _setup_model_part: Wuerstchen's parts don't match the
+        # transformer/text_encoder/vae shape it assumes, and take bespoke per-part contexts
+        # (stable-cascade prior fp16-disable, effnet bf16-on-fp16).
         if config.prior.checkpointing_enabled():
             model.prior_prior.enable_gradient_checkpointing()
         enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, config, config.text_encoder)
@@ -348,7 +347,5 @@ class BaseWuerstchenSetup(
     def prepare_text_caching(self, model: WuerstchenModel, config: TrainConfig):
         if not config.train_text_encoder_or_embedding():
             model.materialize_only("text_encoder")
-        else:
-            model.evict()
 
         model.eval()

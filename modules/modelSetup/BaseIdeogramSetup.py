@@ -42,12 +42,16 @@ class BaseIdeogramSetup(
             config: TrainConfig,
     ):
         super().setup_optimizations(model, config)
-        # The unconditional transformer is frozen but still layer-offloaded so both transformers fit in VRAM
-        # during sampling; it is optional, so _setup_model_part skips it when unloaded.
-        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_ideogram_transformer, attention_mask=False)
-        self._setup_model_part(model, config, "unconditional_transformer", config.unconditional_transformer, enable_checkpointing_for_ideogram_transformer, attention_mask=False)
+        # The unconditional transformer is frozen but still layer-offloaded, so both transformers fit in VRAM
+        # during sampling.
+        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_ideogram_transformer)
+        self._setup_model_part(model, config, "unconditional_transformer", config.unconditional_transformer, enable_checkpointing_for_ideogram_transformer)
         self._setup_model_part(model, config, "text_encoder", config.text_encoder, enable_checkpointing_for_qwen3vl_encoder_layers, disable_fp16_autocast=True)
         self._setup_model_part(model, config, "vae", config.vae)
+
+        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=False)
+        if model.unconditional_transformer is not None:
+            self._set_attention_backend(model.unconditional_transformer, config.attention_mechanism, mask=False)
 
     def predict(
             self,

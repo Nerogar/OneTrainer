@@ -48,9 +48,11 @@ class BasePixArtAlphaSetup(
             config: TrainConfig,
     ):
         super().setup_optimizations(model, config)
-        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_basic_transformer_blocks, attention_mask=True)
+        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_basic_transformer_blocks)
         self._setup_model_part(model, config, "text_encoder", config.text_encoder, enable_checkpointing_for_t5_encoder_layers, disable_fp16_autocast=True)
         self._setup_model_part(model, config, "vae", config.vae)
+
+        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=True)
 
     def _setup_embeddings(
             self,
@@ -312,7 +314,5 @@ class BasePixArtAlphaSetup(
     def prepare_text_caching(self, model: PixArtAlphaModel, config: TrainConfig):
         if not config.train_text_encoder_or_embedding():
             model.materialize_only("text_encoder")
-        else:
-            model.evict()
 
         model.eval()
