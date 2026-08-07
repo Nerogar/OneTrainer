@@ -1,7 +1,7 @@
 # base requirements
 numpy==2.2.6
 opencv-python==4.11.0.86
-pillow==12.2.0
+pillow==12.3.0
 imagesize==1.4.1 #for concept statistics
 tqdm==4.67.1
 PyYAML==6.0.2
@@ -52,10 +52,10 @@ customtkinter==5.2.2
 PySide6==6.11.1
 
 # cloud
-runpod==1.7.10
+runpod==1.11.0
 fabric==3.2.2
 
 # debug
-psutil==7.0.0
-requests==2.33.0
+psutil==7.2.2
+requests==2.34.2
 deepdiff==8.6.2 # output easy to read diff for troublshooting

@@ -6,6 +6,8 @@ from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.PathIOType import PathIOType
 
+from huggingface_hub.constants import HF_HUB_CACHE
+
 
 class BaseModelTabView(ABC):
     def __init__(self, components):
@@ -85,6 +87,25 @@ class BaseModelTabView(ABC):
                                  "Go to https://huggingface.co/settings/tokens to create an access token.",
                          wide_tooltip=True)
         self.components.entry(frame, row, 1, ui_state, "secrets.huggingface_token")
+
+        # offline mode
+        self.components.label(frame, row, 3, "Offline Mode",
+                         tooltip="Skip the Hugging Face login and resolve every model from the local cache only. "
+                                 "Enable this when you have no internet connection; only already-downloaded models can be loaded.",
+                         wide_tooltip=True)
+        self.components.switch(frame, row, 4, ui_state, "offline_mode")
+
+        row += 1
+
+        # huggingface cache directory
+        self.components.label(frame, row, 0, "Hugging Face Cache Directory",
+                         tooltip="Directory used to cache Hugging Face model downloads. "
+                                 "Leave empty to use the default Hugging Face cache directory shown as the placeholder.",
+                         wide_tooltip=True)
+        self.components.path_entry(
+            frame, row, 1, ui_state, "huggingface_cache_dir",
+            mode="dir", placeholder=HF_HUB_CACHE,
+        )
 
         row += 1
 

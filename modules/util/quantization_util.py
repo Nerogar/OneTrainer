@@ -76,12 +76,6 @@ def dequantize(q: Tensor, scale: float | Tensor) -> Tensor:
     return q.float() * scale
 
 
-from modules.module.quantized.LinearFp8 import LinearFp8
-from modules.module.quantized.LinearGGUFA8 import LinearGGUFA8
-from modules.module.quantized.LinearSVD import BaseLinearSVD, make_svd_linear
-from modules.module.quantized.LinearW8A8 import LinearW8A8
-
-
 def __create_linear_layer(construct_fn, module: nn.Linear, copy_parameters: bool) -> nn.Module:
     bias = module.bias is not None
 
@@ -173,6 +167,11 @@ def replace_linear_with_quantized_layers(
         quantization: QuantizationConfig | None = None,
         copy_parameters: bool = False,
 ):
+    from modules.module.quantized.LinearFp8 import LinearFp8
+    from modules.module.quantized.LinearGGUFA8 import LinearGGUFA8
+    from modules.module.quantized.LinearSVD import make_svd_linear
+    from modules.module.quantized.LinearW8A8 import LinearW8A8
+
     kwargs = {}
     if dtype.quantize_nf4():
         linear_class = LinearNf4
@@ -235,6 +234,10 @@ def is_quantized_parameter(
         module: nn.Module,
         parameter_name: str,
 ) -> bool:
+    from modules.module.quantized.LinearFp8 import LinearFp8
+    from modules.module.quantized.LinearSVD import BaseLinearSVD
+    from modules.module.quantized.LinearW8A8 import LinearW8A8
+
     if isinstance(module, BaseLinearSVD):
         if parameter_name in ["svd_up", "svd_down"]:
             return True
@@ -283,6 +286,8 @@ def get_weight_shape(module: nn.Linear) -> torch.Size:
     return torch.Size((module.out_features, module.in_features))
 
 def get_offload_tensors(module: nn.Module) -> list[torch.Tensor]:
+    from modules.module.quantized.LinearSVD import BaseLinearSVD
+
     tensors = []
 
     if bnb is not None:
