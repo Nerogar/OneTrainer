@@ -44,9 +44,11 @@ class BaseZImageSetup(
             config: TrainConfig,
     ):
         super().setup_optimizations(model, config)
-        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_z_image_transformer, attention_mask=True)
+        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_z_image_transformer)
         self._setup_model_part(model, config, "text_encoder", config.text_encoder, enable_checkpointing_for_qwen3_encoder_layers, disable_fp16_autocast=True)
         self._setup_model_part(model, config, "vae", config.vae)
+
+        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=True)
 
     def predict(
             self,

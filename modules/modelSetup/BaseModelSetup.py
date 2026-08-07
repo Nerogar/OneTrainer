@@ -49,8 +49,7 @@ class BaseModelSetup(
             model: BaseModel,
             config: TrainConfig,
     ):
-        # Model-wide dtype/autocast, shared by every leaf. Leaves call super() first so model.train_dtype is
-        # set before their first _setup_model_part, which reads it for the non-fp16 quantize path.
+        # Leaves call super() first, so model.train_dtype is set before their _setup_model_part calls read it.
         model.train_dtype = config.train_dtype
         model.autocast_context = create_autocast_context(self.train_device, config.train_dtype, config.enable_autocast_cache)
 
@@ -251,12 +250,7 @@ class BaseModelSetup(
             checkpointing_fn=None,
             *,
             disable_fp16_autocast: bool = False,
-            attention_mask: bool | None = None,
     ):
-        # Per-part optimization wiring, called once per model part from each leaf. The optional
-        # disable_fp16_autocast context and its dtype are stored per-part and can differ per part
-        # (e.g. HiDream disables fp16 for both text_encoder_3 and the transformer). checkpointing_fn returns
-        # None for non-offloadable parts (SD/SDXL UNet), so no conductor is stored for those.
         module = getattr(model, attr)
         if module is None:
             return
@@ -275,9 +269,6 @@ class BaseModelSetup(
             train_dtype = model.train_dtype
 
         quantize_layers(module, self.train_device, train_dtype, config)
-
-        if attention_mask is not None:
-            self._set_attention_backend(module, config.attention_mechanism, mask=attention_mask)
 
     @staticmethod
     def _set_attention_backend(component, attn: AttentionMechanism, mask: bool):

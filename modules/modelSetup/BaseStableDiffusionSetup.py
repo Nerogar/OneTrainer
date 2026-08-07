@@ -48,8 +48,8 @@ class BaseStableDiffusionSetup(
             model: StableDiffusionModel,
             config: TrainConfig,
     ):
-        # Not routed through _setup_model_part: the UNet's checkpointing needs supports_offloading=False, which
-        # _setup_model_part's checkpointing_fn slot doesn't pass, so the parts are wired by hand here.
+        # Hand-wired rather than via _setup_model_part: the UNet needs supports_offloading=False, which the
+        # checkpointing_fn slot can't pass.
         if config.unet.checkpointing_enabled():
             model.unet.enable_gradient_checkpointing()
             enable_checkpointing_for_basic_transformer_blocks(model.unet, config, config.unet, supports_offloading=False)

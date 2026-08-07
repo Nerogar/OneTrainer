@@ -51,10 +51,8 @@ class BaseSanaSetup(
 
         super().setup_optimizations(model, config)
 
-        # Sana's vae runs under its own fp16-disabled autocast in predict(), set here rather than via
-        # _setup_model_part's autocast handling. Note a preexisting inconsistency (predates this refactor,
-        # kept as-is since Sana is largely outdated): unlike SDXL, model.vae_train_dtype is computed but never
-        # read anywhere, and the vae below is quantized with model.train_dtype, not this fp16-disabled dtype.
+        # Sana's vae runs under its own fp16-disabled autocast in predict(). Inconsistently, vae_train_dtype
+        # is never read and the vae below is quantized with model.train_dtype, not this fp16-disabled dtype.
         model.vae_autocast_context, model.vae_train_dtype = disable_fp16_autocast_context(
             self.train_device,
             config.train_dtype,
@@ -62,9 +60,11 @@ class BaseSanaSetup(
             config.enable_autocast_cache,
         )
 
-        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_sana_transformer, attention_mask=True)
+        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_sana_transformer)
         self._setup_model_part(model, config, "text_encoder", config.text_encoder, enable_checkpointing_for_gemma_layers, disable_fp16_autocast=True)
         self._setup_model_part(model, config, "vae", config.vae)
+
+        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=True)
 
     def _setup_embeddings(
             self,

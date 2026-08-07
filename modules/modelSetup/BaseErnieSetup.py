@@ -42,9 +42,11 @@ class BaseErnieSetup(
             config: TrainConfig,
     ):
         super().setup_optimizations(model, config)
-        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_ernie_transformer, attention_mask=True)
+        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_ernie_transformer)
         self._setup_model_part(model, config, "text_encoder", config.text_encoder, enable_checkpointing_for_mistral_encoder_layers, disable_fp16_autocast=True)
         self._setup_model_part(model, config, "vae", config.vae)
+
+        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=True)
 
     def predict(
             self,
