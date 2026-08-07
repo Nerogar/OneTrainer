@@ -15,9 +15,12 @@ class CompressedWeightMixin(metaclass=ABCMeta):
         self._compressed_dtype = None
 
     def _decompress(self, blob: torch.Tensor) -> torch.Tensor:
-        if not blob.is_cuda:
-            raise NotImplementedError("compressed-weight decompression is CUDA-only")
-        return nvcomp_util.decompress(blob, self._uncompressed_bytes, self._compressed_dtype, self._weight_shape)
+        # decoding only runs on the GPU. DoRA calls this during initialization, when the weight can
+        # still be on the CPU: copy it to the GPU, decode there, and copy the result back.
+        if blob.is_cuda:
+            return nvcomp_util.decompress(blob, self._uncompressed_bytes, self._compressed_dtype, self._weight_shape)
+        weight = nvcomp_util.decompress(blob.cuda(), self._uncompressed_bytes, self._compressed_dtype, self._weight_shape)
+        return weight.to(device=blob.device)
 
     def uncompressed_bytes(self) -> int:
         # bytes the weight occupies decompressed; weight.nbytes is the stored size and drops to the

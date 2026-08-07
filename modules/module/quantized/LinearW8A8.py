@@ -52,6 +52,12 @@ class LinearW8A8Function(torch.autograd.Function):
     #int8 and fp8 differ only in which math runs, and the quantized weight already carries the dtype
     @staticmethod
     def forward(ctx, x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
+        # `weight` is the decompressed weight, so saving it keeps a full-size copy alive until backward.
+        # Under reentrant checkpointing that copy lives only inside the recomputed segment, and not saving
+        # it would cost a second decode: there is no partitioner, so recompute would decode once for the
+        # forward and backward would decode again.
+        # TODO once offloading uses non-reentrant checkpointing, consider not saving the decompressed
+        # weight and decoding in backward() instead.
         ctx.save_for_backward(weight, weight_scale)
         if weight.dtype == torch.int8:
             return int8_forward_tokenwise(x, weight, weight_scale, bias, compute_dtype)

@@ -5,15 +5,16 @@ try:
     from modules.util.nvcomp_util_lowlevel import decompress_into
     _AVAILABLE = True
     print("nvCOMP: low-level batched-ANS backend loaded")
-except ImportError:
+except Exception as lowlevel_error:
     try:
         from modules.util.nvcomp_util_highlevel import compress as compress
         from modules.util.nvcomp_util_highlevel import decompress_into
         _AVAILABLE = True
-        print("nvCOMP: high-level Codec backend loaded (low-level unavailable)")
-    except ImportError:
+        print(f"nvCOMP: high-level Codec backend loaded (low-level unavailable: {type(lowlevel_error).__name__}: {lowlevel_error})")
+    except Exception as highlevel_error:
         _AVAILABLE = False
-        print("nvCOMP: no backend available")
+        print(f"nvCOMP: no backend available (low-level: {type(lowlevel_error).__name__}: {lowlevel_error}; "
+              f"high-level: {type(highlevel_error).__name__}: {highlevel_error})")
 
 
 def available() -> bool:

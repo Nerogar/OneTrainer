@@ -7,6 +7,7 @@
 
 import ctypes
 import math
+import threading
 
 import torch
 
@@ -58,20 +59,24 @@ _max_out_chunk = None       # worst-case compressed bytes for one CHUNK (constan
 _comp_temp = {}             # num_chunks -> compress temp bytes
 _decomp_temp = {}           # num_chunks -> decompress temp bytes
 _shape_cache = {}           # (uncompressed_bytes, device) -> (output offsets, output buffer sizes); identical for every weight of a size
-_scratch_cache = {}         # (num_chunks, device) -> reusable per-decode buffers, see _decode_scratch
+_scratch_cache = {}         # (num_chunks, device, thread) -> reusable per-decode buffers, see _decode_scratch
 
 
 def _decode_scratch(num: int, dev: torch.device):
     # Per-decode buffers that decompress_into used to allocate fresh every call. Their contents never
     # carry information between calls: temp is nvCOMP scratch, actual/statuses are outputs the sync-free
     # design deliberately never reads, and c_ptrs/o_ptrs are fully overwritten by the rebase below. Their
-    # size depends only on the chunk count, which takes few distinct values, so one set per (num, device)
-    # is reused for the model's life -- five allocations per decoded weight become none.
+    # size depends only on the chunk count, which takes few distinct values, so one set per key is
+    # reused for the model's life -- five allocations per decoded weight become none.
     #
-    # Safe only because decodes are serialized: they are issued on the current compute stream and a
-    # reused buffer is still in use by the previous decode until that stream reaches it. Issuing decodes
-    # on two streams concurrently would need one scratch set per stream.
-    key = (num, str(dev))
+    # Reuse is safe only while decodes sharing a set are serialized: a reused buffer is still in use by
+    # the previous decode until that decode's stream reaches it. Within one thread that holds, since its
+    # decodes go on its own current stream in issue order. Across threads it does not, which is why the
+    # thread is part of the key: c_ptrs/o_ptrs are rebased on the host but dereferenced by the kernel
+    # when it runs, so a second thread overwriting them between another thread's rebase and its kernel
+    # would make that kernel read the wrong chunks and write into the wrong output buffer -- silently,
+    # since the sync-free design never reads the statuses. Per-thread sets cost only pointer arrays.
+    key = (num, str(dev), threading.get_ident())
     v = _scratch_cache.get(key)
     if v is None:
         if num not in _decomp_temp:
@@ -108,8 +113,11 @@ def _check(rc: int, what: str):
         raise RuntimeError(f"nvcomp {what} failed with nvcompStatus {rc}")
 
 
-def _stream():
-    return torch.cuda.current_stream().cuda_stream
+def _stream(dev: torch.device):
+    # the stream of the tensor's own device, not of the ambient current device: with a train_device
+    # other than cuda:0 and no set_device call, the latter would launch the decode on cuda:0's stream
+    # against cuda:1 pointers, unordered with respect to the matmuls that consume the result.
+    return torch.cuda.current_stream(dev).cuda_stream
 
 
 @torch.no_grad()
@@ -120,7 +128,7 @@ def compress(weight: torch.Tensor) -> tuple[torch.Tensor, int]:
     assert weight.is_cuda and weight.is_contiguous()
     global _max_out_chunk
     dev = weight.device
-    stream = _stream()
+    stream = _stream(dev)
     flat = weight.view(torch.uint8).reshape(-1)
     total = flat.numel()
     num = math.ceil(total / CHUNK)
@@ -151,7 +159,7 @@ def compress(weight: torch.Tensor) -> tuple[torch.Tensor, int]:
         c_ptrs.data_ptr(), c_bytes.data_ptr(), _OPTS, statuses.data_ptr(), stream), "CompressAsync")
 
     # packing needs the actual sizes on the host -- a sync here is fine, compression runs once at load
-    torch.cuda.current_stream().synchronize()
+    torch.cuda.current_stream(dev).synchronize()
     sizes = c_bytes.tolist()
     offsets, cur = [], 0
     for s in sizes:
@@ -175,7 +183,7 @@ def decompress_into(compressed: torch.Tensor, out: torch.Tensor):
     # matmul. Pointer/size arrays are derived on the device from the blob's header, so no
     # host<->device transfer touches the stream.
     dev = compressed.device
-    stream = _stream()
+    stream = _stream(dev)
     total = out.numel()
     num = math.ceil(total / CHUNK)
     hb = num * 8
