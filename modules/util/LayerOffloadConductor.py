@@ -69,16 +69,20 @@ class StaticLayerTensorAllocator:
         total_cache_bytes = cache_tensor_size * len(self.__layer_allocator.cache_tensors)
         if self.__allocate_forward:
             cache_tensor_index = self.__allocation_end // cache_tensor_size
-            cache_tensor_allocation_end = ceil_16(self.__allocation_end % cache_tensor_size)
+            # never hand out views at storage_offset 0: torch.compile creates a 0/1-specialized
+            # symbol for the storage_offset of any tensor with a dynamic dim (compressed weights),
+            # so an offset-0 view needs its own graph while one "2 <= offset" guard covers all
+            # other placements. keeping every view at byte offset >= 16 avoids those recompiles.
+            cache_tensor_allocation_end = max(ceil_16(self.__allocation_end % cache_tensor_size), 16)
 
             if cache_tensor_allocation_end + num_bytes > cache_tensor_size:
                 # move to the start of the next cache tensor
                 cache_tensor_index += 1
-                cache_tensor_allocation_end = 0
+                cache_tensor_allocation_end = 16
             if cache_tensor_index * cache_tensor_size + cache_tensor_allocation_end + num_bytes > total_cache_bytes:
                 # move to the first cache tensor
                 cache_tensor_index = 0
-                cache_tensor_allocation_end = 0
+                cache_tensor_allocation_end = 16
 
             self.__allocation_end = cache_tensor_index * cache_tensor_size + cache_tensor_allocation_end
             self.__layer_allocator.ensure_allocation(cache_tensor_index)
@@ -91,7 +95,9 @@ class StaticLayerTensorAllocator:
             cache_tensor_index = self.__allocation_start // cache_tensor_size
             cache_tensor_allocation_start = self.__allocation_start % cache_tensor_size
 
-            if cache_tensor_allocation_start - num_bytes < 0:
+            # "< 16" instead of "< 0": the first 16 bytes of every cache tensor are reserved so no
+            # view lands at storage_offset 0 (see the forward-direction comment above)
+            if cache_tensor_allocation_start - num_bytes < 16:
                 # move to the end of the previous cache tensor
                 cache_tensor_index -= 1
                 cache_tensor_allocation_start = cache_tensor_size
