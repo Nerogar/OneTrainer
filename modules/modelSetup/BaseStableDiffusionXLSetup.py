@@ -46,8 +46,8 @@ class BaseStableDiffusionXLSetup(
             model: StableDiffusionXLModel,
             config: TrainConfig,
     ):
-        # Hand-wired rather than via _setup_model_part: the UNet needs supports_offloading=False, which the
-        # checkpointing_fn slot can't pass.
+        super().setup_optimizations(model, config)
+
         if config.unet.checkpointing_enabled():
             model.unet.enable_gradient_checkpointing()
             enable_checkpointing_for_basic_transformer_blocks(model.unet, config, config.unet, supports_offloading=False)
@@ -59,8 +59,6 @@ class BaseStableDiffusionXLSetup(
             apply_circular_padding_to_conv2d(model.unet)
             if model.unet_lora is not None:
                 apply_circular_padding_to_conv2d(model.unet_lora)
-
-        super().setup_optimizations(model, config)
 
         model.vae_autocast_context, model.vae_train_dtype = disable_fp16_autocast_context(
             self.train_device,
