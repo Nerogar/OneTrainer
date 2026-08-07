@@ -68,6 +68,14 @@ def Mod_patched_eval(cls, p, q):
 needs_dynamic_parameter_shapes = False
 
 
+def reset_compile():
+    # needs_dynamic_parameter_shapes is a process global, but only describes the current run. in the
+    # long-lived UI process a compressed run would otherwise keep relaxing force_parameter_static_shapes
+    # for every later run in the same session. call this once per run, before init_compile().
+    global needs_dynamic_parameter_shapes
+    needs_dynamic_parameter_shapes = False
+
+
 def init_compile():
     # cache_size_limit and recompile_limit are aliases for the same dynamo config value.
     # since torch 2.12, dynamo config overrides are stored in ContextVars (pytorch/pytorch#173568),
