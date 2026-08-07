@@ -248,5 +248,7 @@ class BaseModelSetup(
                 component.set_attention_backend("flash")
             case AttentionMechanism.CUDNN:
                 component.set_attention_backend("_native_cudnn")
+            case AttentionMechanism.FLEX:
+                component.set_attention_backend("flex")
             case _:
                 raise NotImplementedError(f"attention mechanism {str(attn)} not implemented")
