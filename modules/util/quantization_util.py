@@ -267,14 +267,9 @@ def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataTy
         return
     child_modules = list(module.modules())
 
-    # per-component weight compression: the caller passes the part's config.<part>.compression flag.
-    # the layers decide compress-or-not at quantize() time, so stamp it on before quantizing.
     compressible = [m for m in child_modules if isinstance(m, CompressedWeightMixin)]
-    if compress:
-        if not compressible:
-            raise ValueError("compression is enabled for this component but its data type cannot be compressed")
-        if not nvcomp_util.available():
-            raise RuntimeError("compression is enabled but nvCOMP is not available")
+    if compress and not nvcomp_util.available():
+        raise RuntimeError("a compressed weight data type is selected but nvCOMP is not available")
     for m in compressible:
         m.compress = compress
 

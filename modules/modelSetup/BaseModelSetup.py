@@ -268,7 +268,7 @@ class BaseModelSetup(
         else:
             train_dtype = model.train_dtype
 
-        quantize_layers(module, self.train_device, train_dtype, config, compress=config_part.compression)
+        quantize_layers(module, self.train_device, train_dtype, config, compress=config_part.weight_dtype.is_compressed())
 
     @staticmethod
     def _set_attention_backend(component, attn: AttentionMechanism, mask: bool):

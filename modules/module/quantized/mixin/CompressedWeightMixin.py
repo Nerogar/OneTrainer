@@ -8,8 +8,6 @@ import torch
 
 class CompressedWeightMixin(metaclass=ABCMeta):
     def _init_compressed_state(self):
-        # compress (whether to compress at quantize time) is set by quantize_layers() from the
-        # per-component config; default off so a layer built outside that path never compresses
         self.compress = False
         self._compressed = False
         self._weight_shape = None
