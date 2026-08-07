@@ -58,6 +58,36 @@ _max_out_chunk = None       # worst-case compressed bytes for one CHUNK (constan
 _comp_temp = {}             # num_chunks -> compress temp bytes
 _decomp_temp = {}           # num_chunks -> decompress temp bytes
 _shape_cache = {}           # (uncompressed_bytes, device) -> (output offsets, output buffer sizes); identical for every weight of a size
+_scratch_cache = {}         # (num_chunks, device) -> reusable per-decode buffers, see _decode_scratch
+
+
+def _decode_scratch(num: int, dev: torch.device):
+    # Per-decode buffers that decompress_into used to allocate fresh every call. Their contents never
+    # carry information between calls: temp is nvCOMP scratch, actual/statuses are outputs the sync-free
+    # design deliberately never reads, and c_ptrs/o_ptrs are fully overwritten by the rebase below. Their
+    # size depends only on the chunk count, which takes few distinct values, so one set per (num, device)
+    # is reused for the model's life -- five allocations per decoded weight become none.
+    #
+    # Safe only because decodes are serialized: they are issued on the current compute stream and a
+    # reused buffer is still in use by the previous decode until that stream reaches it. Issuing decodes
+    # on two streams concurrently would need one scratch set per stream.
+    key = (num, str(dev))
+    v = _scratch_cache.get(key)
+    if v is None:
+        if num not in _decomp_temp:
+            t = ctypes.c_size_t()
+            _check(_LIB.nvcompBatchedANSDecompressGetTempSizeAsync(num, CHUNK, _OPTS, ctypes.byref(t), num * CHUNK),
+                   "DecompressGetTempSize")
+            _decomp_temp[num] = t.value
+        v = (
+            torch.empty(max(_decomp_temp[num], 1), dtype=torch.uint8, device=dev),   # temp
+            torch.empty(num, dtype=torch.int64, device=dev),                         # actual sizes, never read
+            torch.empty(num, dtype=torch.int32, device=dev),                         # statuses, never read
+            torch.empty(num, dtype=torch.int64, device=dev),                         # c_ptrs
+            torch.empty(num, dtype=torch.int64, device=dev),                         # o_ptrs
+        )
+        _scratch_cache[key] = v
+    return v
 
 
 def _shape_arrays(total: int, dev: torch.device):
@@ -150,21 +180,18 @@ def decompress_into(compressed: torch.Tensor, out: torch.Tensor):
     num = math.ceil(total / CHUNK)
     hb = num * 8
 
+    temp, actual, statuses, c_ptrs, o_ptrs = _decode_scratch(num, dev)
+
     c_bytes = compressed[:hb].view(torch.int64)                    # compressed size per chunk (device slice, no copy)
     c_off = compressed[hb:2 * hb].view(torch.int64)                # chunk offsets into the packed data (precomputed at compress)
     data = compressed[2 * hb:]
-    c_ptrs = c_off + data.data_ptr()                               # only the current base is added on-device (one int64 add)
-
+    # rebase both offset arrays onto the current addresses, into the pooled buffers. The blob and the
+    # output move between calls (both come from pools), so the absolute pointers cannot be cached: two
+    # blobs of equal size can occupy one address in turn while carrying different per-chunk offsets,
+    # which a base-address-keyed cache would not distinguish
+    torch.add(c_off, data.data_ptr(), out=c_ptrs)
     o_off, u_bytes = _shape_arrays(total, dev)
-    o_ptrs = o_off + out.data_ptr()
-
-    if num not in _decomp_temp:
-        t = ctypes.c_size_t()
-        _check(_LIB.nvcompBatchedANSDecompressGetTempSizeAsync(num, CHUNK, _OPTS, ctypes.byref(t), total), "DecompressGetTempSize")
-        _decomp_temp[num] = t.value
-    temp = torch.empty(max(_decomp_temp[num], 1), dtype=torch.uint8, device=dev)
-    actual = torch.empty(num, dtype=torch.int64, device=dev)        # out actual sizes -- kept on device, never read
-    statuses = torch.empty(num, dtype=torch.int32, device=dev)      # out per-chunk status -- kept on device, never read
+    torch.add(o_off, out.data_ptr(), out=o_ptrs)
 
     _check(_LIB.nvcompBatchedANSDecompressAsync(
         c_ptrs.data_ptr(), c_bytes.data_ptr(), u_bytes.data_ptr(), actual.data_ptr(), num,

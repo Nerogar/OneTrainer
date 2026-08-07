@@ -282,12 +282,10 @@ def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataTy
             if isinstance(child_module, QuantizedModuleMixin):
                 child_module.quantize(device=device)
 
-    if multi.is_master():
-        sizes = [m.compression_sizes() for m in child_modules if isinstance(m, CompressedWeightMixin)]
-        sizes = [s for s in sizes if s is not None]
-        if sizes:
-            uncompressed = sum(s[0] for s in sizes)
-            compressed = sum(s[1] for s in sizes)
+    if multi.is_master() and compress:
+        uncompressed = sum(m.uncompressed_bytes() for m in compressible)
+        compressed = sum(m.weight.nbytes for m in compressible)
+        if uncompressed > 0:
             tqdm.write(f"nvCOMP weight compression ({type(module).__name__}): {uncompressed / 2**20:.0f} -> {compressed / 2**20:.0f} MiB ({(1 - compressed / uncompressed) * 100:.0f}% saved)")
 
 def get_unquantized_weight(module: nn.Linear, dtype: torch.dtype, device: torch.device) -> Tensor:

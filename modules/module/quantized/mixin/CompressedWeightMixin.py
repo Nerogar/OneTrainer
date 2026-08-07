@@ -21,12 +21,12 @@ class CompressedWeightMixin(metaclass=ABCMeta):
             raise NotImplementedError("compressed-weight decompression is CUDA-only")
         return nvcomp_util.decompress(blob, self._uncompressed_bytes, self._compressed_dtype, self._weight_shape)
 
-    def compression_sizes(self) -> tuple[int, int] | None:
-        # (uncompressed bytes, stored compressed bytes) once the weight is compressed, else None.
-        # the compressed blob is the uint8 weight tensor, so its byte count is weight.numel().
+    def uncompressed_bytes(self) -> int:
+        # bytes the weight occupies decompressed; weight.nbytes is the stored size and drops to the
+        # blob length once compressed
         if not self._compressed:
-            return None
-        return self._uncompressed_bytes, self.weight.numel()
+            return self.weight.nbytes
+        return self._uncompressed_bytes
 
     @torch.no_grad()
     def _compress_weight(self, device: torch.device | None = None):
