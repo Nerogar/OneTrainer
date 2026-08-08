@@ -74,6 +74,14 @@ def quantize_fp8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
     q = quantize_fp8(x, scale)
     return q, scale
 
+def quantize_axiswise(x: Tensor, dim: int, dtype: torch.dtype) -> tuple[Tensor, Tensor]:
+    if dtype == torch.int8:
+        return quantize_int8_axiswise(x, dim)
+    elif dtype == torch.float8_e4m3fn:
+        return quantize_fp8_axiswise(x, dim)
+    else:
+        raise NotImplementedError(f"{dtype} is not an 8-bit quantization dtype")
+
 def dequantize(q: Tensor, scale: float | Tensor) -> Tensor:
     return q.float() * scale
 
