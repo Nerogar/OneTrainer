@@ -23,6 +23,30 @@ CONVROT_BLOCK_SIZE = int(os.environ.get("CONVROT_BLOCK_SIZE", "128"))
 # to int8 (matching plain int8w8's backward) hurts LoRA gradient quality vs keeping it in
 # bf16. Default matches int8w8 so the two paths are directly comparable.
 CONVROT_BF16_DY = os.environ.get("CONVROT_BF16_DY", "0") == "1"
+# Which forward to run once the weight is stored as rotated int8. "int8" uses the fused kernel; "bf16"
+# dequantizes the weight and hands the matmul to the vendor BF16 GEMM. Accuracy and speed pull in opposite
+# directions, so this is a trade rather than a free choice.
+#
+# Measured here on a 5090, 5376 -> 7168, against the dequantized weight as reference:
+#
+#     tokens    fused int8    bf16
+#      2048       1.27 ms    2.74 ms
+#     12000      10.13 ms   11.70 ms
+#     error      9.43e-03   3.61e-03
+#
+# So bf16 is ~2.6x more accurate and 1.15-2.2x slower. Both routes carry the rotation's own quantization error
+# identically -- that is fixed when the weight is stored -- and what separates them is that the fused kernel
+# additionally quantizes the ACTIVATIONS per row on every call.
+#
+# musubi measures bf16 as both more accurate AND faster on an H100 (4.10 vs 6.22 s/it), noting "INT8 arithmetic
+# is not the problem, since an H100 runs INT8 and FP8 at the same rate -- the fused kernel is". That half does
+# not transfer: torch._int_mm on consumer hardware is fast, so the speed ordering reverses while the accuracy
+# ordering holds. Benchmark before assuming either.
+#
+# Default int8, which is the faster route here and matches the behaviour before this knob existed. Prefer bf16
+# when gradient quality matters more than throughput: the base is frozen, so a LoRA's entire gradient arrives
+# through this layer, and activation quantization lands directly on it.
+CONVROT_FWD = os.environ.get("CONVROT_FWD", "int8").lower()
 
 
 class LinearInt8ConvRotFunction(torch.autograd.Function):
@@ -109,14 +133,35 @@ class LinearInt8ConvRot(LinearW8A8):
         assert self._is_quantized
         x = x_orig.reshape(-1, x_orig.shape[-1])
 
-        if x.shape[0] > 16:
+        # The row floor is a HARD REQUIREMENT of torch._int_mm, not a performance heuristic -- do not remove it
+        # or relax it to >=. Measured on torch 2.12.0+cu130 / RTX 5090, int8 5376 -> 7168:
+        #     rows 15 -> RuntimeError: self.size(0) needs to be greater than 16, but got 15
+        #     rows 16 -> RuntimeError: self.size(0) needs to be greater than 16, but got 16
+        #     rows 17 -> ok
+        # so 16 itself fails and strictly-greater is correct. Anything at or below it must take the bf16 route,
+        # which is why that branch is the fallback rather than an alternative: it is the only path that works
+        # for small inputs, whatever CONVROT_FWD asks for.
+        if CONVROT_FWD == "int8" and x.shape[0] > 16:
+            # Decompress first: LinearW8A8 inherits CompressedWeightMixin, so self.weight may be a compressed
+            # blob rather than the int8 tensor, and LinearInt8ConvRotFunction consumes the int8 weight directly.
+            weight = self._decompress(self.weight) if self._compressed else self.weight
             y = LinearInt8ConvRotFunction.apply(
-                x, self.weight, self.scale, self.bias, self.compute_dtype,
+                x, weight, self.scale, self.bias, self.compute_dtype,
                 self.block_size, self.in_features, self.rotation,
             )
         else:
-            w = self.unquantized_weight(dtype=x.dtype, device=x.device)
-            y = torch.nn.functional.linear(x, w, self.bias)
+            # Rotate the ACTIVATIONS and leave the weight rotated as stored, rather than un-rotating the
+            # weight. The Hadamard is orthogonal, so (xR)(WR)^T == x W^T either way, but the costs are not
+            # symmetric: rotating x is tokens x in_features, un-rotating W is out_features x in_features and
+            # runs on every call. Measured on 12000x5376 -> 7168, this is the whole difference between the
+            # bf16 route being slower than the fused int8 kernel and being faster.
+            #
+            # unquantized_weight() still un-rotates, because its callers -- LoRA decompose, offload sizing --
+            # want the weight in its original basis. Only this forward can exploit the stored basis directly.
+            weight = self._decompress(self.weight) if self._compressed else self.weight
+            w_rotated = dequantize(weight, self.scale.to(device=weight.device)).to(x.dtype)
+            x_rotated = block_hadamard(pad_to_block(x, self.block_size), self.block_size, self.rotation)
+            y = torch.nn.functional.linear(x_rotated, w_rotated, self.bias)
 
         return y.reshape(x_orig.shape[:-1] + (y.shape[-1],))
 
