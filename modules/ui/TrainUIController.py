@@ -19,6 +19,7 @@ from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.profiling_util import PeakMemoryRecorder
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ui.validation import flush_and_validate_all
@@ -38,6 +39,10 @@ class TrainUIController:
         self.current_workspace_dir = config.workspace_dir
         self.start_time: float | None = None
         self.start_total_steps: int | None = None
+
+        # the currently open sample window, or None. Tracked so a second click doesn't spawn a
+        # second (non-modal) window - the sample tool isn't designed to run two instances at once.
+        self.sample_window = None
 
     def on_update_train_progress(self, train_progress: TrainProgress, max_step: int, max_epoch: int):
         # capture session start on first progress update
@@ -160,16 +165,25 @@ class TrainUIController:
         ).create_window(parent, view_cls)
 
     def open_sampling_tool(self, parent, view_cls):
+        if self.sample_window is not None:
+            parent.show_window(self.sample_window)  # re-focus the one already open
+            return
         if not self.training_callbacks and not self.training_commands:
             controller = SampleWindowController(
                 self.train_config,
                 use_external_model=False,
             )
-            window = view_cls(parent, controller)
-            parent.show_window(window)
-            parent.connect_window_closed(window, torch_gc)
+            self.sample_window = view_cls(parent, controller)
+            parent.show_window(self.sample_window)
+            def on_closed():
+                self.sample_window = None
+                torch_gc()
+            parent.connect_window_closed(self.sample_window, on_closed)
 
     def open_manual_sample_window(self, parent, view_cls):
+        if self.sample_window is not None:
+            parent.show_window(self.sample_window)  # re-focus the one already open
+            return
         training_callbacks = self.training_callbacks
         training_commands = self.training_commands
 
@@ -180,9 +194,12 @@ class TrainUIController:
                 callbacks=training_callbacks,
                 commands=training_commands,
             )
-            window = view_cls(parent, controller)
-            parent.show_window(window)
-            parent.connect_window_closed(window, lambda: training_callbacks.set_on_sample_custom())
+            self.sample_window = view_cls(parent, controller)
+            parent.show_window(self.sample_window)
+            def on_closed():
+                self.sample_window = None
+                training_callbacks.set_on_sample_custom()
+            parent.connect_window_closed(self.sample_window, on_closed)
 
     def sample_now(self):
         train_commands = self.training_commands
@@ -214,6 +231,10 @@ class TrainUIController:
             self.view.on_update_status(f"Error generating debug package: {e}")
 
     def __training_thread_function(self):
+        with PeakMemoryRecorder("training run", enabled=False):
+            self.__training_thread_function_impl()
+
+    def __training_thread_function_impl(self):
         error_caught = False
 
         self.training_callbacks = TrainCallbacks(
@@ -265,6 +286,10 @@ class TrainUIController:
             errors = flush_and_validate_all()
             if errors:
                 self.view.show_validation_errors(errors)
+                return
+
+            if self.train_config.clear_cache_before_training and self.train_config.latent_caching \
+                    and not self.view.confirm("Clear Cache Before Training", "Clear cache?"):
                 return
 
             self.view.on_training_started()

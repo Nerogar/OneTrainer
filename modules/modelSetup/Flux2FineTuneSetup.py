@@ -10,25 +10,11 @@ from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
 
-import torch
-
 
 @factory.register(BaseModelSetup, ModelType.FLUX_2, TrainingMethod.FINE_TUNE)
 class Flux2FineTuneSetup(
     BaseFlux2Setup,
 ):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
-    ):
-        super().__init__(
-            train_device=train_device,
-            temp_device=temp_device,
-            debug_mode=debug_mode,
-        )
-
     def create_parameters(
             self,
             model: Flux2Model,
@@ -67,12 +53,15 @@ class Flux2FineTuneSetup(
         vae_on_train_device = not config.latent_caching
         text_encoder_on_train_device = not config.latent_caching
 
-        model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
-        model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
+        parts = ["transformer"]
+        if text_encoder_on_train_device:
+            parts.append("text_encoder")
+        if vae_on_train_device:
+            parts.append("vae")
+        model.materialize_only(*parts)
         # keep VAE batch-norm stats on the train device: scale_latents reads them every step,
         # and .to(cuda) from an offloaded VAE would block-sync the stream each step.
         model.vae.bn.to(self.train_device)
-        model.transformer_to(self.train_device)
 
         model.text_encoder.eval()
         model.vae.eval()

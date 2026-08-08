@@ -80,11 +80,6 @@ class Krea2Model(BaseModel):
         self.transformer_lora = None
         self.lora_state_dict = None
 
-    def adapters(self) -> list[LoRAModuleWrapper]:
-        return [a for a in [
-            self.transformer_lora,
-        ] if a is not None]
-
     def diffusers_to_original(self) -> list | None:
         # Krea 2's native checkpoint (krea/Krea-2-Raw's raw.safetensors) is a pure rename of the diffusers
         # Krea2Transformer2DModel state dict -- q/k/v are already split in both namespaces, so no qkv fusion
@@ -126,34 +121,6 @@ class Krea2Model(BaseModel):
                 ("scale_shift_table", "mod.lin", flatten_mod, table_mod),
             ]),
         ]
-
-    def vae_to(self, device: torch.device):
-        self.vae.to(device=device)
-
-    def text_encoder_to(self, device: torch.device): #TODO share more code between models
-        if self.text_encoder_offload_conductor is not None:
-            self.text_encoder_offload_conductor.to(device)
-        else:
-            self.text_encoder.to(device=device)
-
-    def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None:
-            self.transformer_offload_conductor.to(device)
-        else:
-            self.transformer.to(device=device)
-
-        if self.transformer_lora is not None:
-            self.transformer_lora.to(device)
-
-    def to(self, device: torch.device):
-        self.vae_to(device)
-        self.text_encoder_to(device)
-        self.transformer_to(device)
-
-    def eval(self):
-        self.vae.eval()
-        self.text_encoder.eval()
-        self.transformer.eval()
 
     def create_pipeline(self) -> DiffusionPipeline:
         return Krea2Pipeline(
