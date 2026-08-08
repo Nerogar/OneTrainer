@@ -84,16 +84,24 @@ _TRANSPOSE_MIN_M = 1536
 
 
 _AUTOTUNE_KEY = [
-    'QUANTIZED_M', #only tune roughly on M, because M is the transformer sequence length - can vary on data
+    #M is batch*sequence, so unlike N and K it is data-dependent and unbounded: it moves with
+    #resolution, frame count, batch size and (on models that prune prompt padding) the longest
+    #caption in the batch. bucketing it per doubling keeps the number of tuning keys logarithmic
+    #in M instead of linear. proportional resolution is the right shape because the winning config
+    #is decided by block count against SM count, which is linear in M - so equal ratios of M
+    #matter equally at every scale, and a fixed stride is too fine at large M and too coarse at small
+    'QUANTIZED_M',
     'N',
     'K',
     'stride_bk'    #use stride of b as key, to autotune again for a strided rhs matrix (backward pass)
 ]
 
-#the LoRA epilogue keys on the rank tiling as well, and on stride_upr for the same reason as
-#stride_bk above: up arrives row-major (r, N) when the caller's cast to the compute dtype is a
-#real copy, and as a transposed view when it is a no-op, and the two layouts load differently
-_LORA_AUTOTUNE_KEY = [*_AUTOTUNE_KEY, 'R_TILES', 'BLOCK_R', 'stride_upr']
+#the LoRA epilogue keys on the rank tiling as well. up's row stride is deliberately not a key even
+#though it varies: it is 1 in the forward (up is a transposed view of lora_up) and N in the backward
+#(up is lora_down, stored row-major), so keying on it would double the key count on every model.
+#the two layouts load differently but the slab is only BLOCK_R x BLOCK_N and is reused by every
+#M block in the group, too little traffic next to A and B to move the tile choice
+_LORA_AUTOTUNE_KEY = [*_AUTOTUNE_KEY, 'R_TILES', 'BLOCK_R']
 
 #configs for the shared _mm_accumulate core: GROUP_SIZE_M is required by its grouped launch
 #order. Shared memory per config is stages*(BLOCK_M+BLOCK_N)*BLOCK_K bytes and must stay
@@ -265,7 +273,7 @@ def mm_8bit(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
         a, b, c,
         M, N, K,
         a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0),
-        QUANTIZED_M = M // 64, FLOAT = FLOAT, EVEN_K = (K % 128 == 0),
+        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0),
     )
     return c
 
@@ -310,7 +318,7 @@ def scaled_mm_8bit(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor, out_dt
         a, b, c, scale,
         M, N, K,
         a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0),
-        QUANTIZED_M = M // 64, FLOAT = FLOAT, EVEN_K = (K % 128 == 0),
+        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0),
     )
     return c
 
@@ -357,7 +365,7 @@ def rowcol_scaled_mm_8bit(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor,
         a, b, c, scale, scale_n,
         M, N, K,
         a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0),
-        QUANTIZED_M = M // 64, FLOAT = FLOAT, EVEN_K = (K % 128 == 0),
+        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0),
     )
     return c
 
@@ -436,7 +444,7 @@ def scaled_lora_mm_8bit(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor, x
         a, b, c, scale, xd, up,
         M, N, K, R,
         a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0), xd.stride(0), up.stride(0), up.stride(1),
-        QUANTIZED_M = M // 64, FLOAT = FLOAT, EVEN_K = (K % 128 == 0),
+        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0),
         BLOCK_R = block_r, R_TILES = triton.cdiv(R, block_r),
     )
     return c
@@ -486,7 +494,7 @@ def rowcol_scaled_lora_mm_8bit(a: torch.Tensor, b: torch.Tensor, scale: torch.Te
         a, b, c, scale, scale_n, xd, up,
         M, N, K, R,
         a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0), xd.stride(0), up.stride(0), up.stride(1),
-        QUANTIZED_M = M // 64, FLOAT = FLOAT, EVEN_K = (K % 128 == 0),
+        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0),
         BLOCK_R = block_r, R_TILES = triton.cdiv(R, block_r),
     )
     return c
