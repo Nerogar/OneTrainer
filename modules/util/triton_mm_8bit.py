@@ -7,22 +7,23 @@
 #_scaled_mm_kernel folds a per-row dequant scale in and casts to the output dtype, and
 #_scaled_lora_mm_kernel additionally fuses a low-rank update into the same tile.
 
+from modules.util.tqdm_util import tqdm
+
 import torch
 
 import triton
 import triton.language as tl
-from tqdm import tqdm
 
 
 def announce_autotuning(kernel, name=None):
-    prefix = f"[triton] Autotuning {name} " if name else "[triton] Autotuning "
+    prefix = f"autotuning {name} " if name else "autotuning "
     orig_check_disk_cache = kernel.check_disk_cache
     variants = 0
     def check_disk_cache(tuning_key, configs, bench_fn):
         def announced_bench():
             nonlocal variants
             variants += 1
-            tqdm.write(f"{prefix}variant #{variants}...")
+            tqdm.show_status(f"{prefix}variant #{variants}...")
             bench_fn()
         return orig_check_disk_cache(tuning_key, configs, announced_bench)
     kernel.check_disk_cache = check_disk_cache
