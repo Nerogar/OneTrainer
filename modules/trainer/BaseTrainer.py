@@ -97,10 +97,8 @@ class BaseTrainer(
         if self.config.tensorboard_expose:
             tensorboard_args.append("--bind_all")
 
-        # Discard the tensorboard child's stdout/stderr: the TF-not-found notice, the
-        # experimental-data-loading NOTE and the serving banner are all noise, and the
-        # UI already exposes the tensorboard URL. Popen still raises if the executable
-        # is missing, so a real launch failure is not hidden.
+        # discard the child's banner and notices; the UI already shows the tensorboard URL.
+        # Popen still raises if the executable is missing.
         self.tensorboard_subprocess = subprocess.Popen(
             tensorboard_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )

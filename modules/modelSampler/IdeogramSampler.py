@@ -11,6 +11,7 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
+from modules.util.tqdm_util import tqdm
 
 import torch
 
@@ -18,7 +19,6 @@ from diffusers.pipelines.ideogram4.pipeline_ideogram4 import _logit_normal_sigma
 
 import numpy as np
 from PIL import Image as PILImage
-from tqdm import tqdm
 
 
 @factory.register(BaseModelSampler, ModelType.IDEOGRAM_4)
