@@ -11,7 +11,7 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
-from modules.util.torch_util import device_equals, torch_gc
+from modules.util.torch_util import create_mem_pool, device_equals, mem_pool_context, supports_mem_pool, torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -97,6 +97,8 @@ class BaseModel(metaclass=ABCMeta):
         self.autocast_context = nullcontext()
         self.train_dtype = DataType.FLOAT_32
 
+        self._mem_pools = {}
+
     @property
     def train_device(self) -> torch.device:
         return torch.device(self.train_config.train_device)
@@ -137,22 +139,43 @@ class BaseModel(metaclass=ABCMeta):
         stem = f"{part}_1" if hasattr(self, f"{part}_1") else part
 
         conductor = getattr(self, f"{stem}_offload_conductor", None)
+        lora = getattr(self, f"{stem}_lora", None)
+        # A conductor places its own component, so nothing below moves it. Without one, `getattr` raises if
+        # `part` doesn't name a real attribute, and returns None when the part is excluded from training
+        # (e.g. a text encoder with include_text_encoder off): it stays in model_parts() but the loader never
+        # populated it, so there is nothing to move.
+        component = None if conductor is not None else getattr(self, stem)
+
         if conductor is not None:
             if device_equals(device, self.temp_device):
                 conductor.evict()
             else:
                 assert device_equals(device, self.train_device), f"unexpected device {device} for part {part}"
                 conductor.materialize()
+
+        if component is None and lora is None:
+            return
+
+        if supports_mem_pool(device):
+            # The component (when not conductor-managed) and its LoRA share a per-stem MemPool so both land
+            # contiguously and release together on evict. A conductor keeps its own pool, so the stem pool then
+            # holds only the LoRA, keeping its small tensors out of the default pool across the part's evict/reload.
+            pool = self._mem_pools.get(stem)
+            if pool is None:
+                pool = self._mem_pools[stem] = create_mem_pool(device)
+            with mem_pool_context(pool):
+                if component is not None:
+                    component.to(device=device)
+                if lora is not None:
+                    lora.to(device=device)
         else:
-            component = getattr(self, stem)  # raises if `part` doesn't name a real attribute
-            # None when the part is excluded from training (e.g. a text encoder with include_text_encoder off):
-            # it stays in model_parts() but the loader never populated it, so there is nothing to move.
+            # the target has no MemPool (CPU): move normally and drop this stem's pool from the earlier GPU move,
+            # so evict()'s torch_gc can release its segments
             if component is not None:
                 component.to(device=device)
-
-        lora = getattr(self, f"{stem}_lora", None)
-        if lora is not None:
-            lora.to(device)
+            if lora is not None:
+                lora.to(device=device)
+            self._mem_pools.pop(stem, None)
 
     def eval(self):
         # Put every present component on eval(); driven by the same part registry as materialize()/evict().

@@ -1,18 +1,17 @@
 import math
 import random
+from collections import deque
 from typing import Any
 
 from modules.util.config.TrainConfig import TrainConfig, TrainModelPartConfig
-from modules.util.quantization_util import get_offload_tensor_bytes, offload_quantized
+from modules.util.quantization_util import get_offload_tensor_bytes, get_offload_tensors, offload_quantized
 from modules.util.torch_util import (
+    create_mem_pool,
     create_stream_context,
     device_equals,
-    get_tensor_data,
+    mem_pool_context,
     pin_tensor_,
-    replace_tensors_,
-    tensors_match_device,
     tensors_record_stream,
-    tensors_to_device_,
     torch_gc,
     unpin_tensor_,
 )
@@ -23,10 +22,33 @@ from torch import nn
 MESSAGES = []
 
 
+# Only relevant with activation offloading. Each layer-call the CPU enqueues ahead of the GPU floats one
+# layer's worth of activations - the forward's copy stays alive until its D2H runs, the backward's reload
+# destination is allocated when the CPU reaches the block - so the run-ahead has to be capped for peak VRAM
+# to be predictable at all. Saturation needs only enough queued work to cover CPU-side jitter (tens of ms)
+# against a layer-call of tens to hundreds of ms, so a small cap costs no throughput. 0 = unbounded.
+#
+# Also the number of trailing layers whose activations are not offloaded: the backward consumes N-1..0, so
+# the offloads still draining when the forward ends - at most this many - are the ones needed first. Keeping
+# those layers resident is free at this cap and saves a D2H/H2D round-trip of the same bytes.
+MAX_LAYER_CALLS_IN_FLIGHT = 2
+
+
 def log(msg: str = ''):
     pass
     # print(msg)
     # MESSAGES.append(msg)
+
+
+def flat_storage_view(tensor: torch.Tensor) -> torch.Tensor | None:
+    # Contiguous 1-D view over a tensor's whole storage region, or None if the strides leave gaps so that the
+    # elements between the first and last are not all part of this tensor. A permuted view of a freshly
+    # allocated tensor (a transpose, a head-split) is dense and yields a view; a slice of something larger
+    # does not. Copying through this view moves the bytes as-is instead of gathering them element by element.
+    span = 1 + sum((size - 1) * stride for size, stride in zip(tensor.shape, tensor.stride(), strict=True))
+    if span != tensor.numel():
+        return None
+    return torch.as_strided(tensor, (tensor.numel(),), (1,), tensor.storage_offset())
 
 
 def clone_tensor_allocator(tensor: torch.Tensor) -> torch.Tensor:
@@ -34,12 +56,16 @@ def clone_tensor_allocator(tensor: torch.Tensor) -> torch.Tensor:
     return tensor.clone()
 
 
-def ceil_16(number: int) -> int:
-    return number + (16 - (number % 16)) % 16
+# allocate_like places each cached tensor at an aligned offset, wasting up to this many bytes per tensor
+TENSOR_ALIGNMENT_BYTES = 16
 
 
-def floor_16(number: int) -> int:
-    return number - (number % 16)
+def align_up(number: int) -> int:
+    return number + (TENSOR_ALIGNMENT_BYTES - (number % TENSOR_ALIGNMENT_BYTES)) % TENSOR_ALIGNMENT_BYTES
+
+
+def align_down(number: int) -> int:
+    return number - (number % TENSOR_ALIGNMENT_BYTES)
 
 
 class StaticLayerTensorAllocator:
@@ -72,17 +98,17 @@ class StaticLayerTensorAllocator:
             # never hand out views at storage_offset 0: torch.compile creates a 0/1-specialized
             # symbol for the storage_offset of any tensor with a dynamic dim (compressed weights),
             # so an offset-0 view needs its own graph while one "2 <= offset" guard covers all
-            # other placements. keeping every view at byte offset >= 16 avoids those recompiles.
-            cache_tensor_allocation_end = max(ceil_16(self.__allocation_end % cache_tensor_size), 16)
+            # other placements. keeping every view at byte offset >= one alignment unit avoids those recompiles.
+            cache_tensor_allocation_end = max(align_up(self.__allocation_end % cache_tensor_size), TENSOR_ALIGNMENT_BYTES)
 
             if cache_tensor_allocation_end + num_bytes > cache_tensor_size:
                 # move to the start of the next cache tensor
                 cache_tensor_index += 1
-                cache_tensor_allocation_end = 16
+                cache_tensor_allocation_end = TENSOR_ALIGNMENT_BYTES
             if cache_tensor_index * cache_tensor_size + cache_tensor_allocation_end + num_bytes > total_cache_bytes:
                 # move to the first cache tensor
                 cache_tensor_index = 0
-                cache_tensor_allocation_end = 16
+                cache_tensor_allocation_end = TENSOR_ALIGNMENT_BYTES
 
             self.__allocation_end = cache_tensor_index * cache_tensor_size + cache_tensor_allocation_end
             self.__layer_allocator.ensure_allocation(cache_tensor_index)
@@ -95,9 +121,9 @@ class StaticLayerTensorAllocator:
             cache_tensor_index = self.__allocation_start // cache_tensor_size
             cache_tensor_allocation_start = self.__allocation_start % cache_tensor_size
 
-            # "< 16" instead of "< 0": the first 16 bytes of every cache tensor are reserved so no
-            # view lands at storage_offset 0 (see the forward-direction comment above)
-            if cache_tensor_allocation_start - num_bytes < 16:
+            # "< TENSOR_ALIGNMENT_BYTES" instead of "< 0": the first alignment unit of every cache tensor is
+            # reserved so no view lands at storage_offset 0 (see the forward-direction comment above)
+            if cache_tensor_allocation_start - num_bytes < TENSOR_ALIGNMENT_BYTES:
                 # move to the end of the previous cache tensor
                 cache_tensor_index -= 1
                 cache_tensor_allocation_start = cache_tensor_size
@@ -106,7 +132,7 @@ class StaticLayerTensorAllocator:
                 cache_tensor_index = len(self.__layer_allocator.cache_tensors) - 1
                 cache_tensor_allocation_start = cache_tensor_size
 
-            new_allocation_start = floor_16(cache_tensor_allocation_start - num_bytes)
+            new_allocation_start = align_down(cache_tensor_allocation_start - num_bytes)
             self.__layer_allocator.ensure_allocation(cache_tensor_index)
             cache_tensor = self.__layer_allocator.cache_tensors[cache_tensor_index]
             allocated_tensor = cache_tensor[new_allocation_start:new_allocation_start + num_bytes]
@@ -159,31 +185,55 @@ class StaticLayerAllocator:
 
         self.__tensor_allocators = []
 
+        self.__mem_pool = None
+
     def allocate_cache(self, layers: list[nn.Module], target_bytes: int):
         if not self.__allocate_statically or any(x is not None for x in self.cache_tensors):
             return
 
         log(f"allocating cache on device {self.device}")
 
+        # keep the cache tensor in its own MemPool to avoid fragmenting the next cycle's allocation
+        if self.__mem_pool is None:
+            self.__mem_pool = create_mem_pool(self.device)
+
         self.__max_tensor_bytes = 0
         self.__layer_bytes = []
+        total_tensors = 0  # count of individual offload tensors == number of allocate_like calls == alignment slots
         for layer in layers:
             layer_tensor_bytes = [get_offload_tensor_bytes(x) for x in layer.modules()]
+            total_tensors += sum(len(get_offload_tensors(x)) for x in layer.modules())
             self.__max_tensor_bytes = max(self.__max_tensor_bytes, *layer_tensor_bytes)
             self.__layer_bytes.append(sum(layer_tensor_bytes))
 
         cache_bytes = target_bytes
-        num_cache_tensors = min(
-            # no more than 10% overhead
-            math.ceil(int(cache_bytes * 0.10) / self.__max_tensor_bytes),
-            # at least twice self.__max_tensor_bytes for each tensor
-            math.ceil(cache_bytes / (self.__max_tensor_bytes * 2)),
-            # no more than 10 cache tensors
-            10
-        )
-        # add self.__max_tensor_bytes to ensure even the largest tensors can be allocated in the remaining space
-        # add 4kb for the alignment overhead
-        self.cache_tensor_size = math.ceil(cache_bytes / num_cache_tensors) + self.__max_tensor_bytes + 4096
+        if self.device.type == "cuda":
+            # single cache tensor on the GPU: a large cuda allocation is page-mapped (assembled from scattered
+            # physical pages), so one buffer allocates as readily as many and packs with no inter-chunk tail waste.
+            # The GPU cache is filled one layer at a time from the CPU, so the destination buffer and a full
+            # resident source never coexist on the device -- no peak-doubling to guard against here.
+            num_cache_tensors = 1
+        else:
+            # host/pinned cache keeps the multi-chunk split: the chunks are allocated lazily (per ensure_allocation)
+            # to cap peak host RAM while the resident model is copied into the pinned cache, which a single eager
+            # buffer would roughly double.
+            # TODO once the disk-streaming (load_on_demand) path lands here: collapse to a single buffer too when
+            # the layers are streamed per-part from the checkpoint -- then no resident model copy coexists with the
+            # pinned cache, so the peak-doubling that justifies chunking here does not occur.
+            num_cache_tensors = min(
+                # no more than 10% overhead
+                math.ceil(int(cache_bytes * 0.10) / self.__max_tensor_bytes),
+                # at least twice self.__max_tensor_bytes for each tensor
+                math.ceil(cache_bytes / (self.__max_tensor_bytes * 2)),
+                # no more than 10 cache tensors
+                10
+            )
+        # the alignment budget must cover EVERY tensor packed into a cache tensor: allocate_like wastes up to
+        # TENSOR_ALIGNMENT_BYTES per tensor and the ring wrap is unguarded, so a fixed total would silently
+        # overwrite live weights once a cache tensor holds enough tensors. Size it from the actual tensor count.
+        alignment_bytes = TENSOR_ALIGNMENT_BYTES * total_tensors
+        # add self.__max_tensor_bytes so even the largest tensor fits in the space left after a ring wrap
+        self.cache_tensor_size = math.ceil(cache_bytes / num_cache_tensors) + self.__max_tensor_bytes + alignment_bytes
 
         self.__tensor_allocators = [None] * len(layers)
         self.cache_tensors = [None] * num_cache_tensors
@@ -194,8 +244,12 @@ class StaticLayerAllocator:
         if self.cache_tensors[cache_tensor_index] is None:
             torch_gc()
 
-            self.cache_tensors[cache_tensor_index] = \
-                torch.zeros((self.cache_tensor_size,), dtype=torch.int8, device=self.device)
+            # create the cache tensor inside the MemPool so it lands in the pool's isolated segments. the buffers
+            # are allocated lazily here (allocate_cache only sizes them), so the pool context wraps this
+            # allocation rather than allocate_cache.
+            with mem_pool_context(self.__mem_pool):
+                self.cache_tensors[cache_tensor_index] = \
+                    torch.zeros((self.cache_tensor_size,), dtype=torch.int8, device=self.device)
 
             log(f"tensor {cache_tensor_index} not allocated, allocating {self.cache_tensor_size} bytes")
 
@@ -212,6 +266,15 @@ class StaticLayerAllocator:
 
         self.cache_tensors = [None] * len(self.cache_tensors)
         self.__tensor_allocators = [None] * len(self.__tensor_allocators)
+        # the loop above leaves `cache_tensor` bound to the last tensor; clear it so that stray reference can't
+        # keep the MemPool alive through the torch_gc below
+        cache_tensor = None
+
+        # drop the MemPool once its tensors are freed so its now-empty segments return to the driver for the
+        # default pool; a fresh one is created on the next allocate_cache.
+        if self.__mem_pool is not None:
+            self.__mem_pool = None
+            torch_gc()
 
     def get_allocator(self, layer_index: int, allocate_forward: bool) -> StaticLayerTensorAllocator | None:
         if self.__allocate_statically:
@@ -252,9 +315,13 @@ class StaticActivationAllocator:
         self.__allocated_bytes = 0
         self.__max_allocated_bytes = 0
 
+    @property
+    def allocated_bytes(self) -> int:
+        return self.__allocated_bytes
+
     def reserve_cache(self, tensors: list[torch.Tensor]):
         num_bytes = sum(tensor.element_size() * tensor.numel() for tensor in tensors) \
-                    + len(tensors) * 16  # add enough padding for alignment
+                    + len(tensors) * TENSOR_ALIGNMENT_BYTES  # add enough padding for alignment
 
         if num_bytes == 0:
             return
@@ -273,8 +340,16 @@ class StaticActivationAllocator:
             self.__current_cache_tensor_offset = 0
 
         if not cache_found:
-            torch_gc()
-            cache_tensor = torch.zeros((num_bytes,), dtype=torch.int8, device=self.__device)
+            try:
+                cache_tensor = torch.zeros((num_bytes,), dtype=torch.int8, device=self.__device)
+            except (torch.OutOfMemoryError, MemoryError):
+                # collect only when the allocation actually needs the room. This runs once per activation that
+                # overflows the current cache tensor -- on the first step of a run that is every one of them --
+                # and torch_gc's synchronize + gc.collect + empty_cache measured ~350 ms each, 78 s over the 230
+                # allocations one LTX step makes, while none of them ever needed the room. A CUDA cache tensor
+                # raises OutOfMemoryError, a host one MemoryError.
+                torch_gc()
+                cache_tensor = torch.zeros((num_bytes,), dtype=torch.int8, device=self.__device)
             log(f"{self.__device}/allocating activations cache {num_bytes:_}, total: {self.__allocated_bytes:_}, max: {self.__max_allocated_bytes:_}")
 
             if self.__is_pinned:
@@ -290,7 +365,7 @@ class StaticActivationAllocator:
         cache_tensor = self.__cache_tensors[self.__current_cache_tensor]
         allocated_tensor = \
             cache_tensor[self.__current_cache_tensor_offset:self.__current_cache_tensor_offset + num_bytes]
-        self.__current_cache_tensor_offset += ceil_16(num_bytes)
+        self.__current_cache_tensor_offset += align_up(num_bytes)
 
         return allocated_tensor.view(dtype=source_tensor.dtype).view(size=source_tensor.shape)
 
@@ -527,6 +602,23 @@ class LayerOffloadStrategy:
             return [x for x in layers if x < layer_index] + [x for x in layers if x >= layer_index]
 
 
+class _BoundaryActivation:
+    # Offloaded copy of a saved activation on the boundary path. Copy semantics (never mutate the saved
+    # tensor in place - it may be shared across blocks, e.g. a conditioning embedding). cpu holds the
+    # temp-device copy; gpu the reloaded train-device copy; event marks the reload transfer.
+    def __init__(self):
+        self.cpu = None
+        self.gpu = None
+        self.event = None
+        # the source tensor's stride, restored on reload. A saved activation is often a permuted view
+        # (an attention output, a head-split), and the compiled backward asserts on exact strides, so
+        # handing it back contiguous fails assert_size_stride rather than silently computing wrong.
+        self.stride = None
+        # whether the source's storage region was dense, so both legs could move it as flat storage rather
+        # than reordering elements through a copy kernel.
+        self.dense = False
+
+
 class LayerOffloadConductor:
     __module: nn.Module
 
@@ -534,7 +626,6 @@ class LayerOffloadConductor:
     __layer_device_map: list[torch.device | None]
     __layer_offload_fraction: float
 
-    __layer_activations_included_offload_param_indices_map: list[list[int]]
 
     __train_device: torch.device
     __temp_device: torch.device
@@ -554,13 +645,10 @@ class LayerOffloadConductor:
     __layer_train_event_map: list[SyncEvent]
     __layer_transfer_event_map: list[SyncEvent]
 
-    __activations_map: dict[int, Any]
-    __call_index_layer_index_map: dict[int, int]
-    __activations_transfer_event_map: dict[int, SyncEvent]
 
     __offload_strategy = LayerOffloadStrategy | None
     __is_forward_pass: bool
-    __keep_graph: bool
+    __backward_follows: bool
 
     __is_active: bool
 
@@ -582,7 +670,6 @@ class LayerOffloadConductor:
         self.__layer_device_map = []
         self.__layer_offload_fraction = part.offload_fraction
 
-        self.__layer_activations_included_offload_param_indices_map = []
 
         self.__train_device = torch.device(config.train_device)
         self.__temp_device = torch.device(config.temp_device)
@@ -607,13 +694,14 @@ class LayerOffloadConductor:
         self.__layer_train_event_map = []
         self.__layer_transfer_event_map = []
 
-        self.__activations_map = {}
-        self.__call_index_layer_index_map = {}
-        self.__activations_transfer_event_map = {}
+        self.__boundary_activations = {}
 
         self.__offload_strategy = None
         self.__is_forward_pass = False
-        self.__keep_graph = False
+        self.__backward_follows = False
+        self.__inflight_call_events = deque()
+        self.__inflight_transfer_events = deque()
+        self.__warned_non_dense = False
 
         self.__is_active = False
 
@@ -624,11 +712,13 @@ class LayerOffloadConductor:
     def offload_activated(self) -> bool:
         return self.__offload_activations or self.__offload_layers
 
+    def offloads_activations(self) -> bool:
+        return self.__offload_activations
+
     def evict(self):
         torch_gc()
 
         self.__wait_all_layer_transfers()
-        self.__wait_all_activation_transfers()
 
         log("to temp device")
 
@@ -652,7 +742,6 @@ class LayerOffloadConductor:
         torch_gc()
 
         self.__wait_all_layer_transfers()
-        self.__wait_all_activation_transfers()
 
         log("to train device")
 
@@ -690,18 +779,13 @@ class LayerOffloadConductor:
 
         torch_gc()
 
-    def add_layer(self, layer: nn.Module, included_offload_param_indices: list[int] = None):
-        if included_offload_param_indices is None:
-            included_offload_param_indices = []
-
+    def add_layer(self, layer: nn.Module):
         self.__layers.append(layer)
         self.__layer_device_map.append(None)
         self.__layer_train_event_map.append(SyncEvent())
         self.__layer_transfer_event_map.append(SyncEvent())
 
-        self.__layer_activations_included_offload_param_indices_map.append(included_offload_param_indices)
-
-    def start_forward(self, keep_graph: bool):
+    def start_forward(self, backward_follows: bool):
         log("starting forward")
 
         if not self.__is_active:
@@ -713,89 +797,69 @@ class LayerOffloadConductor:
         self.__clear_activations()
 
         self.__is_forward_pass = True
-        self.__keep_graph = keep_graph
+        self.__backward_follows = backward_follows
+        # events from the previous step refer to work the GPU has long finished; carrying them over would
+        # make the first calls of this pass wait on stale entries.
+        self.__inflight_call_events.clear()
+        self.__inflight_transfer_events.clear()
 
-    def before_layer(self, layer_index: int, call_index: int, activations: Any) -> Any:
-        log()
-        log(f"before layer {layer_index}, {call_index}")
+    def __schedule_layer_offload(self, layer_index: int, is_forward: bool, is_next_forward: bool):
+        # windowed layer load/offload schedule around layer_index, in the direction the caller is
+        # running: the boundaries know whether they are in the forward or the backward pass.
+        if not self.__offload_layers:
+            return
 
-        if not self.__is_active:
-            return activations
+        self.__wait_layer_transfer(layer_index)
 
-        self.__call_index_layer_index_map[call_index] = layer_index
+        self.__schedule_deferred_layers_to_temp(except_layer=layer_index)
+        for i in self.__offload_strategy.get_layers_to_offload(
+                layer_index=layer_index,
+                is_forward=is_forward,
+                is_next_forward=is_next_forward,
+                loaded_layers=self.__get_loaded_layers(),
+        ):
+            self.__schedule_layer_to(i, self.__temp_device, is_forward=is_forward)
 
-        if torch.is_grad_enabled() and self.__is_forward_pass:
-            # Offloading can only be used with the use_reentrant=True checkpointing variant.
-            # Gradients are only enabled during the back pass.
-            log("starting backward")
-            self.__is_forward_pass = False
+        for i in self.__offload_strategy.get_layers_to_load(
+                layer_index=layer_index,
+                is_forward=is_forward,
+                is_next_forward=is_next_forward,
+                loaded_layers=self.__get_loaded_layers(),
+        ):
+            self.__schedule_layer_to(i, self.__train_device, is_forward=is_forward)
 
-        if self.__offload_activations and not self.__is_forward_pass:
-            self.__wait_activations_transfer(call_index)
-
-            tensor_indices = self.__layer_activations_included_offload_param_indices_map[layer_index]
-
-            if call_index in self.__activations_map:
-                # during the back pass, replace activations with saved acitvations
-                replace_tensors_(activations, self.__activations_map.pop(call_index), tensor_indices)
-
-            # if current activations are not on train_device, move them now
-            if not tensors_match_device(
-                    activations, self.__train_device,
-                    tensor_indices):
-                log(f"activations for layer {layer_index} not loaded to train device, transferring now")
-                self.__schedule_activations_to_device(
-                    activations, self.__train_device, call_index, wait_train_stream=False)
-                self.__wait_activations_transfer(call_index)
-
-            # schedule previous activations to the train device
-            if call_index - 1 in self.__activations_map:
-                self.__schedule_activations_to_device(
-                    self.__activations_map[call_index - 1], self.__train_device, call_index - 1,
-                    wait_train_stream=False)
-
-        # schedule loading of the next layer and offloading of the previous layer
-        if self.__offload_layers:
-            self.__wait_layer_transfer(layer_index)
-
-            self.__schedule_deferred_layers_to_temp(except_layer=layer_index)
-            for i in self.__offload_strategy.get_layers_to_offload(
-                    layer_index=layer_index,
-                    is_forward=self.__is_forward_pass,
-                    is_next_forward=not self.__keep_graph,
-                    loaded_layers=self.__get_loaded_layers(),
-            ):
-                self.__schedule_layer_to(i, self.__temp_device, is_forward=self.__is_forward_pass)
-
-            for i in self.__offload_strategy.get_layers_to_load(
-                    layer_index=layer_index,
-                    is_forward=self.__is_forward_pass,
-                    is_next_forward=not self.__keep_graph,
-                    loaded_layers=self.__get_loaded_layers(),
-            ):
-                self.__schedule_layer_to(i, self.__train_device, is_forward=self.__is_forward_pass)
-
-        return activations
-
-    def after_layer(self, layer_index: int, call_index: int, activations: Any):
-        log(f"after layer {layer_index}, {call_index}")
-
+    def before_layer(self, layer_index: int, is_forward: bool):
+        # called before a block runs. Waits for this layer's transfer and slides the load window.
         if not self.__is_active:
             return
 
-        # record stream
-        if self.__async_transfer:
-            tensors_record_stream(self.__train_stream, activations)
+        # block until compute and activation transfers have caught up to within MAX_LAYER_CALLS_IN_FLIGHT,
+        # so the floating activations stay bounded.
+        if MAX_LAYER_CALLS_IN_FLIGHT > 0:
+            queues = (("compute", self.__inflight_call_events), ("transfer", self.__inflight_transfer_events))
+            for name, queue in queues:
+                while len(queue) > MAX_LAYER_CALLS_IN_FLIGHT:
+                    queue.popleft().synchronize(f"layer-calls-in-flight cap ({name})")
 
-        # save activations during the forward pass to make them accessible during the backward pass
-        if self.__offload_activations and self.__keep_graph and self.__is_forward_pass:
-            log(f"saving layer {call_index} activations for back pass")
-            self.__activations_map[call_index] = activations
-            self.__schedule_activations_to_device(activations, self.__temp_device, call_index, wait_train_stream=True)
+        self.__schedule_layer_offload(layer_index, is_forward, not self.__backward_follows)
 
-        if self.__async_transfer:
-            event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
-            self.__layer_train_event_map[layer_index] = event
+    def after_layer(self, layer_index: int, activations: Any):
+        # called once this layer's compute is enqueued. Keeps the block's output/grad alive until the train
+        # stream reaches it, and records the event a later offload of this layer has to wait for.
+        if not self.__is_active or not self.__async_transfer:
+            return
+        tensors_record_stream(self.__train_stream, activations)
+        event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
+        self.__layer_train_event_map[layer_index] = event
+        # the same event, queued in call order, is what the run-ahead cap waits on
+        self.__inflight_call_events.append(event)
+
+        # Second marker, on the activations transfer stream, which trails the train stream by its own queue
+        # (measured ~106ms median, ~12 layer-calls of float against a cap of 2). An offloaded activation's
+        # source block is pinned until its D2H actually executes, so this is the distance that holds memory.
+        if self.__offload_activations:
+            self.__inflight_transfer_events.append(
+                SyncEvent(self.__activations_transfer_stream.record_event(), "activations transfer"))
 
     def __get_loaded_layers(self) -> list[int]:
         return [i for i in range(len(self.__layers)) if device_equals(self.__layer_device_map[i], self.__train_device)]
@@ -815,9 +879,7 @@ class LayerOffloadConductor:
         self.__module._apply(convert)
 
     def __clear_activations(self):
-        self.__activations_map.clear()
-        self.__call_index_layer_index_map.clear()
-        self.__activations_transfer_event_map.clear()
+        self.__boundary_activations.clear()
         self.__temp_device_activations_allocator.deallocate()
 
     def __wait_all_layer_train(self):
@@ -827,11 +889,6 @@ class LayerOffloadConductor:
     def __wait_all_layer_transfers(self):
         for layer_index in range(len(self.__layers)):
             self.__wait_layer_transfer(layer_index)
-
-    def __wait_all_activation_transfers(self):
-        call_indices = list(self.__activations_transfer_event_map.keys())
-        for call_index in call_indices:
-            self.__wait_activations_transfer(call_index)
 
     def __wait_layer_train(self, layer_index: int):
         self.__layer_train_event_map[layer_index] \
@@ -843,12 +900,6 @@ class LayerOffloadConductor:
             self.__layer_transfer_event_map[layer_index] \
                 .wait(self.__train_stream, f"wait layer transfer {layer_index}")
             self.__layer_transfer_event_map[layer_index] = SyncEvent()
-
-    def __wait_activations_transfer(self, call_index: int):
-        event = self.__activations_transfer_event_map.pop(call_index, None)
-
-        if event is not None:
-            event.wait(self.__train_stream, f"wait activations transfer {call_index}")
 
     def __schedule_layer_to(
             self,
@@ -920,40 +971,92 @@ class LayerOffloadConductor:
                 continue
             self.__schedule_layer_to(layer_index, device=self.__temp_device, is_forward=False)
 
-    def __schedule_activations_to_device(
-            self,
-            activations: Any,
-            device: torch.device,
-            call_index: int,
-            wait_train_stream: bool,
-    ):
-        log(f"schedule {call_index} activations to {str(device)}")
-        layer_index = self.__call_index_layer_index_map[call_index]
+    def pack_activation(self, layer_index: int, tensor: torch.Tensor):
+        # Copies rather than moving in place, so a tensor still referenced by other blocks (e.g. a shared
+        # conditioning embedding) is never corrupted. The caller selects which tensors to offload.
+        if not self.__is_active or not self.__offload_activations \
+                or not device_equals(tensor.device, self.__train_device) \
+                or layer_index >= len(self.__layers) - MAX_LAYER_CALLS_IN_FLIGHT:
+            return tensor
 
-        activations_allocator = self.__temp_device_activations_allocator \
-            if device_equals(device, self.__temp_device) \
-            else None
-
-        allocator_fn = activations_allocator.allocate_like if activations_allocator is not None else None
-
-        event = None
-        if wait_train_stream and self.__async_transfer:
-            event = SyncEvent(self.__train_stream.record_event(), f"train before activations transfer {call_index}")
+        handle = _BoundaryActivation()
+        handle.stride = tensor.stride()
+        # Transfer the storage as-is when the tensor is dense, so both sides of the copy are contiguous and
+        # equal-length and the transfer stays a DMA. Non-dense tensors have no flat view and fall back to the
+        # logical copy, which reorders elements through a kernel but is always correct.
+        source = flat_storage_view(tensor)
+        handle.dense = source is not None
+        if source is None:
+            source = tensor
+            if not self.__warned_non_dense:
+                # not expected with the current save set (SDPA and mm outputs are fresh allocations), but a
+                # chunk or slice would land here, so say so rather than silently paying the kernel path.
+                # Warn rather than raise: a save set that widens to include a view should get slower, not
+                # abort a training run.
+                self.__warned_non_dense = True
+                print("non-dense activation offloaded via the logical copy path: "
+                      f"layer {layer_index}, shape {tuple(tensor.shape)}, stride {tensor.stride()}")
 
         with create_stream_context(self.__activations_transfer_stream):
-            tensor_indices = self.__layer_activations_included_offload_param_indices_map[layer_index]
+            if self.__async_transfer:
+                self.__activations_transfer_stream.wait_stream(self.__train_stream)
+            self.__temp_device_activations_allocator.reserve_cache([tensor])
+            handle.cpu = self.__temp_device_activations_allocator.allocate_like(tensor)
+            destination = handle.cpu.view(-1) if handle.dense else handle.cpu
+            destination.copy_(source, non_blocking=self.__async_transfer)
+            if self.__async_transfer:
+                tensors_record_stream(self.__activations_transfer_stream, tensor)  # source alive until copied
 
+        self.__boundary_activations.setdefault(layer_index, []).append(handle)
+        return handle
+
+    def __reload_activation(self, handle: '_BoundaryActivation'):
+        if handle.gpu is not None:
+            return
+        # Allocate under the train stream: the allocator's free lists are per-stream, so a destination
+        # homed on the transfer stream can never be reused by compute and forms a second segment pool.
+        # Dense tensors allocate contiguous and get the recorded layout as_strided over them, so the DMA
+        # moves storage without reordering. empty_strided is the non-dense fallback.
+        with create_stream_context(self.__train_stream):
+            if handle.dense:
+                flat = torch.empty(handle.cpu.numel(), dtype=handle.cpu.dtype, device=self.__train_device)
+                handle.gpu = torch.as_strided(flat, handle.cpu.shape, handle.stride)
+            else:
+                handle.gpu = torch.empty_strided(
+                    handle.cpu.shape, handle.stride, dtype=handle.cpu.dtype, device=self.__train_device)
+
+        # the allocator may have just reclaimed this block from still-queued train work, which the H2D on
+        # the transfer stream would otherwise overwrite. Recorded, not waited on here, so the transfer
+        # still overlaps the current layer's compute.
+        event = SyncEvent(self.__train_stream.record_event(), "train before activation reload") \
+            if self.__async_transfer else None
+
+        with create_stream_context(self.__activations_transfer_stream):
             if event is not None:
                 event.wait(self.__activations_transfer_stream)
-
-            tensors = get_tensor_data(activations, tensor_indices)
-            if activations_allocator is not None:
-                activations_allocator.reserve_cache(tensors)
-            tensors_to_device_(activations, device, tensor_indices, non_blocking=self.__async_transfer, allocator=allocator_fn)
-
+            if handle.dense:
+                flat_storage_view(handle.gpu).copy_(handle.cpu.view(-1), non_blocking=self.__async_transfer)
+            else:
+                handle.gpu.copy_(handle.cpu, non_blocking=self.__async_transfer)
             if self.__async_transfer:
-                tensors_record_stream(self.__activations_transfer_stream, tensors)
-                self.__activations_transfer_event_map[call_index] = \
-                    SyncEvent(self.__activations_transfer_stream.record_event(), f"transfer to {device}")
+                tensors_record_stream(self.__activations_transfer_stream, handle.gpu)
+                handle.event = SyncEvent(self.__activations_transfer_stream.record_event())
 
-            del tensors
+    def prefetch_activations(self, layer_index: int):
+        # reload a block's offloaded activations one block ahead so unpack only waits on the transfer
+        if not self.__is_active or not self.__offload_activations:
+            return
+        for handle in self.__boundary_activations.get(layer_index, []):
+            self.__reload_activation(handle)
+
+    def unpack_activation(self, handle: Any):
+        if not isinstance(handle, _BoundaryActivation):
+            return handle  # was not offloaded
+        self.__reload_activation(handle)  # no-op if already prefetched
+        if self.__async_transfer and handle.event is not None:
+            handle.event.wait(self.__train_stream)
+            tensors_record_stream(self.__train_stream, handle.gpu)
+        gpu = handle.gpu
+        handle.gpu = None
+        handle.event = None
+        return gpu
