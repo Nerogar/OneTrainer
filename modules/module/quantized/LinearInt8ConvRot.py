@@ -96,7 +96,8 @@ class LinearInt8ConvRot(LinearW8A8):
         return (self.out_features, self.in_features)
 
     def unquantized_weight(self, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
-        w = dequantize(self.weight.detach(), self.scale)
+        weight = self._decompress(self.weight.detach()) if self._compressed else self.weight.detach()
+        w = dequantize(weight, self.scale.to(device=weight.device))
         w = block_hadamard(w, self.block_size, self.rotation)[..., :self.in_features]
         return w.to(dtype=dtype, device=device)
 
@@ -127,6 +128,11 @@ class LinearInt8ConvRot(LinearW8A8):
         self.requires_grad_(False)
         self.weight = torch.nn.Parameter(weight, requires_grad=False)
         self.scale.copy_(scale)
+
+        # this override replaces LinearW8A8.quantize entirely, so the compression step has to be
+        # repeated here; forward() decompresses on the way in
+        if self.compress:
+            self._compress_weight(device=device)
 
     def forward(self, x_orig: torch.Tensor) -> torch.Tensor:
         assert not self.weight.requires_grad

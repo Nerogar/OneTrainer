@@ -74,6 +74,8 @@ class BaseModelTabView(ABC):
             if include_compressed:
                 options.append(("int W8A8 compressed", DataType.INT_W8A8_COMPRESSED))
             options.append(("int W8A8 ConvRot", DataType.INT_W8A8_CONVROT))
+            if include_compressed:
+                options.append(("int W8A8 ConvRot compressed", DataType.INT_W8A8_CONVROT_COMPRESSED))
 
         if include_gguf:
             options.append(("GGUF", DataType.GGUF))
