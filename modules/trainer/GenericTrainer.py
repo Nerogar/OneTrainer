@@ -43,6 +43,12 @@ from torchvision.transforms.functional import pil_to_tensor
 
 from tqdm import tqdm
 
+# OT_DEBUG_PROFILES=1 dumps a CUDA memory snapshot for the first two steps, where the allocator is still
+# growing, and a profiler trace at steps 10 and 40, past compilation and warmup.
+_DEBUG_PROFILES = os.environ.get("OT_DEBUG_PROFILES") == "1"
+_MEMORY_PROFILE_STEPS = (0, 1) if _DEBUG_PROFILES else ()
+_PROFILE_STEPS = (10, 11, 40, 41) if _DEBUG_PROFILES else ()
+
 
 class GenericTrainer(BaseTrainer):
     model_loader: BaseModelLoader
@@ -725,8 +731,8 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_status("Training ...")
 
                 with (
-                    TorchMemoryRecorder(enabled=False, filename=f"memory-step{train_progress.global_step}-{get_string_timestamp()}.pickle"),
-                    TorchProfiler      (enabled=False, filename=f"profile-step{train_progress.global_step}-{get_string_timestamp()}.json"),
+                    TorchMemoryRecorder(enabled=multi.is_master() and train_progress.global_step in _MEMORY_PROFILE_STEPS, filename=f"memory-step{train_progress.global_step}-{get_string_timestamp()}.pickle"),
+                    TorchProfiler      (enabled=multi.is_master() and train_progress.global_step in _PROFILE_STEPS, filename=f"profile-step{train_progress.global_step}-{get_string_timestamp()}.json"),
                 ):
                     step_seed = train_progress.global_step
                     bf16_stochastic_rounding_set_seed(step_seed, train_device)
