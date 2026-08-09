@@ -1,8 +1,7 @@
-import contextlib
 import traceback
 from uuid import uuid4
 
-from modules.util import create
+from modules.util import create, huggingface_util
 from modules.util.args.ConvertModelArgs import ConvertModelArgs
 from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.ModelFormat import ModelFormat
@@ -10,8 +9,6 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModelNames import EmbeddingName, ModelNames
 from modules.util.torch_util import torch_gc
-
-import huggingface_hub
 
 
 class ConvertModelUIController:
@@ -65,9 +62,7 @@ class ConvertModelUIController:
                 training_method=self.convert_model_args.training_method
             )
 
-            if self.convert_model_args.huggingface_token != "":
-                with contextlib.suppress(ConnectionError):
-                    huggingface_hub.login(token=self.convert_model_args.huggingface_token)
+            huggingface_util.configure_hub(self.convert_model_args.huggingface_token)
 
             print("Loading model " + self.convert_model_args.input_name)
             if self.convert_model_args.training_method in [TrainingMethod.FINE_TUNE]:

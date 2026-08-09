@@ -11,7 +11,7 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
-from modules.util.torch_util import create_mem_pool, mem_pool_context, supports_mem_pool, torch_gc
+from modules.util.torch_util import create_mem_pool, device_equals, mem_pool_context, supports_mem_pool, torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -140,10 +140,17 @@ class BaseModel(metaclass=ABCMeta):
 
         conductor = getattr(self, f"{stem}_offload_conductor", None)
         lora = getattr(self, f"{stem}_lora", None)
+        # None when the conductor owns the component's placement, and also when the part is excluded from
+        # training (e.g. a text encoder with include_text_encoder off): it stays in model_parts() but the
+        # loader never populated it, so there is nothing to move.
         component = None if conductor is not None else getattr(self, stem)
 
         if conductor is not None:
-            conductor.to(device)
+            if device_equals(device, self.temp_device):
+                conductor.evict()
+            else:
+                assert device_equals(device, self.train_device), f"unexpected device {device} for part {part}"
+                conductor.materialize()
 
         if component is None and lora is None:
             return
