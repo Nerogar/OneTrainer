@@ -1,4 +1,3 @@
-import contextlib
 import copy
 import json
 import math
@@ -16,11 +15,11 @@ from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
-from modules.util import create, path_util
+from modules.util import create, huggingface_util, path_util
 from modules.util.bf16_stochastic_rounding import set_seed as bf16_stochastic_rounding_set_seed
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.compile_util import init_compile
+from modules.util.compile_util import init_compile, reset_compile
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
@@ -30,7 +29,7 @@ from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.profiling_util import TorchMemoryRecorder, TorchProfiler
+from modules.util.profiling_util import PeakMemoryRecorder, TorchMemoryRecorder, TorchProfiler
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
@@ -42,8 +41,6 @@ from torch.utils.hooks import RemovableHandle
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
 
-import huggingface_hub
-from requests.exceptions import ConnectionError
 from tqdm import tqdm
 
 
@@ -68,6 +65,7 @@ class GenericTrainer(BaseTrainer):
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
         super().__init__(config, callbacks, commands)
         # torch._dynamo.config overrides are thread-local, so init_compile() must be called in the training thread/process.
+        reset_compile()
         init_compile()
 
         if multi.is_master():
@@ -115,10 +113,12 @@ class GenericTrainer(BaseTrainer):
             else:
                 print("No backup found, continuing without backup...")
 
-        if self.config.secrets.huggingface_token != "":
-            self.callbacks.on_update_status("logging into Hugging Face")
-            with contextlib.suppress(ConnectionError):
-                huggingface_hub.login(token=self.config.secrets.huggingface_token)
+        huggingface_util.configure_hub(
+            self.config.secrets.huggingface_token,
+            offline_mode=self.config.offline_mode,
+            cache_dir=self.config.huggingface_cache_dir,
+            on_status=self.callbacks.on_update_status,
+        )
 
         self.callbacks.on_update_status("loading the model")
 
@@ -139,9 +139,7 @@ class GenericTrainer(BaseTrainer):
         self.model_setup.setup_optimizations(self.model, self.config)
         self.model_setup.setup_train_device(self.model, self.config)
         self.model_setup.setup_model(self.model, self.config)
-        self.model.to(self.temp_device)
         self.model.eval()
-        torch_gc()
 
         self.callbacks.on_update_status("creating the data loader/caching")
 
@@ -193,7 +191,7 @@ class GenericTrainer(BaseTrainer):
                 try:
                     shutil.rmtree(dirpath)
                 except Exception:
-                    print(f"Could not delete old rolling backup {dirpath}")
+                    tqdm.write(f"Could not delete old rolling backup {dirpath}")
 
         return
 
@@ -201,8 +199,9 @@ class GenericTrainer(BaseTrainer):
         self.sample_queue.append(fun)
 
     def __execute_sample_during_training(self):
-        for fun in self.sample_queue:
-            fun()
+        with PeakMemoryRecorder("sampling", enabled=False):
+            for fun in self.sample_queue:
+                fun()
         self.sample_queue = []
 
     def __sample_loop(
@@ -253,7 +252,6 @@ class GenericTrainer(BaseTrainer):
                 on_sample = on_sample_custom if is_custom_sample else on_sample_default
                 on_update_progress = self.callbacks.on_update_sample_custom_progress if is_custom_sample else self.callbacks.on_update_sample_default_progress
 
-                self.model.to(self.temp_device)
                 self.model.eval()
 
                 sample_config = copy.copy(sample_config)
@@ -270,7 +268,7 @@ class GenericTrainer(BaseTrainer):
                 )
             except Exception:
                 traceback.print_exc()
-                print("Error during sampling, proceeding without sampling")
+                tqdm.write("Error during sampling, proceeding without sampling")
 
             torch_gc()
 
@@ -303,7 +301,7 @@ class GenericTrainer(BaseTrainer):
             # We absolutely do not want to fail training just because the sample definition file becomes missing or broken right before sampling.
             except Exception:
                 traceback.print_exc()
-                print("Error during loading the sample definition file, proceeding without sampling")
+                tqdm.write("Error during loading the sample definition file, proceeding without sampling")
                 sample_params_list = []
 
         if self.model.ema:
@@ -428,7 +426,7 @@ class GenericTrainer(BaseTrainer):
         if os.path.isfile(self.config.sample_definition_file_name):
             shutil.copy2(self.config.sample_definition_file_name, samples_path)
 
-    def __backup(self, train_progress: TrainProgress, print_msg: bool = True, print_cb: Callable[[str], None] = print):
+    def __backup(self, train_progress: TrainProgress, print_msg: bool = True):
         torch_gc()
 
         self.callbacks.on_update_status("Creating backup")
@@ -443,7 +441,7 @@ class GenericTrainer(BaseTrainer):
 
         try:
             if print_msg:
-                print_cb("Creating Backup " + backup_path)
+                tqdm.write("Creating Backup " + backup_path)
 
             self.model_saver.save(
                 self.model,
@@ -456,13 +454,13 @@ class GenericTrainer(BaseTrainer):
             self.__save_backup_config(backup_path)
         except Exception:
             traceback.print_exc()
-            print("Could not save backup. Check your disk space!")
+            tqdm.write("Could not save backup. Check your disk space!")
             try:
                 if os.path.isdir(backup_path):
                     shutil.rmtree(backup_path)
             except Exception:
                 traceback.print_exc()
-                print("Could not delete partial backup")
+                tqdm.write("Could not delete partial backup")
         finally:
             if self.config.rolling_backup:
                 self.__prune_backups(self.config.rolling_backup_count)
@@ -475,7 +473,7 @@ class GenericTrainer(BaseTrainer):
 
         torch_gc()
 
-    def __save(self, train_progress: TrainProgress, print_msg: bool = True, print_cb: Callable[[str], None] = print):
+    def __save(self, train_progress: TrainProgress, print_msg: bool = True):
         torch_gc()
 
         self.callbacks.on_update_status("Saving")
@@ -486,7 +484,7 @@ class GenericTrainer(BaseTrainer):
             f"{self.config.save_filename_prefix}{get_string_timestamp()}-save-{train_progress.filename_string()}{self.config.output_model_format.file_extension()}"
         )
         if print_msg:
-            print_cb("Saving " + save_path)
+            tqdm.write("Saving " + save_path)
 
         try:
             if self.model.ema:
@@ -508,13 +506,13 @@ class GenericTrainer(BaseTrainer):
                 self.model.optimizer.train()
         except Exception:
             traceback.print_exc()
-            print("Could not save model. Check your disk space!")
+            tqdm.write("Could not save model. Check your disk space!")
             try:
                 if os.path.isfile(save_path):
                     shutil.rmtree(save_path)
             except Exception:
                 traceback.print_exc()
-                print("Could not delete partial save")
+                tqdm.write("Could not delete partial save")
         finally:
             if self.model.ema:
                 self.model.ema.copy_temp_to(self.parameters)
@@ -717,18 +715,18 @@ class GenericTrainer(BaseTrainer):
                     backup = self.commands.get_and_reset_backup_command()
                     save = self.commands.get_and_reset_save_command()
                     if multi.is_master() and (backup or save):
-                        self.model.to(self.temp_device)
+                        self.model.evict()
                         if backup:
-                            self.__backup(train_progress, True, step_tqdm.write)
+                            self.__backup(train_progress, True)
                         if save:
-                            self.__save(train_progress, True, step_tqdm.write)
+                            self.__save(train_progress, True)
                         self.model_setup.setup_train_device(self.model, self.config)
 
                 self.callbacks.on_update_status("Training ...")
 
                 with (
-                    TorchMemoryRecorder(enabled=False, filename=f"memory-step{train_progress.global_step}.pickle"),
-                    TorchProfiler      (enabled=False, filename=f"profile-step{train_progress.global_step}.json"),
+                    TorchMemoryRecorder(enabled=False, filename=f"memory-step{train_progress.global_step}-{get_string_timestamp()}.pickle"),
+                    TorchProfiler      (enabled=False, filename=f"profile-step{train_progress.global_step}-{get_string_timestamp()}.json"),
                 ):
                     step_seed = train_progress.global_step
                     bf16_stochastic_rounding_set_seed(step_seed, train_device)
@@ -842,7 +840,7 @@ class GenericTrainer(BaseTrainer):
 
     def end(self):
         if self.one_step_trained:
-            self.model.to(self.temp_device)
+            self.model.evict()
 
             if self.config.backup_before_save and multi.is_master():
                 self.__backup(self.model.train_progress)
@@ -875,7 +873,7 @@ class GenericTrainer(BaseTrainer):
                 )
 
         if self.model is not None:
-            self.model.to(self.temp_device)
+            self.model.evict()
 
         if multi.is_master():
             self.tensorboard.close()
