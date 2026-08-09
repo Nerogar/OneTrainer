@@ -15,13 +15,14 @@ from modules.util.quantization_util import (
 import torch
 from torch import Tensor
 
-# Prototype knobs - env-driven, no UI/config plumbing (see PLAN in-an-new-branch-reflective-cocke).
+# Tuning knobs, env-driven rather than config-plumbed: these select between behaviours that are
+# still being characterized, so they are deliberately not exposed in the UI.
 # Block size for the group-wise Hadamard rotation. Not empirically validated; 128 is a common
 # group size in block quantization literature, picked as a starting point to sweep from.
 CONVROT_BLOCK_SIZE = int(os.environ.get("CONVROT_BLOCK_SIZE", "128"))
-# Isolates the untested part of this experiment: whether quantizing the backward grad-output
-# to int8 (matching plain int8w8's backward) hurts LoRA gradient quality vs keeping it in
-# bf16. Default matches int8w8 so the two paths are directly comparable.
+# Isolates the part of the design that is still unmeasured: whether quantizing the backward
+# grad-output to int8 (matching plain int8w8's backward) hurts LoRA gradient quality vs keeping
+# it in bf16. Default matches int8w8 so the two paths are directly comparable.
 CONVROT_BF16_DY = os.environ.get("CONVROT_BF16_DY", "0") == "1"
 # Which forward to run once the weight is stored as rotated int8. "int8" uses the fused kernel; "bf16"
 # dequantizes the weight and hands the matmul to the vendor BF16 GEMM. Accuracy and speed pull in opposite
@@ -126,7 +127,10 @@ class LinearInt8ConvRot(LinearW8A8):
             weight = weight.to(device=orig_device)
 
         self.requires_grad_(False)
-        self.weight = torch.nn.Parameter(weight, requires_grad=False)
+        # assign through .data rather than rebinding self.weight, so the Parameter object's identity
+        # survives quantization -- matches every other quantized layer, and anything already holding
+        # a reference to it (offloading, param groups) keeps seeing the live tensor
+        self.weight.data = weight
         self.scale.copy_(scale)
 
         # this override replaces LinearW8A8.quantize entirely, so the compression step has to be
@@ -228,9 +232,9 @@ def benchmark_throughput(m, k, n, block_size=128, device='cuda'):
 
 
 if __name__ == "__main__":
-    # Clock/config caveats: throughput numbers here are indicative only - see the plan's
-    # verification section for the locked-clock benchmark this repo normally requires before
-    # trusting a number.
+    # Clock/config caveats: throughput numbers here are indicative only - they are taken without
+    # locked clocks, so treat them as relative comparisons between the routes rather than absolute
+    # figures.
     benchmark_snr()
     print()
     benchmark_throughput(2 * 1024 + 50, 3072, 3088)
