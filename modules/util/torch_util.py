@@ -1,4 +1,5 @@
 import gc
+import platform
 from collections.abc import Callable
 from contextlib import nullcontext
 
@@ -12,6 +13,20 @@ accelerator = accelerate.Accelerator()
 default_device = accelerator.device
 
 torch_version = packaging.version.parse(torch.__version__)
+
+
+def supports_mem_pool(device: torch.device) -> bool:
+    return device.type == "cuda"
+
+
+def create_mem_pool(device: torch.device):
+    # a dedicated MemPool the caller can allocate into; None on devices without MemPool support (cpu/mps)
+    return torch.cuda.MemPool() if supports_mem_pool(device) else None
+
+
+def mem_pool_context(mem_pool):
+    # route allocations made in this context into the given MemPool; no-op when it is None
+    return torch.cuda.use_mem_pool(mem_pool) if mem_pool is not None else nullcontext()
 
 
 def state_dict_has_prefix(state_dict: dict | None, prefix: str):
@@ -183,14 +198,24 @@ def pin_tensor_(x):
     # not implemented for other device types
     if torch.cuda.is_available():
         cudart = torch.cuda.cudart()
+        num_bytes = x.numel() * x.element_size()
         err = cudart.cudaHostRegister(
             x.data_ptr(),
-            x.numel() * x.element_size(),
+            num_bytes,
             0,
         )
 
         if err.value != 0:
-            raise RuntimeError(f"CUDA Error while trying to pin memory. error: {err.value}, ptr: {x.data_ptr()}, size: {x.numel() * x.element_size()}")
+            hint = ""
+            if err.value == 1 and num_bytes >= 2**31:
+                # the kernel's page list for a registration holds one entry per 4 KiB, so at 2 GiB it reaches
+                # 4 MiB, the largest single kmalloc there is, and the pin is refused whatever the driver or
+                # GPU. cudaErrorInvalidValue at this size has no other cause, so the attribution is safe.
+                hint = (f". A single pinned allocation of {num_bytes / 2**30:.2f} GiB failed: linux "
+                        f"{platform.release()} cannot pin 2 GiB or more in one call, a kernel bug present in "
+                        f"6.11 and 6.12 and fixed in 6.13. Update the kernel, or run on a host with 6.13 or "
+                        f"newer. This attempt leaked {num_bytes / 2**30:.2f} GiB of host memory until reboot")
+            raise RuntimeError(f"CUDA Error while trying to pin memory. error: {err.value}, ptr: {x.data_ptr()}, size: {num_bytes}{hint}")
 
 
 def unpin_tensor_(x):

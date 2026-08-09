@@ -92,11 +92,11 @@ class CheckpointLayer(BaseCheckpointLayer):
 
 
 class LoadBoundary(torch.autograd.Function):
-    # Identity op on a block's grad-carrying INPUT tensors, driving the conductor only: forward calls
-    # before_layer, backward calls after_layer. Sitting on the input makes its backward fire LAST in
-    # the block's backward.
+    # Identity op on a block's INPUT tensors, driving the conductor only: forward calls before_layer,
+    # backward calls after_layer. Sitting on the input makes its backward fire LAST in the block's
+    # backward. `dummy` keeps the node alive when the inputs carry no grad, see _apply_boundary.
     @staticmethod
-    def forward(ctx, conductor, layer_index, *tensors):
+    def forward(ctx, conductor, layer_index, dummy, *tensors):
         ctx.conductor = conductor
         ctx.layer_index = layer_index
         conductor.before_layer(layer_index, is_forward=True)
@@ -106,7 +106,7 @@ class LoadBoundary(torch.autograd.Function):
         # calling after_layer here, rather than after the forward, makes the train event cover the block's
         # backward kernels, so this layer's offload transfer cannot overlap them.
         ctx.conductor.after_layer(ctx.layer_index, list(grads))
-        return (None, None, *grads)
+        return (None, None, None, *grads)
 
 
 class EvictBoundary(torch.autograd.Function):
@@ -114,7 +114,7 @@ class EvictBoundary(torch.autograd.Function):
     # before_layer. Sitting on the output makes its backward fire FIRST - before the checkpoint
     # rematerializes the block, so the weights are in by then.
     @staticmethod
-    def forward(ctx, conductor, layer_index, *tensors):
+    def forward(ctx, conductor, layer_index, dummy, *tensors):
         ctx.conductor = conductor
         ctx.layer_index = layer_index
         conductor.after_layer(layer_index, list(tensors))
@@ -127,17 +127,24 @@ class EvictBoundary(torch.autograd.Function):
         init_compile()
         ctx.conductor.before_layer(ctx.layer_index, is_forward=False)
         ctx.conductor.prefetch_activations(ctx.layer_index - 1)
-        return (None, None, *grads)
+        return (None, None, None, *grads)
 
 
-def _apply_boundary(boundary, conductor, layer_index, values: tuple) -> tuple:
+def _apply_boundary(boundary, conductor, layer_index, values: tuple, dummy: torch.Tensor | None = None) -> tuple:
     # Wrap all grad-requiring tensors in `values` in a single boundary Function, so its backward fires
     # exactly once around the checkpoint's recompute and no gradient can reach the checkpoint without
     # crossing the boundary. Non-tensor and grad-free entries pass through untouched.
     indices = [i for i, v in enumerate(values) if isinstance(v, torch.Tensor) and v.requires_grad]
+    if not indices and dummy is not None:
+        # Nothing entering the block carries grad, because nothing trainable sits in front of it. A
+        # Function whose inputs all lack grad creates no autograd node, so the boundary would not be
+        # applied at all and the block would run against weights still on the temp device. Force the first
+        # float tensor through against `dummy`, a grad-requiring leaf: the node then exists, and the
+        # block's input gradient - discarded at the boundary - is what fires the backward duty.
+        indices = [i for i, v in enumerate(values) if isinstance(v, torch.Tensor) and v.is_floating_point()][:1]
     if not indices:
         return values
-    wrapped = boundary.apply(conductor, layer_index, *(values[i] for i in indices))
+    wrapped = boundary.apply(conductor, layer_index, dummy, *(values[i] for i in indices))
     values = list(values)
     for j, i in enumerate(indices):
         values[i] = wrapped[j]
@@ -159,6 +166,7 @@ class BoundaryOffloadCheckpointLayer(BaseCheckpointLayer):
         self.layer_index = layer_index
         self.checkpointing = checkpointing
         self.included_offload_param_indices = included_offload_param_indices
+        self.dummy = None
         # compile the block together with its checkpoint, not the bare block: dynamo then traces the
         # checkpoint as a higher-order op and the min-cut partitioner prunes the recompute to what the
         # backward needs. With the checkpoint outside the compiled region the backward re-runs the whole
@@ -228,7 +236,12 @@ class BoundaryOffloadCheckpointLayer(BaseCheckpointLayer):
         if self.layer_index == 0:
             self.conductor.start_forward(backward_follows=True)
 
-        args = _apply_boundary(LoadBoundary, self.conductor, self.layer_index, args)
+        if self.dummy is None:
+            device = next((v.device for v in args if isinstance(v, torch.Tensor)), None)
+            if device is not None:
+                self.dummy = torch.zeros((1,), device=device, requires_grad=True)
+
+        args = _apply_boundary(LoadBoundary, self.conductor, self.layer_index, args, self.dummy)
         output = self.__run_block(args)
         output_tuple = output if isinstance(output, tuple) else (output,)
         output_tuple = _apply_boundary(EvictBoundary, self.conductor, self.layer_index, output_tuple)
