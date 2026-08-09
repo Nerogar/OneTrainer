@@ -19,7 +19,7 @@ from modules.util import create, huggingface_util, path_util
 from modules.util.bf16_stochastic_rounding import set_seed as bf16_stochastic_rounding_set_seed
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.compile_util import init_compile
+from modules.util.compile_util import init_compile, reset_compile
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
@@ -65,6 +65,7 @@ class GenericTrainer(BaseTrainer):
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
         super().__init__(config, callbacks, commands)
         # torch._dynamo.config overrides are thread-local, so init_compile() must be called in the training thread/process.
+        reset_compile()
         init_compile()
 
         if multi.is_master():
@@ -138,9 +139,7 @@ class GenericTrainer(BaseTrainer):
         self.model_setup.setup_optimizations(self.model, self.config)
         self.model_setup.setup_train_device(self.model, self.config)
         self.model_setup.setup_model(self.model, self.config)
-        self.model.to(self.temp_device)
         self.model.eval()
-        torch_gc()
 
         self.callbacks.on_update_status("creating the data loader/caching")
 
@@ -253,7 +252,6 @@ class GenericTrainer(BaseTrainer):
                 on_sample = on_sample_custom if is_custom_sample else on_sample_default
                 on_update_progress = self.callbacks.on_update_sample_custom_progress if is_custom_sample else self.callbacks.on_update_sample_default_progress
 
-                self.model.to(self.temp_device)
                 self.model.eval()
 
                 sample_config = copy.copy(sample_config)
@@ -717,7 +715,7 @@ class GenericTrainer(BaseTrainer):
                     backup = self.commands.get_and_reset_backup_command()
                     save = self.commands.get_and_reset_save_command()
                     if multi.is_master() and (backup or save):
-                        self.model.to(self.temp_device)
+                        self.model.evict()
                         if backup:
                             self.__backup(train_progress, True)
                         if save:
@@ -842,7 +840,7 @@ class GenericTrainer(BaseTrainer):
 
     def end(self):
         if self.one_step_trained:
-            self.model.to(self.temp_device)
+            self.model.evict()
 
             if self.config.backup_before_save and multi.is_master():
                 self.__backup(self.model.train_progress)
@@ -875,7 +873,7 @@ class GenericTrainer(BaseTrainer):
                 )
 
         if self.model is not None:
-            self.model.to(self.temp_device)
+            self.model.evict()
 
         if multi.is_master():
             self.tensorboard.close()
