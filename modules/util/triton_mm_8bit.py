@@ -17,9 +17,10 @@ import triton.language as tl
 
 #Blackwell's block-scaled fp8 mma (mxf8f6f4) runs at the full 8-bit tensor core rate, the legacy
 #fp8 mma only at half rate. Pre-Blackwell has no such instruction and triton emulates
-#tl.dot_scaled with a bf16 mma, which is slower than plain tl.dot - so pick by compute capability
+#tl.dot_scaled with a bf16 mma, which is slower than plain tl.dot - so pick by compute capability.
+#On ROCm the capability is the gfx arch number and RDNA4 reports 12, so require CUDA
 def _prefer_mxfp8(device: torch.device) -> bool:
-    return torch.cuda.get_device_capability(device)[0] >= 12
+    return torch.version.cuda is not None and torch.cuda.get_device_capability(device)[0] >= 12
 
 
 def announce_autotuning(kernel, name=None):
