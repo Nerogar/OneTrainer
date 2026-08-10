@@ -15,6 +15,13 @@ import triton
 import triton.language as tl
 
 
+#Blackwell's block-scaled fp8 mma (mxf8f6f4) runs at the full 8-bit tensor core rate, the legacy
+#fp8 mma only at half rate. Pre-Blackwell has no such instruction and triton emulates
+#tl.dot_scaled with a bf16 mma, which is slower than plain tl.dot - so pick by compute capability
+def _prefer_mxfp8(device: torch.device) -> bool:
+    return torch.cuda.get_device_capability(device)[0] >= 12
+
+
 def announce_autotuning(kernel, name=None):
     prefix = f"autotuning {name} " if name else "autotuning "
     orig_check_disk_cache = kernel.check_disk_cache
@@ -137,7 +144,7 @@ def _mm_accumulate(
         M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn,
         BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr,
-        FLOAT: tl.constexpr, EVEN_K: tl.constexpr,
+        FLOAT: tl.constexpr, EVEN_K: tl.constexpr, MXFP8_MMA: tl.constexpr,
 ):
 
     #grouped launch order: consecutive pids walk down GROUP_SIZE_M M-blocks before advancing
@@ -168,12 +175,22 @@ def _mm_accumulate(
 
     accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32 if FLOAT else tl.int32)
 
+    #the mma multiplies each group of 32 elements along K by one ue8m0 scale. ue8m0 is a bare
+    #exponent with bias 127, so the value 127 means a scale of 1.0 and every element is left
+    #unchanged - the result is the same as an unscaled fp8 matmul
+    if MXFP8_MMA:
+        a_scale = tl.full((BLOCK_SIZE_M, BLOCK_SIZE_K // 32), 127, dtype=tl.uint8)
+        b_scale = tl.full((BLOCK_SIZE_N, BLOCK_SIZE_K // 32), 127, dtype=tl.uint8)
+
     if EVEN_K:
         for _k in range(K // BLOCK_SIZE_K):
             a = tl.load(a_ptrs)
             b = tl.load(b_ptrs)
 
-            accumulator = tl.dot(a, b, accumulator, out_dtype=tl.float32 if FLOAT else tl.int32)
+            if MXFP8_MMA:
+                accumulator = tl.dot_scaled(a, a_scale, "e4m3", b, b_scale, "e4m3", acc=accumulator)
+            else:
+                accumulator = tl.dot(a, b, accumulator, out_dtype=tl.float32 if FLOAT else tl.int32)
 
             a_ptrs += BLOCK_SIZE_K * stride_ak
             b_ptrs += BLOCK_SIZE_K * stride_bk
@@ -182,7 +199,10 @@ def _mm_accumulate(
             a = tl.load(a_ptrs, mask=offs_k[None, :] < K - k*BLOCK_SIZE_K, other=0.0)
             b = tl.load(b_ptrs, mask=offs_k[:, None] < K - k*BLOCK_SIZE_K, other=0.0)
 
-            accumulator = tl.dot(a, b, accumulator, out_dtype=tl.float32 if FLOAT else tl.int32)
+            if MXFP8_MMA:
+                accumulator = tl.dot_scaled(a, a_scale, "e4m3", b, b_scale, "e4m3", acc=accumulator)
+            else:
+                accumulator = tl.dot(a, b, accumulator, out_dtype=tl.float32 if FLOAT else tl.int32)
 
             a_ptrs += BLOCK_SIZE_K * stride_ak
             b_ptrs += BLOCK_SIZE_K * stride_bk
@@ -246,13 +266,13 @@ def _mm_kernel(
         M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn, stride_cm,
         BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr,
-        QUANTIZED_M, FLOAT: tl.constexpr, EVEN_K: tl.constexpr,
+        QUANTIZED_M, FLOAT: tl.constexpr, EVEN_K: tl.constexpr, MXFP8_MMA: tl.constexpr,
 ):
     accumulator, offs_cm, offs_cn = _mm_accumulate(
         a_ptr, b_ptr, M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn,
         BLOCK_SIZE_M, BLOCK_SIZE_N, BLOCK_SIZE_K, GROUP_SIZE_M,
-        FLOAT, EVEN_K,
+        FLOAT, EVEN_K, MXFP8_MMA,
     )
 
     _store_c(c_ptr, accumulator, offs_cm, offs_cn, M, N, stride_cm)
@@ -274,7 +294,7 @@ def mm_8bit(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
         a, b, c,
         M, N, K,
         a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0),
-        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0),
+        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0), MXFP8_MMA = FLOAT and _prefer_mxfp8(a.device),
     )
     return c
 
@@ -291,13 +311,13 @@ def _scaled_mm_kernel(
         M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn, stride_cm,
         BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr,
-        QUANTIZED_M, FLOAT: tl.constexpr, EVEN_K: tl.constexpr,
+        QUANTIZED_M, FLOAT: tl.constexpr, EVEN_K: tl.constexpr, MXFP8_MMA: tl.constexpr,
 ):
     accumulator, offs_cm, offs_cn = _mm_accumulate(
         a_ptr, b_ptr, M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn,
         BLOCK_SIZE_M, BLOCK_SIZE_N, BLOCK_SIZE_K, GROUP_SIZE_M,
-        FLOAT, EVEN_K,
+        FLOAT, EVEN_K, MXFP8_MMA,
     )
 
     #per-row scale on axis 0 (M), fold into the epilogue and cast to the output (compute) dtype directly
@@ -319,7 +339,7 @@ def scaled_mm_8bit(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor, out_dt
         a, b, c, scale,
         M, N, K,
         a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0),
-        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0),
+        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0), MXFP8_MMA = FLOAT and _prefer_mxfp8(a.device),
     )
     return c
 
@@ -338,13 +358,13 @@ def _rowcol_scaled_mm_kernel(
         M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn, stride_cm,
         BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr,
-        QUANTIZED_M, FLOAT: tl.constexpr, EVEN_K: tl.constexpr,
+        QUANTIZED_M, FLOAT: tl.constexpr, EVEN_K: tl.constexpr, MXFP8_MMA: tl.constexpr,
 ):
     accumulator, offs_cm, offs_cn = _mm_accumulate(
         a_ptr, b_ptr, M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn,
         BLOCK_SIZE_M, BLOCK_SIZE_N, BLOCK_SIZE_K, GROUP_SIZE_M,
-        FLOAT, EVEN_K,
+        FLOAT, EVEN_K, MXFP8_MMA,
     )
 
     scale = tl.load(scale_ptr + offs_cm, mask=offs_cm < M, other=0.0)
@@ -366,7 +386,7 @@ def rowcol_scaled_mm_8bit(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor,
         a, b, c, scale, scale_n,
         M, N, K,
         a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0),
-        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0),
+        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0), MXFP8_MMA = FLOAT and _prefer_mxfp8(a.device),
     )
     return c
 
@@ -411,14 +431,14 @@ def _scaled_lora_mm_kernel(
         M, N, K, R,
         stride_am, stride_ak, stride_bk, stride_bn, stride_cm, stride_xdm, stride_upr, stride_upn,
         BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr,
-        QUANTIZED_M, FLOAT: tl.constexpr, EVEN_K: tl.constexpr,
+        QUANTIZED_M, FLOAT: tl.constexpr, EVEN_K: tl.constexpr, MXFP8_MMA: tl.constexpr,
         BLOCK_R: tl.constexpr, R_TILES: tl.constexpr,
 ):
     accumulator, offs_cm, offs_cn = _mm_accumulate(
         a_ptr, b_ptr, M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn,
         BLOCK_SIZE_M, BLOCK_SIZE_N, BLOCK_SIZE_K, GROUP_SIZE_M,
-        FLOAT, EVEN_K,
+        FLOAT, EVEN_K, MXFP8_MMA,
     )
 
     scale = tl.load(scale_ptr + offs_cm, mask=offs_cm < M, other=0.0)
@@ -445,7 +465,7 @@ def scaled_lora_mm_8bit(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor, x
         a, b, c, scale, xd, up,
         M, N, K, R,
         a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0), xd.stride(0), up.stride(0), up.stride(1),
-        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0),
+        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0), MXFP8_MMA = FLOAT and _prefer_mxfp8(a.device),
         BLOCK_R = block_r, R_TILES = triton.cdiv(R, block_r),
     )
     return c
@@ -462,14 +482,14 @@ def _rowcol_scaled_lora_mm_kernel(
         M, N, K, R,
         stride_am, stride_ak, stride_bk, stride_bn, stride_cm, stride_xdm, stride_upr, stride_upn,
         BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr,
-        QUANTIZED_M, FLOAT: tl.constexpr, EVEN_K: tl.constexpr,
+        QUANTIZED_M, FLOAT: tl.constexpr, EVEN_K: tl.constexpr, MXFP8_MMA: tl.constexpr,
         BLOCK_R: tl.constexpr, R_TILES: tl.constexpr,
 ):
     accumulator, offs_cm, offs_cn = _mm_accumulate(
         a_ptr, b_ptr, M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn,
         BLOCK_SIZE_M, BLOCK_SIZE_N, BLOCK_SIZE_K, GROUP_SIZE_M,
-        FLOAT, EVEN_K,
+        FLOAT, EVEN_K, MXFP8_MMA,
     )
 
     scale = tl.load(scale_ptr + offs_cm, mask=offs_cm < M, other=0.0)
@@ -495,7 +515,7 @@ def rowcol_scaled_lora_mm_8bit(a: torch.Tensor, b: torch.Tensor, scale: torch.Te
         a, b, c, scale, scale_n, xd, up,
         M, N, K, R,
         a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0), xd.stride(0), up.stride(0), up.stride(1),
-        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0),
+        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0), MXFP8_MMA = FLOAT and _prefer_mxfp8(a.device),
         BLOCK_R = block_r, R_TILES = triton.cdiv(R, block_r),
     )
     return c
