@@ -22,7 +22,7 @@ import huggingface_hub
 from huggingface_hub import constants as hf_constants
 from huggingface_hub import parse_hf_uri
 from huggingface_hub.errors import HfUriError
-from huggingface_hub.utils import EntryNotFoundError, HfHubHTTPError
+from huggingface_hub.utils import EntryNotFoundError, HfHubHTTPError, RepositoryNotFoundError
 from safetensors.torch import load_file
 
 # huggingface_hub 1.16+ uses httpx, which logs every HTTP request/response at INFO level.
@@ -68,14 +68,17 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 huggingface_hub.whoami(token=token, cache=True)
             except HfHubHTTPError as e:
                 if e.response.status_code == 401:
-                    raise ValueError("Invalid Hugging Face token.") from e
+                    raise ValueError("Invalid Hugging Face token.") from None
                 raise
 
-        huggingface_hub.auth_check(
-            repo_id=repo_id,
-            repo_type="model",
-            token=token,
-        )
+        try:
+            huggingface_hub.auth_check(
+                repo_id=repo_id,
+                repo_type="model",
+                token=token,
+            )
+        except RepositoryNotFoundError as e:
+            raise e.with_traceback(None) from None
         self.__validated_hf_repositories.add(repo_id)
 
     def __load_sub_module(
