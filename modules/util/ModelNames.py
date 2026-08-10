@@ -43,6 +43,17 @@ class ModelNames:
         self.include_text_encoder_4 = include_text_encoder_4
         self.include_unconditional_transformer = include_unconditional_transformer
 
+    # reset all base-model submodule overrides. used when continuing a
+    # fine-tune from a backup: the backup is a complete internal model, so
+    # overrides must not shadow it
+    def clear_overrides(self):
+        self.prior_model = ""
+        self.transformer_model = ""
+        self.effnet_encoder_model = ""
+        self.decoder_model = ""
+        self.text_encoder_4 = ""
+        self.vae_model = ""
+
     def all_embedding(self):
         if self.embedding is not None:
             return self.additional_embeddings + [self.embedding]
