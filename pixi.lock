@@ -918,6 +918,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/1f/17/07d086080f8a83b8d7966955e29bcdbd6a060f5bd949dc9d5abd3658cead/fastar-0.11.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/23/45/caa600acfab94560807a20a64b5830d2cd3c3202b7f1328644d70b7d6bd8/nvidia_ml_py-13.610.43-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/23/fe/2a409406fafd57eaae28158dda5ab11ec6a8c2f839d3813c7d96c6738126/pytorch_optimizer-3.6.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/26/07/b0b7e7862699b87679d919e39a35a71dbca88dcc656458be08e88fa1acf9/nvidia_nvcomp_cu12-5.3.0.16-py3-none-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/28/50/f203ff3a3ddfe19308efc83c5a3a29ed02bf786732ec35e68bf9162f3365/safetensors-0.8.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/29/fb/162a66789c65e5afa3b051309240c26bf37fbc8fea285b4546ae747995a2/transformers-5.5.4-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl
@@ -1005,6 +1006,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/b5/09/c5b6734a50ad4882432b6bb7c02baf757f5b2f256041da5df242e2d7e6b6/scipy-1.15.3-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/b5/70/5d8df3b09e25bce090399cf48e452d25c935ab72dad19406c77f4e828045/psutil-7.2.2-cp36-abi3-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/b5/e8/dbf020b4d98251a9860752a094d09a65e1b436ad181faf929983f697048f/watchdog-6.0.0-py3-none-manylinux2014_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/b7/20/e025aa3fa2ee33ee6a4871aa5a9e10b05472913adaff649ba21f2c98291d/nvidia_libnvcomp_cu12-5.3.0.16-py3-none-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ba/5a/18ad964b0086c6e62e2e7500f7edc89e3faa45033c71c1893d34eed2b2de/dnspython-2.8.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/bc/e7/5c595c75e9f41a44f30e526eda465ea0b4eec93470e074e4a111b253f13a/s3transfer-0.19.2-py3-none-any.whl
@@ -1146,6 +1148,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/54/6f/84908cad2d6aa5144abcf7b42709fe4fdb459bc640ec7ac5786e7693dabc/prompt_toolkit-3.0.53-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/57/26/a798a2e274d77944e784c1c577b85fcbdb7189e59ff821d9a2d6b462f853/prodigyopt-1.1.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/57/f2/d9d8ce1373dabb37e5919f63cd18446556079631d3f2eea3ada03c29f6b8/pyside6-6.11.1-cp310-abi3-win_amd64.whl
+      - pypi: https://files.pythonhosted.org/packages/58/04/8617da111cfea182a73f659b61ac68f32378313b26712998d22a066c52c3/nvidia_nvcomp_cu12-5.3.0.16-py3-none-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/58/0a/a10b45aab35b175aded078a462dc8d0c698f5b13946e7cb0869097b78bb6/absl_py-2.5.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5a/47/59eb7975cb0e4ef0afa764ea945b29a5bb4537a9f771cb7d6c8a5dd74c95/cffi-2.1.0-cp313-cp313-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/5a/de/bbc12563bbf979618d17625a4e753ff7a078523e28d870d3626daa97261a/invoke-3.0.3-py3-none-any.whl
@@ -1245,6 +1248,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/ee/59/4fd8780ee3897217e37dc10a371ce76f75ceef442e30fcb726140bdabc00/prodigy_plus_schedule_free-2.0.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/f0/0f/310fb31e39e2d734ccaa2c0fb981ee41f7bd5056ce9bc29b2248bd569169/humanfriendly-10.0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/f2/f2/728f041460f1b9739b85ee23b45fa5a505962ea11fd85bdbe2a02b021373/darkdetect-0.8.0-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/f3/7a/1ba038e15e7256019ecb23d52d6310fe9e1d24fe92074ee89c066ca0ac58/nvidia_libnvcomp_cu12-5.3.0.16-py3-none-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/f7/5e/35c856e186b74678c24927847ad9895a51f1bc02a0c6126477a6c6040064/pyreadline3-3.5.6-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/f9/36/14b76ca57652e5cc5fd1c11f32a261292c08a0d19a00351013c2549cbfb2/watchfiles-1.2.0-cp313-cp313-win_amd64.whl
@@ -1481,6 +1485,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/89/d3/726bd88f0eece09ddf431bea4c9191c18e7a8d070b854eb0014d447712ee/sentry_sdk-2.66.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/8b/c6/979176efdaa3d239e36d503d5af63a0a773b36662ed8f52e5b6a6d9fd40e/propcache-0.5.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/8c/d7/8ff98376b1acc4503253b685ea09981697385ce344d4e3935c2af49e044d/pfzy-0.3.4-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/8d/50/df4132c3e4171462130ddfc793e042fb8724d68249f14c16eff44236d5d2/nvidia_libnvcomp_cu13-5.3.0.16-py3-none-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/93/73/3aed375e903bfe4622dd9bd984ef86f31e9e1a29a1b7d28f92b935b8e350/scenedetect-0.7-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/93/8c/2e650f2afeb7ee576912636c23ddb621c91ac6a98e66dc8d29c3c69446e1/werkzeug-3.1.8-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/93/ef/aac74263f0252806b46f0fd5a52566ee06129744572d0958cd0a77d22b0a/schedulefree-1.4.1-py3-none-any.whl
@@ -1494,6 +1499,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a2/09/77d55d46fd61b4a135c444fc97158ef34a095e5681d0a6c10b75bf356191/sympy-1.14.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a7/06/3d6badcf13db419e25b07041d9c7b4a2c331d3f4e7134445ec5df57714cd/coloredlogs-15.0.1-py2.py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/a7/36/858d7584989940b37c20362c9f3cdf7b45a0a59e9c4118e6646c109e3127/nvidia_nvcomp_cu13-5.3.0.16-py3-none-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/a7/6c/89b1a230a78f57c52dd8893adb1f92f94411721b6ec12596c56d98c74356/watchfiles-1.2.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/a8/87/77cc11c7a9ea9fd05503def69e3d18605852cd0d4b0d3b8f15bbeb3ef1d1/pooch-1.8.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ab/6e/81d47999aebc1b155f81eca4477a616a70f238a2549848c38983f3c22a82/ftfy-6.3.1-py3-none-any.whl
@@ -1669,6 +1675,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/71/43/1947f06babed6b3f1d7f38b0c767f52df66bfb2bc10b468c4a7de9eceff2/aiohappyeyeballs-2.7.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/77/c1/6e422f34e569cf8e18df68d1939c81c099d2b61e4f7d9621c8a77560799c/pydantic_settings-2.14.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7a/13/e503968fefabd4c6b2650af21e110aa8466fe21432cd7c43a84577a89438/tensorboard_data_server-0.7.2-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/7c/02/61dbc3791452e9aa402815e44073cc846c51e8ddca8b2d01b360095b5380/nvidia_libnvcomp_cu13-5.3.0.16-py3-none-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/7c/f0/5e1a392c817e395b140c18c12a00c0c65c69f8d63da26ad4387aebf2172b/boto3-1.43.62-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7d/68/d8d58938dfb1370b266a1a729e6d77a985be23689a0496498ee17b2cbf90/platformdirs-4.11.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/7e/e8/cff247591966f2d22ec8c003cd7587e27b7ba7b81ab2fb888e3ab75dc285/pydantic_core-2.46.4-cp313-cp313-win_amd64.whl
@@ -1682,6 +1689,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/86/96/7e9aba6fabce3cb05f320abeef5b81efd5134823ae85d1a517872cb83cbc/fastapi_cloud_cli-0.23.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/86/e4/62a06b7e87c4246ac76b7c2da136f972eb4a3a1fc94abb07e7022d6fdb0a/yarl-1.24.5-cp313-cp313-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/87/2e/892ad2862ba54f084ffe8cc4a22667eaf9c2bcec6d2bff1d15713c6c0703/scipy-1.15.3-cp313-cp313-win_amd64.whl
+      - pypi: https://files.pythonhosted.org/packages/87/92/6129bbb5e57868941ea6b978278a6824cb094c470b642e505598ac87c21b/nvidia_nvcomp_cu13-5.3.0.16-py3-none-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/88/39/799be3f2f0f38cc727ee3b4f1445fe6d5e4133064ec2e4115069418a5bb6/cloudpickle-3.1.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/89/d3/726bd88f0eece09ddf431bea4c9191c18e7a8d070b854eb0014d447712ee/sentry_sdk-2.66.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/8c/d7/8ff98376b1acc4503253b685ea09981697385ce344d4e3935c2af49e044d/pfzy-0.3.4-py3-none-any.whl
@@ -7602,6 +7610,13 @@ packages:
   - torch>=1.10 ; python_full_version >= '3.9'
   - torch>=1.10,<2.5 ; python_full_version < '3.9'
   requires_python: '>=3.8'
+- pypi: https://files.pythonhosted.org/packages/26/07/b0b7e7862699b87679d919e39a35a71dbca88dcc656458be08e88fa1acf9/nvidia_nvcomp_cu12-5.3.0.16-py3-none-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+  name: nvidia-nvcomp-cu12
+  version: 5.3.0.16
+  sha256: c2cb2bd40b2a97381a46b3645f8e1b401325b6828c1f227b7685c9ee86412749
+  requires_dist:
+  - nvidia-libnvcomp-cu12==5.3.0.16
+  requires_python: '>=3.9,<3.15'
 - pypi: https://files.pythonhosted.org/packages/28/50/f203ff3a3ddfe19308efc83c5a3a29ed02bf786732ec35e68bf9162f3365/safetensors-0.8.0-cp310-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
   name: safetensors
   version: 0.8.0
@@ -8411,6 +8426,13 @@ packages:
   - pyside6-addons==6.11.1
   - tomli>=2.0.1 ; python_full_version < '3.11'
   requires_python: '>=3.10,<3.15'
+- pypi: https://files.pythonhosted.org/packages/58/04/8617da111cfea182a73f659b61ac68f32378313b26712998d22a066c52c3/nvidia_nvcomp_cu12-5.3.0.16-py3-none-win_amd64.whl
+  name: nvidia-nvcomp-cu12
+  version: 5.3.0.16
+  sha256: 997dfec874c554e104e22136aca1a14a81bb33186301adf301236c08406da8c2
+  requires_dist:
+  - nvidia-libnvcomp-cu12==5.3.0.16
+  requires_python: '>=3.9,<3.15'
 - pypi: https://files.pythonhosted.org/packages/58/0a/a10b45aab35b175aded078a462dc8d0c698f5b13946e7cb0869097b78bb6/absl_py-2.5.0-py3-none-any.whl
   name: absl-py
   version: 2.5.0
@@ -8865,6 +8887,10 @@ packages:
   version: 0.7.2
   sha256: 7e0610d205889588983836ec05dc098e80f97b7e7bbff7e994ebb78f578d0ddb
   requires_python: '>=3.7'
+- pypi: https://files.pythonhosted.org/packages/7c/02/61dbc3791452e9aa402815e44073cc846c51e8ddca8b2d01b360095b5380/nvidia_libnvcomp_cu13-5.3.0.16-py3-none-win_amd64.whl
+  name: nvidia-libnvcomp-cu13
+  version: 5.3.0.16
+  sha256: 34824f687625a48f1fcaeed9b4bd08935d88583ff5fc4811beca1c9a50e343b9
 - pypi: https://files.pythonhosted.org/packages/7c/f0/5e1a392c817e395b140c18c12a00c0c65c69f8d63da26ad4387aebf2172b/boto3-1.43.62-py3-none-any.whl
   name: boto3
   version: 1.43.62
@@ -9075,6 +9101,13 @@ packages:
   - doit>=0.36.0 ; extra == 'dev'
   - pydevtool ; extra == 'dev'
   requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/87/92/6129bbb5e57868941ea6b978278a6824cb094c470b642e505598ac87c21b/nvidia_nvcomp_cu13-5.3.0.16-py3-none-win_amd64.whl
+  name: nvidia-nvcomp-cu13
+  version: 5.3.0.16
+  sha256: 542f8184b92f2e61bfb6d0a4ac9808a8548dcc77ebba92585f8ff8bd3668894e
+  requires_dist:
+  - nvidia-libnvcomp-cu13==5.3.0.16
+  requires_python: '>=3.9,<3.15'
 - pypi: https://files.pythonhosted.org/packages/88/39/799be3f2f0f38cc727ee3b4f1445fe6d5e4133064ec2e4115069418a5bb6/cloudpickle-3.1.2-py3-none-any.whl
   name: cloudpickle
   version: 3.1.2
@@ -9174,6 +9207,10 @@ packages:
   - sphinx-autobuild>=2021.3.14,<2022.0.0 ; extra == 'docs'
   - sphinx-copybutton>=0.4.0,<0.5.0 ; extra == 'docs'
   requires_python: '>=3.7,<4.0'
+- pypi: https://files.pythonhosted.org/packages/8d/50/df4132c3e4171462130ddfc793e042fb8724d68249f14c16eff44236d5d2/nvidia_libnvcomp_cu13-5.3.0.16-py3-none-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+  name: nvidia-libnvcomp-cu13
+  version: 5.3.0.16
+  sha256: 8bf2594c9a3d83bf485c95bffa8ac6406d98b5407ca9e8d9bef5e8fb5d6f5116
 - pypi: https://files.pythonhosted.org/packages/8d/de/5a007fb53b1ab0aafc69d11a5a3dd72a289d5a3e78dcf2c3a3d9b14ffe93/sentencepiece-0.2.1-cp313-cp313-macosx_11_0_arm64.whl
   name: sentencepiece
   version: 0.2.1
@@ -9612,6 +9649,13 @@ packages:
   - humanfriendly>=9.1
   - capturer>=2.4 ; extra == 'cron'
   requires_python: '>=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*'
+- pypi: https://files.pythonhosted.org/packages/a7/36/858d7584989940b37c20362c9f3cdf7b45a0a59e9c4118e6646c109e3127/nvidia_nvcomp_cu13-5.3.0.16-py3-none-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+  name: nvidia-nvcomp-cu13
+  version: 5.3.0.16
+  sha256: b0eeadb227fd087907c410332873a09015593ea61517a12c26732d3ea71d5789
+  requires_dist:
+  - nvidia-libnvcomp-cu13==5.3.0.16
+  requires_python: '>=3.9,<3.15'
 - pypi: https://files.pythonhosted.org/packages/a7/6c/89b1a230a78f57c52dd8893adb1f92f94411721b6ec12596c56d98c74356/watchfiles-1.2.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
   name: watchfiles
   version: 1.2.0
@@ -9933,6 +9977,10 @@ packages:
   - scipy>=1.11.4,<2 ; extra == 'test'
   - transformers>=4.30.1,<5 ; extra == 'test'
   requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/b7/20/e025aa3fa2ee33ee6a4871aa5a9e10b05472913adaff649ba21f2c98291d/nvidia_libnvcomp_cu12-5.3.0.16-py3-none-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+  name: nvidia-libnvcomp-cu12
+  version: 5.3.0.16
+  sha256: 535944be2e37ead56ad1ef80e9dd58a3126fc2ccf238ddffc9d1cb7a48f5300a
 - pypi: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
   name: six
   version: 1.17.0
@@ -10676,6 +10724,10 @@ packages:
   requires_dist:
   - pyobjc-framework-cocoa ; sys_platform == 'darwin' and extra == 'macos-listener'
   requires_python: '>=3.6'
+- pypi: https://files.pythonhosted.org/packages/f3/7a/1ba038e15e7256019ecb23d52d6310fe9e1d24fe92074ee89c066ca0ac58/nvidia_libnvcomp_cu12-5.3.0.16-py3-none-win_amd64.whl
+  name: nvidia-libnvcomp-cu12
+  version: 5.3.0.16
+  sha256: 6b64abe9b7e64f5b2ceee7adf62af0ff6e4307a7cb0b20f51e9bf6d4387ec5d9
 - pypi: https://files.pythonhosted.org/packages/f3/a6/b4081e2d04e1541abf82785ac9e5178a494c19330391f551356c8c18b7b3/torchvision-0.28.0-cp313-cp313-win_amd64.whl
   name: torchvision
   version: 0.28.0

@@ -94,11 +94,13 @@ cuda = [
 cuda12 = [
     "onetrainer[cuda]",
     "nvidia-nccl-cu12==2.29.7; sys_platform == 'linux'",
+    "nvidia-nvcomp-cu12==5.3.0.16",
 ]
 
 cuda13 = [
     "onetrainer[cuda]",
     "nvidia-nccl-cu13==2.29.7; sys_platform == 'linux'",
+    "nvidia-nvcomp-cu13==5.3.0.16",
 ]
 
 rocm = [
