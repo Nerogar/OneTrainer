@@ -253,16 +253,28 @@ def enable_checkpointing(
             "weights from the checkpoint on each use, discarding training updates. Enable 'Cache In RAM' for this "
             "component")
 
+    # simplex is a layer-offloading mode, so with layer offloading off there is no conductor to give the buffer to
+    # and the switch does nothing -- a stale setting rather than a bad one, so read it as inactive instead of
+    # rejecting the combinations below against constraints that would never apply.
+    simplex = part.simplex_offloading and supports_offloading and part.offload_fraction > 0
+    if simplex:
+        if config.part_trained_in_place(part):
+            raise NotImplementedError(
+                "a fully fine-tuned component cannot use 'Simplex Offloading': its weights live in a RAM buffer that "
+                "is filled from the checkpoint, so in-place training updates would be discarded. Disable 'Simplex "
+                "Offloading' for this component")
+        if not config.stream_from_disk:
+            raise NotImplementedError(
+                "'Simplex Offloading' requires 'Stream From Disk': the RAM buffer is filled from the streamed "
+                "weights. Enable 'Stream From Disk' on the model page, or disable 'Simplex Offloading' for this "
+                "component")
+
     if not part.checkpointing_or_offloading_enabled() and not compile:
         return None
 
     # a conductor exists iff this part actually offloads: the user enabled it (part.offloading_enabled()) and the
     # architecture can be driven by the conductor (supports_offloading).
     offload = supports_offloading and part.offloading_enabled()
-    # the full-model-buffer offload (simplex) needs a never-changing base (part not trained in place), a disk-streamed
-    # part, and cache_in_ram to keep it resident. Compute the full condition here rather than passing a value the
-    # conductor would only AND away.
-    simplex = not config.part_trained_in_place(part) and config.stream_from_disk and part.cache_in_ram
     conductor = LayerOffloadConductor(model, config, part, simplex=simplex) if offload else None
     checkpointing = part.checkpointing_enabled()
 
