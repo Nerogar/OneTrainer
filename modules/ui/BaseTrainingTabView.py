@@ -455,6 +455,11 @@ class BaseTrainingTabView(ABC):
             self.components.entry(frame, row, 1, ui_state, f"{part}.offload_fraction")
             row += 1
 
+            self.components.label(frame, row, 0, "Simplex Offloading",
+                                  tooltip="Holds this component's weights in a single RAM buffer, so an offloaded layer never has to be copied back to RAM. Faster, but costs RAM for the whole component instead of only its offloaded layers. Not available for a fully fine-tuned component.")
+            self.components.switch(frame, row, 1, ui_state, f"{part}.simplex_offloading")
+            row += 1
+
         if supports_activation_offloading:
             self.components.label(frame, row, 0, "Offload Activations",
                                   tooltip="Offloads this component's activations to CPU during training to reduce VRAM usage")

@@ -322,10 +322,10 @@ class FullModelTensorAllocator:
 
 
 class FullModelLayerAllocator:
-    # Temp/CPU-side sibling of StaticLayerAllocator, selected in simplex mode. A single flat, permanent pinned
-    # buffer holds every layer's packed weights for the model's lifetime; offload is a pointer swap into that
-    # buffer, so no device->host copy ever runs on the hot path. The buffer is filled once, at materialize, by
-    # an explicit GPU->CPU copy.
+    # Temp/CPU-side sibling of StaticLayerAllocator, selected in simplex mode. A single flat pinned buffer holds
+    # every layer's packed weights; offload is a pointer swap into that buffer, so no device->host copy ever runs
+    # on the hot path. It is filled at materialize by an explicit GPU->CPU copy, and survives evict only while
+    # cache_in_ram is on -- with it off the buffer is freed with the weights and refilled from a fresh stream.
     device: torch.device
 
     def __init__(self, device: torch.device):
@@ -342,8 +342,9 @@ class FullModelLayerAllocator:
         return len(self.__slots) > 0
 
     def allocate_cache(self, layers: list[nn.Module], target_bytes: int, streaming: bool, cache_in_ram: bool):
-        # create the full-model buffer once; (re)pin on every activate. target_bytes is ignored -- every layer is
-        # permanently resident, so the buffer is sized to the exact packed-weight footprint plus alignment.
+        # create the full-model buffer if there is none; (re)pin on every activate. target_bytes is ignored -- every
+        # layer is resident for as long as the part is materialized, so the buffer is sized to the exact
+        # packed-weight footprint plus alignment.
         if self.__buffer is None:
             total_tensors = 0
             total_bytes = 0
@@ -392,7 +393,8 @@ class FullModelLayerAllocator:
             self.__is_buffer_pinned = False
 
     def free(self):
-        # releases the buffer and every slot. Reached only on the error rollback to meta.
+        # releases the buffer and every slot. Reached from the evict to meta -- the cache_in_ram-off eviction and the
+        # error rollback.
         self.deactivate_cache()
         self.__buffer = None
         self.__fill_offset = 0
@@ -934,16 +936,15 @@ class LayerOffloadConductor:
 
                 if self.__simplex_active:
                     if not already_filled:
-                        # first materialize: bring the layer in, then copy each weight into its permanent slot in
-                        # the full-model CPU buffer -- a GPU->CPU copy that runs exactly once for the model's life.
+                        # the buffer is empty: bring the layer in, then copy each weight into its slot in the
+                        # full-model CPU buffer -- a GPU->CPU copy that runs once per fill of the buffer.
                         bring_to_train_device(layer, layer_index)
                         for module in layer.modules():
                             for tensor in get_offload_tensors(module):
                                 tensor.data = self.__temp_device_layer_allocator.fill(tensor)
                     else:
-                        # re-activate: the weights still live in the permanent CPU buffer; the evict only freed the
-                        # GPU ring their .data viewed, so re-point each weight at its surviving slot -- no copy, no
-                        # stream.
+                        # the buffer survived the evict, which freed only the GPU ring the weights viewed, so
+                        # re-point each weight at its surviving slot -- no copy, no stream.
                         for module in layer.modules():
                             for tensor in get_offload_tensors(module):
                                 tensor.data = self.__temp_device_layer_allocator.slot_for(tensor)
