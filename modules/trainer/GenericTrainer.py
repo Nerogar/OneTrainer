@@ -666,7 +666,9 @@ class GenericTrainer(BaseTrainer):
                 torch.clear_autocast_cache()
                 self.model.optimizer.train()
 
-            torch_gc()
+            # no torch_gc here: setup_train_device above ends in materialize_only(), which collects whenever a
+            # part actually moved. On an epoch that changed nothing (the usual case once the caches are warm)
+            # there is nothing to reclaim, and this collection cost ~350ms of the epoch gap on a large model.
 
             if lr_scheduler is None:
                 lr_scheduler = create.create_lr_scheduler(

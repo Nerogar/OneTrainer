@@ -1,3 +1,4 @@
+import contextlib
 import json
 import logging
 import os
@@ -71,6 +72,20 @@ def __stream_reader(
         out_queue.put(e)
     finally:
         out_queue.put(done)
+
+
+def _drop_page_cache(paths: set[str]):
+    # Releases the shards' page cache so it cannot grow large enough to push the host-side offload buffers into swap.
+    # A later re-read of a shard costs far less than that. Linux only; elsewhere the cache is left alone.
+    if not hasattr(os, "posix_fadvise"):
+        return
+    for path in paths:
+        with contextlib.suppress(OSError):
+            fd = os.open(path, os.O_RDONLY)
+            try:
+                os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)
+            finally:
+                os.close(fd)
 
 
 def _intended_float_dtype(
@@ -225,6 +240,7 @@ def stream_module_from_checkpoint(
                 finished += 1
         for t in threads:
             t.join()
+        _drop_page_cache({key_to_file[key] for key, *_ in work})
 
     # tied weights (e.g. Qwen3 lm_head <-> embed_tokens) are saved once, so the target stays meta; fill it with an
     # independent clone of the source (not an alias -- in-place quantize would corrupt both), then quantize. Both keys
@@ -387,7 +403,13 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             if torch.is_floating_point(old_value):
                 old_type = type(old_value)
                 if not is_quantized_parameter(module, tensor_name):
-                    if dtype.is_quantized() or module_name in keep_in_fp32_modules:
+                    if module_name in keep_in_fp32_modules:
+                        value = value.to(dtype=train_dtype.torch_dtype())
+                    elif dtype.is_quantized() and type(module) is nn.Linear:
+                        # a plain Linear that the quantization layer filter excluded
+                        fallback_dtype = quantization.fallback_dtype if quantization is not None else DataType.BFLOAT_16
+                        value = value.to(dtype=fallback_dtype.torch_dtype())
+                    elif dtype.is_quantized():
                         value = value.to(dtype=train_dtype.torch_dtype())
                     else:
                         value = value.to(dtype=dtype.torch_dtype())
@@ -655,7 +677,13 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 if value is not None and torch.is_floating_point(value):
                     old_type = type(value)
                     if not is_quantized_parameter(module, tensor_name):
-                        if dtype.is_quantized() or module_name in keep_in_fp32_modules:
+                        if module_name in keep_in_fp32_modules:
+                            value = value.to(dtype=train_dtype.torch_dtype())
+                        elif dtype.is_quantized() and type(module) is nn.Linear:
+                            # a plain Linear that the quantization layer filter excluded
+                            fallback_dtype = quantization.fallback_dtype if quantization is not None else DataType.BFLOAT_16
+                            value = value.to(dtype=fallback_dtype.torch_dtype())
+                        elif dtype.is_quantized():
                             value = value.to(dtype=train_dtype.torch_dtype())
                         else:
                             value = value.to(dtype=dtype.torch_dtype())
