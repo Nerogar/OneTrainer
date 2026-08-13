@@ -375,6 +375,8 @@ class TrainConfig(BaseConfig):
     debug_dir: str
     workspace_dir: str
     cache_dir: str
+    huggingface_cache_dir: str
+    offline_mode: bool
     tensorboard: bool
     tensorboard_expose: bool
     tensorboard_always_on: bool
@@ -1030,6 +1032,8 @@ class TrainConfig(BaseConfig):
         data.append(("debug_dir", "debug", str, False))
         data.append(("workspace_dir", "workspace/run", str, False))
         data.append(("cache_dir", "workspace-cache/run", str, False))
+        data.append(("huggingface_cache_dir", "", str, False))
+        data.append(("offline_mode", False, bool, False))
         data.append(("tensorboard", True, bool, False))
         data.append(("tensorboard_expose", False, bool, False))
         data.append(("tensorboard_always_on", False, bool, False))

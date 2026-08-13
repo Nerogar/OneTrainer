@@ -51,10 +51,11 @@ class BaseWuerstchenSetup(
             model: WuerstchenModel,
             config: TrainConfig,
     ):
-        # Not routed through _setup_model_part: Wuerstchen's parts (prior_prior, decoder_*, effnet_encoder,
-        # prior_text_encoder) don't match the transformer/text_encoder/vae shape _setup_model_part assumes and
-        # take bespoke per-part contexts (stable-cascade prior fp16-disable, effnet bf16-on-fp16), so this
-        # setup is fully hand-rolled.
+        super().setup_optimizations(model, config)
+
+        # Hand-wired rather than via _setup_model_part: Wuerstchen's parts don't match the
+        # transformer/text_encoder/vae shape it assumes, and take bespoke per-part contexts
+        # (stable-cascade prior fp16-disable, effnet bf16-on-fp16).
         if config.prior.checkpointing_enabled():
             model.prior_prior.enable_gradient_checkpointing()
         enable_checkpointing_for_clip_encoder_layers(model.prior_text_encoder, config, config.text_encoder)
@@ -65,8 +66,6 @@ class BaseWuerstchenSetup(
             apply_circular_padding_to_conv2d(model.prior_prior)
             if model.prior_prior_lora is not None:
                 apply_circular_padding_to_conv2d(model.prior_prior_lora)
-
-        super().setup_optimizations(model, config)
 
         if model.model_type.is_stable_cascade():
             model.prior_autocast_context, model.prior_train_dtype = disable_fp16_autocast_context(
