@@ -17,6 +17,14 @@ import triton
 import triton.language as tl
 
 
+#Blackwell's block-scaled fp8 mma (mxf8f6f4) runs at the full 8-bit tensor core rate, the legacy
+#fp8 mma only at half rate. Pre-Blackwell has no such instruction and triton emulates
+#tl.dot_scaled with a bf16 mma, which is slower than plain tl.dot - so pick by compute capability.
+#On ROCm the capability is the gfx arch number and RDNA4 reports 12, so require CUDA
+def _prefer_mxfp8(device: torch.device) -> bool:
+    return torch.version.cuda is not None and torch.cuda.get_device_capability(device)[0] >= 12
+
+
 @triton.autotune(
     configs=[
         triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 128}, num_stages=4,num_warps=4),
@@ -56,6 +64,7 @@ def _mm_kernel(
         BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
         QUANTIZED_M,
         FLOAT: tl.constexpr,
+        MXFP8_MMA: tl.constexpr,
 ):
 
     pid_n = tl.program_id(axis=0)
@@ -78,13 +87,23 @@ def _mm_kernel(
 
     accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32 if FLOAT else tl.int32)
 
+    #the mma multiplies each group of 32 elements along K by one ue8m0 scale. ue8m0 is a bare
+    #exponent with bias 127, so the value 127 means a scale of 1.0 and every element is left
+    #unchanged - the result is the same as an unscaled fp8 matmul
+    if MXFP8_MMA:
+        a_scale = tl.full((BLOCK_SIZE_M, BLOCK_SIZE_K // 32), 127, dtype=tl.uint8)
+        b_scale = tl.full((BLOCK_SIZE_N, BLOCK_SIZE_K // 32), 127, dtype=tl.uint8)
+
     for k in range(tl.cdiv(K, BLOCK_SIZE_K)):
         a_mask = (offs_am[:, None] < M) & (offs_k[None, :] < K - k*BLOCK_SIZE_K)
         b_mask = (offs_bn[None, :] < N) & (offs_k[:, None] < K - k*BLOCK_SIZE_K)
         a = tl.load(a_ptrs, mask=a_mask, other=0.0)
         b = tl.load(b_ptrs, mask=b_mask, other=0.0)
 
-        accumulator = tl.dot(a, b, accumulator, out_dtype=tl.float32 if FLOAT else tl.int32)
+        if MXFP8_MMA:
+            accumulator = tl.dot_scaled(a, a_scale, "e4m3", b, b_scale, "e4m3", acc=accumulator)
+        else:
+            accumulator = tl.dot(a, b, accumulator, out_dtype=tl.float32 if FLOAT else tl.int32)
 
         a_ptrs += BLOCK_SIZE_K * stride_ak
         b_ptrs += BLOCK_SIZE_K * stride_bk
@@ -116,6 +135,7 @@ def mm_8bit(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
         b.stride(0), b.stride(1),
         c.stride(0), c.stride(1),
         QUANTIZED_M = M // 64,
-        FLOAT = FLOAT
+        FLOAT = FLOAT,
+        MXFP8_MMA = FLOAT and _prefer_mxfp8(a.device),
     )
     return c
