@@ -46,12 +46,13 @@ class BaseHunyuanVideoSetup(
             config: TrainConfig,
     ):
         super().setup_optimizations(model, config)
-        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_hunyuan_video_transformer, disable_fp16_autocast=True, attention_mask=True)
+        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_hunyuan_video_transformer, disable_fp16_autocast=True)
         self._setup_model_part(model, config, "text_encoder_1", config.text_encoder, enable_checkpointing_for_llama_encoder_layers)
         self._setup_model_part(model, config, "text_encoder_2", config.text_encoder_2, enable_checkpointing_for_clip_encoder_layers)
         self._setup_model_part(model, config, "vae", config.vae)
 
         model.vae.enable_tiling()
+        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=True)
 
     def _setup_embeddings(
             self,

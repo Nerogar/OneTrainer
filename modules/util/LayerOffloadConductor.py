@@ -3,6 +3,7 @@ import random
 from collections.abc import Callable
 from typing import Any
 
+from modules.module.quantized.mixin.CompressedWeightMixin import CompressedWeightMixin
 from modules.util.config.TrainConfig import TrainConfig, TrainModelPartConfig
 from modules.util.disk_stream import _is_evicted, evict_to_meta
 from modules.util.enum.DataType import DataType
@@ -11,6 +12,7 @@ from modules.util.quantization_util import (
     get_offload_tensors,
     is_quantized_module,
     offload_quantized,
+    report_compression,
 )
 from modules.util.torch_util import (
     create_mem_pool,
@@ -88,8 +90,8 @@ class StaticLayerTensorAllocator:
         if self.__allocate_forward:
             cache_tensor_index = self.__allocation_end // cache_tensor_size
             # never hand out views at storage_offset 0: torch.compile creates a 0/1-specialized
-            # symbol for the storage_offset of any tensor with a dynamic dim, so an offset-0 view
-            # needs its own graph while one "2 <= offset" guard covers all
+            # symbol for the storage_offset of any tensor with a dynamic dim (compressed weights),
+            # so an offset-0 view needs its own graph while one "2 <= offset" guard covers all
             # other placements. keeping every view past the first alignment slot avoids those
             # recompiles, and costs each tensor at most its alignment budget (the first tensor in a
             # cache tensor previously wasted 0 of it)
@@ -810,7 +812,16 @@ class LayerOffloadConductor:
     def offload_activated(self) -> bool:
         return self.__offload_activations or self.__offload_layers
 
-    def evict(self, to_meta: bool = False):
+    def evict(self, to_meta: bool = False) -> bool:
+        # returns whether anything was actually evicted, so the caller can skip its gc when nothing moved.
+        # Nothing is resident while __materialized is False, so every transfer wait, device walk and collection
+        # below would be pure overhead - and materialize_only() evicts every part it doesn't want on each call,
+        # so in steady state most of these are repeat evictions of an already evicted part. The rollback in
+        # materialize() calls __evict_to_temp/__evict_to_meta directly and so is unaffected by this guard: it
+        # has to run precisely when __materialized is still False but weights are resident.
+        if not self.__materialized:
+            return False
+
         torch_gc()
 
         self.__wait_all_layer_transfers()
@@ -819,10 +830,10 @@ class LayerOffloadConductor:
         log("to temp device")
 
         if to_meta:
-            if self.__materialized:
-                self.__evict_to_meta()
+            self.__evict_to_meta()
         else:
             self.__evict_to_temp()
+        return True
 
     def __evict_to_temp(self):
         # move every layer and the non-layer remainder back to the temp device and free the static caches (the
@@ -850,7 +861,16 @@ class LayerOffloadConductor:
 
     def materialize(
             self, train_dtype: DataType | None = None, name: str | None = None,
-            materialize_fn: Callable | None = None, cache_in_ram: bool = True):
+            materialize_fn: Callable | None = None, cache_in_ram: bool = True) -> bool:
+        # returns whether anything was actually materialized. Already-materialized is the steady state at every
+        # epoch boundary, where setup_train_device re-states what it wants without anything having moved: the
+        # allocators would find their caches allocated and every layer already mapped, so the whole body below
+        # is a walk that changes nothing. The torch_gc is deliberately inside the guard rather than at the top:
+        # it is a pre-allocation collect (the layer ring and the full-model buffer are allocated below), so it
+        # is only worth its cost when an allocation actually follows.
+        if self.__materialized:
+            return False
+
         torch_gc()
 
         self.__wait_all_layer_transfers()
@@ -861,6 +881,8 @@ class LayerOffloadConductor:
         log("to train device")
 
         try:
+            self.__measure_compressed_sizes(materialize_fn, train_dtype, name)
+
             self.__offload_strategy = LayerOffloadStrategy(self.__layers, self.__layer_offload_fraction)
 
             if self.__simplex_active and not streaming:
@@ -976,6 +998,7 @@ class LayerOffloadConductor:
             raise
 
         self.__materialized = True
+        return True
 
     def add_layer(self, layer: nn.Module, included_offload_param_indices: list[int] = None):
         if included_offload_param_indices is None:
@@ -1085,6 +1108,29 @@ class LayerOffloadConductor:
         if self.__async_transfer:
             event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
             self.__layer_train_event_map[layer_index] = event
+
+    def __measure_compressed_sizes(self, materialize_fn: Callable | None, train_dtype: DataType, name: str):
+        # a compressed weight's blob length is data-dependent, so the arenas cannot be sized before every layer has
+        # been compressed once, and sizing them from the uncompressed footprint would cancel the saving. Stream each
+        # layer, compress it, keep the measured length and drop it back to meta: one extra streaming pass, no peak
+        # memory. The lengths outlive evict_to_meta and ANS is deterministic on the same bytes, so this runs once.
+        if materialize_fn is None:
+            return
+        # a resident layer's weights are live, so get_offload_tensor_bytes already measures its real tensors
+        unsized = [i for i, layer in enumerate(self.__layers)
+                   if _is_evicted(layer) and any(isinstance(m, CompressedWeightMixin)
+                                                 and m.compress and m.compressed_bytes() is None
+                                                 for m in layer.modules())]
+        if not unsized:
+            return
+
+        for layer_index in tqdm(unsized, unit="layer", desc=f"measuring compressed size of {name}", leave=False):
+            layer = self.__layers[layer_index]
+            materialize_fn(layer, self.__train_device, train_dtype, self.__disk_layer_key_prefixes[layer_index])
+            evict_to_meta(layer)
+        torch_gc()
+        # the streamed path never reaches quantize_layers' report, so emit the same line here
+        report_compression(self.__module)
 
     def __get_loaded_layers(self) -> list[int]:
         return [i for i in range(len(self.__layers)) if device_equals(self.__layer_device_map[i], self.__train_device)]

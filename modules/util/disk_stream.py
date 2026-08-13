@@ -2,6 +2,7 @@ from collections.abc import Callable
 
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.util.enum.DataType import DataType
+from modules.util.quantization_util import report_compression
 from modules.util.torch_util import torch_gc
 
 import torch
@@ -70,9 +71,10 @@ def stream_module_to(
         cache_in_ram: bool,
         name: str,
         temp_device: torch.device,
-):
+) -> bool:
     # module.to()-style entry point for a materialize-on-demand component; see the module-level comment for the
-    # materialize/evict semantics. Idempotent; train_dtype is used only when materializing.
+    # materialize/evict semantics. Idempotent; train_dtype is used only when materializing. Returns whether any
+    # weight actually moved, so the caller can skip the collection that follows an eviction that did nothing.
     if device.type not in ("meta", temp_device.type):
         # target is the compute device -> materialize the module onto it
         current = _current_device(module)
@@ -80,11 +82,15 @@ def stream_module_to(
             if current.type == "meta":
                 # cold: stream+quantize the weights from the checkpoint onto the compute device
                 materialize_fn(module, device, train_dtype, part_name=name)
+                # quantize_layers reports the saving for a resident component; a streamed one never goes through it
+                report_compression(module)
+                return True
             elif current.type == temp_device.type:
                 # warm (cache_in_ram): the quantized weights are staged resident on the temp device, move them back to
                 # the compute device. Dispatch on device *type* (not equality) so a module already on the compute
                 # device isn't dragged through module.to(), which would raise on the non-persistent buffers left on meta.
                 module.to(device=device)
+                return True
         except Exception:
             # a materialize that fails partway (typically OOM) leaves already-streamed weights resident on the compute
             # device -- live model state torch_gc can't reclaim, which can cascade into a second OOM. Roll back along the
@@ -98,12 +104,16 @@ def stream_module_to(
             else:
                 module.to(device=current)
             raise
+        return False
     elif not cache_in_ram:
         if not _is_evicted(module):
             evict_to_meta(module)
+            return True
     else:
         # cache_in_ram: stage the resident quantized weights on the temp device. Only when currently on the compute
         # device -- a module still on meta (never materialized) has nothing resident to stage and .to() can't move meta,
         # so it stays a no-op here and streams from the checkpoint on its first materialize.
         if _current_device(module).type not in (device.type, "meta"):
             module.to(device=device)
+            return True
+    return False

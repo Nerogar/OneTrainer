@@ -351,6 +351,7 @@ class QuantizationConfig(BaseConfig):
     layer_filter: str
     layer_filter_preset: str
     layer_filter_regex: bool
+    fallback_dtype: DataType
     svd_dtype: DataType
     svd_rank: int
     cache_dir: str
@@ -363,6 +364,7 @@ class QuantizationConfig(BaseConfig):
         data.append(("layer_filter", "", str, False))
         data.append(("layer_filter_preset", "full", str, False))
         data.append(("layer_filter_regex", False, bool, False))
+        data.append(("fallback_dtype", DataType.BFLOAT_16, DataType, False))
         data.append(("svd_dtype", DataType.NONE, DataType, False))
         data.append(("svd_rank", 16, int, False))
         data.append(("cache_dir", None, str, True))
@@ -375,6 +377,8 @@ class TrainConfig(BaseConfig):
     debug_dir: str
     workspace_dir: str
     cache_dir: str
+    huggingface_cache_dir: str
+    offline_mode: bool
     tensorboard: bool
     tensorboard_expose: bool
     tensorboard_always_on: bool
@@ -1030,6 +1034,8 @@ class TrainConfig(BaseConfig):
         data.append(("debug_dir", "debug", str, False))
         data.append(("workspace_dir", "workspace/run", str, False))
         data.append(("cache_dir", "workspace-cache/run", str, False))
+        data.append(("huggingface_cache_dir", "", str, False))
+        data.append(("offline_mode", False, bool, False))
         data.append(("tensorboard", True, bool, False))
         data.append(("tensorboard_expose", False, bool, False))
         data.append(("tensorboard_always_on", False, bool, False))

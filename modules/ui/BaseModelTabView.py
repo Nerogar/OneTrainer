@@ -6,6 +6,8 @@ from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.PathIOType import PathIOType
 
+from huggingface_hub.constants import HF_HUB_CACHE
+
 
 class BaseModelTabView(ABC):
     def __init__(self, components):
@@ -40,6 +42,7 @@ class BaseModelTabView(ABC):
             has_text_encoder_4="text_encoder_4" in parts,
             allow_override_text_encoder_4="text_encoder_4" in parts,
             has_vae="vae" in parts,
+            include_compressed=model_type.supports_compression(),
         )
         if "effnet_encoder" in parts:
             row = self.__create_effnet_encoder_components(frame, row, ui_state)
@@ -53,20 +56,23 @@ class BaseModelTabView(ABC):
             ui_state,
         )
 
-    def __create_dtype_options(self, include_gguf: bool = False, include_a8: bool = False) -> list[tuple[str, DataType]]:
+    def __create_dtype_options(self, include_gguf: bool = False, include_a8: bool = False,
+                               include_compressed: bool = False) -> list[tuple[str, DataType]]:
         options = [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
             ("float8 (W8)", DataType.FLOAT_8),
-            # ("int8", DataType.INT_8),  # TODO: reactivate when the int8 implementation is fixed in bitsandbytes: https://github.com/bitsandbytes-foundation/bitsandbytes/issues/1332
             ("nfloat4", DataType.NFLOAT_4),
         ]
+
         if include_a8:
-            options += [
-                ("float W8A8", DataType.FLOAT_W8A8),
-                ("int W8A8", DataType.INT_W8A8),
-            ]
+            options.append(("float W8A8", DataType.FLOAT_W8A8))
+            if include_compressed:
+                options.append(("float W8A8 compressed", DataType.FLOAT_W8A8_COMPRESSED))
+            options.append(("int W8A8", DataType.INT_W8A8))
+            if include_compressed:
+                options.append(("int W8A8 compressed", DataType.INT_W8A8_COMPRESSED))
 
         if include_gguf:
             options.append(("GGUF", DataType.GGUF))
@@ -85,6 +91,25 @@ class BaseModelTabView(ABC):
                                  "Go to https://huggingface.co/settings/tokens to create an access token.",
                          wide_tooltip=True)
         self.components.entry(frame, row, 1, ui_state, "secrets.huggingface_token")
+
+        # offline mode
+        self.components.label(frame, row, 3, "Offline Mode",
+                         tooltip="Skip the Hugging Face login and resolve every model from the local cache only. "
+                                 "Enable this when you have no internet connection; only already-downloaded models can be loaded.",
+                         wide_tooltip=True)
+        self.components.switch(frame, row, 4, ui_state, "offline_mode")
+
+        row += 1
+
+        # huggingface cache directory
+        self.components.label(frame, row, 0, "Hugging Face Cache Directory",
+                         tooltip="Directory used to cache Hugging Face model downloads. "
+                                 "Leave empty to use the default Hugging Face cache directory shown as the placeholder.",
+                         wide_tooltip=True)
+        self.components.path_entry(
+            frame, row, 1, ui_state, "huggingface_cache_dir",
+            mode="dir", placeholder=HF_HUB_CACHE,
+        )
 
         row += 1
 
@@ -131,16 +156,8 @@ class BaseModelTabView(ABC):
             has_text_encoder_3: bool = False,
             has_text_encoder_4: bool = False,
             has_vae: bool = False,
+            include_compressed: bool = False,
     ) -> int:
-        if has_unet:
-            # unet weight dtype
-            self.components.label(frame, row, 3, "UNet Data Type",
-                             tooltip="The unet weight data type")
-            self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True),
-                                  ui_state, "unet.weight_dtype")
-
-            row += 1
-
         if has_prior:
             if allow_override_prior:
                 # prior model
@@ -159,35 +176,22 @@ class BaseModelTabView(ABC):
 
             row += 1
 
-        if has_transformer:
-            if allow_override_transformer:
-                # transformer model
-                self.components.label(frame, row, 0, "Override Transformer / GGUF",
-                                 tooltip="Can be used to override the transformer in the base model. Safetensors and GGUF files are supported, local and on Huggingface. If a GGUF file is used, the DataType must also be set to GGUF")
-                self.components.path_entry(
-                    frame, row, 1, ui_state, "transformer.model_name",
-                    mode="file", path_modifier=path_util.json_path_modifier
-                )
-
-            # transformer weight dtype
-            self.components.label(frame, row, 3, "Transformer Data Type",
-                             tooltip="The transformer weight data type")
-            self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_gguf=True, include_a8=True),
-                                  ui_state, "transformer.weight_dtype")
-
-            row += 1
-
-        if has_unconditional_transformer:
-            # unconditional transformer weight dtype
-            self.components.label(frame, row, 3, "Unconditional Transformer Data Type",
-                             tooltip="The weight data type of the unconditional transformer, used for the negative branch of CFG during sampling")
-            self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True),
-                                  ui_state, "unconditional_transformer.weight_dtype")
+        if has_transformer and allow_override_transformer:
+            # transformer model
+            self.components.label(frame, row, 0, "Override Transformer / GGUF",
+                             tooltip="Can be used to override the transformer in the base model. Safetensors and GGUF files are supported, local and on Huggingface. If a GGUF file is used, the DataType must also be set to GGUF")
+            self.components.path_entry(
+                frame, row, 1, ui_state, "transformer.model_name",
+                mode="file", path_modifier=path_util.json_path_modifier
+            )
 
             row += 1
 
         presets = controller.get_presets()
 
+        # Quantization Layer Filter (col 0/1) is a tall widget (preset row, custom entry row, regex row).
+        # UNet/Transformer Data Type and the quantization Fallback Data Type share this row too (col 3/4),
+        # lined up so the data type row matches the preset row, and the fallback row matches the entry row.
         self.components.label(frame, row, 0, "Quantization")
         self.components.layer_filter_entry(frame, row, 1, ui_state,
             preset_var_name="quantization.layer_filter_preset", presets=presets,
@@ -200,7 +204,38 @@ class BaseModelTabView(ABC):
             frame_color="transparent",
         )
 
-        # SVDQuant - create vertical grids to match the size of layer_filter_entry
+        if has_unet or has_transformer:
+            dtype_label_frame = self.components.inline_frame(frame, row, 3)
+            dtype_entry_frame = self.components.inline_frame(frame, row, 4)
+
+            if has_unet:
+                self.components.label(dtype_label_frame, 0, 0, "UNet Data Type",
+                                 tooltip="The unet weight data type")
+                self.components.options_kv(dtype_entry_frame, 0, 0, self.__create_dtype_options(include_a8=True, include_compressed=include_compressed),
+                                      ui_state, "unet.weight_dtype")
+            else:
+                self.components.label(dtype_label_frame, 0, 0, "Transformer Data Type",
+                                 tooltip="The transformer weight data type")
+                self.components.options_kv(dtype_entry_frame, 0, 0, self.__create_dtype_options(include_gguf=True, include_a8=True, include_compressed=include_compressed),
+                                      ui_state, "transformer.weight_dtype")
+
+            self.components.label(dtype_label_frame, 1, 0, "Fallback Data Type",
+                             tooltip="The weight data type used for layers excluded by the quantization layer filter. Can itself be a quantized type.")
+            self.components.options_kv(dtype_entry_frame, 1, 0, self.__create_dtype_options(include_a8=True, include_compressed=include_compressed),
+                                  ui_state, "quantization.fallback_dtype")
+
+        row += 1
+
+        if has_unconditional_transformer:
+            # unconditional transformer weight dtype
+            self.components.label(frame, row, 3, "Unconditional Transformer Data Type",
+                             tooltip="The weight data type of the unconditional transformer, used for the negative branch of CFG during sampling")
+            self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True, include_compressed=include_compressed),
+                                  ui_state, "unconditional_transformer.weight_dtype")
+
+            row += 1
+
+        # SVDQuant
         svd_label_frame, svd_entry_frame = self._make_svd_frames(frame, row)
         self.components.label(svd_label_frame, 0, 0, "SVDQuant",
                          tooltip="What datatype to use for SVDQuant weights decomposition.")

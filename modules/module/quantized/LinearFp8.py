@@ -34,8 +34,9 @@ class LinearFp8(
         return weight_bytes + bias_bytes
 
     def unquantized_weight(self, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
+        # 'scale' is not offloaded, so it can sit on the train device while 'weight' is parked on the temp device
         if self.scale is not None:
-            return self.weight.detach().to(dtype) * self.scale.to(dtype=dtype)
+            return self.weight.detach().to(dtype) * self.scale.to(dtype=dtype, device=self.weight.device)
         else:
             return self.weight.detach().to(dtype=dtype)
 

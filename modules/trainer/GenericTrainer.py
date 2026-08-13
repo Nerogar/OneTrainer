@@ -1,4 +1,3 @@
-import contextlib
 import copy
 import json
 import math
@@ -16,11 +15,11 @@ from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
-from modules.util import create, path_util
+from modules.util import create, huggingface_util, path_util
 from modules.util.bf16_stochastic_rounding import set_seed as bf16_stochastic_rounding_set_seed
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.compile_util import init_compile
+from modules.util.compile_util import init_compile, reset_compile
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
@@ -42,9 +41,13 @@ from torch.utils.hooks import RemovableHandle
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
 
-import huggingface_hub
-from requests.exceptions import ConnectionError
 from tqdm import tqdm
+
+# OT_DEBUG_PROFILES=1 dumps a CUDA memory snapshot for the first two steps, where the allocator is still
+# growing, and a profiler trace at steps 10 and 40, past compilation and warmup.
+_DEBUG_PROFILES = os.environ.get("OT_DEBUG_PROFILES") == "1"
+_MEMORY_PROFILE_STEPS = (0, 1) if _DEBUG_PROFILES else ()
+_PROFILE_STEPS = (10, 11, 40, 41) if _DEBUG_PROFILES else ()
 
 
 class GenericTrainer(BaseTrainer):
@@ -68,6 +71,7 @@ class GenericTrainer(BaseTrainer):
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
         super().__init__(config, callbacks, commands)
         # torch._dynamo.config overrides are thread-local, so init_compile() must be called in the training thread/process.
+        reset_compile()
         init_compile()
 
         if multi.is_master():
@@ -115,10 +119,12 @@ class GenericTrainer(BaseTrainer):
             else:
                 print("No backup found, continuing without backup...")
 
-        if self.config.secrets.huggingface_token != "":
-            self.callbacks.on_update_status("logging into Hugging Face")
-            with contextlib.suppress(ConnectionError):
-                huggingface_hub.login(token=self.config.secrets.huggingface_token)
+        huggingface_util.configure_hub(
+            self.config.secrets.huggingface_token,
+            offline_mode=self.config.offline_mode,
+            cache_dir=self.config.huggingface_cache_dir,
+            on_status=self.callbacks.on_update_status,
+        )
 
         self.callbacks.on_update_status("loading the model")
 
@@ -660,7 +666,9 @@ class GenericTrainer(BaseTrainer):
                 torch.clear_autocast_cache()
                 self.model.optimizer.train()
 
-            torch_gc()
+            # no torch_gc here: setup_train_device above ends in materialize_only(), which collects whenever a
+            # part actually moved. On an epoch that changed nothing (the usual case once the caches are warm)
+            # there is nothing to reclaim, and this collection cost ~350ms of the epoch gap on a large model.
 
             if lr_scheduler is None:
                 lr_scheduler = create.create_lr_scheduler(
@@ -727,8 +735,8 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_status("Training ...")
 
                 with (
-                    TorchMemoryRecorder(enabled=False, filename=f"memory-step{train_progress.global_step}-{get_string_timestamp()}.pickle"),
-                    TorchProfiler      (enabled=False, filename=f"profile-step{train_progress.global_step}-{get_string_timestamp()}.json"),
+                    TorchMemoryRecorder(enabled=multi.is_master() and train_progress.global_step in _MEMORY_PROFILE_STEPS, filename=f"memory-step{train_progress.global_step}-{get_string_timestamp()}.pickle"),
+                    TorchProfiler      (enabled=multi.is_master() and train_progress.global_step in _PROFILE_STEPS, filename=f"profile-step{train_progress.global_step}-{get_string_timestamp()}.json"),
                 ):
                     step_seed = train_progress.global_step
                     bf16_stochastic_rounding_set_seed(step_seed, train_device)

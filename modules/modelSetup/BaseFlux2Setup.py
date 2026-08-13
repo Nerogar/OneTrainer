@@ -44,9 +44,11 @@ class BaseFlux2Setup(
         text_encoder_checkpointing_fn = enable_checkpointing_for_mistral_encoder_layers if model.is_dev() \
             else enable_checkpointing_for_qwen3_encoder_layers
         super().setup_optimizations(model, config)
-        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_flux2_transformer, attention_mask=False)
+        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_flux2_transformer)
         self._setup_model_part(model, config, "text_encoder", config.text_encoder, text_encoder_checkpointing_fn, disable_fp16_autocast=True)
         self._setup_model_part(model, config, "vae", config.vae)
+
+        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=False)
 
     def predict(
             self,

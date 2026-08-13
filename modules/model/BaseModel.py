@@ -24,6 +24,21 @@ from torch.optim import Optimizer
 from transformers import PreTrainedTokenizer
 
 
+def _module_is_on(module: torch.nn.Module | LoRAModuleWrapper, device: torch.device) -> bool:
+    # Read a module's residency off its first tensor (parameters first, buffers for a parameterless module).
+    # module.to() is already a per-tensor no-op when the device matches, but whether it moved anything has to be
+    # known before the call to decide whether the collection afterwards is worth running. One tensor is enough:
+    # the modules asked here are moved as a unit by the branch below, so they are never split across devices.
+    # Both callers are duck-typed on .to(): a LoRAModuleWrapper is not an nn.Module, returns a plain list from
+    # parameters() (hence iter(), not next() on it directly) and has no buffers() at all.
+    tensor = next(iter(module.parameters()), None)
+    if tensor is None and hasattr(module, "buffers"):
+        tensor = next(iter(module.buffers()), None)
+    if tensor is None:
+        return True  # nothing to move, so it is trivially where it was asked to be
+    return device_equals(tensor.device, device)
+
+
 class BaseModelEmbedding:
     def __init__(
             self,
@@ -123,9 +138,15 @@ class BaseModel(metaclass=ABCMeta):
 
     def evict(self, *parts: str):
         # Move `parts` onto temp_device. No parts given -> every component in ModelType.model_parts().
+        # Collect once at the end, and only if something was actually freed: materialize_only() evicts every
+        # part it doesn't want on every call, so most evictions here are of parts that are already evicted and
+        # have nothing to reclaim. Each part reports whether it moved rather than the model tracking residency,
+        # so the answer always comes from the component that did (or didn't) do the move.
+        moved = False
         for part in parts or self.model_type.model_parts():
-            self._move_part(part, self.temp_device)
-        torch_gc()
+            moved |= self._move_part(part, self.temp_device)
+        if moved:
+            torch_gc()
 
     def materialize_only(self, *parts: str):
         # Materialize exactly `parts` on train_device; evict every other component in ModelType.model_parts()
@@ -142,28 +163,33 @@ class BaseModel(metaclass=ABCMeta):
         # call this before encode_text, which reads every text encoder the model has.
         self.materialize_only(*self.model_type.text_encoder_parts())
 
-    def _move_part(self, part: str, device: torch.device):
+    def _move_part(self, part: str, device: torch.device) -> bool:
         # Move a component (`part`, or `part_1` for the first of several split text encoders) and its LoRA. The
         # dispatch below routes through an offload conductor and/or a disk-stream materialize closure if present.
+        # Returns whether any weight actually moved: each of the three paths is idempotent and a repeat call is
+        # common (materialize_only states a set, not a delta), so the caller needs to know whether this one did
+        # anything before paying for a collection.
         stem = f"{part}_1" if hasattr(self, f"{part}_1") else part
 
         conductor = self.offload_conductor.get(stem)
         materialize_fn = self.materialize_fn.get(stem)
         cache_in_ram = self.cache_in_ram.get(stem, True)
 
+        moved = False
         if conductor is not None:
-            if device_equals(device, self.train_device):
+            if device_equals(device, self.temp_device):
+                to_meta = materialize_fn is not None and not cache_in_ram
+                moved = conductor.evict(to_meta=to_meta)
+            else:
+                assert device_equals(device, self.train_device), f"unexpected device {device} for part {part}"
                 train_dtype = getattr(self, f"{stem}_train_dtype", self.train_dtype)
-                conductor.materialize(
+                moved = conductor.materialize(
                     train_dtype, name=part, materialize_fn=materialize_fn,
                     cache_in_ram=cache_in_ram)
-            else:
-                to_meta = materialize_fn is not None and not cache_in_ram
-                conductor.evict(to_meta=to_meta)
         elif materialize_fn is not None:
             streamed_component = getattr(self, stem)
             train_dtype = getattr(self, f"{stem}_train_dtype", self.train_dtype)
-            stream_module_to(
+            moved = stream_module_to(
                 streamed_component, device, materialize_fn, train_dtype,
                 cache_in_ram=cache_in_ram, name=part, temp_device=self.temp_device)
 
@@ -177,7 +203,9 @@ class BaseModel(metaclass=ABCMeta):
         to_move.append(lora)
         to_move = [module for module in to_move if module is not None]
         if not to_move:
-            return
+            return moved
+
+        moved |= any(not _module_is_on(module, device) for module in to_move)
 
         if supports_mem_pool(device):
             # The component (when not conductor/stream-managed) and its LoRA share a per-stem MemPool so both release
@@ -195,6 +223,8 @@ class BaseModel(metaclass=ABCMeta):
             for module in to_move:
                 module.to(device=device)
             self._mem_pools.pop(stem, None)
+
+        return moved
 
     def eval(self):
         # Put every present component on eval(); driven by the same part registry as materialize()/evict().
