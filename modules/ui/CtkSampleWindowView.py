@@ -59,7 +59,18 @@ class CtkSampleWindowView(BaseSampleWindowView, ctk.CTkToplevel):
         )
 
         image_label = ctk.CTkLabel(master=self, text="", image=self.image, height=512, width=512)
-        image_label.grid(row=1, column=1, rowspan=3, sticky="nsew")
+        image_label.grid(row=1, column=1, rowspan=2, sticky="nsew")
+
+        # gallery navigation, on the same row as the sample button
+        self.nav_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.prev_button = ctk.CTkButton(self.nav_frame, text="◀", width=40, command=lambda: self.__step_gallery(-1))
+        self.counter_label = ctk.CTkLabel(self.nav_frame, text="")
+        self.next_button = ctk.CTkButton(self.nav_frame, text="▶", width=40, command=lambda: self.__step_gallery(1))
+        self.prev_button.grid(row=0, column=0, padx=5)
+        self.counter_label.grid(row=0, column=1, padx=5)
+        self.next_button.grid(row=0, column=2, padx=5)
+        self.nav_frame.grid(row=3, column=1)
+        self.__render_gallery()
 
         self.progress = self.components.progress(self, 2, 0)
         self.components.button(self, 3, 0, "sample",
@@ -71,11 +82,24 @@ class CtkSampleWindowView(BaseSampleWindowView, ctk.CTkToplevel):
 
     def __update_preview(self, sampler_output: ModelSamplerOutput):
         if sampler_output.file_type == FileType.IMAGE:
-            image = sampler_output.data
+            self.gallery_add(sampler_output.data)
+            self.__render_gallery()
+
+    def __step_gallery(self, delta: int):
+        self.gallery_step(delta)
+        self.__render_gallery()
+
+    def __render_gallery(self):
+        image = self.gallery_current
+        if image is not None:
             self.image.configure(
                 light_image=image,
                 size=(image.width, image.height),
             )
+
+        self.counter_label.configure(text=f"{self.gallery_index + 1} / {self.gallery_count}")
+        self.prev_button.configure(state="normal" if self.gallery_index > 0 else "disabled")
+        self.next_button.configure(state="normal" if self.gallery_index < self.gallery_count - 1 else "disabled")
 
     def __update_progress(self, progress: int, max_progress: int):
         self.progress.set(progress / max_progress)
