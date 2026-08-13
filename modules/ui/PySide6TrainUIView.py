@@ -154,6 +154,10 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         QMessageBox.critical(self, "Cannot Start Training",
                              f"Please fix the following errors before training:\n\n{bullet_list}")
 
+    def confirm(self, title: str, message: str) -> bool:
+        buttons = QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
+        return QMessageBox.question(self, title, message, buttons) == QMessageBox.StandardButton.Ok
+
     def open_dataset_tool(self):
         self.wait_window(self.controller.open_dataset_tool(self, PySide6CaptionUIView))
 

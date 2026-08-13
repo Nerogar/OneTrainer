@@ -3,10 +3,12 @@ from contextlib import contextmanager
 
 from modules.model.BaseModel import BaseModel
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig, TrainModelPartConfig
+from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+from modules.util.quantization_util import quantize_layers
 from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
 
@@ -47,7 +49,9 @@ class BaseModelSetup(
             model: BaseModel,
             config: TrainConfig,
     ):
-        pass
+        # Leaves call super() first, so model.train_dtype is set before their _setup_model_part calls read it.
+        model.train_dtype = config.train_dtype
+        model.autocast_context = create_autocast_context(self.train_device, config.train_dtype, config.enable_autocast_cache)
 
     @abstractmethod
     def setup_model(
@@ -237,6 +241,35 @@ class BaseModelSetup(
                 for param in self.frozen_parameters[unique_name]:
                     param.requires_grad_(False)
 
+    def _setup_model_part(
+            self,
+            model,
+            config: TrainConfig,
+            attr: str,
+            config_part: TrainModelPartConfig,
+            checkpointing_fn=None,
+            *,
+            disable_fp16_autocast: bool = False,
+    ):
+        module = getattr(model, attr)
+        if module is None:
+            return
+
+        if checkpointing_fn is not None:
+            conductor = checkpointing_fn(module, config, config_part)
+            if conductor is not None:
+                setattr(model, f"{attr}_offload_conductor", conductor)
+
+        if disable_fp16_autocast:
+            autocast_context, train_dtype = disable_fp16_autocast_context(
+                self.train_device, config.train_dtype, config.fallback_train_dtype, config.enable_autocast_cache)
+            setattr(model, f"{attr}_autocast_context", autocast_context)
+            setattr(model, f"{attr}_train_dtype", train_dtype)
+        else:
+            train_dtype = model.train_dtype
+
+        quantize_layers(module, self.train_device, train_dtype, config, compress=config_part.weight_dtype.is_compressed())
+
     @staticmethod
     def _set_attention_backend(component, attn: AttentionMechanism, mask: bool):
         match attn:
@@ -248,5 +281,7 @@ class BaseModelSetup(
                 component.set_attention_backend("flash")
             case AttentionMechanism.CUDNN:
                 component.set_attention_backend("_native_cudnn")
+            case AttentionMechanism.FLEX:
+                component.set_attention_backend("flex")
             case _:
                 raise NotImplementedError(f"attention mechanism {str(attn)} not implemented")
