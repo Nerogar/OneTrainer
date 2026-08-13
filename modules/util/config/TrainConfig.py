@@ -269,6 +269,7 @@ class TrainModelPartConfig(BaseConfig):
     guidance_scale: float
     gradient_checkpointing: bool
     offload_fraction: float
+    simplex_offloading: bool
     activation_offloading: bool
     cache_in_ram: bool
 
@@ -310,6 +311,7 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("guidance_scale", 1.0, float, False))
         data.append(("gradient_checkpointing", True, bool, False))
         data.append(("offload_fraction", 0.0, float, False))
+        data.append(("simplex_offloading", False, bool, False))
         data.append(("activation_offloading", False, bool, False))
         data.append(("cache_in_ram", True, bool, False))
 
