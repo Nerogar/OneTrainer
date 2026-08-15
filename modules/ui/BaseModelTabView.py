@@ -36,11 +36,14 @@ class BaseModelTabView(ABC):
             allow_override_transformer=controller.supports_override_transformer(),
             has_unconditional_transformer="unconditional_transformer" in parts,
             has_text_encoder=not model_type.has_multiple_text_encoders(),
+            allow_override_text_encoder=controller.supports_override_text_encoder(),
             has_text_encoder_1=model_type.has_multiple_text_encoders(),
             has_text_encoder_2="text_encoder_2" in parts,
             has_text_encoder_3="text_encoder_3" in parts,
             has_text_encoder_4="text_encoder_4" in parts,
             allow_override_text_encoder_4="text_encoder_4" in parts,
+            has_connectors="connectors" in parts,
+            has_low_noise_transformer="low_noise_transformer" in parts,
             has_vae="vae" in parts,
             include_compressed=model_type.supports_compression(),
         )
@@ -111,6 +114,11 @@ class BaseModelTabView(ABC):
             mode="dir", placeholder=HF_HUB_CACHE,
         )
 
+        # stream from disk
+        self.components.label(frame, row, 3, "Stream From Disk",
+                         tooltip="Uses the streaming model loader to stream frozen weights from disk to VRAM on demand, greatly reducing RAM usage. Only turn off if you hit compatibility issues.")
+        self.components.switch(frame, row, 4, ui_state, "stream_from_disk")
+
         row += 1
 
         # base model
@@ -125,13 +133,6 @@ class BaseModelTabView(ABC):
         self.components.label(frame, row, 3, "Compile transformer blocks",
                          tooltip="Uses torch.compile and Triton to significantly speed up training. Only applies to transformer/unet. Disable in case of compatibility issues.")
         self.components.switch(frame, row, 4, ui_state, "compile")
-
-        row += 1
-
-        # stream from disk
-        self.components.label(frame, row, 0, "Stream From Disk",
-                         tooltip="Uses the streaming model loader to stream frozen weights from disk to VRAM on demand, greatly reducing RAM usage. Only turn off if you hit compatibility issues.")
-        self.components.switch(frame, row, 1, ui_state, "stream_from_disk")
 
         row += 1
 
@@ -150,11 +151,14 @@ class BaseModelTabView(ABC):
             allow_override_transformer: bool = False,
             has_unconditional_transformer: bool = False,
             allow_override_text_encoder_4: bool = False,
+            allow_override_text_encoder: bool = False,
             has_text_encoder: bool = False,
             has_text_encoder_1: bool = False,
             has_text_encoder_2: bool = False,
             has_text_encoder_3: bool = False,
             has_text_encoder_4: bool = False,
+            has_connectors: bool = False,
+            has_low_noise_transformer: bool = False,
             has_vae: bool = False,
             include_compressed: bool = False,
     ) -> int:
@@ -297,6 +301,29 @@ class BaseModelTabView(ABC):
                              tooltip="The text encoder 4 weight data type")
             self.components.options_kv(frame, row, 4, self.__create_dtype_options(),
                                   ui_state, "text_encoder_4.weight_dtype")
+
+            row += 1
+
+        if has_connectors:
+            self.components.label(frame, row, 3, "Connectors Data Type",
+                             tooltip="The weight data type of the LTX connectors, the frozen network that turns text encoder output into the transformer's conditioning")
+            self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True),
+                                  ui_state, "connectors.weight_dtype")
+
+            row += 1
+
+        if has_low_noise_transformer:
+            self.components.label(frame, row, 0, "Low Noise Expert",
+                             tooltip="Directory or Hugging Face repository of the distilled LTX transformer in diffusers format, or a single safetensors or GGUF file of the distilled transformer. Used only for the low-noise steps when sampling. Leave empty to sample with the trained transformer alone.")
+            self.components.path_entry(
+                frame, row, 1, ui_state, "low_noise_transformer.model_name",
+                mode="file", path_modifier=path_util.json_path_modifier
+            )
+
+            self.components.label(frame, row, 3, "Low Noise Expert Data Type",
+                             tooltip="The weight data type of the distilled low-noise expert")
+            self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_gguf=True, include_a8=True, include_compressed=include_compressed),
+                                  ui_state, "low_noise_transformer.weight_dtype")
 
             row += 1
 

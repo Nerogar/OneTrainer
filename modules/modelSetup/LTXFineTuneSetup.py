@@ -1,0 +1,87 @@
+from modules.model.LTXModel import LTXModel
+from modules.modelSetup.BaseLTXSetup import BaseLTXSetup
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.util import factory
+from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.ModuleFilter import ModuleFilter
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
+from modules.util.optimizer_util import init_model_parameters
+from modules.util.TrainProgress import TrainProgress
+
+
+@factory.register(BaseModelSetup, ModelType.LTX_2, TrainingMethod.FINE_TUNE)
+class LTXFineTuneSetup(
+    BaseLTXSetup,
+):
+    def create_parameters(
+            self,
+            model: LTXModel,
+            config: TrainConfig,
+    ) -> NamedParameterGroupCollection:
+        parameter_group_collection = NamedParameterGroupCollection()
+        self._create_model_part_parameters(
+            parameter_group_collection, "transformer", model.transformer, config.transformer,
+            freeze=ModuleFilter.create(config), debug=config.debug_mode,
+        )
+        return parameter_group_collection
+
+    def __setup_requires_grad(
+            self,
+            model: LTXModel,
+            config: TrainConfig,
+    ):
+        self._setup_model_part_requires_grad("transformer", model.transformer, config.transformer, model.train_progress)
+        model.vae.requires_grad_(False)
+        model.audio_vae.requires_grad_(False)
+        model.vocoder.requires_grad_(False)
+        model.text_encoder.requires_grad_(False)
+        model.connectors.requires_grad_(False)
+
+    def setup_model(
+            self,
+            model: LTXModel,
+            config: TrainConfig,
+    ):
+        params = self.create_parameters(model, config)
+        self.__setup_requires_grad(model, config)
+        init_model_parameters(model, params, self.train_device)
+
+    def setup_train_device(
+            self,
+            model: LTXModel,
+            config: TrainConfig,
+    ):
+        vae_on_train_device = not config.latent_caching
+        text_encoder_on_train_device = not config.latent_caching
+
+        parts = ["transformer"]
+        if text_encoder_on_train_device:
+            # the connectors run alongside the TE in the dataloader, so they are needed exactly when it is
+            parts.append("text_encoder")
+            parts.append("connectors")
+        if vae_on_train_device:
+            parts.append("vae")
+        model.materialize_only(*parts)
+        # keep the VAE latent stats on the train device: predict() normalizes with them every step,
+        # and .to(cuda) from an offloaded VAE would block-sync the stream each step.
+        model.vae.latents_mean = model.vae.latents_mean.to(self.train_device)
+        model.vae.latents_std = model.vae.latents_std.to(self.train_device)
+
+        model.text_encoder.eval()
+        model.connectors.eval()
+        model.vae.eval()
+
+        if config.transformer.train:
+            model.transformer.train()
+        else:
+            model.transformer.eval()
+
+    def after_optimizer_step(
+            self,
+            model: LTXModel,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+    ):
+        self.__setup_requires_grad(model, config)

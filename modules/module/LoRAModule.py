@@ -3,6 +3,7 @@ import math
 from abc import abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping
+from contextlib import contextmanager
 from typing import Any
 
 from modules.module.FusedModule import FusedModuleGroup, check_fusion_match, discover_fused_groups
@@ -1110,6 +1111,42 @@ class LoRAModuleWrapper:
             modules += module.modules()
 
         return modules
+
+    @contextmanager
+    def retargeted(self, orig_module: nn.Module):
+        # Temporarily applies this LoRA to a different base module of the same architecture.
+        # TODO: temporary workaround until a LoRA can be attached to more than one base module; rebinds this
+        # one back and forth instead. The PeftBase objects and their weights are shared, not copied.
+        previous = self.orig_module
+        self.remove_hook_from_module()
+        self.__retarget(orig_module)
+        self.hook_to_module()
+        try:
+            yield
+        finally:
+            self.remove_hook_from_module()
+            self.__retarget(previous)
+            self.hook_to_module()
+
+    def __retarget(self, orig_module: nn.Module):
+        # Binds by name against the tree as it stands right now, normalized the same way __create_modules did
+        # so a checkpointing wrapper on either base maps to the same child. Eviction moves weights to meta and
+        # never replaces a module, so an evicted component binds to the layers a later materialize fills.
+        children = {name.replace(".checkpoint.", "."): child for name, child in orig_module.named_modules()}
+        for name, lora_module in self.lora_modules.items():
+            if isinstance(lora_module, FusedModuleGroup):
+                # a fused group also owns a _FusedLinear built over the old leaves, so rebinding it means
+                # rebuilding that too; nothing needs it yet, so refuse rather than half-rebind
+                raise NotImplementedError("retargeting a fused LoRA module is not supported")
+            target = children.get(name)
+            if target is None:
+                raise ValueError(f"retarget: {orig_module.__class__.__name__} has no module named {name}")
+            if get_weight_shape(target) != get_weight_shape(lora_module.orig_module):
+                raise ValueError(
+                    f"retarget: shape mismatch for {name}: "
+                    f"{get_weight_shape(lora_module.orig_module)} vs {get_weight_shape(target)}")
+            lora_module._orig_module = [target]
+        self.orig_module = orig_module
 
     def hook_to_module(self):
         """

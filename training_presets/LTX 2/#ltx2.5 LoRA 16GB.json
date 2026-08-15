@@ -1,0 +1,55 @@
+{
+    "base_model_name": "Lightricks/LTX-2.5-Diffusers",
+    "model_type": "LTX_2",
+    "training_method": "LORA",
+    "output_model_format": "DIFFUSERS_LORA",
+    "batch_size": 2,
+    "learning_rate": 3e-4,
+    "resolution": "512",
+    "frames": "121",
+    "dataloader_threads": 1,
+    "compile": true,
+    "train_dtype": "BFLOAT_16",
+    "output_dtype": "BFLOAT_16",
+    "transformer": {
+        "train": true,
+        "weight_dtype": "INT_W8A8_COMPRESSED",
+        "offload_fraction": 0.5,
+        "simplex_offloading": true,
+        "cache_in_ram": false
+    },
+    "low_noise_transformer": {
+        "model_name": "Lightricks/LTX-2.5-Diffusers",
+        "train": false,
+        "weight_dtype": "INT_W8A8_COMPRESSED",
+        "gradient_checkpointing": false,
+        "offload_fraction": 0.3,
+        "cache_in_ram": false
+    },
+    "text_encoder": {
+        "train": false,
+        "weight_dtype": "FLOAT_8",
+        "offload_fraction": 0.8,
+        "cache_in_ram": false
+    },
+    "connectors": {
+        "train": false,
+        "weight_dtype": "BFLOAT_16",
+        "gradient_checkpointing": false,
+        "offload_fraction": 0.8,
+        "cache_in_ram": false
+    },
+    "vae": {
+        "weight_dtype": "FLOAT_32"
+    },
+    "layer_filter": ".attn1,.attn2,.ff",
+    "layer_filter_preset": "video-attn-mlp",
+    "quantization": {
+        "layer_filter": "^transformer_blocks\\.(?![01]\\.|4[67]\\.)",
+        "layer_filter_preset": "lightricks-2.3-fp8",
+        "layer_filter_regex": true,
+        "fallback_dtype": "BFLOAT_16"
+    },
+    "timestep_distribution": "LOGIT_NORMAL",
+    "dynamic_timestep_shifting": false
+}

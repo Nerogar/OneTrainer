@@ -164,6 +164,13 @@ class LinearW8A8(
         # unchanged. Matches get_offload_tensors (weight + optional bias); the scalar scale buffer is not
         # offload-counted. _dtype is asserted int8/float8_e4m3fn in __init__, so 1 byte/elem is exact.
         # a compressed weight offloads as its blob, so the measured length replaces the element count once it exists.
+        # With compression on the element count is not an approximation but a wrong answer -- it would size every
+        # offload arena ~40% too large -- so a caller that sizes before __measure_compressed_sizes has run is a bug
+        # in the sizing order rather than something to paper over.
+        if self.compress and self._compressed_bytes is None:
+            raise RuntimeError(
+                "offload sizing for a compressed weight whose blob length has not been measured yet; "
+                "LayerOffloadConductor.__measure_compressed_sizes has to run before the arenas are sized")
         weight_bytes = self._compressed_bytes if self._compressed_bytes is not None else self.weight.numel()
         bias_bytes = self.bias.numel() * self.bias.element_size() if self.bias is not None else 0
         return weight_bytes + bias_bytes

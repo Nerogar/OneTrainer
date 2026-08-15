@@ -57,6 +57,10 @@ def build_muon_adam_key_fn(
                     'text_fusion.layerwise_blocks',
                     'text_fusion.refiner_blocks',
                 ]
+            case ModelType.LTX_2:
+                default_patterns = [
+                    'transformer_blocks',
+                ]
             case _: # Unmatched cases
                 raise NotImplementedError(f"Default hidden layer patterns are not defined for model type: {model.model_type}")
         filters = [ModuleFilter(p, use_regex=False) for p in default_patterns]

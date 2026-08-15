@@ -49,6 +49,8 @@ class ModelType(Enum):
 
     IDEOGRAM_4 = 'IDEOGRAM_4'
 
+    LTX_2 = 'LTX_2'
+
     def __str__(self):
         return self.value
 
@@ -129,11 +131,15 @@ class ModelType(Enum):
     def is_ideogram(self):
         return self == ModelType.IDEOGRAM_4
 
+    def is_ltx_2(self):
+        return self == ModelType.LTX_2
+
     def has_dynamic_timestep_shift(self) -> bool:
         return self.is_flux_1() \
             or self.is_flux_2() \
             or self.is_qwen() \
-            or self.is_krea2()
+            or self.is_krea2() \
+            or self.is_ltx_2()
 
     def supports_negative_prompt(self) -> bool:
         # asymmetric dual-network CFG models drive the negative branch from a frozen unconditional network (or an
@@ -157,6 +163,9 @@ class ModelType(Enum):
 
     def has_multiple_text_encoders(self):
         return "text_encoder_2" in self.model_parts()
+
+    def has_low_noise_expert(self) -> bool:
+        return "low_noise_transformer" in self.model_parts()
 
     def is_sd_v1(self):
         return self == ModelType.STABLE_DIFFUSION_15 \
@@ -188,10 +197,16 @@ class ModelType(Enum):
             or self.is_hi_dream() \
             or self.is_z_image() \
             or self.is_ernie() \
-            or self.is_ideogram()
+            or self.is_ideogram() \
+            or self.is_ltx_2()
 
     def is_video_model(self) -> bool:
-        return self.is_hunyuan_video() #incase we add more video models in the future
+        return self.is_hunyuan_video() or self.is_ltx_2()
+
+    def is_audio_model(self) -> bool:
+        # LTX-2 is audio-visual, but audio training/output is not yet implemented (video-only scope) -
+        # its audio branch is frozen and never decoded, so it does not belong here yet.
+        return False
 
     def supports_compression(self) -> bool:
         return not (self.is_stable_diffusion() or self.is_stable_diffusion_xl() or self.is_wuerstchen())
@@ -213,7 +228,7 @@ class ModelType(Enum):
                 or self.is_chroma():
             return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA, TrainingMethod.EMBEDDING)
         if self.is_qwen() or self.is_z_image() or self.is_flux_2() or self.is_ernie() \
-                or self.is_anima() or self.is_krea2() or self.is_ideogram():
+                or self.is_anima() or self.is_krea2() or self.is_ideogram() or self.is_ltx_2():
             return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA)
         raise ValueError(f"No supported training methods defined for model type {self}")
 
@@ -323,6 +338,7 @@ _MODEL_PARTS: dict[ModelType, tuple[str, ...]] = {
     ModelType.Z_IMAGE: ("transformer", "text_encoder", "vae"),
     ModelType.ERNIE: ("transformer", "text_encoder", "vae"),
     ModelType.IDEOGRAM_4: ("transformer", "text_encoder", "unconditional_transformer", "vae"),
+    ModelType.LTX_2: ("transformer", "text_encoder", "connectors", "low_noise_transformer", "vae"),
 }
 
 # subset of _MODEL_PARTS the architecture allows a run to train, for both LoRA and fine-tuning -- the parts each setup
@@ -358,6 +374,7 @@ _TRAINABLE_PARTS: dict[ModelType, tuple[str, ...]] = {
     ModelType.Z_IMAGE: ("transformer",),
     ModelType.ERNIE: ("transformer",),
     ModelType.IDEOGRAM_4: ("transformer",),
+    ModelType.LTX_2: ("transformer",),
 }
 
 

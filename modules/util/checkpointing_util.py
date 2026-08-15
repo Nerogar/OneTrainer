@@ -19,6 +19,8 @@ from diffusers.models.transformers.transformer_hunyuan_video import (
 )
 from transformers.models.clip.modeling_clip import CLIPEncoderLayer
 from transformers.models.gemma2.modeling_gemma2 import Gemma2DecoderLayer
+from transformers.models.gemma3.modeling_gemma3 import Gemma3DecoderLayer
+from transformers.models.gemma4_unified.modeling_gemma4_unified import Gemma4UnifiedTextDecoderLayer
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from transformers.models.mistral.modeling_mistral import MistralDecoderLayer
 from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import Qwen2_5_VLDecoderLayer
@@ -213,9 +215,11 @@ class BoundaryOffloadCheckpointLayer(BaseCheckpointLayer):
         layer_index = self.layer_index
         targets = {_view_key(args[i]) for i in self.included_offload_param_indices
                    if i < len(args) and isinstance(args[i], torch.Tensor)}
-        with torch.autograd.graph.saved_tensors_hooks(
-                lambda t: self.conductor.pack_activation(layer_index, t) if _view_key(t) in targets else t,
-                self.conductor.unpack_activation):
+
+        def pack(t):
+            return self.conductor.pack_activation(layer_index, t) if _view_key(t) in targets else t
+
+        with torch.autograd.graph.saved_tensors_hooks(pack, self.conductor.unpack_activation):
             return run()
 
     def forward(self, *args, **kwargs):
@@ -478,6 +482,26 @@ def enable_checkpointing_for_mistral_encoder_layers(
     ])
 
 
+def enable_checkpointing_for_gemma3_encoder_layers(
+        model: nn.Module,
+        config: TrainConfig,
+        part: TrainModelPartConfig,
+) -> LayerOffloadConductor | None:
+    return enable_checkpointing(model, config, part, False, [
+        (Gemma3DecoderLayer, []),  # no activation offloading: this encoder is never trained
+    ])
+
+
+def enable_checkpointing_for_gemma4_encoder_layers(
+        model: nn.Module,
+        config: TrainConfig,
+        part: TrainModelPartConfig,
+) -> LayerOffloadConductor | None:
+    return enable_checkpointing(model, config, part, False, [
+        (Gemma4UnifiedTextDecoderLayer, []),  # no activation offloading: this encoder is never trained
+    ])
+
+
 
 def enable_checkpointing_for_qwen25vl_encoder_layers(
         model: nn.Module,
@@ -545,6 +569,26 @@ def enable_checkpointing_for_qwen_transformer(
 ) -> LayerOffloadConductor | None:
     return enable_checkpointing(model, config, part, config.compile, [
         (model.transformer_blocks, ["hidden_states", "encoder_hidden_states"]),
+    ])
+
+def enable_checkpointing_for_ltx_transformer(
+        model: nn.Module,
+        config: TrainConfig,
+        part: TrainModelPartConfig,
+) -> LayerOffloadConductor | None:
+    # LTX2VideoTransformerBlock.forward returns (hidden_states, audio_hidden_states)
+    return enable_checkpointing(model, config, part, config.compile, [
+        (model.transformer_blocks, ["hidden_states", "audio_hidden_states"]),
+    ])
+
+def enable_checkpointing_for_ltx_connectors(
+        model: nn.Module,
+        config: TrainConfig,
+        part: TrainModelPartConfig,
+) -> LayerOffloadConductor | None:
+    return enable_checkpointing(model, config, part, False, [
+        (model.video_connector.transformer_blocks, ["hidden_states"]),
+        (model.audio_connector.transformer_blocks, ["hidden_states"]),
     ])
 
 def enable_checkpointing_for_z_image_transformer(

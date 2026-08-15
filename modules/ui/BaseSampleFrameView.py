@@ -1,4 +1,5 @@
 from modules.util.enum.NoiseScheduler import NoiseScheduler
+from modules.util.enum.SamplingMethod import SamplingMethod
 
 
 class BaseSampleFrameView:
@@ -9,6 +10,7 @@ class BaseSampleFrameView:
         is_flow_matching = controller.is_flow_matching()
         is_inpainting_model = controller.is_inpainting_model()
         is_video_model = controller.is_video_model()
+        is_audio_model = controller.is_audio_model()
         if include_prompt:
             # prompt
             self.components.label(top_frame, 0, 0, "prompt:")
@@ -34,6 +36,7 @@ class BaseSampleFrameView:
                                       tooltip="Number of frames to generate. Only used when generating videos.")
                 self.components.entry(bottom_frame, 1, 1, ui_state, "frames")
 
+            if is_audio_model:
                 # length
                 self.components.label(bottom_frame, 1, 2, "length:",
                                       tooltip="Length in seconds of audio output.")
@@ -72,11 +75,27 @@ class BaseSampleFrameView:
             self.components.entry(bottom_frame, 4, 1, ui_state, "diffusion_steps")
 
             if controller.model_type.has_dynamic_timestep_shift():
-                self.components.label(bottom_frame, 5, 2, "override shift:",
+                self.components.label(bottom_frame, 4, 2, "override shift:",
                                       tooltip="Timestep shift for this sample, as the multiplicative factor "
-                                              "(not mu). Empty uses the resolution-dependent shift the model "
-                                              "derives from the token count.")
-                self.components.entry(bottom_frame, 5, 3, ui_state, "override_shift")
+                                              "(not mu). Empty uses the shift the model derives from the "
+                                              "token count.")
+                self.components.entry(bottom_frame, 4, 3, ui_state, "override_shift")
+
+            if controller.supports_multiple_sampling_methods():
+                self.components.label(bottom_frame, 6, 0, "sampling method:",
+                                      tooltip="How this sample is generated. 'base model' walks the whole "
+                                              "schedule with the transformer being trained. 'handoff to "
+                                              "low-noise expert' hands over to the distilled low-noise expert "
+                                              "below the expert's first sigma, as the reference pipeline does. "
+                                              "'distilled' runs the expert's own short schedule from noise, so "
+                                              "the trained transformer never runs. The trained LoRA applies to "
+                                              "the expert as well. Both expert methods fall back to 'base "
+                                              "model' when no expert model is loaded.")
+                self.components.options_kv(bottom_frame, 6, 1, [
+                    ("base model", SamplingMethod.STANDARD),
+                    ("handoff to low-noise expert", SamplingMethod.HANDOFF_LOW_NOISE),
+                    ("distilled", SamplingMethod.DISTILLED),
+                ], ui_state, "sampling_method")
 
             # inpainting
             if is_inpainting_model:

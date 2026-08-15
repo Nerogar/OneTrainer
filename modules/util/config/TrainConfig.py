@@ -506,6 +506,9 @@ class TrainConfig(BaseConfig):
     text_encoder_4: TrainModelPartConfig
     text_encoder_4_layer_skip: int
 
+    connectors: TrainModelPartConfig
+    low_noise_transformer: TrainModelPartConfig
+
     # vae
     vae: TrainModelPartConfig
 
@@ -889,6 +892,8 @@ class TrainConfig(BaseConfig):
             self.text_encoder_2.weight_dtype,
             self.text_encoder_3.weight_dtype,
             self.text_encoder_4.weight_dtype,
+            self.connectors.weight_dtype,
+            self.low_noise_transformer.weight_dtype,
             self.vae.weight_dtype,
             self.effnet_encoder.weight_dtype,
             self.decoder.weight_dtype,
@@ -915,8 +920,10 @@ class TrainConfig(BaseConfig):
             base_model=self.base_model_name,
             prior_model=self.prior.model_name,
             transformer_model=self.transformer.model_name,
+            low_noise_transformer_model=self.low_noise_transformer.model_name,
             effnet_encoder_model=self.effnet_encoder.model_name,
             decoder_model=self.decoder.model_name,
+            text_encoder_model=self.text_encoder.model_name,
             text_encoder_4=self.text_encoder_4.model_name,
             vae_model=self.vae.model_name,
             lora=self.lora_model_name,
@@ -929,6 +936,7 @@ class TrainConfig(BaseConfig):
             include_text_encoder_3=self.text_encoder_3.include,
             include_text_encoder_4=self.text_encoder_4.include,
             include_unconditional_transformer=self.unconditional_transformer.include,
+            include_low_noise_transformer=self.low_noise_transformer.include,
         )
 
     def train_any_embedding(self) -> bool:
@@ -1198,6 +1206,22 @@ class TrainConfig(BaseConfig):
         text_encoder_4.learning_rate = None
         data.append(("text_encoder_4", text_encoder_4, TrainModelPartConfig, False))
         data.append(("text_encoder_4_layer_skip", 0, int, False))
+
+        # connectors
+        connectors = TrainModelPartConfig.default_values()
+        connectors.model_name = ""
+        connectors.train = False
+        connectors.gradient_checkpointing = False
+        connectors.activation_offloading = False
+        data.append(("connectors", connectors, TrainModelPartConfig, False))
+
+        # low noise transformer
+        low_noise_transformer = TrainModelPartConfig.default_values()
+        low_noise_transformer.model_name = ""
+        low_noise_transformer.train = False
+        low_noise_transformer.gradient_checkpointing = False
+        low_noise_transformer.activation_offloading = False
+        data.append(("low_noise_transformer", low_noise_transformer, TrainModelPartConfig, False))
 
         # vae
         vae = TrainModelPartConfig.default_values()

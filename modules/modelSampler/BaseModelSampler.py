@@ -121,6 +121,25 @@ class BaseModelSampler(metaclass=ABCMeta):
         return batch_progress
 
     @staticmethod
+    def build_video_sampler_output(video: torch.Tensor) -> ModelSamplerOutput:
+        # `video` is the video processor's output, [B, F, C, H, W] with values in [0, 1]. Only the first batch
+        # item is kept, and a single frame becomes an image rather than a one-frame video.
+        video = video.cpu().float()
+
+        if video.shape[1] == 1:
+            image = video[0, 0].permute(1, 2, 0).numpy()  # [H, W, C]
+            return ModelSamplerOutput(
+                file_type=FileType.IMAGE,
+                data=Image.fromarray((image * 255).round().astype("uint8")),
+            )
+        else:
+            frames = video[0].permute(0, 2, 3, 1)  # [F, H, W, C]
+            return ModelSamplerOutput(
+                file_type=FileType.VIDEO,
+                data=(frames.clamp(0, 1) * 255).round().to(dtype=torch.int8),
+            )
+
+    @staticmethod
     def save_sampler_output(
             sampler_output: ModelSamplerOutput,
             destination: str,

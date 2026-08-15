@@ -44,6 +44,7 @@ class TopBarController:
             ("Z-Image", ModelType.Z_IMAGE),
             ("Ernie Image", ModelType.ERNIE),
             ("Ideogram 4", ModelType.IDEOGRAM_4),
+            ("LTX 2", ModelType.LTX_2),
         ]
 
     def get_training_methods(self, model_type: ModelType) -> list[tuple[str, TrainingMethod]]:

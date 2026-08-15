@@ -2,6 +2,7 @@ from typing import Any
 
 from modules.util.config.BaseConfig import BaseConfig
 from modules.util.enum.NoiseScheduler import NoiseScheduler
+from modules.util.enum.SamplingMethod import SamplingMethod
 
 
 def _get_model_defaults(model_type) -> dict:
@@ -145,6 +146,14 @@ def _get_model_defaults(model_type) -> dict:
             "diffusion_steps": 25,
             "cfg_scale": 4.0,
         })
+    elif model_type.is_ltx_2():
+        defaults.update({
+            "width": 960,
+            "height": 540,
+            "diffusion_steps": 40,
+            "cfg_scale": 4.0,
+            "override_shift": 7.8,
+        })
     elif model_type.is_ideogram():
         # Ideogram 4 recommends 48 flow-matching steps on a logit-normal schedule with
         # guidance held at 7.0 for the main steps (dropping to 3.0 for the final polish steps).
@@ -172,6 +181,7 @@ class SampleConfig(BaseConfig):
     diffusion_steps: int
     cfg_scale: float
     noise_scheduler: NoiseScheduler
+    sampling_method: SamplingMethod
     override_shift: float | None
 
     text_encoder_1_layer_skip: int
@@ -217,6 +227,7 @@ class SampleConfig(BaseConfig):
         data.append(("diffusion_steps", defaults["diffusion_steps"], int, False))
         data.append(("cfg_scale", defaults["cfg_scale"], float, False))
         data.append(("noise_scheduler", defaults["noise_scheduler"], NoiseScheduler, False))
+        data.append(("sampling_method", SamplingMethod.HANDOFF_LOW_NOISE, SamplingMethod, False))
         data.append(("override_shift", defaults["override_shift"], float, True))
 
         data.append(("text_encoder_1_layer_skip", 0, int, False))

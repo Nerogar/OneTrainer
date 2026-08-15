@@ -153,9 +153,9 @@ def stream_module_from_checkpoint(
     work = []  # (key, sub_module, tensor_name, is_buffer, module_name)
     for name, sub_module in module.named_modules():
         module_name = name.split(".")[-1]
-        # gradient checkpointing in compile mode wraps each block in a CheckpointLayer, inserting a ".checkpoint."
+        # gradient checkpointing in compile mode wraps each block in a CheckpointLayer, inserting a "checkpoint"
         # level into the live path; the checkpoint keys have none, so strip it before lookup (as LoRAModule does).
-        lookup_name = name.replace(".checkpoint.", ".")
+        lookup_name = ".".join(p for p in name.split(".") if p != "checkpoint")
         for tensor_name, param in list(sub_module.named_parameters(recurse=False)):
             key = ".".join(p for p in (key_prefix, lookup_name, tensor_name) if p)
             if key in key_to_file and param.is_meta:
@@ -377,7 +377,8 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             new_state_dict = {}
             for k, v in state_dict.items():
                 new_k, _ = rename_source_key(
-                    k, weight_renamings, [], prefix=sub_module.base_model_prefix, meta_state_dict=meta_state_dict,
+                    k, weight_renamings, [], base_model_prefix=sub_module.base_model_prefix,
+                    meta_state_dict=meta_state_dict,
                 )
                 new_state_dict[new_k] = v
             state_dict = new_state_dict
@@ -518,7 +519,8 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             source_key_map = {}
             for key, file in key_to_file.items():
                 renamed = rename_source_key(
-                    key, weight_renamings, [], prefix=sub_module.base_model_prefix, meta_state_dict=meta_state_dict,
+                    key, weight_renamings, [], base_model_prefix=sub_module.base_model_prefix,
+                    meta_state_dict=meta_state_dict,
                 )[0]
                 renamed_key_to_file[renamed] = file
                 source_key_map[renamed] = key
@@ -756,16 +758,19 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             quantization: QuantizationConfig,
             config: str | None = None,
             stream_from_disk: bool = False,
+            subfolder: str = "transformer",
     ):
         # a single-file (optionally GGUF-quantized) checkpoint is loaded directly, using
         # a separate repo to source the model config if the checkpoint doesn't carry one;
-        # otherwise the transformer is loaded from its subfolder in the base model repo.
+        # otherwise the transformer is loaded from its subfolder in the base model repo. subfolder is that name:
+        # "transformer" everywhere except where a repo ships more than one DiT and the trainable one is not the
+        # repo's default (LTX 2.5's transformer_full/).
         # Returns a (transformer, materialize_fn) pair, materialize_fn None when not streamed.
         if transformer_model_name:
             single_file_kwargs = {}
             if config is not None:
                 single_file_kwargs["config"] = config
-                single_file_kwargs["subfolder"] = "transformer"
+                single_file_kwargs["subfolder"] = subfolder
 
             transformer = module_type.from_single_file(
                 transformer_model_name,
@@ -787,7 +792,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 weight_dtypes.transformer,
                 weight_dtypes.train_dtype,
                 base_model_name,
-                "transformer",
+                subfolder,
                 quantization,
                 stream_from_disk=stream_from_disk,
             )

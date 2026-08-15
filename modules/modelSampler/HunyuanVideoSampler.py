@@ -7,7 +7,6 @@ from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSampler
 from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
-from modules.util.enum.FileType import FileType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.VideoFormat import VideoFormat
@@ -15,8 +14,6 @@ from modules.util.staged_pipeline import run_staged_pipeline
 from modules.util.tqdm_util import tqdm
 
 import torch
-
-from PIL import Image
 
 
 @factory.register(BaseModelSampler, ModelType.HUNYUAN_VIDEO)
@@ -156,26 +153,8 @@ class HunyuanVideoSampler(BaseModelSampler):
 
         image = video_processor.postprocess(image, output_type='pt')
 
-        is_image = image.shape[2] == 1
-        if is_image:
-            image = image.view((image.shape[0], image.shape[1], image.shape[3], image.shape[4]))
-            image = image.cpu().permute(0, 2, 3, 1).float().numpy()
-            image = (image * 255).round().astype("uint8")
-            image = Image.fromarray(image[0])
-
-            return ModelSamplerOutput(
-                file_type=FileType.IMAGE,
-                data=image,
-            )
-        else:
-            image = image.cpu().permute(0, 2, 3, 4, 1).float()
-            image = (image.clamp(0, 1) * 255).round().to(dtype=torch.int8)
-            image = image[0]
-
-            return ModelSamplerOutput(
-                file_type=FileType.VIDEO,
-                data=image,
-            )
+        # postprocess keeps channels ahead of frames, so swap them to [B, F, C, H, W]
+        return self.build_video_sampler_output(image.permute(0, 2, 1, 3, 4))
 
     def sample_all(
             self,
