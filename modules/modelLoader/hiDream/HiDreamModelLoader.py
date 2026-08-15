@@ -134,23 +134,13 @@ class HiDreamModelLoader(
             if text_encoder_4_model_name:
                 # override repo holds text_encoder_4 at its root, not in a base-model subfolder, so it bypasses
                 # _load_text_encoder (which always loads from a base-repo subfolder) and loads directly.
-                # _load_transformers_sub_module returns a (module, materialize_fn) pair only when streaming; a bare
-                # module otherwise.
-                if stream_from_disk:
-                    model.text_encoder_4, model.materialize_fn["text_encoder_4"] = self._load_transformers_sub_module(
-                        LlamaForCausalLM,
-                        weight_dtypes.text_encoder_4,
-                        weight_dtypes.train_dtype,
-                        text_encoder_4_model_name,
-                        stream_from_disk=True,
-                    )
-                else:
-                    model.text_encoder_4 = self._load_transformers_sub_module(
-                        LlamaForCausalLM,
-                        weight_dtypes.text_encoder_4,
-                        weight_dtypes.train_dtype,
-                        text_encoder_4_model_name,
-                    )
+                model.text_encoder_4, model.materialize_fn["text_encoder_4"] = self._load_transformers_sub_module(
+                    LlamaForCausalLM,
+                    weight_dtypes.text_encoder_4,
+                    weight_dtypes.train_dtype,
+                    text_encoder_4_model_name,
+                    stream_from_disk=stream_from_disk,
+                )
             else:
                 model.text_encoder_4, model.materialize_fn["text_encoder_4"] = self._load_text_encoder(
                     LlamaForCausalLM,

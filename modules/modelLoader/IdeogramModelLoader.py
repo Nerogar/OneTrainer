@@ -64,9 +64,8 @@ class IdeogramModelLoader(
         )
         # the unconditional transformer is frozen and only used for the negative branch of the dual-network CFG at
         # sampling, so it has its own weight dtype independent of the trainable transformer's. It is optional. It uses
-        # _load_diffusers_sub_module directly (not _load_transformer) because of its own subfolder and dtype; in
-        # streaming mode that returns a materialize closure, otherwise a plain module.
-        if include_unconditional_transformer and stream_from_disk:
+        # _load_diffusers_sub_module directly (not _load_transformer) because of its own subfolder and dtype.
+        if include_unconditional_transformer:
             model.unconditional_transformer, model.materialize_fn["unconditional_transformer"] = \
                 self._load_diffusers_sub_module(
                     Ideogram4Transformer2DModel,
@@ -75,17 +74,8 @@ class IdeogramModelLoader(
                     base_model_name,
                     "unconditional_transformer",
                     quantization,
-                    stream_from_disk=True,
+                    stream_from_disk=stream_from_disk,
                 )
-        elif include_unconditional_transformer:
-            model.unconditional_transformer = self._load_diffusers_sub_module(
-                Ideogram4Transformer2DModel,
-                weight_dtypes.unconditional_transformer,
-                weight_dtypes.train_dtype,
-                base_model_name,
-                "unconditional_transformer",
-                quantization,
-            )
         else:
             model.unconditional_transformer = None
 

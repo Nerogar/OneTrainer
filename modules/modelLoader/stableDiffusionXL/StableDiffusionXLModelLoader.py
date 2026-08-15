@@ -114,28 +114,17 @@ class StableDiffusionXLModelLoader(
             vae_model_name,
         )
 
-        # the SDXL UNet has no single-file transformer helper and lives in the "unet" subfolder, so it streams via
-        # _load_diffusers_sub_module directly, which returns a (module, materialize_fn) pair only when streaming and a
-        # bare module otherwise (train_dtype is applied per-materialize when streaming, so pass None there).
-        if stream_from_disk:
-            model.unet, model.materialize_fn["unet"] = self._load_diffusers_sub_module(
-                UNet2DConditionModel,
-                weight_dtypes.unet,
-                None,
-                base_model_name,
-                "unet",
-                quantization,
-                stream_from_disk=True,
-            )
-        else:
-            model.unet = self._load_diffusers_sub_module(
-                UNet2DConditionModel,
-                weight_dtypes.unet,
-                weight_dtypes.train_dtype,
-                base_model_name,
-                "unet",
-                quantization,
-            )
+        # the SDXL UNet has no single-file transformer helper and lives in the "unet" subfolder, so it loads via
+        # _load_diffusers_sub_module directly.
+        model.unet, model.materialize_fn["unet"] = self._load_diffusers_sub_module(
+            UNet2DConditionModel,
+            weight_dtypes.unet,
+            weight_dtypes.train_dtype,
+            base_model_name,
+            "unet",
+            quantization,
+            stream_from_disk=stream_from_disk,
+        )
 
     def __load_ckpt(
             self,

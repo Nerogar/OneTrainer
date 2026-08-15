@@ -450,8 +450,12 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             train_dtype: DataType,
             pretrained_model_name_or_path: str,
             subfolder: str = "",
-            stream_from_disk: bool = False,
+            stream_from_disk: bool | None = None,
     ):
+        # stream_from_disk None means the caller never streams this sub-module, and a bare module is returned.
+        # Passing True or False marks the call site as stream-capable and always returns a
+        # (sub_module, materialize_fn) pair -- materialize_fn None when not streaming -- so that caller needs no
+        # branch on the flag.
         user_agent = {
             "file_type": "model",
             "framework": "pytorch",
@@ -469,7 +473,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
 
         if not stream_from_disk:
             # LEGACY fallback: whole-checkpoint-into-RAM load
-            return self.__load_sub_module_legacy(
+            sub_module = self.__load_sub_module_legacy(
                 sub_module=sub_module,
                 dtype=dtype,
                 train_dtype=train_dtype,
@@ -481,6 +485,11 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 pytorch_model_filename="pytorch_model.bin",
                 shard_index_filename="model.safetensors.index.json",
             )
+            if stream_from_disk is None:
+                return sub_module
+            else:
+                # the weights are already in RAM, so there is nothing left to materialize
+                return sub_module, None
 
         keep_in_fp32_modules = module_type._keep_in_fp32_modules or []
         replace_linear_with_quantized_layers(sub_module, dtype, keep_in_fp32_modules, None, copy_parameters=False)
@@ -579,8 +588,12 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             pretrained_model_name_or_path: str,
             subfolder: str | None = None,
             quantization: QuantizationConfig | None = None,
-            stream_from_disk: bool = False,
+            stream_from_disk: bool | None = None,
     ):
+        # stream_from_disk None means the caller never streams this sub-module, and a bare module is returned.
+        # Passing True or False marks the call site as stream-capable and always returns a
+        # (sub_module, materialize_fn) pair -- materialize_fn None when not streaming -- so that caller needs no
+        # branch on the flag.
         user_agent = {
             "file_type": "model",
             "framework": "pytorch",
@@ -598,7 +611,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
 
         if not stream_from_disk:
             # LEGACY fallback: whole-checkpoint-into-RAM load
-            return self.__load_sub_module_legacy(
+            sub_module = self.__load_sub_module_legacy(
                 sub_module=sub_module,
                 dtype=dtype,
                 train_dtype=train_dtype,
@@ -610,6 +623,11 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 pytorch_model_filename="diffusion_pytorch_model.bin",
                 shard_index_filename="diffusion_pytorch_model.safetensors.index.json",
             )
+            if stream_from_disk is None:
+                return sub_module
+            else:
+                # the weights are already in RAM, so there is nothing left to materialize
+                return sub_module, None
 
         keep_in_fp32_modules = module_type._keep_in_fp32_modules or []
         replace_linear_with_quantized_layers(sub_module, dtype, keep_in_fp32_modules, quantization, copy_parameters=False)
@@ -742,8 +760,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         # a single-file (optionally GGUF-quantized) checkpoint is loaded directly, using
         # a separate repo to source the model config if the checkpoint doesn't carry one;
         # otherwise the transformer is loaded from its subfolder in the base model repo.
-        # Always returns a (transformer, materialize_fn) pair -- materialize_fn None when not streamed -- so callers
-        # pass stream_from_disk through.
+        # Returns a (transformer, materialize_fn) pair, materialize_fn None when not streamed.
         if transformer_model_name:
             single_file_kwargs = {}
             if config is not None:
@@ -761,10 +778,10 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization,
             )
             return transformer, None
-        elif stream_from_disk:
-            # stream from disk: meta skeleton + materialize closure; weights are streamed and quantized to the compute
-            # device on use and evicted back to meta afterwards, so the full unquantized module never lands in RAM.
-            # train_dtype is applied per-materialize, not here.
+        else:
+            # when streaming, this yields a meta skeleton + materialize closure: weights are streamed and quantized
+            # to the compute device on use and evicted back to meta afterwards, so the full unquantized module never
+            # lands in RAM, and train_dtype is applied per-materialize rather than here.
             return self._load_diffusers_sub_module(
                 module_type,
                 weight_dtypes.transformer,
@@ -772,18 +789,8 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 base_model_name,
                 "transformer",
                 quantization,
-                stream_from_disk=True,
+                stream_from_disk=stream_from_disk,
             )
-        else:
-            transformer = self._load_diffusers_sub_module(
-                module_type,
-                weight_dtypes.transformer,
-                weight_dtypes.train_dtype,
-                base_model_name,
-                "transformer",
-                quantization,
-            )
-            return transformer, None
 
     def _load_text_encoder(
             self,
@@ -794,28 +801,18 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             subfolder: str,
             stream_from_disk: bool = False,
     ):
-        # text encoders have no single-file override and always load from their subfolder. Always returns a
-        # (text_encoder, materialize_fn) pair -- materialize_fn None when not streamed -- mirroring _load_transformer.
+        # text encoders have no single-file override and always load from their subfolder. Returns a
+        # (text_encoder, materialize_fn) pair, materialize_fn None when not streamed, mirroring _load_transformer.
         # dtype/train_dtype are explicit rather than a weight_dtypes bundle since a model can hold several encoders
         # (text_encoder, text_encoder_2, ...) with differing dtypes.
-        if stream_from_disk:
-            return self._load_transformers_sub_module(
-                module_type,
-                dtype,
-                train_dtype,
-                base_model_name,
-                subfolder,
-                stream_from_disk=True,
-            )
-        else:
-            text_encoder = self._load_transformers_sub_module(
-                module_type,
-                dtype,
-                train_dtype,
-                base_model_name,
-                subfolder,
-            )
-            return text_encoder, None
+        return self._load_transformers_sub_module(
+            module_type,
+            dtype,
+            train_dtype,
+            base_model_name,
+            subfolder,
+            stream_from_disk=stream_from_disk,
+        )
 
     def _load_vae(
             self,
