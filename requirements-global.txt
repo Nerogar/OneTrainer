@@ -34,7 +34,7 @@ pooch==1.8.2
 open-clip-torch==2.32.0
 
 # data loader
--e git+https://github.com/dxqb/mgds-private.git@ltx2#egg=mgds # EncodeGemma3Text, not yet upstream
+-e git+https://github.com/dxqb/MGDS.git@fc1391a#egg=mgds # ltx2-squashed, not yet upstream
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers
