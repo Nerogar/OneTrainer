@@ -50,6 +50,7 @@ def make_fine_tune_model_loader(
             self._load_internal_data(model, model_names.base_model)
             model.model_spec = self._load_default_model_spec(model_type)
 
+            base_model_loader._validate_hf_repo_access(model_names.base_model)
             base_model_loader.load(model, model_type, model_names, weight_dtypes, quantization)
             if embedding_loader_class is not None:
                 embedding_loader.load(model, model_names.base_model, model_names)
