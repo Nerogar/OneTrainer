@@ -71,6 +71,13 @@ class BaseSampleFrameView:
             self.components.label(bottom_frame, 4, 0, "steps:")
             self.components.entry(bottom_frame, 4, 1, ui_state, "diffusion_steps")
 
+            if controller.model_type.has_dynamic_timestep_shift():
+                self.components.label(bottom_frame, 5, 2, "override shift:",
+                                      tooltip="Timestep shift for this sample, as the multiplicative factor "
+                                              "(not mu). Empty uses the resolution-dependent shift the model "
+                                              "derives from the token count.")
+                self.components.entry(bottom_frame, 5, 3, ui_state, "override_shift")
+
             # inpainting
             if is_inpainting_model:
                 self.components.label(bottom_frame, 5, 0, "inpainting:",

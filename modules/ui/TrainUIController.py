@@ -108,8 +108,11 @@ class TrainUIController:
         if self.train_config.tensorboard_expose:
             tensorboard_args.append("--bind_all")
 
+        # discard the child's banner and notices; the UI already shows the tensorboard URL.
         try:
-            self.always_on_tensorboard_subprocess = subprocess.Popen(tensorboard_args)
+            self.always_on_tensorboard_subprocess = subprocess.Popen(
+                tensorboard_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
         except Exception:
             self.always_on_tensorboard_subprocess = None
 

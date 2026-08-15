@@ -9,6 +9,7 @@ from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleM
 from modules.util.config.TrainConfig import QuantizationConfig, TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.ModuleFilter import ModuleFilter
+from modules.util.tqdm_util import tqdm
 
 import torch
 from torch import Tensor, nn
@@ -16,7 +17,6 @@ from torch import Tensor, nn
 from diffusers.quantizers.gguf.utils import GGUFLinear, dequantize_gguf_tensor
 
 import accelerate
-from tqdm import tqdm
 
 try:
     from modules.module.quantized.LinearNf4 import LinearNf4
@@ -27,17 +27,31 @@ except ImportError:
     LinearNf4 = None
 
 def quantize_int8(x: Tensor, scale: float | Tensor) -> Tensor:
-    q = x.float().mul(1.0 / scale).round_().clamp_(-128.0, 127.0).to(torch.int8)
-    return q
+    xf = x.to(torch.float32, copy=True)
+    return xf.mul_(1.0 / scale).round_().clamp_(-128.0, 127.0).to(torch.int8)
 
-def quantize_int8_tensorwise_get_scale(x: Tensor) -> float:
-    abs_max = x.abs().max()
-    scale = (abs_max.float() / 127.0).clamp(min=1e-30)
-    return scale
+def quantize_int8_tensorwise_get_scale(x: Tensor) -> Tensor:
+    # max|x| == max(max x, -min x): one pass over x, no full-tensor abs() copy
+    min_val, max_val = torch.aminmax(x)
+    abs_max = torch.maximum(max_val, min_val.neg())
+    return (abs_max.float() / 127.0).clamp(min=1e-30)
 
-def quantize_int8_tensorwise(x: Tensor) -> tuple[Tensor, float]:
+def quantize_int8_tensorwise(x: Tensor) -> tuple[Tensor, Tensor]:
     scale = quantize_int8_tensorwise_get_scale(x)
     q = quantize_int8(x, scale)
+    return q, scale
+
+# Quantizing a whole weight at once allocates a full-size fp32 intermediary, which spikes VRAM on small
+# GPUs. The chunked variants work in row-blocks, bounding that transient to one block. Load-time only,
+# so the Python loop costs nothing.
+_QUANTIZE_CHUNK_ELEMENTS = 16 * 1024 * 1024
+
+def quantize_int8_tensorwise_chunked(x: Tensor) -> tuple[Tensor, Tensor]:
+    scale = quantize_int8_tensorwise_get_scale(x)
+    q = torch.empty_like(x, dtype=torch.int8)
+    rows = max(1, _QUANTIZE_CHUNK_ELEMENTS // x[0].numel())
+    for i in range(0, x.shape[0], rows):
+        q[i:i + rows] = quantize_int8(x[i:i + rows], scale)
     return q, scale
 
 def quantize_int8_axiswise_get_scale(x: Tensor, dim: int) -> Tensor:
@@ -51,28 +65,45 @@ def quantize_int8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
     return q, scale
 
 def quantize_fp8(x: Tensor, scale: float | Tensor) -> Tensor:
-    q = x.float().mul(1.0 / scale).clamp_(-448.0, 448.0).to(torch.float8_e4m3fn)
-    return q
+    xf = x.to(torch.float32, copy=True)
+    return xf.mul_(1.0 / scale).clamp_(-448.0, 448.0).to(torch.float8_e4m3fn)
 
-def quantize_fp8_tensorwise_get_scale(x: Tensor) -> float:
-    abs_max = x.abs().max()
-    scale = (abs_max.float() / 448.0).clamp(min=1e-30)
-    return scale
+def quantize_fp8_tensorwise_get_scale(x: Tensor) -> Tensor:
+    # max|x| == max(max x, -min x): one pass over x, no full-tensor abs() copy
+    min_val, max_val = torch.aminmax(x)
+    abs_max = torch.maximum(max_val, min_val.neg())
+    return (abs_max.float() / 448.0).clamp(min=1e-30)
+
+def quantize_fp8_tensorwise(x: Tensor) -> tuple[Tensor, Tensor]:
+    scale = quantize_fp8_tensorwise_get_scale(x)
+    q = quantize_fp8(x, scale)
+    return q, scale
+
+def quantize_fp8_tensorwise_chunked(x: Tensor) -> tuple[Tensor, Tensor]:
+    scale = quantize_fp8_tensorwise_get_scale(x)
+    q = torch.empty_like(x, dtype=torch.float8_e4m3fn)
+    rows = max(1, _QUANTIZE_CHUNK_ELEMENTS // x[0].numel())
+    for i in range(0, x.shape[0], rows):
+        q[i:i + rows] = quantize_fp8(x[i:i + rows], scale)
+    return q, scale
 
 def quantize_fp8_axiswise_get_scale(x: Tensor, dim: int) -> Tensor:
     abs_max = x.abs().amax(dim=dim, keepdim=True)
     scale = (abs_max.float() / 448.0).clamp(min=1e-30)
     return scale
 
-def quantize_fp8_tensorwise(x: Tensor) -> tuple[Tensor, float]:
-    scale = quantize_fp8_tensorwise_get_scale(x)
-    q = quantize_fp8(x, scale)
-    return q, scale
-
 def quantize_fp8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
     scale = quantize_fp8_axiswise_get_scale(x, dim)
     q = quantize_fp8(x, scale)
     return q, scale
+
+def quantize_axiswise(x: Tensor, dim: int, dtype: torch.dtype) -> tuple[Tensor, Tensor]:
+    if dtype == torch.int8:
+        return quantize_int8_axiswise(x, dim)
+    elif dtype == torch.float8_e4m3fn:
+        return quantize_fp8_axiswise(x, dim)
+    else:
+        raise NotImplementedError(f"{dtype} is not an 8-bit quantization dtype")
 
 def dequantize(q: Tensor, scale: float | Tensor) -> Tensor:
     return q.float() * scale
@@ -102,6 +133,7 @@ def __replace_linear_layers(
         construct_fn,
         keep_in_fp32_modules: list[str] | None = None,
         filters: list[ModuleFilter] | None = None,
+        fallback_construct_fn = None,
         copy_parameters: bool = False,
         name_prefix: str = "",
         visited_modules: set[int] | None = None,
@@ -121,10 +153,12 @@ def __replace_linear_layers(
     if isinstance(parent_module, (nn.ModuleList, nn.Sequential, nn.ModuleDict)):
         for key, module in (parent_module.items() if isinstance(parent_module, nn.ModuleDict) else enumerate(parent_module)):
             if isinstance(module, convert_type):
-                if filters is not None and len(filters) > 0 and not any(f.matches(name_prefix) for f in filters):
+                matches = filters is None or len(filters) == 0 or any(f.matches(name_prefix) for f in filters)
+                fn = construct_fn if matches else fallback_construct_fn
+                if fn is None:
                     continue
 
-                quant_linear = __create_linear_layer(construct_fn, module, copy_parameters)
+                quant_linear = __create_linear_layer(fn, module, copy_parameters)
                 parent_module[key] = quant_linear
                 del module
             elif id(module) not in visited_modules:
@@ -133,6 +167,7 @@ def __replace_linear_layers(
                     construct_fn=construct_fn,
                     keep_in_fp32_modules=keep_in_fp32_modules,
                     filters=filters,
+                    fallback_construct_fn=fallback_construct_fn,
                     copy_parameters=copy_parameters,
                     name_prefix=f"{name_prefix}.{key}",
                     visited_modules=visited_modules,
@@ -145,10 +180,12 @@ def __replace_linear_layers(
             module = getattr(parent_module, attr_name)
             if isinstance(module, convert_type):
                 key_name = attr_name if name_prefix == "" else f"{name_prefix}.{attr_name}"
-                if filters is not None and len(filters) > 0 and not any(f.matches(key_name) for f in filters):
+                matches = filters is None or len(filters) == 0 or any(f.matches(key_name) for f in filters)
+                fn = construct_fn if matches else fallback_construct_fn
+                if fn is None:
                     continue
 
-                quant_linear = __create_linear_layer(construct_fn, module, copy_parameters)
+                quant_linear = __create_linear_layer(fn, module, copy_parameters)
                 setattr(parent_module, attr_name, quant_linear)
                 del module
             elif isinstance(module, nn.Module) and id(module) not in visited_modules:
@@ -157,10 +194,39 @@ def __replace_linear_layers(
                     construct_fn=construct_fn,
                     keep_in_fp32_modules=keep_in_fp32_modules,
                     filters=filters,
+                    fallback_construct_fn=fallback_construct_fn,
                     copy_parameters=copy_parameters,
                     name_prefix=attr_name if name_prefix == "" else f"{name_prefix}.{attr_name}",
                     visited_modules=visited_modules,
                 )
+
+def __quantized_linear_class_and_kwargs(dtype: DataType):
+    # only the W8A8 dtypes have a compressed variant, so this covers every layer that can be built compressed
+    if dtype.is_compressed() and not nvcomp_util.available():
+        raise RuntimeError("a compressed weight data type is selected but nvCOMP is not available")
+
+    # deferred imports: the quantized Linear modules pull in heavy backends, so they stay
+    # out of module scope and are only imported once a quantized dtype is actually requested
+    from modules.module.quantized.LinearFp8 import LinearFp8
+    from modules.module.quantized.LinearGGUFA8 import LinearGGUFA8
+    from modules.module.quantized.LinearW8A8 import LinearW8A8
+
+    if dtype.quantize_nf4():
+        return LinearNf4, {}
+    elif dtype.quantize_int8():
+        return bnb.nn.Linear8bitLt, {'has_fp16_weights': False}
+    elif dtype.quantize_fp8():
+        return LinearFp8, {}
+    elif dtype.quantize_intW8A8():
+        return LinearW8A8, {'dtype': torch.int8, 'compress': dtype.is_compressed()}
+    elif dtype.quantize_fpW8A8():
+        return LinearW8A8, {'dtype': torch.float8_e4m3fn, 'compress': dtype.is_compressed()}
+    elif dtype == DataType.GGUF_A8_INT:
+        return LinearGGUFA8, {'dtype': torch.int8}
+    elif dtype == DataType.GGUF_A8_FLOAT:
+        return LinearGGUFA8, {'dtype': torch.float8_e4m3fn}
+    else:
+        return None, {}
 
 def replace_linear_with_quantized_layers(
         parent_module: nn.Module,
@@ -169,34 +235,14 @@ def replace_linear_with_quantized_layers(
         quantization: QuantizationConfig | None = None,
         copy_parameters: bool = False,
 ):
-    from modules.module.quantized.LinearFp8 import LinearFp8
     from modules.module.quantized.LinearGGUFA8 import LinearGGUFA8
     from modules.module.quantized.LinearSVD import make_svd_linear
-    from modules.module.quantized.LinearW8A8 import LinearW8A8
 
-    kwargs = {}
-    if dtype.quantize_nf4():
-        linear_class = LinearNf4
-    elif dtype.quantize_int8():
-        linear_class = bnb.nn.Linear8bitLt
-        kwargs = {'has_fp16_weights': False}
-    elif dtype.quantize_fp8():
-        linear_class = LinearFp8
-    elif dtype.quantize_intW8A8():
-        linear_class = LinearW8A8
-        kwargs = {'dtype': torch.int8}
-    elif dtype.quantize_fpW8A8():
-        linear_class=LinearW8A8
-        kwargs = {'dtype': torch.float8_e4m3fn}
-    elif dtype == DataType.GGUF_A8_INT:
-        linear_class=LinearGGUFA8
-        kwargs = {'dtype': torch.int8}
-    elif dtype == DataType.GGUF_A8_FLOAT:
-        linear_class=LinearGGUFA8
-        kwargs = {'dtype': torch.float8_e4m3fn}
-    else:
+    linear_class, kwargs = __quantized_linear_class_and_kwargs(dtype)
+    if linear_class is None:
         return
 
+    fallback_construct_fn = None
     if quantization is not None:
         if quantization.svd_dtype != DataType.NONE:
             if dtype.is_gguf():
@@ -210,6 +256,11 @@ def replace_linear_with_quantized_layers(
             ModuleFilter(pattern, use_regex=quantization.layer_filter_regex)
             for pattern in quantization.layer_filter.split(",")
         ]
+
+        if not dtype.is_gguf() and quantization.fallback_dtype.is_quantized():
+            fallback_linear_class, fallback_kwargs = __quantized_linear_class_and_kwargs(quantization.fallback_dtype)
+            if fallback_linear_class is not None:
+                fallback_construct_fn = partial(fallback_linear_class, **fallback_kwargs)
     else:
         quant_filters = None
 
@@ -219,6 +270,7 @@ def replace_linear_with_quantized_layers(
         construct_fn=partial(linear_class, **kwargs),
         keep_in_fp32_modules=keep_in_fp32_modules,
         filters=quant_filters,
+        fallback_construct_fn=fallback_construct_fn,
         copy_parameters=copy_parameters,
         convert_type=convert_type,
     )
@@ -262,29 +314,39 @@ def is_quantized_parameter(
     return False
 
 
-def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataType, config: TrainConfig, compress: bool = False):
+def is_quantized_module(module: nn.Module) -> bool:
+    return any(is_quantized_parameter(module, name)
+               for name, _ in module.named_parameters(recurse=False))
+
+
+def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataType, config: TrainConfig):
     if module is None:
         return
     child_modules = list(module.modules())
 
-    compressible = [m for m in child_modules if isinstance(m, CompressedWeightMixin)]
-    if compress and not nvcomp_util.available():
-        raise RuntimeError("a compressed weight data type is selected but nvCOMP is not available")
-    for m in compressible:
-        m.compress = compress
+    for child_module in tqdm(child_modules, desc="Quantizing model weights", total=len(child_modules), delay=5, smoothing=0.1):
+        if isinstance(child_module, (QuantizedModuleMixin, GGUFLinear)):
+            child_module.compute_dtype = train_dtype.torch_dtype()
+        if isinstance(child_module, QuantizedModuleMixin):
+            child_module.quantize(device=device)
 
-    for _ in multi.master_first(): #avoid cache writing conflicts
-        for child_module in tqdm(child_modules, desc="Quantizing model weights", total=len(child_modules), delay=5, smoothing=0.1):
-            if isinstance(child_module, (QuantizedModuleMixin, GGUFLinear)):
-                child_module.compute_dtype = train_dtype.torch_dtype()
-            if isinstance(child_module, QuantizedModuleMixin):
-                child_module.quantize(device=device)
+    report_compression(module)
 
-    if multi.is_master() and compress:
-        uncompressed = sum(m.uncompressed_bytes() for m in compressible)
-        compressed = sum(m.weight.nbytes for m in compressible)
-        if uncompressed > 0:
-            tqdm.write(f"nvCOMP weight compression ({type(module).__name__}): {uncompressed / 2**20:.0f} -> {compressed / 2**20:.0f} MiB ({(1 - compressed / uncompressed) * 100:.0f}% saved)")
+
+def report_compression(module: nn.Module):
+    # one line per component, summed over its compressed layers. Reads the measured lengths, which outlive the blob,
+    # so the streamed path -- where the layers are back on meta by now -- reports the same numbers as the resident one.
+    # A streamed component is cold-materialized once per eviction cycle, so the line is emitted on the first one only.
+    if not multi.is_master() or getattr(module, "_compression_reported", False):
+        return
+    compressible = [m for m in module.modules()
+                    if isinstance(m, CompressedWeightMixin) and m.compressed_bytes() is not None]
+    if not compressible:
+        return
+    module._compression_reported = True
+    uncompressed = sum(m.uncompressed_bytes() for m in compressible)
+    compressed = sum(m.compressed_bytes() for m in compressible)
+    tqdm.write(f"nvCOMP weight compression ({type(module).__name__}): {uncompressed / 2**20:.0f} -> {compressed / 2**20:.0f} MiB ({(1 - compressed / uncompressed) * 100:.0f}% saved)")
 
 def get_unquantized_weight(module: nn.Linear, dtype: torch.dtype, device: torch.device) -> Tensor:
     assert isinstance(module, nn.Linear)
@@ -320,6 +382,9 @@ def get_offload_tensors(module: nn.Module) -> list[torch.Tensor]:
 
 
 def get_offload_tensor_bytes(module: nn.Module) -> int:
+    if isinstance(module, QuantizedLinearMixin) and module.weight.is_meta:
+        return module.predict_offload_bytes()
+
     tensors = get_offload_tensors(module)
 
     return sum(t.element_size() * t.numel() for t in tensors)
@@ -329,15 +394,13 @@ def offload_quantized(
         module: nn.Module,
         device: torch.device,
         non_blocking: bool = False,
-        allocator: Callable[[torch.tensor], torch.tensor] | None = None,
+        place: Callable[[torch.Tensor, bool], torch.Tensor] | None = None,
 ):
     tensors = get_offload_tensors(module)
 
-    if allocator is None:
+    if place is None:
         for tensor in tensors:
             tensor.data = tensor.data.to(device=device, non_blocking=non_blocking)
     else:
         for tensor in tensors:
-            new_tensor = allocator(tensor)
-            new_tensor.copy_(tensor.data, non_blocking=non_blocking)
-            tensor.data = new_tensor
+            tensor.data = place(tensor, non_blocking)

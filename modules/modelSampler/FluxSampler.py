@@ -11,15 +11,14 @@ from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
-from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
 from modules.util.image_util import load_image
+from modules.util.staged_pipeline import run_staged_pipeline
+from modules.util.tqdm_util import tqdm
 
 import torch
 from torch import nn
 from torchvision.transforms import transforms
-
-from tqdm import tqdm
 
 
 @factory.register(BaseModelSampler, ModelType.FLUX_DEV_1)
@@ -38,131 +37,6 @@ class FluxSampler(BaseModelSampler):
         self.model_type = model_type
         self.pipeline = model.create_pipeline()
 
-    @torch.no_grad()
-    def __sample_base(
-            self,
-            prompt: str,
-            negative_prompt: str,
-            height: int,
-            width: int,
-            seed: int,
-            random_seed: bool,
-            diffusion_steps: int,
-            cfg_scale: float,
-            noise_scheduler: NoiseScheduler,
-            text_encoder_1_layer_skip: int = 0,
-            text_encoder_2_layer_skip: int = 0,
-            text_encoder_2_sequence_length: int | None = None,
-            transformer_attention_mask: bool = False,
-            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
-    ) -> ModelSamplerOutput:
-        with self.model.autocast_context:
-            generator = torch.Generator(device=self.train_device)
-            if random_seed:
-                generator.seed()
-            else:
-                generator.manual_seed(seed)
-
-            noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
-            image_processor = self.pipeline.image_processor
-            transformer = self.pipeline.transformer
-            vae = self.pipeline.vae
-            vae_scale_factor = 8
-            num_latent_channels = 16
-
-            # prepare prompt
-            self.model.materialize_only_text_encoders()
-
-            prompt_embedding, pooled_prompt_embedding = self.model.encode_text(
-                text=prompt,
-                train_device=self.train_device,
-                text_encoder_1_layer_skip=text_encoder_1_layer_skip,
-                text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-                text_encoder_2_sequence_length=text_encoder_2_sequence_length,
-                apply_attention_mask=transformer_attention_mask,
-            )
-
-            # prepare latent image
-            latent_image = torch.randn(
-                size=(1, num_latent_channels, height // vae_scale_factor, width // vae_scale_factor),
-                generator=generator,
-                device=self.train_device,
-                dtype=torch.float32,
-            )
-
-            image_ids = self.model.prepare_latent_image_ids(
-                height // vae_scale_factor,
-                width // vae_scale_factor,
-                self.train_device,
-                self.model.train_dtype.torch_dtype()
-            )
-
-            shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
-            latent_image = self.model.pack_latents(latent_image)
-
-            # prepare timesteps
-            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=math.log(shift))
-            timesteps = noise_scheduler.timesteps
-
-            # denoising loop
-            extra_step_kwargs = {}
-            if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
-                extra_step_kwargs["generator"] = generator
-
-            text_ids = torch.zeros(prompt_embedding.shape[1], 3, device=self.train_device)
-
-            self.model.materialize_only("transformer")
-            for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
-                latent_model_input = torch.cat([latent_image])
-                expanded_timestep = timestep.expand(latent_model_input.shape[0])
-
-                # handle guidance
-                if transformer.config.guidance_embeds:
-                    guidance = torch.tensor([cfg_scale], device=self.train_device)
-                    guidance = guidance.expand(latent_model_input.shape[0])
-                else:
-                    guidance = None
-
-                # predict the noise residual
-                noise_pred = transformer(
-                    hidden_states=latent_model_input.to(dtype=self.model.train_dtype.torch_dtype()),
-                    timestep=expanded_timestep / 1000,
-                    guidance=guidance.to(dtype=self.model.train_dtype.torch_dtype()),
-                    pooled_projections=pooled_prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
-                    encoder_hidden_states=prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
-                    txt_ids=text_ids,
-                    img_ids=image_ids,
-                    joint_attention_kwargs=None,
-                    return_dict=True
-                ).sample
-
-                # compute the previous noisy sample x_t -> x_t-1
-                latent_image = noise_scheduler.step(
-                    noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs
-                )[0]
-
-                on_update_progress(i + 1, len(timesteps))
-
-            latent_image = self.model.unpack_latents(
-                latent_image,
-                height // vae_scale_factor,
-                width // vae_scale_factor,
-            )
-
-            # decode
-            self.model.materialize_only("vae")
-
-            latents = (latent_image / vae.config.scaling_factor) + vae.config.shift_factor
-            image = vae.decode(latents, return_dict=False)[0]
-
-            do_denormalize = [True] * image.shape[0] #TODO remove and test, from Flux and other models. True is the default
-            image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
-
-            return ModelSamplerOutput(
-                file_type=FileType.IMAGE,
-                data=image[0],
-            )
-
     def __create_erode_kernel(self, device, dtype=torch.float32):
         kernel_radius = 2
 
@@ -177,208 +51,268 @@ class FluxSampler(BaseModelSampler):
         kernel.to(device)
         return kernel
 
+    # only present for conditioning (inpainting) model types: VAE-encode the conditioning image + mask
     @torch.no_grad()
-    def __sample_inpainting(
+    def __cond_encode(
             self,
-            prompt: str,
-            negative_prompt: str,
-            height: int,
-            width: int,
-            seed: int,
-            random_seed: bool,
-            diffusion_steps: int,
-            cfg_scale: float,
-            noise_scheduler: NoiseScheduler,
-            sample_inpainting: bool = False,
-            base_image_path: str = "",
-            mask_image_path: str = "",
-            text_encoder_1_layer_skip: int = 0,
-            text_encoder_2_layer_skip: int = 0,
-            text_encoder_2_sequence_length: int | None = None,
-            transformer_attention_mask: bool = False,
-            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
-    ) -> ModelSamplerOutput:
-        with self.model.autocast_context:
-            generator = torch.Generator(device=self.train_device)
-            if random_seed:
-                generator.seed()
-            else:
-                generator.manual_seed(seed)
+            sample_config: SampleConfig,
+    ) -> dict:
+        self.model.materialize_only("vae")
+        vae = self.pipeline.vae
+        vae_scale_factor = 8
+        height = self.quantize_resolution(sample_config.height, 64)
+        width = self.quantize_resolution(sample_config.width, 64)
 
-            noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
-            image_processor = self.pipeline.image_processor
-            transformer = self.pipeline.transformer
-            vae = self.pipeline.vae
-            vae_scale_factor = 8
-            num_latent_channels = 16
+        if sample_config.sample_inpainting:
+            t = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Resize(
+                    (height, width), interpolation=transforms.InterpolationMode.BILINEAR, antialias=True
+                ),
+            ])
 
-            # prepare conditioning image
-            self.model.materialize_only("vae")
-
-            if sample_inpainting:
-                t = transforms.Compose([
-                    transforms.ToTensor(),
-                    transforms.Resize(
-                        (height, width), interpolation=transforms.InterpolationMode.BILINEAR, antialias=True
-                    ),
-                ])
-
-                image = load_image(base_image_path, convert_mode="RGB")
-                image = t(image).to(
-                    dtype=self.model.train_dtype.torch_dtype(),
-                    device=self.train_device,
-                )
-
-                mask = load_image(mask_image_path, convert_mode='L')
-                mask = t(mask).to(
-                    dtype=self.model.train_dtype.torch_dtype(),
-                    device=self.train_device,
-                )
-
-                erode_kernel = self.__create_erode_kernel(self.train_device, dtype=self.model.train_dtype.torch_dtype())
-                eroded_mask = erode_kernel(mask)
-                eroded_mask = (eroded_mask > 0.5).to(dtype=self.model.train_dtype.torch_dtype())
-
-                image = (image * 2.0) - 1.0
-                conditioning_image = (image * (1 - eroded_mask))
-                conditioning_image = conditioning_image.unsqueeze(0)
-
-                latent_conditioning_image = vae.encode(conditioning_image).latent_dist.mode()
-                latent_conditioning_image = (latent_conditioning_image - vae.config.shift_factor) \
-                                            * vae.config.scaling_factor
-
-                latent_conditioning_image = self.model.pack_latents(latent_conditioning_image)
-
-                # batch_size, height, 8, width, 8
-                mask = mask.view(
-                    mask.shape[0],
-                    height // vae_scale_factor,
-                    vae_scale_factor,
-                    width // vae_scale_factor,
-                    vae_scale_factor,
-                )
-                # batch_size, 8, 8, height, width
-                mask = mask.permute(0, 2, 4, 1, 3)
-                # batch_size, 8*8, height, width
-                mask = mask.reshape(
-                    mask.shape[0],
-                    vae_scale_factor * vae_scale_factor,
-                    height // vae_scale_factor,
-                    width // vae_scale_factor,
-                )
-
-                latent_mask = self.model.pack_latents(mask)
-            else:
-                conditioning_image = torch.zeros(
-                    (1, 3, height, width),
-                    dtype=self.model.train_dtype.torch_dtype(),
-                    device=self.train_device,
-                )
-                latent_conditioning_image = vae.encode(conditioning_image).latent_dist.mode()
-                latent_conditioning_image = (latent_conditioning_image - vae.config.shift_factor) \
-                                            * vae.config.scaling_factor
-
-                latent_conditioning_image = self.model.pack_latents(latent_conditioning_image)
-
-                latent_mask = torch.ones(
-                    size=(1, (height // vae_scale_factor // 2) * (width // vae_scale_factor // 2), 256),
-                    dtype=self.model.train_dtype.torch_dtype(),
-                    device=self.train_device
-                )
-
-            # prepare prompt
-            self.model.materialize_only_text_encoders()
-
-            prompt_embedding, pooled_prompt_embedding = self.model.encode_text(
-                text=prompt,
-                train_device=self.train_device,
-                text_encoder_1_layer_skip=text_encoder_1_layer_skip,
-                text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-                text_encoder_2_sequence_length=text_encoder_2_sequence_length,
-                apply_attention_mask=transformer_attention_mask,
-            )
-
-            # prepare latent image
-            latent_image = torch.randn(
-                size=(1, num_latent_channels, height // vae_scale_factor, width // vae_scale_factor),
-                generator=generator,
+            image = load_image(sample_config.base_image_path, convert_mode="RGB")
+            image = t(image).to(
+                dtype=self.model.train_dtype.torch_dtype(),
                 device=self.train_device,
-                dtype=torch.float32,
             )
 
-            image_ids = self.model.prepare_latent_image_ids(
+            mask = load_image(sample_config.mask_image_path, convert_mode='L')
+            mask = t(mask).to(
+                dtype=self.model.train_dtype.torch_dtype(),
+                device=self.train_device,
+            )
+
+            erode_kernel = self.__create_erode_kernel(self.train_device, dtype=self.model.train_dtype.torch_dtype())
+            eroded_mask = erode_kernel(mask)
+            eroded_mask = (eroded_mask > 0.5).to(dtype=self.model.train_dtype.torch_dtype())
+
+            image = (image * 2.0) - 1.0
+            conditioning_image = (image * (1 - eroded_mask))
+            conditioning_image = conditioning_image.unsqueeze(0)
+
+            latent_conditioning_image = vae.encode(conditioning_image).latent_dist.mode()
+            latent_conditioning_image = (latent_conditioning_image - vae.config.shift_factor) \
+                                        * vae.config.scaling_factor
+
+            latent_conditioning_image = self.model.pack_latents(latent_conditioning_image)
+
+            # batch_size, height, 8, width, 8
+            mask = mask.view(
+                mask.shape[0],
+                height // vae_scale_factor,
+                vae_scale_factor,
+                width // vae_scale_factor,
+                vae_scale_factor,
+            )
+            # batch_size, 8, 8, height, width
+            mask = mask.permute(0, 2, 4, 1, 3)
+            # batch_size, 8*8, height, width
+            mask = mask.reshape(
+                mask.shape[0],
+                vae_scale_factor * vae_scale_factor,
                 height // vae_scale_factor,
                 width // vae_scale_factor,
-                self.train_device,
-                self.model.train_dtype.torch_dtype()
             )
 
-            shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
-            latent_image = self.model.pack_latents(latent_image)
-            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=math.log(shift))
-            timesteps = noise_scheduler.timesteps
+            latent_mask = self.model.pack_latents(mask)
+        else:
+            conditioning_image = torch.zeros(
+                (1, 3, height, width),
+                dtype=self.model.train_dtype.torch_dtype(),
+                device=self.train_device,
+            )
+            latent_conditioning_image = vae.encode(conditioning_image).latent_dist.mode()
+            latent_conditioning_image = (latent_conditioning_image - vae.config.shift_factor) \
+                                        * vae.config.scaling_factor
 
-            # denoising loop
-            extra_step_kwargs = {}
-            if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
-                extra_step_kwargs["generator"] = generator
+            latent_conditioning_image = self.model.pack_latents(latent_conditioning_image)
 
-            text_ids = torch.zeros(prompt_embedding.shape[1], 3, device=self.train_device)
+            latent_mask = torch.ones(
+                size=(1, (height // vae_scale_factor // 2) * (width // vae_scale_factor // 2), 256),
+                dtype=self.model.train_dtype.torch_dtype(),
+                device=self.train_device
+            )
 
-            self.model.materialize_only("transformer")
-            for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
-                latent_model_input = torch.cat([latent_image])
+        return {
+            "latent_conditioning_image": latent_conditioning_image,
+            "latent_mask": latent_mask,
+        }
+
+    @torch.no_grad()
+    def __encode(
+            self,
+            sample_config: SampleConfig,
+    ) -> dict:
+        self.model.materialize_only_text_encoders()
+        prompt_embedding, pooled_prompt_embedding = self.model.encode_text(
+            text=sample_config.prompt,
+            train_device=self.train_device,
+            text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
+            text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
+            text_encoder_2_sequence_length=sample_config.text_encoder_2_sequence_length,
+            apply_attention_mask=sample_config.transformer_attention_mask,
+        )
+
+        return {
+            "prompt_embedding": prompt_embedding,
+            "pooled_prompt_embedding": pooled_prompt_embedding,
+        }
+
+    @torch.no_grad()
+    def __denoise(
+            self,
+            sample_config: SampleConfig,
+            prompt_embedding: torch.Tensor,
+            pooled_prompt_embedding: torch.Tensor,
+            on_update_progress: Callable[[int, int], None],
+            latent_conditioning_image: torch.Tensor | None = None,
+            latent_mask: torch.Tensor | None = None,
+    ) -> dict:
+        self.model.materialize_only("transformer")
+        # conditioning tensors are only present for inpainting model types (their cond-encode stage ran)
+        is_inpainting = latent_conditioning_image is not None
+        transformer = self.pipeline.transformer
+        vae_scale_factor = 8
+        num_latent_channels = 16
+        height = self.quantize_resolution(sample_config.height, 64)
+        width = self.quantize_resolution(sample_config.width, 64)
+        cfg_scale = sample_config.cfg_scale
+        diffusion_steps = sample_config.diffusion_steps
+
+        generator = torch.Generator(device=self.train_device)
+        if sample_config.random_seed:
+            generator.seed()
+        else:
+            generator.manual_seed(sample_config.seed)
+
+        noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
+
+        # prepare latent image
+        latent_image = torch.randn(
+            size=(1, num_latent_channels, height // vae_scale_factor, width // vae_scale_factor),
+            generator=generator,
+            device=self.train_device,
+            dtype=torch.float32,
+        )
+
+        image_ids = self.model.prepare_latent_image_ids(
+            height // vae_scale_factor,
+            width // vae_scale_factor,
+            self.train_device,
+            self.model.train_dtype.torch_dtype()
+        )
+
+        shift = sample_config.override_shift \
+            or self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
+        latent_image = self.model.pack_latents(latent_image)
+
+        # prepare timesteps
+        noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=math.log(shift))
+        timesteps = noise_scheduler.timesteps
+
+        # denoising loop
+        extra_step_kwargs = {}
+        if "generator" in set(inspect.signature(noise_scheduler.step).parameters.keys()):
+            extra_step_kwargs["generator"] = generator
+
+        text_ids = torch.zeros(prompt_embedding.shape[1], 3, device=self.train_device)
+
+        for i, timestep in enumerate(tqdm(timesteps, desc="steps", leave=False)):
+            latent_model_input = torch.cat([latent_image])
+            if is_inpainting:
                 latent_model_input = torch.concat(
                     [latent_model_input, latent_conditioning_image, latent_mask], -1
                 )
-                expanded_timestep = timestep.expand(latent_model_input.shape[0])
+            expanded_timestep = timestep.expand(latent_model_input.shape[0])
 
-                # handle guidance
-                if transformer.config.guidance_embeds:
-                    guidance = torch.tensor([cfg_scale], device=self.train_device)
-                    guidance = guidance.expand(latent_model_input.shape[0])
-                else:
-                    guidance = None
+            # handle guidance
+            if transformer.config.guidance_embeds:
+                guidance = torch.tensor([cfg_scale], device=self.train_device)
+                guidance = guidance.expand(latent_model_input.shape[0])
+            else:
+                guidance = None
 
-                # predict the noise residual
-                noise_pred = transformer(
-                    hidden_states=latent_model_input.to(dtype=self.model.train_dtype.torch_dtype()),
-                    timestep=expanded_timestep / 1000,
-                    guidance=guidance.to(dtype=self.model.train_dtype.torch_dtype()),
-                    pooled_projections=pooled_prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
-                    encoder_hidden_states=prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
-                    txt_ids=text_ids.to(dtype=self.model.train_dtype.torch_dtype()),
-                    img_ids=image_ids.to(dtype=self.model.train_dtype.torch_dtype()),
-                    joint_attention_kwargs=None,
-                    return_dict=True
-                ).sample
+            # predict the noise residual
+            noise_pred = transformer(
+                hidden_states=latent_model_input.to(dtype=self.model.train_dtype.torch_dtype()),
+                timestep=expanded_timestep / 1000,
+                guidance=guidance.to(dtype=self.model.train_dtype.torch_dtype()),
+                pooled_projections=pooled_prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
+                encoder_hidden_states=prompt_embedding.to(dtype=self.model.train_dtype.torch_dtype()),
+                txt_ids=text_ids.to(dtype=self.model.train_dtype.torch_dtype()) if is_inpainting else text_ids,
+                img_ids=image_ids.to(dtype=self.model.train_dtype.torch_dtype()) if is_inpainting else image_ids,
+                joint_attention_kwargs=None,
+                return_dict=True
+            ).sample
 
-                # compute the previous noisy sample x_t -> x_t-1
-                latent_image = noise_scheduler.step(
-                    noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs
-                )[0]
+            # compute the previous noisy sample x_t -> x_t-1
+            latent_image = noise_scheduler.step(
+                noise_pred, timestep, latent_image, return_dict=False, **extra_step_kwargs
+            )[0]
 
-                on_update_progress(i + 1, len(timesteps))
+            on_update_progress(i + 1, len(timesteps))
 
-            latent_image = self.model.unpack_latents(
-                latent_image,
-                height // vae_scale_factor,
-                width // vae_scale_factor,
+        latent_image = self.model.unpack_latents(
+            latent_image,
+            height // vae_scale_factor,
+            width // vae_scale_factor,
+        )
+
+        return {
+            "latent_image": latent_image,
+        }
+
+    @torch.no_grad()
+    def __decode(
+            self,
+            latent_image: torch.Tensor,
+    ) -> ModelSamplerOutput:
+        self.model.materialize_only("vae")
+        image_processor = self.pipeline.image_processor
+        vae = self.pipeline.vae
+
+        latents = (latent_image / vae.config.scaling_factor) + vae.config.shift_factor
+        image = vae.decode(latents, return_dict=False)[0]
+
+        do_denormalize = [True] * image.shape[0]
+        image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
+
+        return ModelSamplerOutput(
+            file_type=FileType.IMAGE,
+            data=image[0],
+        )
+
+    def sample_all(
+            self,
+            sample_configs: list[SampleConfig],
+            destinations: list[str],
+            image_format: ImageFormat | None = None,
+            video_format: VideoFormat | None = None,
+            audio_format: AudioFormat | None = None,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+    ) -> list[ModelSamplerOutput]:
+        stages = [("encoding", self.__encode), ("denoising", self.__denoise), ("decoding", self.__decode)]
+        # conditioning (inpainting) model types VAE-encode a conditioning image first
+        if self.model_type.has_conditioning_image_input():
+            stages.insert(0, ("encoding conditioning image", self.__cond_encode))
+
+        batch_progress = self.batch_progress_callback(sample_configs, on_update_progress)
+
+        with self.model.autocast_context:
+            sampler_outputs = run_staged_pipeline(
+                stages,
+                {"sample_config": sample_configs},
+                {"on_update_progress": batch_progress},
             )
 
-            # decode
-            self.model.materialize_only("vae")
-
-            latents = (latent_image / vae.config.scaling_factor) + vae.config.shift_factor
-            image = vae.decode(latents, return_dict=False)[0]
-
-            do_denormalize = [True] * image.shape[0]
-            image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
-
-            return ModelSamplerOutput(
-                file_type=FileType.IMAGE,
-                data=image[0],
+        for sampler_output, destination in zip(sampler_outputs, destinations, strict=True):
+            self.save_sampler_output(
+                sampler_output, destination,
+                image_format, video_format, audio_format,
             )
+
+        return sampler_outputs
 
     def sample(
             self,
@@ -390,47 +324,11 @@ class FluxSampler(BaseModelSampler):
             on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):
-        if self.model_type.has_conditioning_image_input():
-            sampler_output = self.__sample_inpainting(
-                prompt=sample_config.prompt,
-                negative_prompt=sample_config.negative_prompt,
-                height=self.quantize_resolution(sample_config.height, 64),
-                width=self.quantize_resolution(sample_config.width, 64),
-                seed=sample_config.seed,
-                random_seed=sample_config.random_seed,
-                diffusion_steps=sample_config.diffusion_steps,
-                cfg_scale=sample_config.cfg_scale,
-                noise_scheduler=sample_config.noise_scheduler,
-                sample_inpainting=sample_config.sample_inpainting,
-                base_image_path=sample_config.base_image_path,
-                mask_image_path=sample_config.mask_image_path,
-                text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
-                text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
-                text_encoder_2_sequence_length=sample_config.text_encoder_2_sequence_length,
-                transformer_attention_mask=sample_config.transformer_attention_mask,
-                on_update_progress=on_update_progress,
-            )
-        else:
-            sampler_output = self.__sample_base(
-                prompt=sample_config.prompt,
-                negative_prompt=sample_config.negative_prompt,
-                height=self.quantize_resolution(sample_config.height, 64),
-                width=self.quantize_resolution(sample_config.width, 64),
-                seed=sample_config.seed,
-                random_seed=sample_config.random_seed,
-                diffusion_steps=sample_config.diffusion_steps,
-                cfg_scale=sample_config.cfg_scale,
-                noise_scheduler=sample_config.noise_scheduler,
-                text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
-                text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
-                text_encoder_2_sequence_length=sample_config.text_encoder_2_sequence_length,
-                transformer_attention_mask=sample_config.transformer_attention_mask,
-                on_update_progress=on_update_progress,
-            )
-
-        self.save_sampler_output(
-            sampler_output, destination,
+        # single-sample entry point: a staged batch of one
+        sampler_output = self.sample_all(
+            [sample_config], [destination],
             image_format, video_format, audio_format,
-        )
+            on_update_progress=on_update_progress,
+        )[0]
 
         on_sample(sampler_output)

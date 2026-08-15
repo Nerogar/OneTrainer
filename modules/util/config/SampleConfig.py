@@ -17,6 +17,8 @@ def _get_model_defaults(model_type) -> dict:
         "cfg_scale": 7.0,
         "noise_scheduler": NoiseScheduler.DDIM,
         "negative_prompt": "",
+        # None keeps the sampler's derived shift; a model whose reference pipeline pins a fixed one sets it here
+        "override_shift": None,
     }
 
     if model_type is None:
@@ -170,6 +172,7 @@ class SampleConfig(BaseConfig):
     diffusion_steps: int
     cfg_scale: float
     noise_scheduler: NoiseScheduler
+    override_shift: float | None
 
     text_encoder_1_layer_skip: int
     text_encoder_1_sequence_length: int | None
@@ -214,6 +217,7 @@ class SampleConfig(BaseConfig):
         data.append(("diffusion_steps", defaults["diffusion_steps"], int, False))
         data.append(("cfg_scale", defaults["cfg_scale"], float, False))
         data.append(("noise_scheduler", defaults["noise_scheduler"], NoiseScheduler, False))
+        data.append(("override_shift", defaults["override_shift"], float, True))
 
         data.append(("text_encoder_1_layer_skip", 0, int, False))
         data.append(("text_encoder_1_sequence_length", None, int, True))

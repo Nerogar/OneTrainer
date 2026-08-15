@@ -8,6 +8,7 @@ from modules.modelSampler.BaseModelSampler import (
 from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.compile_util import init_compile
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.EMAMode import EMAMode
@@ -90,6 +91,8 @@ class SampleWindowController:
             model_names=model_names,
             weight_dtypes=self.initial_train_config.weight_dtypes(),
             quantization=self.initial_train_config.quantization,
+            stream_from_disk=self.initial_train_config.stream_from_disk,
+            cache_in_ram=self.initial_train_config.cache_in_ram(),
         )
         model.train_config = self.initial_train_config
 
@@ -118,6 +121,8 @@ class SampleWindowController:
                 # lazy initialization
                 self.model = self.load_model()
                 self.model_sampler = self.create_sampler(self.model)
+
+            init_compile()
 
             sample.from_train_config(self.current_train_config)
 
