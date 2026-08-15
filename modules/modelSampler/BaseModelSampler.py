@@ -73,9 +73,71 @@ class BaseModelSampler(metaclass=ABCMeta):
     ):
         pass
 
+    def sample_all(
+            self,
+            sample_configs: list[SampleConfig],
+            destinations: list[str],
+            image_format: ImageFormat | None = None,
+            video_format: VideoFormat | None = None,
+            audio_format: AudioFormat | None = None,
+            on_update_progress: Callable[[int, int], None] = lambda _, __: None,
+    ) -> list[ModelSamplerOutput]:
+        # Item-major fallback for samplers not split into pipeline stages: run each sample
+        # end to end, cycling this model's parts on-device once per sample instead of once
+        # per batch. Progress restarts at each sample, matching how these samplers reported
+        # when the trainer still sampled one at a time. Samplers that define stages override
+        # this with run_staged_pipeline.
+        sampler_outputs = []
+        for sample_config, destination in zip(sample_configs, destinations, strict=True):
+            self.sample(
+                sample_config, destination,
+                image_format, video_format, audio_format,
+                on_sample=sampler_outputs.append,
+                on_update_progress=on_update_progress,
+            )
+        return sampler_outputs
+
     @staticmethod
     def quantize_resolution(resolution: int, quantization: int) -> int:
         return round(resolution / quantization) * quantization
+
+    @staticmethod
+    def batch_progress_callback(
+            sample_configs: list[SampleConfig],
+            on_update_progress: Callable[[int, int], None],
+    ) -> Callable[[int, int], None]:
+        # denoise reports its own per-sample step count; the staged pipeline denoises
+        # every sample before any decode, so translate those into one continuous bar
+        # spanning the whole batch rather than restarting at each sample
+        total_steps = sum(sample_config.diffusion_steps for sample_config in sample_configs)
+        completed_steps = 0
+
+        def batch_progress(step: int, sample_steps: int):
+            nonlocal completed_steps
+            on_update_progress(completed_steps + step, total_steps)
+            if step == sample_steps:
+                completed_steps += sample_steps
+
+        return batch_progress
+
+    @staticmethod
+    def build_video_sampler_output(video: torch.Tensor) -> ModelSamplerOutput:
+        # `video` is the video processor's output, [B, F, C, H, W] with values in [0, 1]. Only the first batch
+        # item is kept, and a single frame becomes an image rather than a one-frame video.
+        video = video.cpu().float()
+
+        if video.shape[1] == 1:
+            image = video[0, 0].permute(1, 2, 0).numpy()  # [H, W, C]
+            return ModelSamplerOutput(
+                file_type=FileType.IMAGE,
+                data=Image.fromarray((image * 255).round().astype("uint8")),
+            )
+        else:
+            frames = video[0].permute(0, 2, 3, 1)  # [F, H, W, C]
+            return ModelSamplerOutput(
+                file_type=FileType.VIDEO,
+                data=(frames.clamp(0, 1) * 255).round().to(dtype=torch.int8),
+            )
 
     @staticmethod
     def save_sampler_output(

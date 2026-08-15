@@ -16,5 +16,11 @@ class SampleFrameController:
     def is_video_model(self) -> bool:
         return self.model_type.is_video_model()
 
+    def is_audio_model(self) -> bool:
+        return self.model_type.is_audio_model()
+
     def supports_negative_prompt(self) -> bool:
         return self.model_type.supports_negative_prompt()
+
+    def supports_multiple_sampling_methods(self) -> bool:
+        return self.model_type.has_low_noise_expert()

@@ -16,6 +16,8 @@ class ModelWeightDtypes:
             text_encoder_2: DataType,
             text_encoder_3: DataType,
             text_encoder_4: DataType,
+            connectors: DataType,
+            low_noise_transformer: DataType,
             vae: DataType,
             effnet_encoder: DataType,
             decoder: DataType,
@@ -35,6 +37,8 @@ class ModelWeightDtypes:
         self.text_encoder_2 = text_encoder_2
         self.text_encoder_3 = text_encoder_3
         self.text_encoder_4 = text_encoder_4
+        self.connectors = connectors
+        self.low_noise_transformer = low_noise_transformer
         self.vae = vae
         self.effnet_encoder = effnet_encoder
         self.decoder = decoder
@@ -53,6 +57,8 @@ class ModelWeightDtypes:
             self.text_encoder_2,
             self.text_encoder_3,
             self.text_encoder_4,
+            self.connectors,
+            self.low_noise_transformer,
             self.vae,
             self.effnet_encoder,
             self.decoder,

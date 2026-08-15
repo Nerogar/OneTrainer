@@ -66,6 +66,8 @@ class BaseTrainingTabView(ABC):
             self.__setup_ernie_ui(column_0, column_1, column_2, controller, ui_state)
         elif model_type.is_ideogram():
             self.__setup_ideogram_ui(column_0, column_1, column_2, controller, ui_state)
+        elif model_type.is_ltx_2():
+            self.__setup_ltx_2_ui(column_0, column_1, column_2, controller, ui_state)
 
     def __setup_stable_diffusion_ui(self, column_0, column_1, column_2, controller, ui_state):
         self.__create_base_frame(column_0, 0, controller, ui_state)
@@ -242,6 +244,20 @@ class BaseTrainingTabView(ABC):
         self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=False, supports_force_attention_mask=False)
         self.__create_unconditional_transformer_frame(column_1, 2, ui_state)
         self.__create_noise_frame(column_1, 3, ui_state, supports_dynamic_timestep_shifting=True)
+
+        self.__create_masked_frame(column_2, 1, ui_state)
+        self.__create_loss_frame(column_2, 2, controller, ui_state)
+        self.__create_layer_frame(column_2, 3, controller, ui_state)
+
+    def __setup_ltx_2_ui(self, column_0, column_1, column_2, controller, ui_state):
+        self.__create_base_frame(column_0, 0, controller, ui_state)
+        self.__create_text_encoder_frame(column_0, 1, ui_state, supports_clip_skip=False, supports_training=False)
+        self.__create_connectors_frame(column_0, 2, ui_state)
+        self.__create_low_noise_transformer_frame(column_0, 3, ui_state)
+
+        self.__create_base2_frame(column_1, 0, controller, ui_state, video_training_enabled=True)
+        self.__create_transformer_frame(column_1, 1, ui_state, supports_guidance_scale=False, supports_force_attention_mask=False)
+        self.__create_noise_frame(column_1, 2, ui_state, supports_dynamic_timestep_shifting=True)
 
         self.__create_masked_frame(column_2, 1, ui_state)
         self.__create_loss_frame(column_2, 2, controller, ui_state)
@@ -455,11 +471,21 @@ class BaseTrainingTabView(ABC):
             self.components.entry(frame, row, 1, ui_state, f"{part}.offload_fraction")
             row += 1
 
+            self.components.label(frame, row, 0, "Simplex Offloading",
+                                  tooltip="Holds this component's weights in a single RAM buffer, so an offloaded layer never has to be copied back to RAM. Faster, but costs RAM for the whole component instead of only its offloaded layers. Not available for a fully fine-tuned component.")
+            self.components.switch(frame, row, 1, ui_state, f"{part}.simplex_offloading")
+            row += 1
+
         if supports_activation_offloading:
             self.components.label(frame, row, 0, "Offload Activations",
                                   tooltip="Offloads this component's activations to CPU during training to reduce VRAM usage")
             self.components.switch(frame, row, 1, ui_state, f"{part}.activation_offloading")
             row += 1
+
+        self.components.label(frame, row, 0, "Cache In RAM",
+                              tooltip="Keeps this model part's streamed weights in RAM between uses instead of re-reading them from disk on every use, trading RAM for loading speed. Only has an effect when \"Stream From Disk\" (model page) is enabled.")
+        self.components.switch(frame, row, 1, ui_state, f"{part}.cache_in_ram")
+        row += 1
 
         return row
 
@@ -711,6 +737,32 @@ class BaseTrainingTabView(ABC):
 
         row = self.__create_offloading_widgets(frame, row, ui_state, "unconditional_transformer", supports_checkpointing=False)
 
+    def __create_connectors_frame(self, master, row, ui_state):
+        frame = self.components.section_frame(master, row)
+        row = 0
+
+        self.components.label(frame, row, 0, "Connectors")
+        row += 1
+
+        row = self.__create_offloading_widgets(
+            frame, row, ui_state, "connectors", supports_checkpointing=False)
+
+    def __create_low_noise_transformer_frame(self, master, row, ui_state):
+        frame = self.components.section_frame(master, row)
+        row = 0
+
+        # include low noise expert
+        self.components.label(frame, row, 0, "Include Low Noise Expert",
+                              tooltip="Loads the distilled transformer named on the model tab and hands the "
+                                      "low-noise sampling steps over to it. If disabled, or if no model is given, "
+                                      "the trained transformer samples the whole schedule on its own")
+        self.components.switch(frame, row, 1, ui_state, "low_noise_transformer.include")
+        row += 1
+
+        row = self.__create_offloading_widgets(
+            frame, row, ui_state, "low_noise_transformer", supports_checkpointing=False,
+            supports_activation_offloading=False)
+
     def __create_noise_frame(self, master, row, ui_state,
                               supports_generalized_offset_noise: bool = False,
                               supports_dynamic_timestep_shifting: bool = False):
@@ -769,7 +821,7 @@ class BaseTrainingTabView(ABC):
         if supports_dynamic_timestep_shifting:
             # dynamic timestep shifting
             self.components.label(frame, 9, 0, "Dynamic Timestep Shifting",
-                                  tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. For Ideogram, the shifting instead follows the model's own resolution-aware sampling schedule. Note: For Z-Image, the dynamic shifting parameters are likely wrong and unknown. Use with care or set your own, fixed shift.", wide_tooltip=True)
+                                  tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. For Ideogram, the shifting instead follows the model's own resolution-aware sampling schedule. Note: For Z-Image, the dynamic shifting parameters are likely wrong and unknown. Use with care or set your own, fixed shift. Note: For LTX, the shift grows exponentially with the token count and is not capped, so a video puts nearly every timestep at high noise - a 10s 720p clip gives a shift above 30000. Use with care or set your own, fixed shift.", wide_tooltip=True)
             self.components.switch(frame, 9, 1, ui_state, "dynamic_timestep_shifting")
 
     def __create_masked_frame(self, master, row, ui_state):

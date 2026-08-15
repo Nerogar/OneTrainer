@@ -14,8 +14,10 @@ class ModelNames:
             base_model: str = "",
             prior_model: str = "",
             transformer_model: str = "",
+            low_noise_transformer_model: str = "",
             effnet_encoder_model: str = "",
             decoder_model: str = "",
+            text_encoder_model: str = "",
             text_encoder_4: str = "",
             vae_model: str = "",
             lora: str = "",
@@ -26,12 +28,15 @@ class ModelNames:
             include_text_encoder_3: bool = True,
             include_text_encoder_4: bool = True,
             include_unconditional_transformer: bool = True,
+            include_low_noise_transformer: bool = True,
     ):
         self.base_model = base_model
         self.prior_model = prior_model
         self.transformer_model = transformer_model
+        self.low_noise_transformer_model = low_noise_transformer_model
         self.effnet_encoder_model = effnet_encoder_model
         self.decoder_model = decoder_model
+        self.text_encoder_model = text_encoder_model
         self.text_encoder_4 = text_encoder_4
         self.vae_model = vae_model
         self.lora = lora
@@ -42,6 +47,7 @@ class ModelNames:
         self.include_text_encoder_3 = include_text_encoder_3
         self.include_text_encoder_4 = include_text_encoder_4
         self.include_unconditional_transformer = include_unconditional_transformer
+        self.include_low_noise_transformer = include_low_noise_transformer
 
     def all_embedding(self):
         if self.embedding is not None:

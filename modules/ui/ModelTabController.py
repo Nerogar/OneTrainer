@@ -26,7 +26,15 @@ class ModelTabController:
             or model_type.is_qwen()
             or model_type.is_anima()
             or model_type.is_hunyuan_video()
+            or model_type.is_ltx_2()
         )
+
+    def supports_override_text_encoder(self) -> bool:
+        model_type = self.train_config.model_type
+        # Only LTX-2's loader reads a text encoder override right now (useful because the
+        # diffusers-format checkpoint bundles a float32 copy of the stock Gemma-3-12B text encoder,
+        # roughly double the size of the official bf16 google/gemma-3-* release).
+        return model_type.is_ltx_2()
 
     def get_output_formats(self) -> list[tuple[str, ModelFormat]]:
         labels = {

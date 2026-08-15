@@ -269,7 +269,9 @@ class TrainModelPartConfig(BaseConfig):
     guidance_scale: float
     gradient_checkpointing: bool
     offload_fraction: float
+    simplex_offloading: bool
     activation_offloading: bool
+    cache_in_ram: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -309,7 +311,9 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("guidance_scale", 1.0, float, False))
         data.append(("gradient_checkpointing", True, bool, False))
         data.append(("offload_fraction", 0.0, float, False))
+        data.append(("simplex_offloading", False, bool, False))
         data.append(("activation_offloading", False, bool, False))
+        data.append(("cache_in_ram", True, bool, False))
 
         return TrainModelPartConfig(data)
 
@@ -349,6 +353,7 @@ class QuantizationConfig(BaseConfig):
     layer_filter: str
     layer_filter_preset: str
     layer_filter_regex: bool
+    fallback_dtype: DataType
     svd_dtype: DataType
     svd_rank: int
     cache_dir: str
@@ -361,6 +366,7 @@ class QuantizationConfig(BaseConfig):
         data.append(("layer_filter", "", str, False))
         data.append(("layer_filter_preset", "full", str, False))
         data.append(("layer_filter_regex", False, bool, False))
+        data.append(("fallback_dtype", DataType.BFLOAT_16, DataType, False))
         data.append(("svd_dtype", DataType.NONE, DataType, False))
         data.append(("svd_rank", 16, int, False))
         data.append(("cache_dir", None, str, True))
@@ -402,6 +408,7 @@ class TrainConfig(BaseConfig):
     async_offloading: bool
     force_circular_padding: bool
     compile: bool
+    stream_from_disk: bool
 
     # data settings
     concept_file_name: str
@@ -498,6 +505,9 @@ class TrainConfig(BaseConfig):
     # text encoder 4
     text_encoder_4: TrainModelPartConfig
     text_encoder_4_layer_skip: int
+
+    connectors: TrainModelPartConfig
+    low_noise_transformer: TrainModelPartConfig
 
     # vae
     vae: TrainModelPartConfig
@@ -882,6 +892,8 @@ class TrainConfig(BaseConfig):
             self.text_encoder_2.weight_dtype,
             self.text_encoder_3.weight_dtype,
             self.text_encoder_4.weight_dtype,
+            self.connectors.weight_dtype,
+            self.low_noise_transformer.weight_dtype,
             self.vae.weight_dtype,
             self.effnet_encoder.weight_dtype,
             self.decoder.weight_dtype,
@@ -891,13 +903,27 @@ class TrainConfig(BaseConfig):
             self.embedding_weight_dtype,
         )
 
+    def cache_in_ram(self) -> dict[str, bool]:
+        return {part: getattr(self, part).cache_in_ram for part in self.model_type.model_parts()}
+
+    def part_trained_in_place(self, part: TrainModelPartConfig) -> bool:
+        # True iff a FINE_TUNE run updates this part's base weights. 'train' defaults True even for parts the
+        # architecture can't train (e.g. a frozen text encoder), so also require the model type to list the part as
+        # trainable. Gates the offload/streaming modes that would silently discard in-place weight updates.
+        if self.training_method != TrainingMethod.FINE_TUNE or not part.train:
+            return False
+        name = next((p for p in self.model_type.model_parts() if getattr(self, p) is part), None)
+        return name in self.model_type.trainable_parts()
+
     def model_names(self) -> ModelNames:
         return ModelNames(
             base_model=self.base_model_name,
             prior_model=self.prior.model_name,
             transformer_model=self.transformer.model_name,
+            low_noise_transformer_model=self.low_noise_transformer.model_name,
             effnet_encoder_model=self.effnet_encoder.model_name,
             decoder_model=self.decoder.model_name,
+            text_encoder_model=self.text_encoder.model_name,
             text_encoder_4=self.text_encoder_4.model_name,
             vae_model=self.vae.model_name,
             lora=self.lora_model_name,
@@ -910,6 +936,7 @@ class TrainConfig(BaseConfig):
             include_text_encoder_3=self.text_encoder_3.include,
             include_text_encoder_4=self.text_encoder_4.include,
             include_unconditional_transformer=self.unconditional_transformer.include,
+            include_low_noise_transformer=self.low_noise_transformer.include,
         )
 
     def train_any_embedding(self) -> bool:
@@ -1046,6 +1073,7 @@ class TrainConfig(BaseConfig):
         data.append(("async_offloading", True, bool, False))
         data.append(("force_circular_padding", False, bool, False))
         data.append(("compile", False, bool, False))
+        data.append(("stream_from_disk", True, bool, False))
 
         # data settings
         data.append(("concept_file_name", "training_concepts/concepts.json", str, False))
@@ -1178,6 +1206,22 @@ class TrainConfig(BaseConfig):
         text_encoder_4.learning_rate = None
         data.append(("text_encoder_4", text_encoder_4, TrainModelPartConfig, False))
         data.append(("text_encoder_4_layer_skip", 0, int, False))
+
+        # connectors
+        connectors = TrainModelPartConfig.default_values()
+        connectors.model_name = ""
+        connectors.train = False
+        connectors.gradient_checkpointing = False
+        connectors.activation_offloading = False
+        data.append(("connectors", connectors, TrainModelPartConfig, False))
+
+        # low noise transformer
+        low_noise_transformer = TrainModelPartConfig.default_values()
+        low_noise_transformer.model_name = ""
+        low_noise_transformer.train = False
+        low_noise_transformer.gradient_checkpointing = False
+        low_noise_transformer.activation_offloading = False
+        data.append(("low_noise_transformer", low_noise_transformer, TrainModelPartConfig, False))
 
         # vae
         vae = TrainModelPartConfig.default_values()

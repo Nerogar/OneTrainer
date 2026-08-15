@@ -3,11 +3,12 @@ import math
 from abc import abstractmethod
 from collections import defaultdict
 from collections.abc import Mapping
+from contextlib import contextmanager
 from typing import Any
 
 from modules.module.FusedModule import FusedModuleGroup, check_fusion_match, discover_fused_groups
 from modules.module.oft_utils import OFTRotationModule
-from modules.module.quantized.LinearSVD import BaseLinearSVD
+from modules.module.quantized.mixin.LoRAFusableLinearMixin import LoRAFusableLinearMixin
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
 from modules.util.lokr_utils import factorization, make_kron, rebuild_tucker
@@ -113,6 +114,13 @@ class PeftBase(nn.Module):
         # once instead of recomputing the whole fused forward per leaf. Returns None (the default) for
         # peft types that recompose the base weight itself (DoRA, OFT, LoKr-decompose), which must keep
         # going through the fused forward.
+        return None
+
+    def fused_leaf_forward(self, leaf: nn.Module, x, start: int, end: int) -> Tensor | None:
+        # Returns one leaf's complete output (base + this adapter's contribution) when the leaf can
+        # fold the adapter into its own base matmul, so no delta is computed or added separately.
+        # start/end are the leaf's row range in the fused output. Returns None (the default) when no
+        # such path exists, and the caller falls back to delta_forward.
         return None
 
     @property
@@ -570,10 +578,17 @@ class LoRAModule(PeftBase):
 
     def forward(self, x, *args, **kwargs):
         self.check_initialized()
-        if isinstance(self.orig_module, BaseLinearSVD):
-            return self.orig_module.forward_with_lora(x, self.lora_down, self.lora_up, self.dropout, self.alpha)
+        if isinstance(self.orig_module, LoRAFusableLinearMixin):
+            return self.orig_module.forward_with_lora(x, self.lora_down.weight, self.lora_up.weight, self.dropout, self.alpha)
 
         return self.orig_forward(x) + self.delta_forward(x, *args, **kwargs)
+
+    def fused_leaf_forward(self, leaf: nn.Module, x, start: int, end: int) -> Tensor | None:
+        self.check_initialized()
+        if not isinstance(leaf, LoRAFusableLinearMixin):
+            return None
+        #the fused adapter's up spans all leaves' concatenated outputs; narrow it to this leaf's rows
+        return leaf.forward_with_lora(x, self.lora_down.weight, self.lora_up.weight[start:end], self.dropout, self.alpha)
 
     def delta_forward(self, x, *args, **kwargs) -> Tensor | None:
         self.check_initialized()
@@ -779,6 +794,11 @@ class DoRAModule(LoRAModule):
 
     def delta_forward(self, x, *args, **kwargs) -> Tensor | None:
         # DoRA scales the recomposed weight, so there is no delta term; back to None from LoRAModule's.
+        return None
+
+    def fused_leaf_forward(self, leaf: nn.Module, x, start: int, end: int) -> Tensor | None:
+        # same reason as delta_forward: the leaf folds an additive term into its own base matmul,
+        # and DoRA recomposes the weight instead
         return None
 
     def forward(self, x, *args, **kwargs):
@@ -1091,6 +1111,42 @@ class LoRAModuleWrapper:
             modules += module.modules()
 
         return modules
+
+    @contextmanager
+    def retargeted(self, orig_module: nn.Module):
+        # Temporarily applies this LoRA to a different base module of the same architecture.
+        # TODO: temporary workaround until a LoRA can be attached to more than one base module; rebinds this
+        # one back and forth instead. The PeftBase objects and their weights are shared, not copied.
+        previous = self.orig_module
+        self.remove_hook_from_module()
+        self.__retarget(orig_module)
+        self.hook_to_module()
+        try:
+            yield
+        finally:
+            self.remove_hook_from_module()
+            self.__retarget(previous)
+            self.hook_to_module()
+
+    def __retarget(self, orig_module: nn.Module):
+        # Binds by name against the tree as it stands right now, normalized the same way __create_modules did
+        # so a checkpointing wrapper on either base maps to the same child. Eviction moves weights to meta and
+        # never replaces a module, so an evicted component binds to the layers a later materialize fills.
+        children = {name.replace(".checkpoint.", "."): child for name, child in orig_module.named_modules()}
+        for name, lora_module in self.lora_modules.items():
+            if isinstance(lora_module, FusedModuleGroup):
+                # a fused group also owns a _FusedLinear built over the old leaves, so rebinding it means
+                # rebuilding that too; nothing needs it yet, so refuse rather than half-rebind
+                raise NotImplementedError("retargeting a fused LoRA module is not supported")
+            target = children.get(name)
+            if target is None:
+                raise ValueError(f"retarget: {orig_module.__class__.__name__} has no module named {name}")
+            if get_weight_shape(target) != get_weight_shape(lora_module.orig_module):
+                raise ValueError(
+                    f"retarget: shape mismatch for {name}: "
+                    f"{get_weight_shape(lora_module.orig_module)} vs {get_weight_shape(target)}")
+            lora_module._orig_module = [target]
+        self.orig_module = orig_module
 
     def hook_to_module(self):
         """

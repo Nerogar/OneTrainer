@@ -5,7 +5,7 @@ pillow==12.3.0
 imagesize==1.4.1 #for concept statistics
 tqdm==4.67.1
 PyYAML==6.0.2
-huggingface-hub==1.22.0
+huggingface-hub==1.27.0
 scipy==1.15.3
 matplotlib==3.10.3
 av==16.1.0
@@ -20,9 +20,11 @@ safetensors==0.8.0
 tensorboard==2.20.0
 
 # diffusion models
--e git+https://github.com/huggingface/diffusers.git@1ffa423#egg=diffusers
+-e git+https://github.com/huggingface/diffusers.git@175fe6b#egg=diffusers
 gguf==0.17.1
-transformers==5.5.4 # pinned below 5.6, see https://github.com/Nerogar/OneTrainer/pull/1506
+transformers==5.14.1 # LTX-2.5's Gemma 4 encoder needs >=5.10; 5.15 breaks its RoPE init. CLIP models
+                     # (SD1.x, SDXL, Flux, HunyuanVideo, Würstchen) stay broken on this branch until the
+                     # flattening migration of https://github.com/Nerogar/OneTrainer/pull/1506 is done.
 sentencepiece==0.2.1 # transitive dependency of transformers for tokenizer loading
 omegaconf==2.3.0 # needed to load stable diffusion from single ckpt files
 invisible-watermark==0.2.0 # needed for the SDXL pipeline
@@ -32,7 +34,7 @@ pooch==1.8.2
 open-clip-torch==2.32.0
 
 # data loader
--e git+https://github.com/Nerogar/mgds.git@3a6994a#egg=mgds
+-e git+https://github.com/dxqb/MGDS.git@fc1391a#egg=mgds # ltx2-squashed, not yet upstream
 
 # optimizers
 dadaptation==3.2 # dadaptation optimizers
