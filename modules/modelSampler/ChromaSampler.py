@@ -45,6 +45,7 @@ class ChromaSampler(BaseModelSampler):
             diffusion_steps: int,
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
+            override_shift: float | None = None,
             text_encoder_layer_skip: int = 0,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
@@ -56,6 +57,8 @@ class ChromaSampler(BaseModelSampler):
                 generator.manual_seed(seed)
 
             noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
+            if override_shift is not None:
+                noise_scheduler.set_shift(override_shift)
             image_processor = self.pipeline.image_processor
             transformer = self.pipeline.transformer
             vae = self.pipeline.vae
@@ -170,6 +173,7 @@ class ChromaSampler(BaseModelSampler):
             diffusion_steps=sample_config.diffusion_steps,
             cfg_scale=sample_config.cfg_scale,
             noise_scheduler=sample_config.noise_scheduler,
+            override_shift=sample_config.override_shift,
             text_encoder_layer_skip=sample_config.text_encoder_1_layer_skip,
             on_update_progress=on_update_progress,
         )

@@ -46,6 +46,7 @@ class ErnieSampler(BaseModelSampler):
             diffusion_steps: int,
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
+            override_shift: float | None = None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
@@ -56,6 +57,8 @@ class ErnieSampler(BaseModelSampler):
                 generator.manual_seed(seed)
 
             noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
+            if override_shift is not None:
+                noise_scheduler.set_shift(override_shift)
             vae = self.pipeline.vae
 
             vae_scale_factor = 8
@@ -145,6 +148,7 @@ class ErnieSampler(BaseModelSampler):
             diffusion_steps=sample_config.diffusion_steps,
             cfg_scale=sample_config.cfg_scale,
             noise_scheduler=sample_config.noise_scheduler,
+            override_shift=sample_config.override_shift,
             on_update_progress=on_update_progress,
         )
 
