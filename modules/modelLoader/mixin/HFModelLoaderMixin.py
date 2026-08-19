@@ -5,7 +5,7 @@ import os
 import queue
 import threading
 from abc import ABCMeta
-from itertools import repeat
+from itertools import chain, repeat
 
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.config.TrainConfig import QuantizationConfig
@@ -153,9 +153,9 @@ def stream_module_from_checkpoint(
     work = []  # (key, sub_module, tensor_name, is_buffer, module_name)
     for name, sub_module in module.named_modules():
         module_name = name.split(".")[-1]
-        # gradient checkpointing in compile mode wraps each block in a CheckpointLayer, inserting a ".checkpoint."
+        # gradient checkpointing in compile mode wraps each block in a CheckpointLayer, inserting a "checkpoint"
         # level into the live path; the checkpoint keys have none, so strip it before lookup (as LoRAModule does).
-        lookup_name = name.replace(".checkpoint.", ".")
+        lookup_name = ".".join(p for p in name.split(".") if p != "checkpoint")
         for tensor_name, param in list(sub_module.named_parameters(recurse=False)):
             key = ".".join(p for p in (key_prefix, lookup_name, tensor_name) if p)
             if key in key_to_file and param.is_meta:
@@ -266,6 +266,14 @@ def stream_module_from_checkpoint(
                 if buffer is not None and not buffer.is_meta:
                     with mem_pool_context(dest_pool_for(sub_module)):
                         sub_module._buffers[buffer_name] = buffer.to(device)
+
+    # a tensor whose key did not resolve stays on the meta skeleton, and would only surface deep inside the first
+    # forward as an error naming neither the key nor the lookup. Runs last: a tie target is meta until the fill above.
+    on_meta = next((name for name, tensor in chain(module.named_parameters(), module.named_buffers())
+                    if tensor.is_meta), None)
+    if on_meta is not None:
+        raise RuntimeError(
+            f"no checkpoint key resolved for {'.'.join(p for p in (key_prefix, on_meta) if p)}, left on meta")
 
     if bar is not None:
         bar.close()
