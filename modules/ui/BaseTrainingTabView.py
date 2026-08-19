@@ -461,6 +461,11 @@ class BaseTrainingTabView(ABC):
             self.components.switch(frame, row, 1, ui_state, f"{part}.activation_offloading")
             row += 1
 
+        self.components.label(frame, row, 0, "Cache In RAM",
+                              tooltip="Keeps this model part's streamed weights in RAM between uses instead of re-reading them from disk on every use, trading RAM for loading speed. Only has an effect when \"Stream From Disk\" (model page) is enabled.")
+        self.components.switch(frame, row, 1, ui_state, f"{part}.cache_in_ram")
+        row += 1
+
         return row
 
     def __create_text_encoder_frame(self, master, row, ui_state, supports_clip_skip=True, supports_training=True,
