@@ -1,11 +1,11 @@
 #8bit matmul kernels adapted from the Triton tutorial here:
 #https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html
 
-#All three mm entry points share the _mm_accumulate compute core (grouped launch order
-#for L2 reuse, compile-time layout/divisibility specialization, EVEN_K loop selection)
-#and differ only in the epilogue: _mm_kernel stores the raw int32/fp32 product,
-#_scaled_mm_kernel folds a per-row dequant scale in and casts to the output dtype, and
-#_scaled_lora_mm_kernel additionally fuses a low-rank update into the same tile.
+#There is one mm entry point, built on the _mm_accumulate compute core (grouped launch order
+#for L2 reuse, compile-time layout/divisibility specialization).
+#Everything the callers vary is an optional epilogue argument defaulting to None: a per-row
+#dequant scale, a per-column one, a fused low-rank update. Triton specializes a None argument
+#as a constexpr, so each combination compiles to what a separate kernel per epilogue would.
 
 from modules.util.tqdm_util import tqdm
 
@@ -102,15 +102,10 @@ _AUTOTUNE_KEY = [
     'QUANTIZED_M',
     'N',
     'K',
-    'stride_bk'    #use stride of b as key, to autotune again for a strided rhs matrix (backward pass)
+    'stride_bk',   #use stride of b as key, to autotune again for a strided rhs matrix (backward pass)
+    'R_TILES',
+    'BLOCK_R',
 ]
-
-#the LoRA epilogue keys on the rank tiling as well. up's row stride is deliberately not a key even
-#though it varies: it is 1 in the forward (up is a transposed view of lora_up) and N in the backward
-#(up is lora_down, stored row-major), so keying on it would double the key count on every model.
-#the two layouts load differently but the slab is only BLOCK_R x BLOCK_N and is reused by every
-#M block in the group, too little traffic next to A and B to move the tile choice
-_LORA_AUTOTUNE_KEY = [*_AUTOTUNE_KEY, 'R_TILES', 'BLOCK_R']
 
 #configs for the shared _mm_accumulate core: GROUP_SIZE_M is required by its grouped launch
 #order. Shared memory per config is stages*(BLOCK_M+BLOCK_N)*BLOCK_K bytes and must stay
@@ -137,7 +132,7 @@ _AUTOTUNE_CONFIGS = [
 
 
 #shared compute core of the 8-bit mm kernels: grouped launch order, divisibility hints and
-#the EVEN_K-specialized main loop. Returns the raw accumulator plus the output tile offsets;
+#the main loop. Returns the raw accumulator plus the output tile offsets;
 #each entry kernel below adds its own epilogue and stores.
 @triton.jit
 def _mm_accumulate(
@@ -145,7 +140,7 @@ def _mm_accumulate(
         M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn,
         BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr,
-        FLOAT: tl.constexpr, EVEN_K: tl.constexpr, MXFP8_MMA: tl.constexpr,
+        FLOAT: tl.constexpr, MXFP8_MMA: tl.constexpr,
 ):
 
     #grouped launch order: consecutive pids walk down GROUP_SIZE_M M-blocks before advancing
@@ -183,30 +178,19 @@ def _mm_accumulate(
         a_scale = tl.full((BLOCK_SIZE_M, BLOCK_SIZE_K // 32), 127, dtype=tl.uint8)
         b_scale = tl.full((BLOCK_SIZE_N, BLOCK_SIZE_K // 32), 127, dtype=tl.uint8)
 
-    if EVEN_K:
-        for _k in range(K // BLOCK_SIZE_K):
-            a = tl.load(a_ptrs)
-            b = tl.load(b_ptrs)
+    #K is a multiple of every BLOCK_SIZE_K (see _K_ALIGN), so every block is full and the loads
+    #need no mask
+    for _k in range(K // BLOCK_SIZE_K):
+        a = tl.load(a_ptrs)
+        b = tl.load(b_ptrs)
 
-            if MXFP8_MMA:
-                accumulator = tl.dot_scaled(a, a_scale, "e4m3", b, b_scale, "e4m3", acc=accumulator)
-            else:
-                accumulator = tl.dot(a, b, accumulator, out_dtype=tl.float32 if FLOAT else tl.int32)
+        if MXFP8_MMA:
+            accumulator = tl.dot_scaled(a, a_scale, "e4m3", b, b_scale, "e4m3", acc=accumulator)
+        else:
+            accumulator = tl.dot(a, b, accumulator, out_dtype=tl.float32 if FLOAT else tl.int32)
 
-            a_ptrs += BLOCK_SIZE_K * stride_ak
-            b_ptrs += BLOCK_SIZE_K * stride_bk
-    else:
-        for k in range(tl.cdiv(K, BLOCK_SIZE_K)):
-            a = tl.load(a_ptrs, mask=offs_k[None, :] < K - k*BLOCK_SIZE_K, other=0.0)
-            b = tl.load(b_ptrs, mask=offs_k[:, None] < K - k*BLOCK_SIZE_K, other=0.0)
-
-            if MXFP8_MMA:
-                accumulator = tl.dot_scaled(a, a_scale, "e4m3", b, b_scale, "e4m3", acc=accumulator)
-            else:
-                accumulator = tl.dot(a, b, accumulator, out_dtype=tl.float32 if FLOAT else tl.int32)
-
-            a_ptrs += BLOCK_SIZE_K * stride_ak
-            b_ptrs += BLOCK_SIZE_K * stride_bk
+        a_ptrs += BLOCK_SIZE_K * stride_ak
+        b_ptrs += BLOCK_SIZE_K * stride_bk
 
     offs_cm = pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
     offs_cn = pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
@@ -223,6 +207,11 @@ def _store_c(c_ptr, value, offs_cm, offs_cn, M, N, stride_cm):
     tl.store(c_ptrs, value, mask=c_mask)
 
 
+#the main loop reads whole K blocks, so _prepare_mm zero-pads K up to a multiple of every
+#BLOCK_SIZE_K
+_K_ALIGN = max(c.kwargs['BLOCK_SIZE_K'] for c in _AUTOTUNE_CONFIGS)
+assert triton.next_power_of_2(_K_ALIGN) == _K_ALIGN
+
 def _prepare_mm(a: torch.Tensor, b: torch.Tensor, out_dtype: torch.dtype):
     assert a.shape[1] == b.shape[0], "Incompatible dimensions"
     assert a.is_contiguous(), "Matrix A must be contiguous"
@@ -237,163 +226,29 @@ def _prepare_mm(a: torch.Tensor, b: torch.Tensor, out_dtype: torch.dtype):
     #the kernel handles exactly two B layouts: k-major (forward, weight.T) and n-major (backward, weight)
     B_K_MAJOR = (b.stride(0) == 1)
     assert B_K_MAJOR or b.stride(1) == 1, "Matrix B must be contiguous along one axis"
+
+    #zero-padding K keeps every block of the main loop full; the padded products are zero. Only
+    #layers with an odd width pay for the copies (SDXL's 320-wide ones, Sana's 2240)
+    if K % _K_ALIGN != 0:
+        pad = _K_ALIGN - K % _K_ALIGN
+        a = torch.nn.functional.pad(a, (0, pad))
+        #padding the storage of b keeps its layout, padding a transposed view would not
+        b = torch.nn.functional.pad(b.t(), (0, pad)).t() if B_K_MAJOR else torch.nn.functional.pad(b, (0, 0, 0, pad))
+        K += pad
     #n-major B runs the mm ~30% slower; for large M a transpose copy pays for itself (see transpose_8bit)
     if not B_K_MAJOR and M >= _TRANSPOSE_MIN_M:
         b = transpose_8bit(b).t()
         B_K_MAJOR = True
     c = torch.empty((M, N), device=a.device, dtype=out_dtype)
-    return b, c, M, N, K, FLOAT
+    return a, b, c, M, N, K, FLOAT
 
 
-def _prepare_scaled_mm(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor, out_dtype: torch.dtype):
-    #_prepare_mm plus the per-row scale reshape (the scaled kernels fold it into the epilogue)
-    b, c, M, N, K, FLOAT = _prepare_mm(a, b, out_dtype)
+def _prepare_scale(scale: torch.Tensor, entries: int, axis: str):
+    #a dequant scale is one fp32 value per row of a or per column of b, read straight from the
+    #epilogue, so any other shape or dtype is materialized here rather than in the kernel
     scale = scale.reshape(-1).to(torch.float32).contiguous()
-    assert scale.shape[0] == M, "scale must have one entry per row of a"
-    return b, c, scale, M, N, K, FLOAT
-
-
-def _prepare_rowcol_scaled_mm(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor, scale_n: torch.Tensor, out_dtype: torch.dtype):
-    b, c, scale, M, N, K, FLOAT = _prepare_scaled_mm(a, b, scale, out_dtype)
-    scale_n = scale_n.reshape(-1).to(torch.float32).contiguous()
-    assert scale_n.shape[0] == N, "scale_n must have one entry per column of b"
-    return b, c, scale, scale_n, M, N, K, FLOAT
-
-
-@triton.autotune(configs=_AUTOTUNE_CONFIGS, key=_AUTOTUNE_KEY, cache_results=True)
-@triton.jit
-def _mm_kernel(
-        a_ptr, b_ptr, c_ptr,
-        M, N, K,
-        stride_am, stride_ak, stride_bk, stride_bn, stride_cm,
-        BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr,
-        QUANTIZED_M, FLOAT: tl.constexpr, EVEN_K: tl.constexpr, MXFP8_MMA: tl.constexpr,
-):
-    accumulator, offs_cm, offs_cn = _mm_accumulate(
-        a_ptr, b_ptr, M, N, K,
-        stride_am, stride_ak, stride_bk, stride_bn,
-        BLOCK_SIZE_M, BLOCK_SIZE_N, BLOCK_SIZE_K, GROUP_SIZE_M,
-        FLOAT, EVEN_K, MXFP8_MMA,
-    )
-
-    _store_c(c_ptr, accumulator, offs_cm, offs_cn, M, N, stride_cm)
-
-announce_autotuning(_mm_kernel, name="8-bit matmul")
-
-#Opaque custom ops work around pytorch#164124: torch.compile otherwise absorbs the traced
-#@triton.autotune kernels and freezes the config benchmarked for the first shape. Kept opaque,
-#these bodies run eagerly, so Triton's autotuner selects per key and the JIT sees real sizes
-@torch.library.custom_op("ot_quant::mm_8bit", mutates_args=())
-def mm_8bit(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
-    out_dtype = torch.float32 if a.dtype == torch.float8_e4m3fn else torch.int32
-    b, c, M, N, K, FLOAT = _prepare_mm(a, b, out_dtype)
-
-    #1D grid: the kernel derives pid_m/pid_n itself in grouped order for L2 reuse
-    def grid(META):
-        return (triton.cdiv(N, META['BLOCK_SIZE_N']) * triton.cdiv(M, META['BLOCK_SIZE_M']), )
-    _mm_kernel[grid](
-        a, b, c,
-        M, N, K,
-        a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0),
-        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0), MXFP8_MMA = FLOAT and _prefer_mxfp8(a.device),
-    )
-    return c
-
-@mm_8bit.register_fake
-def _(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
-    out_dtype = torch.float32 if a.dtype == torch.float8_e4m3fn else torch.int32
-    return a.new_empty((a.shape[0], b.shape[1]), dtype=out_dtype)
-
-
-@triton.autotune(configs=_AUTOTUNE_CONFIGS, key=_AUTOTUNE_KEY, cache_results=True)
-@triton.jit
-def _scaled_mm_kernel(
-        a_ptr, b_ptr, c_ptr, scale_ptr,
-        M, N, K,
-        stride_am, stride_ak, stride_bk, stride_bn, stride_cm,
-        BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr,
-        QUANTIZED_M, FLOAT: tl.constexpr, EVEN_K: tl.constexpr, MXFP8_MMA: tl.constexpr,
-):
-    accumulator, offs_cm, offs_cn = _mm_accumulate(
-        a_ptr, b_ptr, M, N, K,
-        stride_am, stride_ak, stride_bk, stride_bn,
-        BLOCK_SIZE_M, BLOCK_SIZE_N, BLOCK_SIZE_K, GROUP_SIZE_M,
-        FLOAT, EVEN_K, MXFP8_MMA,
-    )
-
-    #per-row scale on axis 0 (M), fold into the epilogue and cast to the output (compute) dtype directly
-    scale = tl.load(scale_ptr + offs_cm, mask=offs_cm < M, other=0.0)
-    result = accumulator.to(tl.float32) * scale[:, None]
-    result = result.to(c_ptr.dtype.element_ty)
-
-    _store_c(c_ptr, result, offs_cm, offs_cn, M, N, stride_cm)
-
-announce_autotuning(_scaled_mm_kernel, name="8-bit scaled matmul")
-
-@torch.library.custom_op("ot_quant::scaled_mm_8bit", mutates_args=())
-def scaled_mm_8bit(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor, out_dtype: torch.dtype) -> torch.Tensor:
-    b, c, scale, M, N, K, FLOAT = _prepare_scaled_mm(a, b, scale, out_dtype)
-
-    def grid(META):
-        return (triton.cdiv(N, META['BLOCK_SIZE_N']) * triton.cdiv(M, META['BLOCK_SIZE_M']), )
-    _scaled_mm_kernel[grid](
-        a, b, c, scale,
-        M, N, K,
-        a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0),
-        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0), MXFP8_MMA = FLOAT and _prefer_mxfp8(a.device),
-    )
-    return c
-
-@scaled_mm_8bit.register_fake
-def _(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor, out_dtype: torch.dtype) -> torch.Tensor:
-    return a.new_empty((a.shape[0], b.shape[1]), dtype=out_dtype)
-
-
-#_scaled_mm_kernel's epilogue with a second dequant scale on axis 1 (N), for callers whose weight
-#is quantized axiswise rather than tensorwise (LinearGGUFA8), where the weight scale is one entry
-#per output column and so cannot be folded into the per-row scale
-@triton.autotune(configs=_AUTOTUNE_CONFIGS, key=_AUTOTUNE_KEY, cache_results=True)
-@triton.jit
-def _rowcol_scaled_mm_kernel(
-        a_ptr, b_ptr, c_ptr, scale_ptr, scale_n_ptr,
-        M, N, K,
-        stride_am, stride_ak, stride_bk, stride_bn, stride_cm,
-        BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr,
-        QUANTIZED_M, FLOAT: tl.constexpr, EVEN_K: tl.constexpr, MXFP8_MMA: tl.constexpr,
-):
-    accumulator, offs_cm, offs_cn = _mm_accumulate(
-        a_ptr, b_ptr, M, N, K,
-        stride_am, stride_ak, stride_bk, stride_bn,
-        BLOCK_SIZE_M, BLOCK_SIZE_N, BLOCK_SIZE_K, GROUP_SIZE_M,
-        FLOAT, EVEN_K, MXFP8_MMA,
-    )
-
-    scale = tl.load(scale_ptr + offs_cm, mask=offs_cm < M, other=0.0)
-    scale_n = tl.load(scale_n_ptr + offs_cn, mask=offs_cn < N, other=0.0)
-    result = accumulator.to(tl.float32) * scale[:, None] * scale_n[None, :]
-    result = result.to(c_ptr.dtype.element_ty)
-
-    _store_c(c_ptr, result, offs_cm, offs_cn, M, N, stride_cm)
-
-announce_autotuning(_rowcol_scaled_mm_kernel, name="8-bit row/column scaled matmul")
-
-@torch.library.custom_op("ot_quant::rowcol_scaled_mm_8bit", mutates_args=())
-def rowcol_scaled_mm_8bit(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor, scale_n: torch.Tensor, out_dtype: torch.dtype) -> torch.Tensor:
-    b, c, scale, scale_n, M, N, K, FLOAT = _prepare_rowcol_scaled_mm(a, b, scale, scale_n, out_dtype)
-
-    def grid(META):
-        return (triton.cdiv(N, META['BLOCK_SIZE_N']) * triton.cdiv(M, META['BLOCK_SIZE_M']), )
-    _rowcol_scaled_mm_kernel[grid](
-        a, b, c, scale, scale_n,
-        M, N, K,
-        a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0),
-        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0), MXFP8_MMA = FLOAT and _prefer_mxfp8(a.device),
-    )
-    return c
-
-@rowcol_scaled_mm_8bit.register_fake
-def _(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor, scale_n: torch.Tensor, out_dtype: torch.dtype) -> torch.Tensor:
-    return a.new_empty((a.shape[0], b.shape[1]), dtype=out_dtype)
+    assert scale.shape[0] == entries, f"scale must have one entry per {axis}"
+    return scale
 
 
 #rank-tile width is min(next_pow2(R), cap): the cap bounds the staged tile, and with it the
@@ -402,12 +257,13 @@ def _(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor, scale_n: torch.Tens
 _LORA_BLOCK_R_CAP = 64
 
 
-def _prepare_lora(a: torch.Tensor, b: torch.Tensor, xd: torch.Tensor, up: torch.Tensor):
-    R = xd.shape[1]
-    assert xd.shape[0] == a.shape[0] and up.shape[0] == R and up.shape[1] == b.shape[1], "Incompatible low-rank dimensions"
-    assert xd.stride(1) == 1, "xd must be contiguous along the rank axis"
-    assert xd.dtype == up.dtype
-    return R, min(max(16, triton.next_power_of_2(R)), _LORA_BLOCK_R_CAP)
+def _prepare_lora(lora_xd: torch.Tensor, lora_up: torch.Tensor, M: int, N: int):
+    R = lora_xd.shape[1]
+    assert lora_xd.shape[0] == M and lora_up.shape[0] == R and lora_up.shape[1] == N, "Incompatible low-rank dimensions"
+    assert lora_xd.stride(1) == 1, "lora_xd must be contiguous along the rank axis"
+    assert lora_xd.dtype == lora_up.dtype
+    block_r = min(max(16, triton.next_power_of_2(R)), _LORA_BLOCK_R_CAP)
+    return R, block_r, triton.cdiv(R, block_r), lora_xd.stride(0), lora_up.stride(0), lora_up.stride(1)
 
 @triton.jit
 def _add_lora(
@@ -425,102 +281,83 @@ def _add_lora(
     return result
 
 
-@triton.autotune(configs=_AUTOTUNE_CONFIGS, key=_LORA_AUTOTUNE_KEY, cache_results=True)
+@triton.autotune(configs=_AUTOTUNE_CONFIGS, key=_AUTOTUNE_KEY, cache_results=True)
 @triton.jit
-def _scaled_lora_mm_kernel(
-        a_ptr, b_ptr, c_ptr, scale_ptr, xd_ptr, up_ptr,
-        M, N, K, R,
-        stride_am, stride_ak, stride_bk, stride_bn, stride_cm, stride_xdm, stride_upr, stride_upn,
+def _mm_kernel(
+        a_ptr, b_ptr, c_ptr,
+        M, N, K,
+        stride_am, stride_ak, stride_bk, stride_bn, stride_cm,
         BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr,
-        QUANTIZED_M, FLOAT: tl.constexpr, EVEN_K: tl.constexpr, MXFP8_MMA: tl.constexpr,
-        BLOCK_R: tl.constexpr, R_TILES: tl.constexpr,
+        QUANTIZED_M, FLOAT: tl.constexpr, MXFP8_MMA: tl.constexpr,
+        scale_m_ptr=None, scale_n_ptr=None,
+        xd_ptr=None, up_ptr=None, R=None, stride_xdm=None, stride_upr=None, stride_upn=None,
+        BLOCK_R: tl.constexpr = None, R_TILES: tl.constexpr = None,
 ):
-    accumulator, offs_cm, offs_cn = _mm_accumulate(
+    result, offs_cm, offs_cn = _mm_accumulate(
         a_ptr, b_ptr, M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn,
         BLOCK_SIZE_M, BLOCK_SIZE_N, BLOCK_SIZE_K, GROUP_SIZE_M,
-        FLOAT, EVEN_K, MXFP8_MMA,
+        FLOAT, MXFP8_MMA,
     )
 
-    scale = tl.load(scale_ptr + offs_cm, mask=offs_cm < M, other=0.0)
-    result = accumulator.to(tl.float32) * scale[:, None]
+    if scale_m_ptr is not None or scale_n_ptr is not None or xd_ptr is not None:
+        result = result.to(tl.float32)
 
-    result = _add_lora(result, xd_ptr, up_ptr, offs_cm, offs_cn, M, N, R,
-                       stride_xdm, stride_upr, stride_upn, BLOCK_R, R_TILES)
-    result = result.to(c_ptr.dtype.element_ty)
+    if scale_m_ptr is not None:
+        scale_m = tl.load(scale_m_ptr + offs_cm, mask=offs_cm < M, other=0.0)
+        result = result * scale_m[:, None]
 
-    _store_c(c_ptr, result, offs_cm, offs_cn, M, N, stride_cm)
+    if scale_n_ptr is not None:
+        scale_n = tl.load(scale_n_ptr + offs_cn, mask=offs_cn < N, other=0.0)
+        result = result * scale_n[None, :]
 
-announce_autotuning(_scaled_lora_mm_kernel, name="8-bit scaled LoRA matmul")
+    if xd_ptr is not None:
+        result = _add_lora(result, xd_ptr, up_ptr, offs_cm, offs_cn, M, N, R,
+                           stride_xdm, stride_upr, stride_upn, BLOCK_R, R_TILES)
 
-@torch.library.custom_op("ot_quant::scaled_lora_mm_8bit", mutates_args=())
-def scaled_lora_mm_8bit(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor, xd: torch.Tensor, up: torch.Tensor, out_dtype: torch.dtype) -> torch.Tensor:
-    #returns (a @ b) * scale + xd @ up in out_dtype (rank-tiled epilogue). xd is (M, r), up is
-    #(r, N) (the lora_up weight transposed, alpha folded in)
-    R, block_r = _prepare_lora(a, b, xd, up)
-    b, c, scale, M, N, K, FLOAT = _prepare_scaled_mm(a, b, scale, out_dtype)
+    _store_c(c_ptr, result.to(c_ptr.dtype.element_ty), offs_cm, offs_cn, M, N, stride_cm)
 
+announce_autotuning(_mm_kernel, name="8-bit matmul")
+
+#Opaque custom ops work around pytorch#164124: torch.compile otherwise absorbs the traced
+#@triton.autotune kernels and freezes the config benchmarked for the first shape. Kept opaque,
+#these bodies run eagerly, so Triton's autotuner selects per key and the JIT sees real sizes
+@torch.library.custom_op("ot_quant::mm_8bit", mutates_args=())
+def mm_8bit(a: torch.Tensor, b: torch.Tensor, out_dtype: torch.dtype,
+            scale_m: torch.Tensor | None = None, scale_n: torch.Tensor | None = None,
+            lora_xd: torch.Tensor | None = None, lora_up: torch.Tensor | None = None) -> torch.Tensor:
+    #returns (a @ b) * scale_m * scale_n + lora_xd @ lora_up in out_dtype, each epilogue term optional
+    assert out_dtype.is_floating_point or (scale_m is None and scale_n is None and lora_xd is None), \
+        "an integer out_dtype takes no epilogue"
+    a, b, c, M, N, K, FLOAT = _prepare_mm(a, b, out_dtype)
+
+    if scale_m is not None:
+        scale_m = _prepare_scale(scale_m, M, "row of a")
+    if scale_n is not None:
+        scale_n = _prepare_scale(scale_n, N, "column of b")
+
+    if lora_xd is not None:
+        R, block_r, r_tiles, stride_xdm, stride_upr, stride_upn = _prepare_lora(lora_xd, lora_up, M, N)
+    else:
+        assert lora_up is None, "lora_up must be passed together with lora_xd"
+        R = block_r = r_tiles = stride_xdm = stride_upr = stride_upn = None
+
+    #1D grid: the kernel derives pid_m/pid_n itself in grouped order for L2 reuse
     def grid(META):
         return (triton.cdiv(N, META['BLOCK_SIZE_N']) * triton.cdiv(M, META['BLOCK_SIZE_M']), )
-    _scaled_lora_mm_kernel[grid](
-        a, b, c, scale, xd, up,
-        M, N, K, R,
-        a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0), xd.stride(0), up.stride(0), up.stride(1),
-        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0), MXFP8_MMA = FLOAT and _prefer_mxfp8(a.device),
-        BLOCK_R = block_r, R_TILES = triton.cdiv(R, block_r),
+    _mm_kernel[grid](
+        a, b, c,
+        M, N, K,
+        a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0),
+        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, MXFP8_MMA = FLOAT and _prefer_mxfp8(a.device),
+        scale_m_ptr = scale_m, scale_n_ptr = scale_n,
+        xd_ptr = lora_xd, up_ptr = lora_up, R = R, stride_xdm = stride_xdm, stride_upr = stride_upr, stride_upn = stride_upn,
+        BLOCK_R = block_r, R_TILES = r_tiles,
     )
     return c
 
-@scaled_lora_mm_8bit.register_fake
-def _(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor, xd: torch.Tensor, up: torch.Tensor, out_dtype: torch.dtype) -> torch.Tensor:
-    return a.new_empty((a.shape[0], b.shape[1]), dtype=out_dtype)
-
-
-@triton.autotune(configs=_AUTOTUNE_CONFIGS, key=_LORA_AUTOTUNE_KEY, cache_results=True)
-@triton.jit
-def _rowcol_scaled_lora_mm_kernel(
-        a_ptr, b_ptr, c_ptr, scale_ptr, scale_n_ptr, xd_ptr, up_ptr,
-        M, N, K, R,
-        stride_am, stride_ak, stride_bk, stride_bn, stride_cm, stride_xdm, stride_upr, stride_upn,
-        BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr,
-        QUANTIZED_M, FLOAT: tl.constexpr, EVEN_K: tl.constexpr, MXFP8_MMA: tl.constexpr,
-        BLOCK_R: tl.constexpr, R_TILES: tl.constexpr,
-):
-    accumulator, offs_cm, offs_cn = _mm_accumulate(
-        a_ptr, b_ptr, M, N, K,
-        stride_am, stride_ak, stride_bk, stride_bn,
-        BLOCK_SIZE_M, BLOCK_SIZE_N, BLOCK_SIZE_K, GROUP_SIZE_M,
-        FLOAT, EVEN_K, MXFP8_MMA,
-    )
-
-    scale = tl.load(scale_ptr + offs_cm, mask=offs_cm < M, other=0.0)
-    scale_n = tl.load(scale_n_ptr + offs_cn, mask=offs_cn < N, other=0.0)
-    result = accumulator.to(tl.float32) * scale[:, None] * scale_n[None, :]
-
-    result = _add_lora(result, xd_ptr, up_ptr, offs_cm, offs_cn, M, N, R,
-                       stride_xdm, stride_upr, stride_upn, BLOCK_R, R_TILES)
-    result = result.to(c_ptr.dtype.element_ty)
-
-    _store_c(c_ptr, result, offs_cm, offs_cn, M, N, stride_cm)
-
-announce_autotuning(_rowcol_scaled_lora_mm_kernel, name="8-bit row/column scaled LoRA matmul")
-
-@torch.library.custom_op("ot_quant::rowcol_scaled_lora_mm_8bit", mutates_args=())
-def rowcol_scaled_lora_mm_8bit(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor, scale_n: torch.Tensor, xd: torch.Tensor, up: torch.Tensor, out_dtype: torch.dtype) -> torch.Tensor:
-    R, block_r = _prepare_lora(a, b, xd, up)
-    b, c, scale, scale_n, M, N, K, FLOAT = _prepare_rowcol_scaled_mm(a, b, scale, scale_n, out_dtype)
-
-    def grid(META):
-        return (triton.cdiv(N, META['BLOCK_SIZE_N']) * triton.cdiv(M, META['BLOCK_SIZE_M']), )
-    _rowcol_scaled_lora_mm_kernel[grid](
-        a, b, c, scale, scale_n, xd, up,
-        M, N, K, R,
-        a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0), xd.stride(0), up.stride(0), up.stride(1),
-        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, EVEN_K = (K % 128 == 0), MXFP8_MMA = FLOAT and _prefer_mxfp8(a.device),
-        BLOCK_R = block_r, R_TILES = triton.cdiv(R, block_r),
-    )
-    return c
-
-@rowcol_scaled_lora_mm_8bit.register_fake
-def _(a: torch.Tensor, b: torch.Tensor, scale: torch.Tensor, scale_n: torch.Tensor, xd: torch.Tensor, up: torch.Tensor, out_dtype: torch.dtype) -> torch.Tensor:
+@mm_8bit.register_fake
+def _(a: torch.Tensor, b: torch.Tensor, out_dtype: torch.dtype,
+      scale_m: torch.Tensor | None = None, scale_n: torch.Tensor | None = None,
+      lora_xd: torch.Tensor | None = None, lora_up: torch.Tensor | None = None) -> torch.Tensor:
     return a.new_empty((a.shape[0], b.shape[1]), dtype=out_dtype)

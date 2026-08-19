@@ -1,6 +1,5 @@
 from modules.module.quantized.mixin.LoRAFusableLinearMixin import LoRAFusableLinearMixin
 from modules.util.mm_8bit import mm_8bit as mm_8bit
-from modules.util.mm_8bit import rowcol_scaled_lora_mm_8bit, rowcol_scaled_mm_8bit
 from modules.util.quantization_util import (
     quantize_axiswise,
     quantize_fp8_axiswise,
@@ -43,20 +42,12 @@ def forward_axiswise_postscaled_torch(dtype: torch.dtype, x: Tensor, weight: Ten
     return res_scaled
 
 @torch.no_grad()
-def backward_axiswise_postscaled_triton(dtype: torch.dtype, output: Tensor, weight: Tensor) -> Tensor:
-    output_8, output_scale = quantize_axiswise(output, dim=-1, dtype=dtype)
-    w_8, w_scale = quantize_axiswise(weight, dim=0, dtype=dtype)
-    mm_res = mm_8bit(output_8.contiguous(), w_8)
-    return mm_res.float().mul_(w_scale).mul_(output_scale).to(output.dtype)
-
-
-@torch.no_grad()
 def forward_axiswise_epiloguescaled_triton(dtype: torch.dtype, x: Tensor, weight: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
     x_8, x_scale = quantize_axiswise(x, dim=-1, dtype=dtype)
     w_8, w_scale = quantize_axiswise(weight, dim=-1, dtype=dtype)
-    #rowcol_scaled_mm_8bit folds the per-token scale (axis 0) and the per-channel weight scale
+    #the mm folds the per-token scale (axis 0) and the per-channel weight scale
     #(axis 1) into the epilogue and returns compute_dtype directly
-    res_scaled = rowcol_scaled_mm_8bit(x_8, w_8.T, x_scale, w_scale, compute_dtype)
+    res_scaled = mm_8bit(x_8, w_8.T, out_dtype=compute_dtype, scale_m=x_scale, scale_n=w_scale)
     if bias is not None:
         res_scaled.add_(bias)
     return res_scaled
@@ -65,14 +56,14 @@ def forward_axiswise_epiloguescaled_triton(dtype: torch.dtype, x: Tensor, weight
 def backward_axiswise_epiloguescaled_triton(dtype: torch.dtype, output: Tensor, weight: Tensor) -> Tensor:
     output_8, output_scale = quantize_axiswise(output, dim=-1, dtype=dtype)
     w_8, w_scale = quantize_axiswise(weight, dim=0, dtype=dtype)
-    return rowcol_scaled_mm_8bit(output_8.contiguous(), w_8, output_scale, w_scale, output.dtype)
+    return mm_8bit(output_8.contiguous(), w_8, out_dtype=output.dtype, scale_m=output_scale, scale_n=w_scale)
 
 
 @torch.no_grad()
 def forward_axiswise_lora_epiloguescaled_triton(dtype: torch.dtype, x: Tensor, weight: Tensor, bias: Tensor | None, compute_dtype: torch.dtype, x_down: Tensor, lora_up: Tensor) -> Tensor:
     x_8, x_scale = quantize_axiswise(x, dim=-1, dtype=dtype)
     w_8, w_scale = quantize_axiswise(weight, dim=-1, dtype=dtype)
-    res_scaled = rowcol_scaled_lora_mm_8bit(x_8, w_8.T, x_scale, w_scale, x_down, lora_up, compute_dtype)
+    res_scaled = mm_8bit(x_8, w_8.T, out_dtype=compute_dtype, scale_m=x_scale, scale_n=w_scale, lora_xd=x_down, lora_up=lora_up)
     if bias is not None:
         res_scaled.add_(bias)
     return res_scaled
@@ -81,7 +72,7 @@ def forward_axiswise_lora_epiloguescaled_triton(dtype: torch.dtype, x: Tensor, w
 def backward_axiswise_lora_epiloguescaled_triton(dtype: torch.dtype, output: Tensor, weight: Tensor, grad_x_down_pre: Tensor, lora_down: Tensor) -> Tensor:
     output_8, output_scale = quantize_axiswise(output, dim=-1, dtype=dtype)
     w_8, w_scale = quantize_axiswise(weight, dim=0, dtype=dtype)
-    return rowcol_scaled_lora_mm_8bit(output_8.contiguous(), w_8, output_scale, w_scale, grad_x_down_pre, lora_down.to(grad_x_down_pre.dtype), output.dtype)
+    return mm_8bit(output_8.contiguous(), w_8, out_dtype=output.dtype, scale_m=output_scale, scale_n=w_scale, lora_xd=grad_x_down_pre, lora_up=lora_down.to(grad_x_down_pre.dtype))
 
 
 forward_axiswise = forward_axiswise_epiloguescaled_triton
