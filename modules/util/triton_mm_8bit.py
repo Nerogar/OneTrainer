@@ -105,7 +105,12 @@ _AUTOTUNE_KEY = [
     'stride_bk',   #use stride of b as key, to autotune again for a strided rhs matrix (backward pass)
     'R_TILES',
     'BLOCK_R',
+    'TILED',
 ]
+
+TILE_SIZE = 64
+#a jit function can only read a global that is wrapped as constexpr
+_TILE_SIZE = tl.constexpr(TILE_SIZE)
 
 #configs for the shared _mm_accumulate core: GROUP_SIZE_M is required by its grouped launch
 #order. Shared memory per config is stages*(BLOCK_M+BLOCK_N)*BLOCK_K bytes and must stay
@@ -131,6 +136,21 @@ _AUTOTUNE_CONFIGS = [
 ]
 
 
+#the dot for the operand dtype. On Blackwell the plain fp8 mma runs at half rate, so fp8 goes
+#through the block-scaled mma with unit scales instead, which runs at full rate
+@triton.jit
+def _dot_8bit(a, b, acc, FLOAT: tl.constexpr, MXFP8_MMA: tl.constexpr):
+    if MXFP8_MMA:
+        #the mma multiplies each group of 32 elements along K by one ue8m0 scale. ue8m0 is a bare
+        #exponent with bias 127, so the value 127 means a scale of 1.0 and every element is left
+        #unchanged - the result is the same as an unscaled fp8 matmul
+        a_scale = tl.full((a.shape[0], a.shape[1] // 32), 127, dtype=tl.uint8)
+        b_scale = tl.full((b.shape[1], b.shape[0] // 32), 127, dtype=tl.uint8)
+        return tl.dot_scaled(a, a_scale, "e4m3", b, b_scale, "e4m3", acc=acc)
+    else:
+        return tl.dot(a, b, acc, out_dtype=tl.float32 if FLOAT else tl.int32)
+
+
 #shared compute core of the 8-bit mm kernels: grouped launch order, divisibility hints and
 #the main loop. Returns the raw accumulator plus the output tile offsets;
 #each entry kernel below adds its own epilogue and stores.
@@ -140,9 +160,9 @@ def _mm_accumulate(
         M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn,
         BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr,
-        FLOAT: tl.constexpr, MXFP8_MMA: tl.constexpr,
+        FLOAT: tl.constexpr, MXFP8_MMA: tl.constexpr, TILED: tl.constexpr,
+        scale_kn_ptr=None, stride_kn_k=0, stride_kn_n=0,
 ):
-
     #grouped launch order: consecutive pids walk down GROUP_SIZE_M M-blocks before advancing
     #to the next N-block, so the concurrent wave covers a rectangle of blocks and each B panel
     #is read from DRAM once and reused by GROUP_SIZE_M CTAs out of L2. A naive row-major grid
@@ -169,25 +189,26 @@ def _mm_accumulate(
     a_ptrs = a_ptr + (offs_am[:, None] * stride_am + offs_k[None, :] * stride_ak)
     b_ptrs = b_ptr + (offs_k[:, None] * stride_bk + offs_bn[None, :] * stride_bn)
 
-    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32 if FLOAT else tl.int32)
+    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32 if (FLOAT or TILED) else tl.int32)
 
-    #the mma multiplies each group of 32 elements along K by one ue8m0 scale. ue8m0 is a bare
-    #exponent with bias 127, so the value 127 means a scale of 1.0 and every element is left
-    #unchanged - the result is the same as an unscaled fp8 matmul
-    if MXFP8_MMA:
-        a_scale = tl.full((BLOCK_SIZE_M, BLOCK_SIZE_K // 32), 127, dtype=tl.uint8)
-        b_scale = tl.full((BLOCK_SIZE_N, BLOCK_SIZE_K // 32), 127, dtype=tl.uint8)
+    if TILED:
+        tl.static_assert(BLOCK_SIZE_K == _TILE_SIZE and BLOCK_SIZE_N % _TILE_SIZE == 0)
+        N_TILES: tl.constexpr = BLOCK_SIZE_N // _TILE_SIZE
+        tiles_n = (pid_n * N_TILES + tl.arange(0, N_TILES)) % (N // _TILE_SIZE)
+        offs_kn = tiles_n * stride_kn_n
 
     #K is a multiple of every BLOCK_SIZE_K (see _K_ALIGN), so every block is full and the loads
     #need no mask
-    for _k in range(K // BLOCK_SIZE_K):
+    for k in range(K // BLOCK_SIZE_K):
         a = tl.load(a_ptrs)
         b = tl.load(b_ptrs)
 
-        if MXFP8_MMA:
-            accumulator = tl.dot_scaled(a, a_scale, "e4m3", b, b_scale, "e4m3", acc=accumulator)
+        if TILED:
+            scale = tl.load(scale_kn_ptr + k * stride_kn_k + offs_kn)
+            scale_cols = tl.reshape(tl.broadcast_to(scale[:, None], (N_TILES, _TILE_SIZE)), (BLOCK_SIZE_N,))
+            accumulator += _dot_8bit(a, b, None, FLOAT, MXFP8_MMA).to(tl.float32) * scale_cols[None, :]
         else:
-            accumulator = tl.dot(a, b, accumulator, out_dtype=tl.float32 if FLOAT else tl.int32)
+            accumulator = _dot_8bit(a, b, accumulator, FLOAT, MXFP8_MMA)
 
         a_ptrs += BLOCK_SIZE_K * stride_ak
         b_ptrs += BLOCK_SIZE_K * stride_bk
@@ -251,6 +272,17 @@ def _prepare_scale(scale: torch.Tensor, entries: int, axis: str):
     return scale
 
 
+def _prepare_tile_scale(scale_kn: torch.Tensor, N: int, K: int):
+    #scale_kn is (K/tile, N/tile) of the unpadded b; when _prepare_mm zero-padded K, the padded
+    #tiles get zero scale rows
+    assert scale_kn.ndim == 2 and scale_kn.shape[1] * TILE_SIZE == N and N % TILE_SIZE == 0, \
+        f"scale_kn must be (K/{TILE_SIZE}, {N // TILE_SIZE}) for a tile of {TILE_SIZE}, got {tuple(scale_kn.shape)}"
+    if scale_kn.shape[0] * TILE_SIZE < K:
+        scale_kn = torch.nn.functional.pad(scale_kn, (0, 0, 0, K // TILE_SIZE - scale_kn.shape[0]))
+    assert scale_kn.shape[0] * TILE_SIZE == K
+    return scale_kn, scale_kn.stride(0), scale_kn.stride(1)
+
+
 #rank-tile width is min(next_pow2(R), cap): the cap bounds the staged tile, and with it the
 #epilogue's shared memory, so occupancy stays rank-independent. 64 keeps
 #2*BLOCK_R*(BLOCK_M+BLOCK_N) inside the main mm's pool on Ada; 128 overflowed it (backward OOM)
@@ -281,15 +313,23 @@ def _add_lora(
     return result
 
 
-@triton.autotune(configs=_AUTOTUNE_CONFIGS, key=_AUTOTUNE_KEY, cache_results=True)
+def _prune_configs(configs, named_args, **kwargs):
+    #the tile-scaled loop descales once per block, so a block must be exactly one tile of K
+    if kwargs['TILED']:
+        return [c for c in configs if c.kwargs['BLOCK_SIZE_K'] == TILE_SIZE]
+    return configs
+
+@triton.autotune(configs=_AUTOTUNE_CONFIGS, key=_AUTOTUNE_KEY, cache_results=True,
+                 prune_configs_by={'early_config_prune': _prune_configs})
 @triton.jit
 def _mm_kernel(
         a_ptr, b_ptr, c_ptr,
         M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn, stride_cm,
         BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr, GROUP_SIZE_M: tl.constexpr,
-        QUANTIZED_M, FLOAT: tl.constexpr, MXFP8_MMA: tl.constexpr,
+        QUANTIZED_M, FLOAT: tl.constexpr, MXFP8_MMA: tl.constexpr, TILED: tl.constexpr,
         scale_m_ptr=None, scale_n_ptr=None,
+        scale_kn_ptr=None, stride_kn_k=0, stride_kn_n=0,
         xd_ptr=None, up_ptr=None, R=None, stride_xdm=None, stride_upr=None, stride_upn=None,
         BLOCK_R: tl.constexpr = None, R_TILES: tl.constexpr = None,
 ):
@@ -297,7 +337,8 @@ def _mm_kernel(
         a_ptr, b_ptr, M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn,
         BLOCK_SIZE_M, BLOCK_SIZE_N, BLOCK_SIZE_K, GROUP_SIZE_M,
-        FLOAT, MXFP8_MMA,
+        FLOAT, MXFP8_MMA, TILED,
+        scale_kn_ptr, stride_kn_k, stride_kn_n,
     )
 
     if scale_m_ptr is not None or scale_n_ptr is not None or xd_ptr is not None:
@@ -325,8 +366,9 @@ announce_autotuning(_mm_kernel, name="8-bit matmul")
 @torch.library.custom_op("ot_quant::mm_8bit", mutates_args=())
 def mm_8bit(a: torch.Tensor, b: torch.Tensor, out_dtype: torch.dtype,
             scale_m: torch.Tensor | None = None, scale_n: torch.Tensor | None = None,
+            scale_kn: torch.Tensor | None = None,
             lora_xd: torch.Tensor | None = None, lora_up: torch.Tensor | None = None) -> torch.Tensor:
-    #returns (a @ b) * scale_m * scale_n + lora_xd @ lora_up in out_dtype, each epilogue term optional
+    #returns (a @ b) * scale_m * scale_n * scale_kn + lora_xd @ lora_up in out_dtype, each term optional
     assert out_dtype.is_floating_point or (scale_m is None and scale_n is None and lora_xd is None), \
         "an integer out_dtype takes no epilogue"
     a, b, c, M, N, K, FLOAT = _prepare_mm(a, b, out_dtype)
@@ -335,6 +377,12 @@ def mm_8bit(a: torch.Tensor, b: torch.Tensor, out_dtype: torch.dtype,
         scale_m = _prepare_scale(scale_m, M, "row of a")
     if scale_n is not None:
         scale_n = _prepare_scale(scale_n, N, "column of b")
+
+    if scale_kn is not None:
+        assert scale_n is None, "scale_n and scale_kn are the same weight scale at two granularities"
+        scale_kn, stride_kn_k, stride_kn_n = _prepare_tile_scale(scale_kn, N, K)
+    else:
+        stride_kn_k = stride_kn_n = 0
 
     if lora_xd is not None:
         R, block_r, r_tiles, stride_xdm, stride_upr, stride_upn = _prepare_lora(lora_xd, lora_up, M, N)
@@ -349,8 +397,9 @@ def mm_8bit(a: torch.Tensor, b: torch.Tensor, out_dtype: torch.dtype,
         a, b, c,
         M, N, K,
         a.stride(0), a.stride(1), b.stride(0), b.stride(1), c.stride(0),
-        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, MXFP8_MMA = FLOAT and _prefer_mxfp8(a.device),
+        QUANTIZED_M = M.bit_length(), FLOAT = FLOAT, MXFP8_MMA = FLOAT and _prefer_mxfp8(a.device), TILED = scale_kn is not None,
         scale_m_ptr = scale_m, scale_n_ptr = scale_n,
+        scale_kn_ptr = scale_kn, stride_kn_k = stride_kn_k, stride_kn_n = stride_kn_n,
         xd_ptr = lora_xd, up_ptr = lora_up, R = R, stride_xdm = stride_xdm, stride_upr = stride_upr, stride_upn = stride_upn,
         BLOCK_R = block_r, R_TILES = r_tiles,
     )
@@ -359,5 +408,6 @@ def mm_8bit(a: torch.Tensor, b: torch.Tensor, out_dtype: torch.dtype,
 @mm_8bit.register_fake
 def _(a: torch.Tensor, b: torch.Tensor, out_dtype: torch.dtype,
       scale_m: torch.Tensor | None = None, scale_n: torch.Tensor | None = None,
+      scale_kn: torch.Tensor | None = None,
       lora_xd: torch.Tensor | None = None, lora_up: torch.Tensor | None = None) -> torch.Tensor:
     return a.new_empty((a.shape[0], b.shape[1]), dtype=out_dtype)

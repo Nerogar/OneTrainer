@@ -50,6 +50,35 @@ def quantize_int8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
     q = quantize_int8(x, scale)
     return q, scale
 
+def _as_tiles(x: Tensor, tile_size: int) -> Tensor:
+    n, k = x.shape
+    return x.reshape(n // tile_size, tile_size, k // tile_size, tile_size)
+
+def _tilewise_get_scale(x: Tensor, tile_size: int, max_value: float) -> Tensor:
+    abs_max = _as_tiles(x, tile_size).abs().amax(dim=(1, 3), keepdim=True)
+    return (abs_max.float() / max_value).clamp(min=1e-30)
+
+def _tilewise_scale_kn(scale: Tensor) -> Tensor:
+    return scale.reshape(scale.shape[0], scale.shape[2]).t().contiguous()
+
+def quantize_int8_tilewise(x: Tensor, tile_size: int) -> tuple[Tensor, Tensor]:
+    scale = _tilewise_get_scale(x, tile_size, 127.0)
+    q = quantize_int8(_as_tiles(x, tile_size), scale).reshape(x.shape)
+    return q, _tilewise_scale_kn(scale)
+
+def quantize_fp8_tilewise(x: Tensor, tile_size: int) -> tuple[Tensor, Tensor]:
+    scale = _tilewise_get_scale(x, tile_size, 448.0)
+    q = quantize_fp8(_as_tiles(x, tile_size), scale).reshape(x.shape)
+    return q, _tilewise_scale_kn(scale)
+
+def quantize_tilewise(x: Tensor, tile_size: int, dtype: torch.dtype) -> tuple[Tensor, Tensor]:
+    if dtype == torch.int8:
+        return quantize_int8_tilewise(x, tile_size)
+    elif dtype == torch.float8_e4m3fn:
+        return quantize_fp8_tilewise(x, tile_size)
+    else:
+        raise NotImplementedError(f"{dtype} is not an 8-bit quantization dtype")
+
 def quantize_fp8(x: Tensor, scale: float | Tensor) -> Tensor:
     q = x.float().mul(1.0 / scale).clamp_(-448.0, 448.0).to(torch.float8_e4m3fn)
     return q
@@ -83,6 +112,9 @@ def quantize_axiswise(x: Tensor, dim: int, dtype: torch.dtype) -> tuple[Tensor, 
         raise NotImplementedError(f"{dtype} is not an 8-bit quantization dtype")
 
 def dequantize(q: Tensor, scale: float | Tensor) -> Tensor:
+    if isinstance(scale, Tensor) and scale.ndim == 2:
+        tile_size = q.shape[1] // scale.shape[0]
+        return (_as_tiles(q, tile_size).float() * scale.t()[:, None, :, None]).reshape(q.shape)
     return q.float() * scale
 
 
@@ -193,6 +225,9 @@ def replace_linear_with_quantized_layers(
     elif dtype.quantize_intW8A8():
         linear_class = LinearW8A8
         kwargs = {'dtype': torch.int8}
+    elif dtype.quantize_intW8A8_tilewise():
+        linear_class = LinearW8A8
+        kwargs = {'dtype': torch.int8, 'tilewise': True}
     elif dtype.quantize_fpW8A8():
         linear_class=LinearW8A8
         kwargs = {'dtype': torch.float8_e4m3fn}

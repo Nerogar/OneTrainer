@@ -2,14 +2,13 @@ from modules.module.quantized.mixin.CompressedWeightMixin import CompressedWeigh
 from modules.module.quantized.mixin.LoRAFusableLinearMixin import LoRAFusableLinearMixin
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
-from modules.util.mm_8bit import mm_8bit as mm_8bit
+from modules.util.mm_8bit import TILE_SIZE, mm_8bit
 from modules.util.quantization_util import (
     dequantize,
     quantize_axiswise,
-    quantize_fp8_axiswise,
     quantize_fp8_tensorwise,
-    quantize_int8_axiswise,
     quantize_int8_tensorwise,
+    quantize_tilewise,
 )
 
 import torch
@@ -17,55 +16,44 @@ from torch import Tensor, nn
 
 
 @torch.no_grad()
-def forward_tokenwise_postscaled_torch(x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
-    if weight.dtype == torch.int8:
-        x_8, x_scale = quantize_int8_axiswise(x, dim=-1)
-        res = torch._int_mm(x_8, weight.T)
-        res_scaled = res.float().mul_(weight_scale * x_scale).to(compute_dtype)
-    else:
-        x_8, x_scale = quantize_fp8_axiswise(x, dim=-1)
-        one = torch.tensor(1.0, device=x.device)
-        res = torch._scaled_mm(x_8, weight.T, scale_a=one, scale_b=weight_scale.float(), out_dtype=torch.float)
-        res_scaled = res.mul_(x_scale).to(compute_dtype) #much faster than scaled by _scaled_mm
-    if bias is not None:
-        res_scaled.add_(bias)
-    return res_scaled
-
-@torch.no_grad()
-def forward_tokenwise_epiloguescaled_triton(x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
+def forward_tokenwise(x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
     x_8, x_scale = quantize_axiswise(x, dim=-1, dtype=weight.dtype)
-    res_scaled = mm_8bit(x_8, weight.T, out_dtype=compute_dtype, scale_m=weight_scale * x_scale)
+    if weight_scale.ndim == 2:
+        res_scaled = mm_8bit(x_8, weight.T, out_dtype=compute_dtype, scale_m=x_scale, scale_kn=weight_scale)
+    else:
+        res_scaled = mm_8bit(x_8, weight.T, out_dtype=compute_dtype, scale_m=weight_scale * x_scale)
     if bias is not None:
         res_scaled.add_(bias)
     return res_scaled
 
 @torch.no_grad()
-def backward_tokenwise_epiloguescaled_triton(output: Tensor, weight: Tensor, weight_scale: Tensor) -> Tensor:
+def backward_tokenwise(output: Tensor, weight: Tensor, weight_scale: Tensor) -> Tensor:
     output_8, output_scale = quantize_axiswise(output, dim=-1, dtype=weight.dtype)
     #almost always, grad outputs are already contiguous and this is a no-op. But there are some grad outputs from SDXL that are non-contiguous:
-    return mm_8bit(output_8.contiguous(), weight, out_dtype=output.dtype, scale_m=weight_scale * output_scale)
-
-
-forward_tokenwise = forward_tokenwise_epiloguescaled_triton
-backward_tokenwise = backward_tokenwise_epiloguescaled_triton
+    if weight_scale.ndim == 2:
+        return mm_8bit(output_8.contiguous(), weight, out_dtype=output.dtype, scale_m=output_scale, scale_kn=weight_scale.t())
+    else:
+        return mm_8bit(output_8.contiguous(), weight, out_dtype=output.dtype, scale_m=weight_scale * output_scale)
 
 
 @torch.no_grad()
-def forward_tokenwise_lora_epiloguescaled_triton(x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype, x_down: Tensor, lora_up: Tensor) -> Tensor:
+def forward_tokenwise_lora(x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype, x_down: Tensor, lora_up: Tensor) -> Tensor:
     x_8, x_scale = quantize_axiswise(x, dim=-1, dtype=weight.dtype)
-    res_scaled = mm_8bit(x_8, weight.T, out_dtype=compute_dtype, scale_m=weight_scale * x_scale, lora_xd=x_down, lora_up=lora_up)
+    if weight_scale.ndim == 2:
+        res_scaled = mm_8bit(x_8, weight.T, out_dtype=compute_dtype, scale_m=x_scale, scale_kn=weight_scale, lora_xd=x_down, lora_up=lora_up)
+    else:
+        res_scaled = mm_8bit(x_8, weight.T, out_dtype=compute_dtype, scale_m=weight_scale * x_scale, lora_xd=x_down, lora_up=lora_up)
     if bias is not None:
         res_scaled.add_(bias)
     return res_scaled
 
 @torch.no_grad()
-def backward_tokenwise_lora_epiloguescaled_triton(output: Tensor, weight: Tensor, weight_scale: Tensor, grad_x_down_pre: Tensor, lora_down: Tensor) -> Tensor:
+def backward_tokenwise_lora(output: Tensor, weight: Tensor, weight_scale: Tensor, grad_x_down_pre: Tensor, lora_down: Tensor) -> Tensor:
     output_8, output_scale = quantize_axiswise(output, dim=-1, dtype=weight.dtype)
-    return mm_8bit(output_8.contiguous(), weight, out_dtype=output.dtype, scale_m=weight_scale * output_scale, lora_xd=grad_x_down_pre, lora_up=lora_down.to(grad_x_down_pre.dtype))
-
-
-forward_tokenwise_lora = forward_tokenwise_lora_epiloguescaled_triton
-backward_tokenwise_lora = backward_tokenwise_lora_epiloguescaled_triton
+    if weight_scale.ndim == 2:
+        return mm_8bit(output_8.contiguous(), weight, out_dtype=output.dtype, scale_m=output_scale, scale_kn=weight_scale.t(), lora_xd=grad_x_down_pre, lora_up=lora_down.to(grad_x_down_pre.dtype))
+    else:
+        return mm_8bit(output_8.contiguous(), weight, out_dtype=output.dtype, scale_m=weight_scale * output_scale, lora_xd=grad_x_down_pre, lora_up=lora_down.to(grad_x_down_pre.dtype))
 
 
 class LinearW8A8Function(torch.autograd.Function):
@@ -129,7 +117,7 @@ class LinearW8A8(
     CompressedWeightMixin,
     LoRAFusableLinearMixin,
 ):
-    def __init__(self, dtype: torch.dtype, *args, **kwargs):
+    def __init__(self, dtype: torch.dtype, tilewise: bool = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         assert dtype in [torch.int8, torch.float8_e4m3fn]
@@ -137,7 +125,19 @@ class LinearW8A8(
 
         self.__is_quantized = False
         self.compute_dtype = None
-        self.register_buffer("scale", torch.tensor(1.0, dtype=torch.float32))
+        self._tilewise = tilewise
+        if tilewise:
+            if TILE_SIZE is None:
+                raise RuntimeError(
+                    "a tilewise W8A8 data type needs the triton kernel, which is not available here. "
+                    "Use the non-tilewise int or float W8A8 data type instead.")
+            if self.out_features % TILE_SIZE != 0 or self.in_features % TILE_SIZE != 0:
+                raise ValueError(
+                    f"tilewise needs both weight dimensions to be multiples of {TILE_SIZE}, "
+                    f"but this layer is ({self.out_features}, {self.in_features})")
+            self.register_buffer("scale", torch.ones(self.in_features // TILE_SIZE, self.out_features // TILE_SIZE, dtype=torch.float32))
+        else:
+            self.register_buffer("scale", torch.tensor(1.0, dtype=torch.float32))
 
         self._init_compressed_state()
 
@@ -161,7 +161,9 @@ class LinearW8A8(
         orig_device = weight.device
         if device is not None:
             weight = weight.to(device=device)
-        if self._dtype == torch.int8:
+        if self._tilewise:
+            weight, scale = quantize_tilewise(weight, TILE_SIZE, self._dtype)
+        elif self._dtype == torch.int8:
             weight, scale = quantize_int8_tensorwise(weight)
         else:
             weight, scale = quantize_fp8_tensorwise(weight)
@@ -245,9 +247,8 @@ def benchmark_int8(m, k, n, device = 'cuda', steps = 10000):
     run_benchmark(lambda: torch_backward(y_8, w_8), "torch mm backward int8", steps=steps)
     run_benchmark(lambda: mm_8bit(y_8, w_8, out_dtype=torch.int32), "triton mm backward int8", steps=steps)
 
-    run_benchmark(lambda: forward_tokenwise_postscaled_torch(x, w_8, w_scale, bias=None, compute_dtype=torch.bfloat16), "torch forward int", steps=steps, compile=True)
-    run_benchmark(lambda: forward_tokenwise_epiloguescaled_triton(x, w_8, w_scale, bias=None, compute_dtype=torch.bfloat16), "triton scaled forward int", steps=steps, compile=True)
-    run_benchmark(lambda: backward_tokenwise_epiloguescaled_triton(y, w_8, w_scale), "triton scaled backward int", steps=steps, compile=True)
+    run_benchmark(lambda: forward_tokenwise(x, w_8, w_scale, bias=None, compute_dtype=torch.bfloat16), "triton scaled forward int", steps=steps, compile=True)
+    run_benchmark(lambda: backward_tokenwise(y, w_8, w_scale), "triton scaled backward int", steps=steps, compile=True)
 
 
 @torch.no_grad()
@@ -267,9 +268,8 @@ def benchmark_fp8(m, k, n, device = 'cuda', steps = 10000):
     run_benchmark(lambda: torch_backward(y_8, w_8), "torch mm backward fp8", steps=steps)
     run_benchmark(lambda: mm_8bit(y_8, w_8, out_dtype=torch.float32), "triton mm backward fp8", steps=steps)
 
-    run_benchmark(lambda: forward_tokenwise_postscaled_torch(x, w_8, w_scale, bias=None, compute_dtype=torch.bfloat16), "torch forward fp8", steps=steps, compile=True)
-    run_benchmark(lambda: forward_tokenwise_epiloguescaled_triton(x, w_8, w_scale, bias=None, compute_dtype=torch.bfloat16), "triton scaled forward fp8", steps=steps, compile=True)
-    run_benchmark(lambda: backward_tokenwise_epiloguescaled_triton(y, w_8, w_scale), "triton scaled backward fp8", steps=steps, compile=True)
+    run_benchmark(lambda: forward_tokenwise(x, w_8, w_scale, bias=None, compute_dtype=torch.bfloat16), "triton scaled forward fp8", steps=steps, compile=True)
+    run_benchmark(lambda: backward_tokenwise(y, w_8, w_scale), "triton scaled backward fp8", steps=steps, compile=True)
 
 
 @torch.no_grad()
@@ -285,7 +285,7 @@ def benchmark_lora(m, k, n, r, dtype, device='cuda', steps=1000):
     up_w = torch.randn(n, r, device=device, dtype=torch.bfloat16) * 0.02
 
     baseline = forward_tokenwise
-    fused = forward_tokenwise_lora_epiloguescaled_triton
+    fused = forward_tokenwise_lora
 
     def run_unfused():
         y = baseline(x, w_8, w_scale, bias=None, compute_dtype=torch.bfloat16)
