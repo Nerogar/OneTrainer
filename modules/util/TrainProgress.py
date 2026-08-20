@@ -5,11 +5,13 @@ class TrainProgress:
             epoch_step: int = 0,
             epoch_sample: int = 0,
             global_step: int = 0,
+            last_action_epoch: dict | None = None,
     ):
         self.epoch = epoch
         self.epoch_step = epoch_step
         self.epoch_sample = epoch_sample
         self.global_step = global_step
+        self.last_action_epoch = last_action_epoch if last_action_epoch is not None else {}
 
     def next_step(self, batch_size: int):
         self.epoch_step += 1
