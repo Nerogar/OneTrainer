@@ -52,7 +52,6 @@ class BaseHunyuanVideoSetup(
         self._setup_model_part(model, config, "vae", config.vae)
 
         model.vae.enable_tiling()
-        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=True)
 
     def _setup_embeddings(
             self,

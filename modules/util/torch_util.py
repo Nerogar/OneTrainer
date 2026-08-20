@@ -15,6 +15,20 @@ default_device = accelerator.device
 torch_version = packaging.version.parse(torch.__version__)
 
 
+def supports_mem_pool(device: torch.device) -> bool:
+    return device.type == "cuda"
+
+
+def create_mem_pool(device: torch.device):
+    # a dedicated MemPool the caller can allocate into; None on devices without MemPool support (cpu/mps)
+    return torch.cuda.MemPool() if supports_mem_pool(device) else None
+
+
+def mem_pool_context(mem_pool):
+    # route allocations made in this context into the given MemPool; no-op when it is None
+    return torch.cuda.use_mem_pool(mem_pool) if mem_pool is not None else nullcontext()
+
+
 def state_dict_has_prefix(state_dict: dict | None, prefix: str):
     if not state_dict:
         return False
