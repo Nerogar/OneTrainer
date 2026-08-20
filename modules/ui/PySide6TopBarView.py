@@ -36,6 +36,15 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
     def _setup_frame_column_weight(self):
         pyside6_components._layout(self.frame).setColumnStretch(5, 1)
 
+    def _init_preset_display(self):
+        # the "Load Preset" button doubles as the display; a tooltip keeps it
+        # obvious that it opens the preset menu even when it shows a preset name
+        self.preset_button.setToolTip("Load a preset")
+
+    def _set_preset_text(self, text: str):
+        # empty means nothing is loaded: fall back to the button's default label
+        self.preset_button.setText(text or "Load Preset")
+
     def _forget_dropdown(self, widget):
         lo = pyside6_components._layout(self.frame)
         lo.removeWidget(widget)
