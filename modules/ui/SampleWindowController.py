@@ -8,6 +8,7 @@ from modules.modelSampler.BaseModelSampler import (
 from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
+from modules.util.compile_util import init_compile
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.EMAMode import EMAMode
@@ -118,6 +119,8 @@ class SampleWindowController:
                 # lazy initialization
                 self.model = self.load_model()
                 self.model_sampler = self.create_sampler(self.model)
+
+            init_compile()
 
             sample.from_train_config(self.current_train_config)
 
