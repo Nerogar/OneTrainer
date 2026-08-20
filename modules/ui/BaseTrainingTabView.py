@@ -869,8 +869,9 @@ class BaseTrainingTabView(ABC):
         row += 1
 
     def __create_layer_frame(self, master, row, controller, ui_state):
+        frame = self.components.section_frame(master, row)
         presets = controller.get_layer_presets()
-        self.components.layer_filter_entry(master, row, 0, ui_state,
+        self.components.layer_filter_entry(frame, row, 0, ui_state,
                                            preset_var_name="layer_filter_preset", presets=presets,
                                            preset_label="Layer Filter",
                                            preset_tooltip="Select a preset defining which layers to train, or select 'Custom' to define your own.\nA blank 'custom' field or 'Full' will train all layers.",
