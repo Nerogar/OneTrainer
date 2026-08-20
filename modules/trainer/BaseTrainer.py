@@ -97,7 +97,11 @@ class BaseTrainer(
         if self.config.tensorboard_expose:
             tensorboard_args.append("--bind_all")
 
-        self.tensorboard_subprocess = subprocess.Popen(tensorboard_args)
+        # discard the child's banner and notices; the UI already shows the tensorboard URL.
+        # Popen still raises if the executable is missing.
+        self.tensorboard_subprocess = subprocess.Popen(
+            tensorboard_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
 
     def _stop_tensorboard(self):
         self.tensorboard_subprocess.kill()
