@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
 
-set -eo pipefail
-
-if [ "$OT_PIP_INSTALL" = "true" ]; then
-    echo "[OneTrainer] Running via pip..."
-    bash scripts/pip-install/run-cmd.sh "$@"
-    exit 0
-fi
+set -e
 
 source "${BASH_SOURCE[0]%/*}/lib.include.sh"
 
@@ -26,4 +20,4 @@ prepare_runtime_environment
 
 # Remove $1 (name of the script) and pass all remaining arguments to the script.
 shift
-run_in_env python "${OT_CUSTOM_SCRIPT_FILE}" "$@"
+run_python_in_active_env "${OT_CUSTOM_SCRIPT_FILE}" "$@"
