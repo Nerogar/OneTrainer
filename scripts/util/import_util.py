@@ -17,9 +17,6 @@ def script_imports(allow_zluda: bool = True):
     # records from child loggers. Set OT_DEBUG_WARNINGS to see them all.
     if not os.environ.get("OT_DEBUG_WARNINGS"):
         # diffusers/transformers chatty logger.warning() lines at import/load time.
-        logging.getLogger("diffusers.modular_pipelines").addFilter(
-            lambda record: 'Modular Diffusers is currently an experimental feature' not in record.getMessage()
-        )
         # The subject of these two is interpolated into the message, so match the whole
         # sentence with .* standing in for the runtime value.
         logging.getLogger("diffusers.configuration_utils").addFilter(
