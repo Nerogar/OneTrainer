@@ -46,6 +46,7 @@ class QwenSampler(BaseModelSampler):
             diffusion_steps: int,
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
+            override_shift: float | None = None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
@@ -82,7 +83,7 @@ class QwenSampler(BaseModelSampler):
                 dtype=torch.float32,
             )
 
-            shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
+            shift = override_shift or self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
             latent_image = self.model.pack_latents(latent_image)
 
             noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=math.log(shift))
@@ -170,6 +171,7 @@ class QwenSampler(BaseModelSampler):
             diffusion_steps=sample_config.diffusion_steps,
             cfg_scale=sample_config.cfg_scale,
             noise_scheduler=sample_config.noise_scheduler,
+            override_shift=sample_config.override_shift,
             on_update_progress=on_update_progress,
         )
 

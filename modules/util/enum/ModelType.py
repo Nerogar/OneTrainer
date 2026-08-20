@@ -129,6 +129,16 @@ class ModelType(Enum):
     def is_ideogram(self):
         return self == ModelType.IDEOGRAM_4
 
+    def supports_sample_shift_override(self) -> bool:
+        return self.is_flux() \
+            or self.is_chroma() \
+            or self.is_qwen() \
+            or self.is_anima() \
+            or self.is_krea2() \
+            or self.is_hunyuan_video() \
+            or self.is_z_image() \
+            or self.is_ernie()
+
     def supports_negative_prompt(self) -> bool:
         # asymmetric dual-network CFG models drive the negative branch from a frozen unconditional network (or an
         # empty prompt), not a user-supplied negative prompt
