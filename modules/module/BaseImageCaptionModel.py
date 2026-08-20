@@ -126,6 +126,7 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             mode: str = 'fill',
             progress_callback: Callable[[int, int], None] = None,
             error_callback: Callable[[str], None] = None,
+            is_cancelled: Callable[[], bool] = None,
     ):
         """
         Captions all samples in a list
@@ -141,11 +142,14 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
                 - add: creates a new caption for all samples, appending if a caption already exists
             progress_callback (`Callable[[int, int], None]`): called after every processed image
             error_callback (`Callable[[str], None]`): called for every exception
+            is_cancelled (`Callable[[], bool]`): checked before each image; if it returns True the run stops
         """
 
         if progress_callback is not None:
             progress_callback(0, len(filenames))
         for i, filename in enumerate(tqdm(filenames)):
+            if is_cancelled is not None and is_cancelled():
+                break
             try:
                 self.caption_image(filename, initial_caption, caption_prefix, caption_postfix, mode)
             except Exception:
@@ -164,6 +168,7 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             progress_callback: Callable[[int, int], None] = None,
             error_callback: Callable[[str], None] = None,
             include_subdirectories: bool = False,
+            is_cancelled: Callable[[], bool] = None,
     ):
         """
         Captions all samples in a folder
@@ -191,4 +196,5 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
             mode=mode,
             progress_callback=progress_callback,
             error_callback=error_callback,
+            is_cancelled=is_cancelled,
         )

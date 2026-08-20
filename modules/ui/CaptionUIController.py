@@ -2,9 +2,11 @@ import os
 import subprocess
 import traceback
 
+from modules.module.BaseImageCaptionModel import CaptionSample
 from modules.module.Blip2Model import Blip2Model
 from modules.module.BlipModel import BlipModel
 from modules.module.ClipSegModel import ClipSegModel
+from modules.module.LMStudioCaptionModel import LMStudioCaptionModel
 from modules.module.MaskByColor import MaskByColor
 from modules.module.RembgHumanModel import RembgHumanModel
 from modules.module.RembgModel import RembgModel
@@ -236,6 +238,12 @@ class CaptionUIController:
         multiplier = 1.0 + (delta * 0.05)
         self.mask_draw_radius = max(0.0025, self.mask_draw_radius * multiplier)
 
+    def set_mask_draw_origin(self, event_x, event_y):
+        # Called at the start of a fresh stroke (mouse press) so the first dab is a
+        # dot at the click point instead of a line from where the last stroke ended.
+        self.mask_draw_x = event_x
+        self.mask_draw_y = event_y
+
     def handle_edit_mask(self, event_x, event_y, is_left, is_right, alpha):
         if len(self.image_rel_paths) == 0 or self.current_image_index >= len(self.image_rel_paths):
             return
@@ -346,6 +354,24 @@ class CaptionUIController:
             self._release_models()
             print("loading WD14_VIT_v2 model, this may take a while")
             self.captioning_model = WDModel(default_device, torch.float16)
+
+    def load_lmstudio_captioning_model(self, server_url, system_prompt, user_prompt):
+        self._release_models()
+        self.captioning_model = LMStudioCaptionModel(server_url, system_prompt, user_prompt)
+
+    def caption_current_image(self, server_url, system_prompt, user_prompt):
+        if (
+            len(self.image_rel_paths) == 0
+            or self.current_image_index < 0
+            or self.current_image_index >= len(self.image_rel_paths)
+        ):
+            return None
+
+        image_name = self.image_rel_paths[self.current_image_index]
+        image_path = os.path.join(self.dir, image_name)
+
+        model = LMStudioCaptionModel(server_url, system_prompt, user_prompt)
+        return model.generate_caption(CaptionSample(image_path))
 
     def print_help(self):
         print(self.help_text)
