@@ -6,6 +6,7 @@ from itertools import repeat
 
 from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.DataType import DataType
+from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.quantization_util import (
     is_quantized_parameter,
     replace_linear_with_quantized_layers,
@@ -14,6 +15,7 @@ from modules.util.quantization_util import (
 import torch
 from torch import nn
 
+from diffusers import GGUFQuantizationConfig
 from transformers.conversion_mapping import get_checkpoint_conversion_mapping
 from transformers.core_model_loading import rename_source_key
 
@@ -328,3 +330,87 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             None,
             quantization,
         )
+
+    def _load_transformer(
+            self,
+            module_type,
+            weight_dtypes: ModelWeightDtypes,
+            base_model_name: str,
+            transformer_model_name: str,
+            quantization: QuantizationConfig,
+            config: str | None = None,
+    ):
+        # a single-file (optionally GGUF-quantized) checkpoint is loaded directly, using
+        # a separate repo to source the model config if the checkpoint doesn't carry one;
+        # otherwise the transformer is loaded from its subfolder in the base model repo
+        if transformer_model_name:
+            single_file_kwargs = {}
+            if config is not None:
+                single_file_kwargs["config"] = config
+                single_file_kwargs["subfolder"] = "transformer"
+
+            transformer = module_type.from_single_file(
+                transformer_model_name,
+                **single_file_kwargs,
+                #avoid loading the transformer in float32:
+                torch_dtype=torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype(),
+                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16) if weight_dtypes.transformer.is_gguf() else None,
+            )
+            return self._convert_diffusers_sub_module_to_dtype(
+                transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization,
+            )
+        else:
+            return self._load_diffusers_sub_module(
+                module_type,
+                weight_dtypes.transformer,
+                weight_dtypes.train_dtype,
+                base_model_name,
+                "transformer",
+                quantization,
+            )
+
+    def _load_text_encoder(
+            self,
+            module_type,
+            dtype: DataType,
+            train_dtype: DataType,
+            base_model_name: str,
+            subfolder: str,
+    ):
+        # text encoders have no single-file override and always load from their subfolder in the base model
+        # repo; kept as a per-model entry point alongside _load_transformer / _load_vae. dtype/train_dtype are
+        # explicit rather than a weight_dtypes bundle since a model can hold several encoders (text_encoder,
+        # text_encoder_2, ...) with differing dtypes
+        return self._load_transformers_sub_module(
+            module_type,
+            dtype,
+            train_dtype,
+            base_model_name,
+            subfolder,
+        )
+
+    def _load_vae(
+            self,
+            module_type,
+            dtype: DataType,
+            train_dtype: DataType,
+            base_model_name: str,
+            vae_model_name: str,
+    ):
+        # a separate vae repo overrides the base model's vae subfolder when given. train_dtype is explicit
+        # since some models (e.g. SDXL) upgrade the vae to fallback_train_dtype to avoid fp16 overflow
+        if vae_model_name:
+            return self._load_diffusers_sub_module(
+                module_type,
+                dtype,
+                train_dtype,
+                vae_model_name,
+            )
+        else:
+            return self._load_diffusers_sub_module(
+                module_type,
+                dtype,
+                train_dtype,
+                base_model_name,
+                "vae",
+            )

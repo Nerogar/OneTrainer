@@ -81,7 +81,7 @@ class StableDiffusion3ModelLoader(
         )
 
         if include_text_encoder_1:
-            text_encoder_1 = self._load_transformers_sub_module(
+            text_encoder_1 = self._load_text_encoder(
                 CLIPTextModelWithProjection,
                 weight_dtypes.text_encoder,
                 weight_dtypes.train_dtype,
@@ -92,7 +92,7 @@ class StableDiffusion3ModelLoader(
             text_encoder_1 = None
 
         if include_text_encoder_2:
-            text_encoder_2 = self._load_transformers_sub_module(
+            text_encoder_2 = self._load_text_encoder(
                 CLIPTextModelWithProjection,
                 weight_dtypes.text_encoder_2,
                 weight_dtypes.train_dtype,
@@ -103,7 +103,7 @@ class StableDiffusion3ModelLoader(
             text_encoder_2 = None
 
         if include_text_encoder_3:
-            text_encoder_3 = self._load_transformers_sub_module(
+            text_encoder_3 = self._load_text_encoder(
                 T5EncoderModel,
                 weight_dtypes.text_encoder_3,
                 weight_dtypes.fallback_train_dtype,
@@ -113,21 +113,13 @@ class StableDiffusion3ModelLoader(
         else:
             text_encoder_3 = None
 
-        if vae_model_name:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKL,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                vae_model_name,
-            )
-        else:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKL,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                base_model_name,
-                "vae",
-            )
+        vae = self._load_vae(
+            AutoencoderKL,
+            weight_dtypes.vae,
+            weight_dtypes.train_dtype,
+            base_model_name,
+            vae_model_name,
+        )
 
         transformer = self._load_diffusers_sub_module(
             SD3Transformer2DModel,

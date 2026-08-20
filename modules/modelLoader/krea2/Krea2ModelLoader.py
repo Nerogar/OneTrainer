@@ -8,12 +8,9 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 
-import torch
-
 from diffusers import (
     AutoencoderKLQwenImage,
     FlowMatchEulerDiscreteScheduler,
-    GGUFQuantizationConfig,
     Krea2Transformer2DModel,
 )
 from transformers import Qwen2Tokenizer, Qwen3VLModel
@@ -62,7 +59,7 @@ class Krea2ModelLoader(
             subfolder="scheduler",
         )
 
-        text_encoder = self._load_transformers_sub_module(
+        text_encoder = self._load_text_encoder(
             Qwen3VLModel,
             weight_dtypes.text_encoder,
             weight_dtypes.fallback_train_dtype,
@@ -70,43 +67,22 @@ class Krea2ModelLoader(
             "text_encoder",
         )
 
-        if vae_model_name: #TODO simplify
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKLQwenImage,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                vae_model_name,
-            )
-        else:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKLQwenImage,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                base_model_name,
-                "vae",
-            )
+        vae = self._load_vae(
+            AutoencoderKLQwenImage,
+            weight_dtypes.vae,
+            weight_dtypes.train_dtype,
+            base_model_name,
+            vae_model_name,
+        )
 
-        if transformer_model_name:
-            transformer = Krea2Transformer2DModel.from_single_file(
-                transformer_model_name,
-                config=base_model_name,
-                subfolder="transformer",
-                #avoid loading the transformer in float32:
-                torch_dtype = torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype(),
-                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16) if weight_dtypes.transformer.is_gguf() else None,
-            )
-            transformer = self._convert_diffusers_sub_module_to_dtype(
-                transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization,
-            )
-        else:
-            transformer = self._load_diffusers_sub_module(
-                Krea2Transformer2DModel,
-                weight_dtypes.transformer,
-                weight_dtypes.train_dtype,
-                base_model_name,
-                "transformer",
-                quantization,
-            )
+        transformer = self._load_transformer(
+            Krea2Transformer2DModel,
+            weight_dtypes,
+            base_model_name,
+            transformer_model_name,
+            quantization,
+            config=base_model_name,
+        )
 
         model.model_type = model_type
         model.tokenizer = tokenizer

@@ -81,7 +81,7 @@ class HunyuanVideoModelLoader(
         )
 
         if include_text_encoder_1:
-            text_encoder_1 = self._load_transformers_sub_module(
+            text_encoder_1 = self._load_text_encoder(
                 LlamaModel,
                 weight_dtypes.text_encoder,
                 weight_dtypes.train_dtype,
@@ -92,7 +92,7 @@ class HunyuanVideoModelLoader(
             text_encoder_1 = None
 
         if include_text_encoder_2:
-            text_encoder_2 = self._load_transformers_sub_module(
+            text_encoder_2 = self._load_text_encoder(
                 CLIPTextModel,
                 weight_dtypes.text_encoder_2,
                 weight_dtypes.fallback_train_dtype,
@@ -102,43 +102,22 @@ class HunyuanVideoModelLoader(
         else:
             text_encoder_2 = None
 
-        if vae_model_name:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKLHunyuanVideo,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                vae_model_name,
-            )
-        else:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKLHunyuanVideo,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                base_model_name,
-                "vae",
-            )
+        vae = self._load_vae(
+            AutoencoderKLHunyuanVideo,
+            weight_dtypes.vae,
+            weight_dtypes.train_dtype,
+            base_model_name,
+            vae_model_name,
+        )
 
-        if transformer_model_name:
-            transformer = HunyuanVideoTransformer3DModel.from_single_file(
-                transformer_model_name,
-                config=base_model_name,
-                subfolder="transformer",
-                #avoid loading the transformer in float32:
-                torch_dtype = torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype(),
-                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16) if weight_dtypes.transformer.is_gguf() else None,
-            )
-            transformer = self._convert_diffusers_sub_module_to_dtype(
-                transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization
-            )
-        else:
-            transformer = self._load_diffusers_sub_module(
-                HunyuanVideoTransformer3DModel,
-                weight_dtypes.transformer,
-                weight_dtypes.train_dtype,
-                base_model_name,
-                "transformer",
-                quantization,
-            )
+        transformer = self._load_transformer(
+            HunyuanVideoTransformer3DModel,
+            weight_dtypes,
+            base_model_name,
+            transformer_model_name,
+            quantization,
+            config=base_model_name,
+        )
 
         model.model_type = model_type
         model.tokenizer_1 = tokenizer_1
