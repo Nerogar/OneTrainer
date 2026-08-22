@@ -8,7 +8,6 @@ HIDDEN_STATES_LAYER = -2
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.ModelType import ModelType
-from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 import torch
 from torch import Tensor
@@ -34,8 +33,6 @@ class ErnieModel(BaseModel):
     # autocast context
     text_encoder_autocast_context: torch.autocast | nullcontext
 
-    text_encoder_offload_conductor: LayerOffloadConductor | None
-    transformer_offload_conductor: LayerOffloadConductor | None
 
     transformer_lora: LoRAModuleWrapper | None
     lora_state_dict: dict | None
@@ -56,8 +53,6 @@ class ErnieModel(BaseModel):
 
         self.text_encoder_autocast_context = nullcontext()
 
-        self.text_encoder_offload_conductor = None
-        self.transformer_offload_conductor = None
 
         self.transformer_lora = None
         self.lora_state_dict = None
