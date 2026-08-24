@@ -48,6 +48,7 @@ def make_lora_model_loader(
             model.model_spec = self._load_default_model_spec(model_type)
 
             if model_names.base_model is not None:
+                base_model_loader._validate_hf_repo_access(model_names.base_model)
                 base_model_loader.load(model, model_type, model_names, weight_dtypes, quantization)
             lora_model_loader.load(model, model_names)
             if embedding_loader_class is not None:

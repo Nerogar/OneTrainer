@@ -19,6 +19,7 @@ debug*.py
 config.json
 secrets.json
 *.zip
+training_presets/*.json
 
 # environments
 /.venv*
