@@ -44,6 +44,7 @@ def init_concept_stats(advanced_checks : bool):
                 "min_caption_length" : "-",
                 "avg_caption_length" : "-",
                 "aspect_buckets" : {},
+                "aspect_bucket_files" : {},     #relative file paths per bucket, populated only in advanced scan
                 "force_cancelled" : False
             }
 
@@ -80,6 +81,7 @@ def init_concept_stats(advanced_checks : bool):
         #initialize counts for all buckets to 0
         for aspect in aspect_ratio_list:
             stats_dict["aspect_buckets"][aspect] = 0
+            stats_dict["aspect_bucket_files"][aspect] = []
 
     return stats_dict
 
@@ -140,6 +142,7 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                 true_aspect = height/width
                 nearest_aspect = min(aspect_ratio_list, key=lambda x:abs(x-true_aspect))    #try to match math used in aspect bucketing
                 stats_dict["aspect_buckets"][nearest_aspect] += 1
+                stats_dict["aspect_bucket_files"][nearest_aspect].append(os.path.relpath(path, conceptconfig.path))
 
                 if pixels > stats_dict["max_pixels"][0]:
                     stats_dict["max_pixels"] = [pixels, os.path.relpath(path, conceptconfig.path), f'{width}w x {height}h']
@@ -183,6 +186,7 @@ def folder_scan(dir, stats_dict : dict, advanced_checks : bool, conceptconfig : 
                 true_aspect = height/width
                 nearest_aspect = min(aspect_ratio_list, key=lambda x:abs(x-true_aspect))
                 stats_dict["aspect_buckets"][nearest_aspect] += 1
+                stats_dict["aspect_bucket_files"][nearest_aspect].append(os.path.relpath(path, conceptconfig.path))
 
                 if pixels > stats_dict["max_pixels"][0]:
                     stats_dict["max_pixels"] = [pixels, os.path.relpath(path, conceptconfig.path), f'{width}w x {height}h']
@@ -238,6 +242,9 @@ def combine_stats_dicts(input_dicts : list[dict], advanced_checks : bool):
             elif advanced_checks and key in ["aspect_buckets"]:
                 for subkey in dict[key]:
                     final_dict[key][subkey] += dict[key][subkey]
+            elif advanced_checks and key in ["aspect_bucket_files"]:
+                for subkey in dict[key]:
+                    final_dict[key][subkey].extend(dict[key][subkey])
             elif advanced_checks and key in ["max_pixels", "max_length", "max_fps", "max_caption_length"]:
                 if dict[key][0] > final_dict[key][0]:
                     final_dict[key] = dict[key]

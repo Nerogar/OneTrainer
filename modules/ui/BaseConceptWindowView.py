@@ -12,6 +12,8 @@ class BaseConceptWindowView:
         self.bucket_ax = None
         self.text_color = None
         self.canvas = None
+        #{aspect_ratio_string: [relative file paths]} for the currently displayed smallest buckets
+        self._smallest_bucket_files = {}
 
     def build_general_tab(self, frame, controller, ui_state, text_ui_state):
         # name
@@ -305,8 +307,10 @@ class BaseConceptWindowView:
                          tooltip="Graph of all possible buckets and the number of images in each one, defined as height/width. Buckets range from 0.25 (4:1 extremely wide) to 4 (1:4 extremely tall). \
                             Images which don't match a bucket exactly are cropped to the nearest one.", underline=True)
         self.small_bucket_label = self.components.label(frame, 17, 1, "\nSmallest Buckets", pad=0,
-                         tooltip="Image buckets with the least nonzero total images - if 'batch size' is larger than this, these images will be ignored during training! See the wiki for more details.", underline=True)
+                         tooltip="Image buckets with the least nonzero total images - if 'batch size' is larger than this, these images will be ignored during training! See the wiki for more details.\n\nClick the list below to see the files in these buckets.", underline=True)
         self.small_bucket_preview = self.components.label(frame, 18, 1, pad=0, text="-")
+        #clicking the preview opens a popup listing the files in the smallest buckets; populated by _update_concept_stats
+        self.components.bind_clickable(self.small_bucket_preview, self._show_smallest_bucket_files)
 
         #refresh stats - must be after all labels are defined or will give error
         self.refresh_basic_stats_button = self.components.button(master=frame, row=0, column=0, text="Refresh Basic", command=lambda: controller.get_concept_stats_threaded(self, False, 9999),
@@ -403,6 +407,8 @@ class BaseConceptWindowView:
 
         #aspect bucketing
         aspect_buckets = controller.concept.concept_stats["aspect_buckets"]
+        aspect_bucket_files = controller.concept.concept_stats["aspect_bucket_files"]
+        self._smallest_bucket_files = {}
         if len(aspect_buckets) != 0 and max(val for val in aspect_buckets.values()) > 0:    #check aspect_bucket data exists and is not all zero
             min_val = min(val for val in aspect_buckets.values() if val > 0)                #smallest nonzero values
             if max(val for val in aspect_buckets.values()) > min_val:                       #check if any buckets larger than min_val exist - if all images are same aspect then there won't be
@@ -412,7 +418,10 @@ class BaseConceptWindowView:
             min_aspect_buckets = {key: val for key,val in aspect_buckets.items() if val in (min_val, min_val2)}
             min_bucket_str = ""
             for key, val in min_aspect_buckets.items():
-                min_bucket_str += f'aspect {self.decimal_to_aspect_ratio(key)} : {val} img\n'
+                aspect_str = self.decimal_to_aspect_ratio(key)
+                min_bucket_str += f'aspect {aspect_str} : {val} img\n'
+                #remember the files behind each displayed bucket so the click handler can list them
+                self._smallest_bucket_files[aspect_str] = aspect_bucket_files.get(key, [])
             min_bucket_str.strip()
             self.components.set_label_text(self.small_bucket_preview, min_bucket_str)
 
@@ -433,6 +442,17 @@ class BaseConceptWindowView:
         aspect_fraction = fractions.Fraction(value).limit_denominator(16)
         aspect_string = f'{aspect_fraction.denominator}:{aspect_fraction.numerator}'
         return aspect_string
+
+    def _show_smallest_bucket_files(self):
+        #popup listing the files in each of the smallest buckets, grouped by aspect ratio
+        if not any(self._smallest_bucket_files.values()):
+            return  #no advanced scan data yet
+        sections = []
+        for aspect_str, files in self._smallest_bucket_files.items():
+            header = f'aspect {aspect_str} ({len(files)} img):'
+            sections.append(header + "\n" + "\n".join(files))
+        text = "\n\n".join(sections)
+        self.components.show_text_popup(self, "Smallest bucket files", text)
 
     def _disable_scan_buttons(self):
         self.components.set_widget_enabled(self.refresh_basic_stats_button, False)
