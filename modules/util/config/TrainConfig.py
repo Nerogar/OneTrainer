@@ -41,7 +41,6 @@ class TrainOptimizerConfig(BaseConfig):
     beta2: float
     beta3: float
     bias_correction: bool
-    block_wise: bool
     capturable: bool
     centered: bool
     clip_threshold: float
@@ -71,7 +70,6 @@ class TrainOptimizerConfig(BaseConfig):
     nesterov: bool
     no_prox: bool
     optim_bits: int
-    percentile_clipping: int
     r: float
     relative_step: bool
     safeguard_warmup: bool
@@ -155,7 +153,6 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("beta2", None, float, True))
         data.append(("beta3", None, float, True))
         data.append(("bias_correction", False, bool, False))
-        data.append(("block_wise", False, bool, False))
         data.append(("capturable", False, bool, False))
         data.append(("centered", False, bool, False))
         data.append(("clip_threshold", None, float, True))
@@ -185,7 +182,6 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("nesterov", False, bool, False))
         data.append(("no_prox", False, bool, False))
         data.append(("optim_bits", None, int, True))
-        data.append(("percentile_clipping", None, int, True))
         data.append(("r", None, float, True))
         data.append(("relative_step", False, bool, False))
         data.append(("safeguard_warmup", False, bool, False))

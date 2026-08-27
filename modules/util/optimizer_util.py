@@ -114,8 +114,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "eps": 1e-10,
         "optim_bits": 32,
         "min_8bit_size": 4096,
-        "percentile_clipping": 100,
-        "block_wise": True,
     },
     Optimizer.ADAGRAD_8BIT: {
         "lr_decay": 0,
@@ -124,8 +122,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "eps": 1e-10,
         "optim_bits": 8,
         "min_8bit_size": 4096,
-        "percentile_clipping": 100,
-        "block_wise": True,
         "fused_back_pass": False,
     },
     Optimizer.ADAM_8BIT: {
@@ -136,8 +132,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "amsgrad": False,
         "optim_bits": 32,
         "min_8bit_size": 4096,
-        "percentile_clipping": 100,
-        "block_wise": True,
         "is_paged": False,
     },
     Optimizer.ADAMW_8BIT: {
@@ -148,8 +142,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "amsgrad": False,
         "optim_bits": 32,
         "min_8bit_size": 4096,
-        "percentile_clipping": 100,
-        "block_wise": True,
         "is_paged": False,
     },
     Optimizer.MUON: {
@@ -203,8 +195,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "adam_w_mode": True,
         "optim_bits": 32,
         "min_8bit_size": 4096,
-        "percentile_clipping": 100,
-        "block_wise": False,
         "max_unorm": 1.0,
     },
     Optimizer.LAMB_8BIT: {
@@ -216,8 +206,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "amsgrad": False,
         "adam_w_mode": True,
         "min_8bit_size": 4096,
-        "percentile_clipping": 100,
-        "block_wise": False,
         "max_unorm": 1.0,
     },
     Optimizer.LARS: {
@@ -227,7 +215,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "nesterov": False,
         "optim_bits": 32,
         "min_8bit_size": 4096,
-        "percentile_clipping": 100,
         "max_unorm": 0.02,
     },
     Optimizer.LARS_8BIT: {
@@ -236,7 +223,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "weight_decay": 0,
         "nesterov": False,
         "min_8bit_size": 4096,
-        "percentile_clipping": 100,
         "max_unorm": 0.02,
     },
     Optimizer.LION_8BIT: {
@@ -244,8 +230,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "beta2": 0.999,
         "weight_decay": 0,
         "min_8bit_size": 4096,
-        "percentile_clipping": 100,
-        "block_wise": True,
         "is_paged": False,
     },
     Optimizer.RMSPROP: {
@@ -256,8 +240,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "centered": False,
         "optim_bits": 32,
         "min_8bit_size": 4096,
-        "percentile_clipping": 100,
-        "block_wise": True,
     },
     Optimizer.RMSPROP_8BIT: {
         "alpha": 0.99,
@@ -266,8 +248,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "momentum": 0,
         "centered": False,
         "min_8bit_size": 4096,
-        "percentile_clipping": 100,
-        "block_wise": True,
     },
     Optimizer.SGD_8BIT: {
         "momentum": 0,
@@ -275,8 +255,6 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "weight_decay": 0,
         "nesterov": False,
         "min_8bit_size": 4096,
-        "percentile_clipping": 100,
-        "block_wise": True,
     },
     Optimizer.SCHEDULE_FREE_ADAMW: {
         "beta1": 0.9,
