@@ -6,9 +6,9 @@ from modules.util.mm_8bit import mm_8bit as mm_8bit
 from modules.util.quantization_util import (
     dequantize,
     quantize_fp8_axiswise,
-    quantize_fp8_tensorwise,
+    quantize_fp8_tensorwise_chunked,
     quantize_int8_axiswise,
-    quantize_int8_tensorwise,
+    quantize_int8_tensorwise_chunked,
 )
 
 import torch
@@ -115,9 +115,9 @@ class LinearW8A8(
         if device is not None:
             weight = weight.to(device=device)
         if self._dtype == torch.int8:
-            weight, scale = quantize_int8_tensorwise(weight)
+            weight, scale = quantize_int8_tensorwise_chunked(weight)
         else:
-            weight, scale = quantize_fp8_tensorwise(weight)
+            weight, scale = quantize_fp8_tensorwise_chunked(weight)
 
         if device is not None:
             weight = weight.to(device=orig_device)
