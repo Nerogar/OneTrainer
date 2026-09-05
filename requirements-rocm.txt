@@ -8,4 +8,4 @@ torchvision==0.27.0+rocm7.2; sys_platform == "linux"
 onnxruntime==1.23.2
 
 # optimizers
-# TODO
+bitsandbytes==0.49.2 # bitsandbytes for 8-bit optimizers and weight quantization
