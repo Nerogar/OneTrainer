@@ -17,7 +17,7 @@ class CtkSampleFrameView(BaseSampleFrameView, ctk.CTkFrame):
         ctk.CTkFrame.__init__(self, parent, fg_color="transparent")
         BaseSampleFrameView.__init__(self, ctk_components)
 
-        if include_prompt and include_prompt:
+        if include_prompt and include_settings:
             self.grid_rowconfigure(0, weight=0)
             self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
