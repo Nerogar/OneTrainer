@@ -363,6 +363,13 @@ class BaseTrainingTabView(ABC):
                               tooltip="Clips the gradient norm. Leave empty to disable gradient clipping.")
         self.components.entry(frame, 10, 1, ui_state, "clip_grad_norm")
 
+        # train seed
+        self.components.label(frame, 11, 0, "Seed",
+                              tooltip="Seed used for the training process (data ordering and per-step noise). Use the same seed to reproduce a run. Set to -1 to use a random seed for every training run.")
+        self.components.entry(frame, 11, 1, ui_state, "train_seed",
+                              extra_validate=check_range(lower=-1, upper=2**31 - 1,
+                                                         message="Seed must be -1 or between 0 and 2147483647"))
+
     def __create_base2_frame(self, master, row, controller, ui_state, video_training_enabled: bool = False,
                               supports_circular_padding: bool = False):
         frame = self.components.section_frame(master, row)

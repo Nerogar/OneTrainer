@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 
+import modules.util.multi_gpu_util as multi
 from modules.model.BaseModel import BaseModel
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig, TrainModelPartConfig
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
@@ -34,6 +35,19 @@ class BaseModelSetup(
         self.temp_device = temp_device
         self.debug_mode = debug_mode
         self.frozen_parameters = {}
+
+    @staticmethod
+    def _get_batch_seed(
+            config: TrainConfig,
+            train_progress: TrainProgress,
+            *,
+            deterministic: bool = False,
+    ) -> int | None:
+        if deterministic:
+            return 0
+        if config.train_seed == -1:
+            return None
+        return config.train_seed + train_progress.global_step * multi.world_size() + multi.rank()
 
     @abstractmethod
     def create_parameters(

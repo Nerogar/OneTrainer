@@ -1,7 +1,6 @@
 from abc import ABCMeta
 from random import Random
 
-import modules.util.multi_gpu_util as multi
 from modules.model.IdeogramModel import IdeogramModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
@@ -63,10 +62,14 @@ class BaseIdeogramSetup(
             deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
-            batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
+            batch_seed = self._get_batch_seed(config, train_progress, deterministic=deterministic)
             generator = torch.Generator(device=config.train_device)
-            generator.manual_seed(batch_seed)
-            rand = Random(batch_seed)
+            if batch_seed is None:
+                generator.seed()
+                rand = Random()
+            else:
+                generator.manual_seed(batch_seed)
+                rand = Random(batch_seed)
 
             latent_image = batch['latent_image']  # (B, 32, H_lat, W_lat)
             batch_size = latent_image.shape[0]

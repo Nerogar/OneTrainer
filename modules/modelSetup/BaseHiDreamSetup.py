@@ -245,10 +245,14 @@ class BaseHiDreamSetup(
             deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
-            batch_seed = 0 if deterministic else train_progress.global_step
+            batch_seed = self._get_batch_seed(config, train_progress, deterministic=deterministic)
             generator = torch.Generator(device=config.train_device)
-            generator.manual_seed(batch_seed)
-            rand = Random(batch_seed)
+            if batch_seed is None:
+                generator.seed()
+                rand = Random()
+            else:
+                generator.manual_seed(batch_seed)
+                rand = Random(batch_seed)
 
             vae_scaling_factor = model.vae.config['scaling_factor']
             vae_shift_factor = model.vae.config['shift_factor']
