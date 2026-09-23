@@ -111,6 +111,11 @@ class BaseIdeogramSetup(
                 model.noise_scheduler.timesteps,
             )
 
+            if not deterministic:
+                scaled_noisy_latent_image, latent_noise = self._apply_ciop(
+                    scaled_noisy_latent_image, latent_noise, config, generator, rand
+                )
+
             # build the packed [left-pad][text][image] layout (shared helper; identical to the sampler)
             position_ids, segment_ids, indicator = model.prepare_packed_ids(
                 text_lengths, grid_h, grid_w, max_text_tokens, self.train_device,
