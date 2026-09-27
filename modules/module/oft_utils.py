@@ -155,24 +155,32 @@ class OFTRotationModule(nn.Module):
         Q_skew = self._pytorch_skew_symmetric(Q, block_size)
 
         if oft_cans:
-            eye_matrix = torch.eye(block_size, device=Q_skew.device, dtype=Q_skew.dtype).repeat(b, 1, 1)
-            Q_squared = torch.bmm(Q_skew, Q_skew)
+            eye_matrix = torch.eye(block_size, device=Q_skew.device, dtype=Q_skew.dtype).expand(b, -1, -1)
             if use_matrix_exp:
-                # Matrix-exp path
+                # Scale down by 2^3 = 8
+                k = 3
+                Q_scaled = Q_skew / (2.0 ** k)
+                Q_squared = torch.bmm(Q_scaled, Q_scaled)
                 c = 4.0 - 2.0 * math.sqrt(2.0)
                 d = 6.0 - 4.0 * math.sqrt(2.0)
-                inner = eye_matrix * 2.0 + Q_skew * c + Q_squared * d
-                G = eye_matrix + Q_skew * 2.0 + torch.bmm(Q_squared, inner)
+                inner = eye_matrix * 2.0 + Q_scaled * c + Q_squared * d
+                G = eye_matrix + Q_scaled * 2.0 + torch.bmm(Q_squared, inner)
+                # Repeated squaring (restores 2*theta geodesic)
+                for _ in range(k):
+                    G = torch.bmm(G, G)
+                # Empirically, 3 steps for BF16 (hits precision floor), 5 for FP32 (hits 1e-7)
+                steps = 3 if G.dtype == torch.bfloat16 else 5
+                R = self._cans_newton_schulz_iteration(G=G, steps=steps)
             else:
                 # Cayley path
+                Q_squared = torch.bmm(Q_skew, Q_skew)
                 # Compute G = (I + Q)^2 = I + 2Q + Q^2
                 # Squaring the matrix doubles the rotation range and matches Cayley (I + 2Q).
                 G = eye_matrix + 2 * Q_skew + Q_squared
-
-            # Empirically, BF16 requires 5 steps to converge to ortho error ~1e-2 (its limit)
-            # While FP32 takes 7 steps to converge to ortho error ~1e-6
-            steps = 5 if G.dtype == torch.bfloat16 else 7
-            R = self._cans_newton_schulz_iteration(G=G, steps=steps)
+                # Empirically, BF16 requires 5 steps to converge to ortho error ~1e-2 (its limit)
+                # While FP32 takes 7 steps to converge to ortho error ~1e-6
+                steps = 5 if G.dtype == torch.bfloat16 else 7
+                R = self._cans_newton_schulz_iteration(G=G, steps=steps)
         elif use_matrix_exp:
             eye_matrix = torch.eye(block_size, device=Q.device, dtype=Q.dtype).repeat(b, 1, 1)
             Q_squared = torch.bmm(Q_skew, Q_skew)
