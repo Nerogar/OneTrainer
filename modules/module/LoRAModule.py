@@ -699,7 +699,7 @@ class OFTModule(PeftBase):
 
         weight = self.orig_module.weight
         weight_reshaped = weight.reshape(weight.shape[0], self.rank, self.oft_block_size)
-        rotated_weight_reshaped = torch.einsum("ork,rkc->orc", weight_reshaped, orth_rotate)
+        rotated_weight_reshaped = torch.einsum("ork,rkc->orc", weight_reshaped, orth_rotate.to(weight.dtype))
 
         rotated_weight = rotated_weight_reshaped.reshape(weight.shape)
 
