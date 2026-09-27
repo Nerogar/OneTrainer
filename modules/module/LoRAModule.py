@@ -730,9 +730,9 @@ class DoRAOFTModule(OFTModule):
     """
     dora_log_multiplier: nn.Parameter | None
 
-    def __init__(self, prefix: str, orig_module: nn.Module | None, oft_block_size: int, block_share: bool, oft_scaled: bool, **kwargs):
+    def __init__(self, *args, **kwargs):
         self.dora_log_multiplier = None
-        super().__init__(prefix, orig_module, oft_block_size, block_share, oft_scaled, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def initialize_weights(self):
         super().initialize_weights()
