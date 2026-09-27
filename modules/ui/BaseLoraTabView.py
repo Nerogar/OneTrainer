@@ -90,11 +90,6 @@ class BaseLoraTabView:
                                   tooltip="Applies a scaling factor to the learned weights. This ensures that the effective learning rate remains consistent across different block sizes. Without this, different block sizes require significantly different learning rates.")
             self.components.switch(master, 2, 4, ui_state, "oft_scaled")
 
-            # DoRA-OFT (DOFT)
-            self.components.label(master, 3, 3, "DoRA OFT (DOFT)",
-                             tooltip="Combines Weight-Decomposed Low-Rank Adaptation (DoRA) with OFT. By decoupling the weight into magnitude and direction components, it achieves the superior training dynamics of DoRA but with the stability and performance of OFT. Because OFT is norm-preserving, it avoids the heavy re-calculations typically found in standard DoRA, resulting in faster training (same speed as standard OFT) and better convergence.")
-            self.components.switch(master, 3, 4, ui_state, "dora_oft")
-
             # Dropout Percentage
             self.components.label(master, 2, 0, "Dropout Probability",
                                   tooltip="Dropout probability. This percentage of the rotated adapter nodes that will be randomly restored to the base model initial statue. Helps with overfitting. 0 disables, 1 maximum.")
@@ -104,6 +99,11 @@ class BaseLoraTabView:
             self.components.label(master, 3, 0, f"{name} Weight Data Type",
                                   tooltip=f"The {name} weight data type used for training. This can reduce memory consumption, but reduces precision")
             self.components.options_kv(master, 3, 1, controller.get_lora_weight_dtypes(), ui_state, "lora_weight_dtype")
+
+            # DoRA-OFT (DOFT)
+            self.components.label(master, 3, 3, "DoRA OFT (DOFT)",
+                             tooltip="Combines Weight-Decomposed Low-Rank Adaptation (DoRA) with OFT. By decoupling the weight into magnitude and direction components, it achieves the superior training dynamics of DoRA but with the stability and performance of OFT. Because OFT is norm-preserving, it avoids the heavy re-calculations typically found in standard DoRA, resulting in faster training (same speed as standard OFT) and better convergence.")
+            self.components.switch(master, 3, 4, ui_state, "dora_oft")
 
             # For use with additional embeddings.
             self.components.label(master, 4, 0, "Bundle Embeddings",
