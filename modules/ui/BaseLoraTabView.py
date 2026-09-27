@@ -100,6 +100,11 @@ class BaseLoraTabView:
                                   tooltip=f"The {name} weight data type used for training. This can reduce memory consumption, but reduces precision")
             self.components.options_kv(master, 3, 1, controller.get_lora_weight_dtypes(), ui_state, "lora_weight_dtype")
 
+            # DoRA-OFT (DOFT)
+            self.components.label(master, 3, 3, "DoRA OFT (DOFT)",
+                             tooltip="Combines Weight-Decomposed Low-Rank Adaptation (DoRA) with OFT. By decoupling the weight into magnitude and direction components, it achieves the superior training dynamics of DoRA but with the stability and performance of OFT. Because OFT is norm-preserving, it avoids the heavy re-calculations typically found in standard DoRA, resulting in faster training (same speed as standard OFT) and better convergence.")
+            self.components.switch(master, 3, 4, ui_state, "dora_oft")
+
             # For use with additional embeddings.
             self.components.label(master, 4, 0, "Bundle Embeddings",
                                   tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
