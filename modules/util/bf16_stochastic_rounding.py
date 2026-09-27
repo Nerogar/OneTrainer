@@ -20,6 +20,10 @@ def copy_stochastic_(target: Tensor, source: Tensor):
 
     global generator
 
+    # Ensure generator device matches source device to prevent RuntimeError 
+    # (e.g. EMA stochastic rounding with CPU)
+    gen = generator if (generator is not None and generator.device == source.device) else None
+
     # create a random 16 bit integer
     result = torch.randint(
         size=source.shape,
@@ -27,7 +31,7 @@ def copy_stochastic_(target: Tensor, source: Tensor):
         dtype=torch.int32,
         low=0,
         high=(1 << 16),
-        generator=generator,
+        generator=gen,
     )
 
     # add the random number to the lower 16 bit of the mantissa
