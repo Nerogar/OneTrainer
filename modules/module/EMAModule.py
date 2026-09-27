@@ -1,5 +1,7 @@
 from collections.abc import Iterable
 
+from modules.util.bf16_stochastic_rounding import add_stochastic_
+
 import torch
 
 
@@ -10,6 +12,7 @@ class EMAModuleWrapper:
             decay: float = 0.9999,
             update_step_interval: int = 1,
             device: torch.device | None = None,
+            ema_stochastic_rounding: bool = False,
     ):
         parameters = list(parameters)
         self.ema_parameters = [p.clone().detach().to(device) for p in parameters]
@@ -19,6 +22,7 @@ class EMAModuleWrapper:
         self.decay = decay
         self.update_step_interval = update_step_interval
         self.device = device
+        self.ema_stochastic_rounding = ema_stochastic_rounding
 
         # TODO: add an automatic decay calculation based on this formula:
         # The impact of the last n steps can be calculated as:
@@ -43,7 +47,13 @@ class EMAModuleWrapper:
         if (optimization_step + 1) % self.update_step_interval == 0:
             for ema_parameter, parameter in zip(self.ema_parameters, parameters, strict=True):
                 if parameter.requires_grad:
-                    if ema_parameter.device == parameter.device:
+                    if self.ema_stochastic_rounding and ema_parameter.dtype == torch.bfloat16:
+                        parameter_copy = parameter.detach().to(device=ema_parameter.device, dtype=torch.float32)
+                        parameter_copy.sub_(ema_parameter)
+                        parameter_copy.mul_(one_minus_decay)
+                        add_stochastic_(ema_parameter, parameter_copy)
+                        del parameter_copy
+                    elif ema_parameter.device == parameter.device:
                         ema_parameter.add_(one_minus_decay * (parameter - ema_parameter))
                     else:
                         # in place calculations to save memory
