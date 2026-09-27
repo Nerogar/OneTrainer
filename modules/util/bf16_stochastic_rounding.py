@@ -20,7 +20,7 @@ def copy_stochastic_(target: Tensor, source: Tensor):
 
     global generator
 
-    # Ensure generator device matches source device to prevent RuntimeError 
+    # Ensure generator device matches source device to prevent RuntimeError
     # (e.g. EMA stochastic rounding with CPU)
     gen = generator if (generator is not None and generator.device == source.device) else None
 

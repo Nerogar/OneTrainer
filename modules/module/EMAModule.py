@@ -1,8 +1,8 @@
 from collections.abc import Iterable
 
-import torch
-
 from modules.util.bf16_stochastic_rounding import add_stochastic_
+
+import torch
 
 
 class EMAModuleWrapper:
