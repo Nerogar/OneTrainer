@@ -738,7 +738,8 @@ class DoRAOFTModule(OFTModule):
         super().initialize_weights()
 
         # Calculate multiplier shape
-        multiplier_shape = (self.orig_module.weight.shape[0],)
+        out_dim = self.shape[0]
+        multiplier_shape = (out_dim,)
 
         # Initialize dora_log_multiplier to 0.0 (exp(0) = 1.0 multiplier)
         self.dora_log_multiplier = nn.Parameter(
