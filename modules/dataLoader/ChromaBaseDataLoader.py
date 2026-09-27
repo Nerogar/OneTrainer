@@ -26,6 +26,7 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.CHROMA_1)
 class ChromaBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -119,7 +120,7 @@ class ChromaBaseDataLoader(
         debug_dir = os.path.join(config.debug_dir, "dataloader")
 
         def before_save_fun():
-            model.vae_to(self.train_device)
+            model.materialize("vae")
 
         decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         upscale_mask = ScaleImage(in_name='latent_mask', out_name='decoded_mask', factor=8)
@@ -154,5 +155,3 @@ class ChromaBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
         )
-
-factory.register(BaseDataLoader, ChromaBaseDataLoader, ModelType.CHROMA_1)

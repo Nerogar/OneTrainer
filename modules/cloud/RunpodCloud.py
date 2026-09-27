@@ -68,7 +68,7 @@ class RunpodCloud(LinuxCloud):
         secrets=self.config.secrets.cloud
         pod=runpod.create_pod(
             name=config.name,
-            image_name="",
+            image_name="dxqbyd/runpod-onetrainer-cli:latest",
             template_id="1a33vbssq9",
             gpu_type_id=config.gpu_type,
             cloud_type=config.sub_type,

@@ -25,6 +25,8 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_3)
+@factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_35)
 class StableDiffusion3BaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -158,7 +160,7 @@ class StableDiffusion3BaseDataLoader(
         debug_dir = os.path.join(config.debug_dir, "dataloader")
 
         def before_save_fun():
-            model.vae_to(self.train_device)
+            model.materialize("vae")
 
         decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         decode_conditioning_image = DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
@@ -198,5 +200,3 @@ class StableDiffusion3BaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
         )
-
-factory.register(BaseDataLoader, StableDiffusion3BaseDataLoader, ModelType.STABLE_DIFFUSION_35)

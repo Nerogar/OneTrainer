@@ -1,10 +1,8 @@
 from modules.model.ChromaModel import ChromaModel
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
-from modules.util.convert.lora.convert_chroma_lora import convert_chroma_lora_key_sets
-from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
-from modules.util.enum.ModelFormat import ModelFormat
+from modules.util.convert_lora_util import kohya_flatten
+from modules.util.convert_util import convert
 
-import torch
 from torch import Tensor
 
 
@@ -14,8 +12,14 @@ class ChromaLoRASaver(
     def __init__(self):
         super().__init__()
 
-    def _get_convert_key_sets(self, model: ChromaModel) -> list[LoraConversionKeySet] | None:
-        return convert_chroma_lora_key_sets()
+    def _convert_legacy(self, model: ChromaModel, state_dict: dict[str, Tensor]) -> dict[str, Tensor]:
+        # Single-TE model: own override so the lone text encoder stays unnumbered (lora_te, not lora_te1).
+        state_dict = convert(state_dict, [
+            ("transformer", "lora_transformer"),
+            ("text_encoder", "lora_te"),
+            ("bundle_emb", "bundle_emb"),
+        ], strict=True)
+        return kohya_flatten(state_dict)
 
     def _get_state_dict(
             self,
@@ -39,12 +43,3 @@ class ChromaLoRASaver(
                     state_dict[f"bundle_emb.{placeholder}.t5_out"] = embedding.text_encoder_embedding.output_vector
 
         return state_dict
-
-    def save(
-            self,
-            model: ChromaModel,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
-    ):
-        self._save(model, output_model_format, output_model_destination, dtype)

@@ -1,7 +1,6 @@
 import json
+import logging
 import os
-import re
-import traceback
 from abc import ABCMeta
 from itertools import repeat
 
@@ -15,10 +14,16 @@ from modules.util.quantization_util import (
 import torch
 from torch import nn
 
+from transformers.conversion_mapping import get_checkpoint_conversion_mapping
+from transformers.core_model_loading import rename_source_key
+
 import accelerate
 import huggingface_hub
 from huggingface_hub.utils import EntryNotFoundError
 from safetensors.torch import load_file
+
+# huggingface_hub 1.16+ uses httpx, which logs every HTTP request/response at INFO level.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 class HFModelLoaderMixin(metaclass=ABCMeta):
@@ -114,12 +119,20 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         if hasattr(sub_module, '_fix_state_dict_keys_on_load'):
             sub_module._fix_state_dict_keys_on_load(state_dict)
 
-        if hasattr(sub_module, "_checkpoint_conversion_mapping"): #required for loading the text encoder of Qwen
+        #some checkpoints (e.g. Ernie's Mistral3 text encoder, Qwen's Qwen2_5_VL text encoder) were saved with an
+        #older module layout than the one transformers builds from the config in this version. transformers' own
+        #from_pretrained applies the same renaming via its checkpoint conversion registry, so we reuse it here.
+        #diffusers sub-modules have no such registry (their config is a plain FrozenDict, no model_type), and
+        #never need this renaming.
+        weight_renamings = get_checkpoint_conversion_mapping(sub_module.config.model_type) \
+            if hasattr(sub_module.config, 'model_type') else None
+        if weight_renamings:
+            meta_state_dict = sub_module.state_dict()
             new_state_dict = {}
             for k, v in state_dict.items():
-                new_k = k
-                for pattern, replacement in sub_module._checkpoint_conversion_mapping.items():
-                    new_k = re.sub(pattern, replacement, new_k)
+                new_k, _ = rename_source_key(
+                    k, weight_renamings, [], prefix=sub_module.base_model_prefix, meta_state_dict=meta_state_dict,
+                )
                 new_state_dict[new_k] = v
             state_dict = new_state_dict
 
@@ -157,6 +170,23 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                     module._parameters[tensor_name] = new_value
 
         del state_dict
+
+        #tied weights (e.g. T5EncoderModel's encoder.embed_tokens.weight <-> shared.weight, or
+        #Qwen3ForCausalLM's lm_head.weight <-> model.embed_tokens.weight) are saved only once in the checkpoint,
+        #so the tied key above is never assigned and stays an empty meta tensor. populate it by cloning the
+        #source weight that was actually loaded, rather than aliasing the same Parameter object: aliasing would
+        #make a later in-place quantization of one side (e.g. quantize_layers() quantizing lm_head) silently
+        #corrupt the other (e.g. the embedding table), since both attribute paths would refer to the same object.
+        tied_weights_keys = getattr(sub_module, '_tied_weights_keys', None)
+        if tied_weights_keys is not None:
+            for target_key, source_key in tied_weights_keys.items():
+                module = sub_module
+                *parents, tensor_name = target_key.split(".")
+                for p in parents:
+                    module = getattr(module, p)
+                if module._parameters[tensor_name].is_meta:
+                    source = sub_module.get_parameter(source_key)
+                    module._parameters[tensor_name] = type(module._parameters[tensor_name])(source)
 
         return sub_module
 
@@ -298,22 +328,3 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             None,
             quantization,
         )
-
-    def _prepare_sub_modules(self, pretrained_model_name_or_path: str, diffusers_modules: list[str], transformers_modules: list[str]):
-        is_local = os.path.isdir(pretrained_model_name_or_path)
-        if is_local:
-            return
-
-        diffusers_paths = [((folder + "/") if folder else "") + "diffusion_pytorch_model*" for folder in diffusers_modules]
-        transformers_paths = [((folder + "/") if folder else "") + "model*" for folder in transformers_modules]
-        transformers_paths.extend([((folder + "/") if folder else "") + "pytorch_model*" for folder in transformers_modules])
-        try:
-            huggingface_hub.snapshot_download(
-                pretrained_model_name_or_path,
-                allow_patterns=diffusers_paths + transformers_paths,
-            )
-        except huggingface_hub.errors.HFValidationError:
-            pass
-        except Exception:
-            traceback.print_exc()
-            print("Error during bulk preloading of Huggingface model repository, proceeding without preloading")

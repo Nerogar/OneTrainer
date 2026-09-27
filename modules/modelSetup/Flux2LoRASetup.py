@@ -10,24 +10,11 @@ from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
 
-import torch
 
-
+@factory.register(BaseModelSetup, ModelType.FLUX_2, TrainingMethod.LORA)
 class Flux2LoRASetup(
     BaseFlux2Setup,
 ):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
-    ):
-        super().__init__(
-            train_device=train_device,
-            temp_device=temp_device,
-            debug_mode=debug_mode,
-        )
-
     def create_parameters(
             self,
             model: Flux2Model,
@@ -55,7 +42,8 @@ class Flux2LoRASetup(
             config: TrainConfig,
     ):
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "transformer", config, config.layer_filter.split(",")
+            model.transformer, "transformer", config, config.layer_filter.split(","),
+            fusion_spec=model.fusion_groups(), fuse=config.output_model_format.needs_qkv_fusion(),
         )
 
         if model.lora_state_dict:
@@ -78,9 +66,12 @@ class Flux2LoRASetup(
         vae_on_train_device = not config.latent_caching
         text_encoder_on_train_device = not config.latent_caching
 
-        model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
-        model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
-        model.transformer_to(self.train_device)
+        parts = ["transformer"]
+        if text_encoder_on_train_device:
+            parts.append("text_encoder")
+        if vae_on_train_device:
+            parts.append("vae")
+        model.materialize_only(*parts)
 
         model.text_encoder.eval()
         model.vae.eval()
@@ -97,5 +88,3 @@ class Flux2LoRASetup(
             train_progress: TrainProgress
     ):
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, Flux2LoRASetup, ModelType.FLUX_2, TrainingMethod.LORA)

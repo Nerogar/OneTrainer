@@ -13,24 +13,11 @@ from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
 from modules.util.TrainProgress import TrainProgress
 
-import torch
 
-
+@factory.register(BaseModelSetup, ModelType.HI_DREAM_FULL, TrainingMethod.LORA)
 class HiDreamLoRASetup(
     BaseHiDreamSetup,
 ):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
-    ):
-        super().__init__(
-            train_device=train_device,
-            temp_device=temp_device,
-            debug_mode=debug_mode,
-        )
-
     def create_parameters(
             self,
             model: HiDreamModel,
@@ -100,33 +87,33 @@ class HiDreamLoRASetup(
             model: HiDreamModel,
             config: TrainConfig,
     ):
-        create_te1 = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te1")
-        create_te2 = config.text_encoder_2.train or state_dict_has_prefix(model.lora_state_dict, "lora_te2")
-        create_te3 = config.text_encoder_3.train or state_dict_has_prefix(model.lora_state_dict, "lora_te3")
-        create_te4 = config.text_encoder_4.train or state_dict_has_prefix(model.lora_state_dict, "lora_te4")
+        create_te1 = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
+        create_te2 = config.text_encoder_2.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder_2")
+        create_te3 = config.text_encoder_3.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder_3")
+        create_te4 = config.text_encoder_4.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder_4")
 
         if model.text_encoder_1 is not None:
             model.text_encoder_1_lora = LoRAModuleWrapper(
-                model.text_encoder_1, "lora_te1", config
+                model.text_encoder_1, "text_encoder", config
             ) if create_te1 else None
 
         if model.text_encoder_2 is not None:
             model.text_encoder_2_lora = LoRAModuleWrapper(
-                model.text_encoder_2, "lora_te2", config
+                model.text_encoder_2, "text_encoder_2", config
             ) if create_te2 else None
 
         if model.text_encoder_3 is not None:
             model.text_encoder_3_lora = LoRAModuleWrapper(
-                model.text_encoder_3, "lora_te3", config
+                model.text_encoder_3, "text_encoder_3", config
             ) if create_te3 else None
 
         if model.text_encoder_4 is not None:
             model.text_encoder_4_lora = LoRAModuleWrapper(
-                model.text_encoder_4, "lora_te4", config
+                model.text_encoder_4, "text_encoder_4", config
             ) if create_te4 else None
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "lora_transformer", config, config.layer_filter.split(",")
+            model.transformer, "transformer", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:
@@ -208,12 +195,18 @@ class HiDreamLoRASetup(
             config.train_text_encoder_4_or_embedding() \
             or not config.latent_caching
 
-        model.text_encoder_1_to(self.train_device if text_encoder_1_on_train_device else self.temp_device)
-        model.text_encoder_2_to(self.train_device if text_encoder_2_on_train_device else self.temp_device)
-        model.text_encoder_3_to(self.train_device if text_encoder_3_on_train_device else self.temp_device)
-        model.text_encoder_4_to(self.train_device if text_encoder_4_on_train_device else self.temp_device)
-        model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
-        model.transformer_to(self.train_device)
+        parts = ["transformer"]
+        if text_encoder_1_on_train_device:
+            parts.append("text_encoder")
+        if text_encoder_2_on_train_device:
+            parts.append("text_encoder_2")
+        if text_encoder_3_on_train_device:
+            parts.append("text_encoder_3")
+        if text_encoder_4_on_train_device:
+            parts.append("text_encoder_4")
+        if vae_on_train_device:
+            parts.append("vae")
+        model.materialize_only(*parts)
 
         if model.text_encoder_1:
             if config.text_encoder.train:
@@ -264,5 +257,3 @@ class HiDreamLoRASetup(
             if model.embedding_wrapper_4 is not None:
                 model.embedding_wrapper_4.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, HiDreamLoRASetup, ModelType.HI_DREAM_FULL, TrainingMethod.LORA)

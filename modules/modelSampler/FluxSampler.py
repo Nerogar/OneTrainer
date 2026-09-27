@@ -14,7 +14,6 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
 from modules.util.image_util import load_image
-from modules.util.torch_util import torch_gc
 
 import torch
 from torch import nn
@@ -23,6 +22,8 @@ from torchvision.transforms import transforms
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.FLUX_DEV_1)
+@factory.register(BaseModelSampler, ModelType.FLUX_FILL_DEV_1)
 class FluxSampler(BaseModelSampler):
     def __init__(
             self,
@@ -70,7 +71,7 @@ class FluxSampler(BaseModelSampler):
             num_latent_channels = 16
 
             # prepare prompt
-            self.model.text_encoder_to(self.train_device)
+            self.model.materialize_only_text_encoders()
 
             prompt_embedding, pooled_prompt_embedding = self.model.encode_text(
                 text=prompt,
@@ -80,9 +81,6 @@ class FluxSampler(BaseModelSampler):
                 text_encoder_2_sequence_length=text_encoder_2_sequence_length,
                 apply_attention_mask=transformer_attention_mask,
             )
-
-            self.model.text_encoder_to(self.temp_device)
-            torch_gc()
 
             # prepare latent image
             latent_image = torch.randn(
@@ -113,7 +111,7 @@ class FluxSampler(BaseModelSampler):
 
             text_ids = torch.zeros(prompt_embedding.shape[1], 3, device=self.train_device)
 
-            self.model.transformer_to(self.train_device)
+            self.model.materialize_only("transformer")
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 latent_model_input = torch.cat([latent_image])
                 expanded_timestep = timestep.expand(latent_model_input.shape[0])
@@ -145,8 +143,6 @@ class FluxSampler(BaseModelSampler):
 
                 on_update_progress(i + 1, len(timesteps))
 
-            self.model.transformer_to(self.temp_device)
-            torch_gc()
             latent_image = self.model.unpack_latents(
                 latent_image,
                 height // vae_scale_factor,
@@ -154,16 +150,13 @@ class FluxSampler(BaseModelSampler):
             )
 
             # decode
-            self.model.vae_to(self.train_device)
+            self.model.materialize_only("vae")
 
             latents = (latent_image / vae.config.scaling_factor) + vae.config.shift_factor
             image = vae.decode(latents, return_dict=False)[0]
 
             do_denormalize = [True] * image.shape[0] #TODO remove and test, from Flux and other models. True is the default
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
-
-            self.model.vae_to(self.temp_device)
-            torch_gc()
 
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,
@@ -220,7 +213,7 @@ class FluxSampler(BaseModelSampler):
             num_latent_channels = 16
 
             # prepare conditioning image
-            self.model.vae_to(self.train_device)
+            self.model.materialize_only("vae")
 
             if sample_inpainting:
                 t = transforms.Compose([
@@ -294,7 +287,7 @@ class FluxSampler(BaseModelSampler):
                 )
 
             # prepare prompt
-            self.model.text_encoder_to(self.train_device)
+            self.model.materialize_only_text_encoders()
 
             prompt_embedding, pooled_prompt_embedding = self.model.encode_text(
                 text=prompt,
@@ -304,9 +297,6 @@ class FluxSampler(BaseModelSampler):
                 text_encoder_2_sequence_length=text_encoder_2_sequence_length,
                 apply_attention_mask=transformer_attention_mask,
             )
-
-            self.model.text_encoder_to(self.temp_device)
-            torch_gc()
 
             # prepare latent image
             latent_image = torch.randn(
@@ -335,7 +325,7 @@ class FluxSampler(BaseModelSampler):
 
             text_ids = torch.zeros(prompt_embedding.shape[1], 3, device=self.train_device)
 
-            self.model.transformer_to(self.train_device)
+            self.model.materialize_only("transformer")
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 latent_model_input = torch.cat([latent_image])
                 latent_model_input = torch.concat(
@@ -370,9 +360,6 @@ class FluxSampler(BaseModelSampler):
 
                 on_update_progress(i + 1, len(timesteps))
 
-            self.model.transformer_to(self.temp_device)
-            torch_gc()
-
             latent_image = self.model.unpack_latents(
                 latent_image,
                 height // vae_scale_factor,
@@ -380,16 +367,13 @@ class FluxSampler(BaseModelSampler):
             )
 
             # decode
-            self.model.vae_to(self.train_device)
+            self.model.materialize_only("vae")
 
             latents = (latent_image / vae.config.scaling_factor) + vae.config.shift_factor
             image = vae.decode(latents, return_dict=False)[0]
 
             do_denormalize = [True] * image.shape[0]
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
-
-            self.model.vae_to(self.temp_device)
-            torch_gc()
 
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,
@@ -450,6 +434,3 @@ class FluxSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, FluxSampler, ModelType.FLUX_DEV_1)
-factory.register(BaseModelSampler, FluxSampler, ModelType.FLUX_FILL_DEV_1)

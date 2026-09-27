@@ -1,10 +1,6 @@
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
-from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
-from modules.util.convert.lora.convert_sd_lora import convert_sd_lora_key_sets
-from modules.util.enum.ModelFormat import ModelFormat
 
-import torch
 from torch import Tensor
 
 
@@ -14,8 +10,10 @@ class StableDiffusionLoRASaver(
     def __init__(self):
         super().__init__()
 
-    def _get_convert_key_sets(self, model: StableDiffusionModel) -> list[LoraConversionKeySet] | None:
-        return convert_sd_lora_key_sets()
+    def _convert_legacy(self, model: StableDiffusionModel, state_dict: dict[str, Tensor]) -> dict[str, Tensor]:
+        # SD's KOHYA already keeps diffusers UNet names (unlike SDXL's sgm body), so LEGACY is byte-identical
+        # to KOHYA -- just reuse it.
+        return self._convert_kohya(model, state_dict)
 
     def _get_state_dict(
             self,
@@ -39,12 +37,3 @@ class StableDiffusionLoRASaver(
                     state_dict[f"bundle_emb.{placeholder}.clip_l_out"] = embedding.text_encoder_embedding.output_vector
 
         return state_dict
-
-    def save(
-            self,
-            model: StableDiffusionModel,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
-    ):
-        self._save(model, output_model_format, output_model_destination, dtype)

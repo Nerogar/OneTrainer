@@ -1,3 +1,4 @@
+import copy
 import os
 import traceback
 
@@ -132,6 +133,7 @@ class StableDiffusionModelLoader(
 
         model.model_type = model_type
         model.tokenizer = tokenizer
+        model.orig_tokenizer = copy.deepcopy(tokenizer)
         model.noise_scheduler = noise_scheduler
         model.text_encoder = text_encoder
         model.vae = vae
@@ -206,6 +208,7 @@ class StableDiffusionModelLoader(
 
         model.model_type = model_type
         model.tokenizer = pipeline.tokenizer
+        model.orig_tokenizer = copy.deepcopy(pipeline.tokenizer)
         model.noise_scheduler = noise_scheduler
         model.text_encoder = text_encoder
         model.vae = vae
@@ -262,6 +265,7 @@ class StableDiffusionModelLoader(
 
         model.model_type = model_type
         model.tokenizer = pipeline.tokenizer
+        model.orig_tokenizer = copy.deepcopy(pipeline.tokenizer)
         model.noise_scheduler = noise_scheduler
         model.text_encoder = text_encoder
         model.vae = vae

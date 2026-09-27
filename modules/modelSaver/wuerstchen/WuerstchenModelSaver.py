@@ -25,7 +25,7 @@ class WuerstchenModelSaver(
             dtype: torch.dtype | None,
     ):
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
-        pipeline = model.create_pipeline().prior_pipe
+        pipeline = model.create_pipeline(use_original_tokenizers=True).prior_pipe
         original_device = pipeline.device
         pipeline.to("cpu")
         pipeline_copy = copy.deepcopy(pipeline)
@@ -86,7 +86,9 @@ class WuerstchenModelSaver(
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 self.__save_diffusers(model, output_model_destination, dtype)
-            case ModelFormat.SAFETENSORS:
+            case ModelFormat.LEGACY_SAFETENSORS:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)
+            case _:
+                raise NotImplementedError(f"Unsupported output format: {output_model_format}")

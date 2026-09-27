@@ -1,0 +1,6 @@
+{
+    "modelspec.sai_model_spec": "1.0.0",
+    "modelspec.architecture": "Anima/lora",
+    "modelspec.implementation": "https://github.com/huggingface/diffusers",
+    "modelspec.title": "Anima LoRA"
+}

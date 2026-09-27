@@ -1,10 +1,8 @@
-from modules.model.WuerstchenModel import WuerstchenModel
+from modules.model.WuerstchenModel import WuerstchenModel, cascade_prior_legacy
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
-from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
-from modules.util.convert.lora.convert_stable_cascade_lora import convert_stable_cascade_lora_key_sets
-from modules.util.enum.ModelFormat import ModelFormat
+from modules.util.convert_lora_util import kohya_flatten
+from modules.util.convert_util import convert
 
-import torch
 from torch import Tensor
 
 
@@ -14,10 +12,20 @@ class WuerstchenLoRASaver(
     def __init__(self):
         super().__init__()
 
-    def _get_convert_key_sets(self, model: WuerstchenModel) -> list[LoraConversionKeySet] | None:
+    def _convert_legacy(self, model: WuerstchenModel, state_dict: dict[str, Tensor]) -> dict[str, Tensor]:
+        # Stable Cascade has a real, loadable legacy (flattened split-attn body). Wuerstchen v2's only
+        # historical output was a verbatim-dotted dict the loader could never un-prefix, so it's dropped
+        # (like Sana/HiDream).
         if model.model_type.is_stable_cascade():
-            return convert_stable_cascade_lora_key_sets()
-        return None
+            state_dict = convert(state_dict, [
+                ("prior", "lora_prior_unet", cascade_prior_legacy),
+                ("text_encoder", "lora_prior_te"),
+                ("bundle_emb", "bundle_emb"),
+            ], strict=True)
+            return kohya_flatten(state_dict)
+        raise NotImplementedError(
+            "The LEGACY LoRA output format is not supported for Wuerstchen v2 (its only prior LEGACY output "
+            "was a never-loadable dotted format). Use DIFFUSERS_LORA or KOHYA_LORA.")
 
     def _get_state_dict(
             self,
@@ -41,12 +49,3 @@ class WuerstchenLoRASaver(
                     state_dict[f"bundle_emb.{placeholder}.clip_g_out"] = embedding.prior_text_encoder_embedding.output_vector
 
         return state_dict
-
-    def save(
-            self,
-            model: WuerstchenModel,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
-    ):
-        self._save(model, output_model_format, output_model_destination, dtype)

@@ -1,8 +1,7 @@
-import copy
 import os.path
 from pathlib import Path
 
-from modules.model.Flux2Model import Flux2Model, diffusers_checkpoint_to_original
+from modules.model.Flux2Model import Flux2Model
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
 from modules.util.convert_util import convert
 from modules.util.enum.ModelFormat import ModelFormat
@@ -27,18 +26,7 @@ class Flux2ModelSaver(
         # Copy the model to cpu by first moving the original model to cpu. This preserves some VRAM.
         pipeline = model.create_pipeline()
         pipeline.to("cpu")
-        if dtype is not None: #TODO necessary?
-            # replace the tokenizers __deepcopy__ before calling deepcopy, to prevent a copy being made.
-            # the tokenizer tries to reload from the file system otherwise
-            tokenizer = pipeline.tokenizer
-            tokenizer.__deepcopy__ = lambda memo: tokenizer
-
-            save_pipeline = copy.deepcopy(pipeline)
-            save_pipeline.to(device="cpu", dtype=dtype, silence_dtype_warnings=True)
-
-            delattr(tokenizer, '__deepcopy__')
-        else:
-            save_pipeline = pipeline
+        save_pipeline = self._copy_pipeline_to_dtype(pipeline, dtype, pipeline.tokenizer)
 
         os.makedirs(Path(destination).absolute(), exist_ok=True)
         save_pipeline.save_pretrained(destination)
@@ -53,7 +41,7 @@ class Flux2ModelSaver(
             dtype: torch.dtype | None,
     ):
         state_dict = model.transformer.state_dict()
-        state_dict = convert(state_dict, diffusers_checkpoint_to_original)
+        state_dict = convert(state_dict, model.checkpoint_diffusers_to_original())
 
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
         self._convert_state_dict_to_contiguous(save_state_dict)
@@ -79,7 +67,9 @@ class Flux2ModelSaver(
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 self.__save_diffusers(model, output_model_destination, dtype)
-            case ModelFormat.SAFETENSORS:
+            case ModelFormat.LEGACY_SAFETENSORS | ModelFormat.ORIGINAL_TRANSFORMER:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)
+            case _:
+                raise NotImplementedError(f"Unsupported output format: {output_model_format}")

@@ -10,24 +10,18 @@ from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
 
-import torch
 
-
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE)
 class StableDiffusionFineTuneSetup(
     BaseStableDiffusionSetup,
 ):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
-    ):
-        super().__init__(
-            train_device=train_device,
-            temp_device=temp_device,
-            debug_mode=debug_mode,
-        )
-
     def create_parameters(
             self,
             model: StableDiffusionModel,
@@ -76,7 +70,6 @@ class StableDiffusionFineTuneSetup(
         elif config.force_epsilon_prediction:
             model.force_epsilon_prediction()
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
@@ -95,10 +88,14 @@ class StableDiffusionFineTuneSetup(
             or config.train_any_embedding() \
             or not config.latent_caching
 
-        model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
-        model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
-        model.unet_to(self.train_device)
-        model.depth_estimator_to(self.temp_device)
+        parts = ["unet"]
+        if text_encoder_on_train_device:
+            parts.append("text_encoder")
+        if vae_on_train_device:
+            parts.append("vae")
+        model.materialize_only(*parts)
+        if model.depth_estimator is not None:
+            model.depth_estimator.to(self.temp_device)
 
         if config.text_encoder.train:
             model.text_encoder.train()
@@ -122,12 +119,3 @@ class StableDiffusionFineTuneSetup(
             self._normalize_output_embeddings(model.all_text_encoder_embeddings())
             model.embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE)
-factory.register(BaseModelSetup, StableDiffusionFineTuneSetup, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE)

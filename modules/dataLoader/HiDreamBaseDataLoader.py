@@ -27,6 +27,7 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.HI_DREAM_FULL)
 class HiDreamBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -179,7 +180,7 @@ class HiDreamBaseDataLoader(
         debug_dir = os.path.join(config.debug_dir, "dataloader")
 
         def before_save_fun():
-            model.vae_to(self.train_device)
+            model.materialize("vae")
 
         decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         decode_conditioning_image = DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
@@ -219,5 +220,3 @@ class HiDreamBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
         )
-
-factory.register(BaseDataLoader, HiDreamBaseDataLoader, ModelType.HI_DREAM_FULL)

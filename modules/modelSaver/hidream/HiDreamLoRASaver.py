@@ -1,10 +1,6 @@
 from modules.model.HiDreamModel import HiDreamModel
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
-from modules.util.convert.lora.convert_hidream_lora import convert_hidream_lora_key_sets
-from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
-from modules.util.enum.ModelFormat import ModelFormat
 
-import torch
 from torch import Tensor
 
 
@@ -13,9 +9,6 @@ class HiDreamLoRASaver(
 ):
     def __init__(self):
         super().__init__()
-
-    def _get_convert_key_sets(self, model: HiDreamModel) -> list[LoraConversionKeySet] | None:
-        return convert_hidream_lora_key_sets()
 
     def _get_state_dict(
             self,
@@ -57,12 +50,3 @@ class HiDreamLoRASaver(
                     state_dict[f"bundle_emb.{placeholder}.llama_out"] = embedding.text_encoder_4_embedding.output_vector
 
         return state_dict
-
-    def save(
-            self,
-            model: HiDreamModel,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
-    ):
-        self._save(model, output_model_format, output_model_destination, dtype, enable_omi_format=True)
