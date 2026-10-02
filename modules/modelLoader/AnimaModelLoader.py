@@ -22,6 +22,42 @@ from diffusers import (
 )
 from transformers import Qwen2Tokenizer, Qwen3Model, T5TokenizerFast
 
+from safetensors import safe_open
+from safetensors.torch import load_file
+
+_ORIGINAL_PREFIX = "net."
+# ComfyUI saves Anima checkpoints (e.g. finetunes in models/diffusion_models) under this prefix
+# instead of the original "net.", which diffusers' single file converter doesn't recognize
+_COMFY_PREFIX = "model.diffusion_model."
+_LLM_ADAPTER_PREFIX = _ORIGINAL_PREFIX + "llm_adapter."
+
+
+def _read_original_checkpoint(path: str) -> tuple[dict | None, dict | None]:
+    """For a local .safetensors checkpoint, returns (transformer_state_dict, llm_adapter_state_dict).
+
+    The transformer dict is only returned when the keys need renaming (ComfyUI layout), otherwise
+    None so the file is loaded by path as before. The adapter dict holds the checkpoint's own LLM
+    adapter (finetunes often change it) with keys matching AnimaTextConditioner, or None.
+    """
+    if not path.lower().endswith(".safetensors") or not os.path.isfile(path):
+        return None, None
+
+    with safe_open(path, "pt") as f:
+        keys = list(f.keys())
+    is_comfy = any(k.startswith(_COMFY_PREFIX) for k in keys)
+    has_adapter = any(k.startswith((_LLM_ADAPTER_PREFIX, _COMFY_PREFIX + "llm_adapter.")) for k in keys)
+    if not is_comfy and not has_adapter:
+        return None, None
+
+    state_dict = load_file(path)
+    if is_comfy:
+        state_dict = {_ORIGINAL_PREFIX + k.removeprefix(_COMFY_PREFIX): v for k, v in state_dict.items()}
+    adapter = {
+        k.removeprefix(_LLM_ADAPTER_PREFIX): state_dict.pop(k)
+        for k in list(state_dict) if k.startswith(_LLM_ADAPTER_PREFIX)
+    }
+    return (state_dict if is_comfy else None), (adapter or None)
+
 
 class AnimaModelLoader(
     HFModelLoaderMixin,
@@ -103,8 +139,11 @@ class AnimaModelLoader(
             )
 
         if transformer_model_name:
+            transformer_state_dict, llm_adapter_state_dict = _read_original_checkpoint(transformer_model_name)
+            if llm_adapter_state_dict is not None:
+                text_conditioner.load_state_dict(llm_adapter_state_dict)
             transformer = CosmosTransformer3DModel.from_single_file(
-                transformer_model_name,
+                transformer_state_dict if transformer_state_dict is not None else transformer_model_name,
                 config=base_model_name,
                 subfolder="transformer",
                 #avoid loading the transformer in float32:

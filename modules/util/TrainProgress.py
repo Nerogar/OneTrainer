@@ -11,6 +11,10 @@ class TrainProgress:
         self.epoch_sample = epoch_sample
         self.global_step = global_step
 
+        # latest training loss, only used for progress display (not saved in backups)
+        self.loss: float | None = None
+        self.smooth_loss: float | None = None
+
     def next_step(self, batch_size: int):
         self.epoch_step += 1
         self.epoch_sample += batch_size

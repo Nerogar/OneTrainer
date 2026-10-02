@@ -19,6 +19,8 @@ from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.download_progress import report_downloads
+from modules.util.i18n import t
 from modules.util.profiling_util import PeakMemoryRecorder
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
@@ -50,9 +52,21 @@ class TrainUIController:
             self.start_total_steps = train_progress.epoch * max_step + train_progress.epoch_step
         eta_str = self._calculate_eta_string(train_progress, max_step, max_epoch)
         self.view.on_update_progress(train_progress.epoch_step, max_step, train_progress.epoch, max_epoch, eta_str)
+        on_update_train_details = getattr(self.view, "on_update_train_details", None)
+        if on_update_train_details is not None:
+            on_update_train_details(self._calculate_train_details(train_progress, max_step, max_epoch))
 
     def on_update_status(self, status: str):
         self.view.on_update_status(status)
+
+    def on_download_progress(self, file_name: str, done: int, total: int | None):
+        gb = 1024 ** 3
+        size = f"{done / gb:.2f} / {total / gb:.2f} GB" if total else f"{done / gb:.2f} GB"
+        self.on_update_status(t("Downloading the base model (first time only): {file} {size}").format(
+            file=file_name, size=size))
+        on_download_progress = getattr(self.view, "on_download_progress", None)
+        if on_download_progress is not None:
+            on_download_progress(done, total)
 
     def _calculate_eta_string(self, train_progress: TrainProgress, max_step: int, max_epoch: int) -> str | None:
         assert self.start_time is not None and self.start_total_steps is not None
@@ -70,7 +84,39 @@ class TrainUIController:
 
         total_eta = spent_total / steps_done_this_session * remaining_steps
 
-        td = datetime.timedelta(seconds=total_eta)
+        return self._format_duration(total_eta)
+
+    def _calculate_train_details(self, train_progress: TrainProgress, max_step: int, max_epoch: int) -> dict:
+        # plain values only: the view reads them on the main thread while training continues
+        spent_total = time.monotonic() - self.start_time
+        current_total_steps = train_progress.epoch * max_step + train_progress.epoch_step
+        steps_done_this_session = current_total_steps - self.start_total_steps
+        total_steps = max_step * max_epoch
+
+        seconds_per_step = None
+        finish_time = None
+        if steps_done_this_session > 0 and spent_total > 0:
+            seconds_per_step = spent_total / steps_done_this_session
+            if steps_done_this_session > 30:
+                remaining_steps = max(total_steps - current_total_steps, 0)
+                finish_time = datetime.datetime.now() + datetime.timedelta(seconds=seconds_per_step * remaining_steps)
+
+        return {
+            "step": min(current_total_steps, total_steps),
+            "total_steps": total_steps,
+            "epoch_step": train_progress.epoch_step,
+            "max_step": max_step,
+            "seconds_per_step": seconds_per_step,
+            "elapsed": self._format_duration(spent_total),
+            "finish_time": finish_time,
+            # getattr: a TrainProgress pickled by an older cloud trainer has no loss fields
+            "loss": getattr(train_progress, "loss", None),
+            "smooth_loss": getattr(train_progress, "smooth_loss", None),
+        }
+
+    @staticmethod
+    def _format_duration(seconds: float) -> str:
+        td = datetime.timedelta(seconds=seconds)
         days = td.days
         hours, remainder = divmod(td.seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -240,11 +286,15 @@ class TrainUIController:
         self.training_callbacks = TrainCallbacks(
             on_update_train_progress=self.on_update_train_progress,
             on_update_status=self.on_update_status,
+            # views without a live preview simply don't define these
+            on_sample_default=getattr(self.view, "on_sample_preview", lambda _: None),
+            on_update_sample_default_progress=getattr(self.view, "on_sample_preview_progress", lambda _, __: None),
         )
 
         trainer = create.create_trainer(self.train_config, self.training_callbacks, self.training_commands, reattach=self.view.get_cloud_reattach())
         try:
-            trainer.start()
+            with report_downloads(self.on_download_progress):
+                trainer.start()
             if self.train_config.cloud.enabled:
                 self.view.sync_cloud_secrets()
 

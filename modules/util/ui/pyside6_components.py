@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
+from modules.util.i18n import t
 from modules.util.path_util import supported_image_extensions, supported_video_extensions
 from modules.util.ui.pyside6_validation import PySide6FieldValidator, PySide6PathValidator
 from modules.util.ui.UIState import BaseUIState
@@ -15,6 +16,7 @@ from PySide6.QtGui import QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFrame,
     QGridLayout,
@@ -25,6 +27,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QSpinBox,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -51,7 +54,7 @@ def _set_tooltip(component: QWidget, text: str, wide: bool = False) -> None:
     # plain QToolTip text is rendered on a single line; wrap it as rich text
     # with a max-width so it matches Ctk's wraplength of 180/350px
     width = 350 if wide else 180
-    component.setToolTip(f'<p style="max-width: {width}px;">{html.escape(text)}</p>')
+    component.setToolTip(f'<p style="max-width: {width}px;">{html.escape(t(text))}</p>')
 
 
 def _alignment(sticky: str) -> Qt.AlignmentFlag:
@@ -160,7 +163,7 @@ def label(
         wraplength: int = 0,
         underline: bool = False,
 ) -> QLabel:
-    component = QLabel(text, master)
+    component = QLabel(t(text), master)
     cell_alignment = Qt.AlignVCenter | Qt.AlignLeft
     if wraplength > 0:
         component.setWordWrap(True)
@@ -441,7 +444,7 @@ def layer_filter_entry(
 
 
 def icon_button(master: QWidget, row: int, column: int, text: str, command: Callable[[], None]) -> QPushButton:
-    component = QPushButton(text, master)
+    component = QPushButton(t(text), master)
     component.setFixedWidth(40)
     component.clicked.connect(command)
     _add(_layout(master), component, row, column, sticky="new")
@@ -478,7 +481,7 @@ def button(
         sticky: str = "new",
         width: int | None = None,
 ) -> QPushButton:
-    component = QPushButton(text, master)
+    component = QPushButton(t(text), master)
     component.clicked.connect(command)
     if width is not None:
         # ctk's width is a floor, not a cap: CTkButton never disables grid propagation,
@@ -511,7 +514,7 @@ def preset_menu_button(
     build_menu(menu, tree)
 
     component = QToolButton(master)
-    component.setText(text)
+    component.setText(t(text))
     component.setMenu(menu)
     component.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
     # the global QToolButton stylesheet (pyside6_util.create_application) enlarges the
@@ -537,6 +540,17 @@ class NoScrollComboBox(QComboBox):
             super().wheelEvent(event)
         else:
             event.ignore()
+
+
+class NoScrollSpinBox(QSpinBox):
+    # same as NoScrollComboBox: the wheel scrolls the page instead of changing the value
+    def wheelEvent(self, event: QWheelEvent):
+        event.ignore()
+
+
+class NoScrollDoubleSpinBox(QDoubleSpinBox):
+    def wheelEvent(self, event: QWheelEvent):
+        event.ignore()
 
 
 def options(
@@ -691,7 +705,7 @@ def switch(
         width: int | None = None,
 ) -> QCheckBox:
     var = ui_state.get_var(var_name)
-    component = QCheckBox(text, master)
+    component = QCheckBox(t(text), master)
     component.setChecked(bool(var.get()))
 
     if command:
@@ -750,8 +764,8 @@ def double_progress(
     lo.setContentsMargins(0, 0, 0, 0)
     lo.setColumnStretch(1, 1)
 
-    label_1_component = QLabel(label_1, frame)
-    label_2_component = QLabel(label_2, frame)
+    label_1_component = QLabel(t(label_1), frame)
+    label_2_component = QLabel(t(label_2), frame)
     progress_1_component = QProgressBar(frame)
     progress_2_component = QProgressBar(frame)
     description_1_component = QLabel("", frame)
@@ -810,7 +824,7 @@ def set_widget_enabled(widget: QWidget, enabled: bool) -> None:
 
 
 def set_label_text(label: QLabel, text: str) -> None:
-    label.setText(str(text))
+    label.setText(t(str(text)))
 
 
 def call_after(widget: QWidget, delay_ms: int, func) -> None:
