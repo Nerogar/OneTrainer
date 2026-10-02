@@ -2,6 +2,7 @@ import contextlib
 from abc import ABC
 
 from modules.ui.BaseConfigListView import BaseConfigListView
+from modules.util.i18n import t
 from modules.util.ui import pyside6_components
 
 from PySide6.QtWidgets import QInputDialog, QWidget
@@ -90,7 +91,7 @@ class PySide6ConfigListView(BaseConfigListView, ABC):
             return
         self._update_item_enabled_state()
         if self.toggle_button is not None:
-            self.toggle_button.setText("Disable" if self._is_current_item_enabled else "Enable")
+            self.toggle_button.setText(t("Disable") if self._is_current_item_enabled else "Enable")
 
     def _show_name_dialog(self, callback):
         text, ok = QInputDialog.getText(self.master, "name", "Name")

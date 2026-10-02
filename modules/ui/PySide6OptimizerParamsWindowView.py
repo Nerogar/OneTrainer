@@ -2,6 +2,7 @@ from modules.ui.BaseOptimizerParamsWindowView import BaseOptimizerParamsWindowVi
 from modules.ui.MuonAdamWindowController import MuonAdamWindowController
 from modules.ui.OptimizerParamsWindowController import OptimizerParamsWindowController
 from modules.ui.PySide6MuonAdamWindowView import PySide6MuonAdamWindowView
+from modules.util.i18n import t
 from modules.util.ui import pyside6_components
 from modules.util.ui.PySide6UIState import PySide6UIState
 
@@ -24,7 +25,7 @@ class PySide6OptimizerParamsWindowView(BaseOptimizerParamsWindowView, QDialog):
         self.muon_adam_button = None
         self._dynamic_frame = None
 
-        self.setWindowTitle("Optimizer Settings")
+        self.setWindowTitle(t("Optimizer Settings"))
         self.resize(800, 500)
 
         outer = QGridLayout(self)
@@ -37,7 +38,7 @@ class PySide6OptimizerParamsWindowView(BaseOptimizerParamsWindowView, QDialog):
         lo.setColumnStretch(4, 1)
         outer.addWidget(scroll, 0, 0)
 
-        ok = QPushButton("ok", self)
+        ok = QPushButton(t("ok"), self)
         ok.clicked.connect(self._on_close)
         outer.addWidget(ok, 1, 0)
 

@@ -1,5 +1,6 @@
 from modules.ui.BaseMuonAdamWindowView import BaseMuonAdamWindowView
 from modules.ui.MuonAdamWindowController import MuonAdamWindowController
+from modules.util.i18n import t
 from modules.util.ui import pyside6_components
 
 from PySide6.QtWidgets import QDialog, QGridLayout, QPushButton
@@ -13,7 +14,7 @@ class PySide6MuonAdamWindowView(BaseMuonAdamWindowView, QDialog):
         # delete on close so entry widgets and the field validators they register globally are freed, not leaked
         self.finished.connect(self.deleteLater)
 
-        self.setWindowTitle(controller.get_title())
+        self.setWindowTitle(t(controller.get_title()))
         self.resize(800, 500)
 
         outer = QGridLayout(self)
@@ -27,6 +28,6 @@ class PySide6MuonAdamWindowView(BaseMuonAdamWindowView, QDialog):
         self.build_content(frame, controller, ui_state)
         outer.addWidget(scroll, 0, 0)
 
-        ok = QPushButton("ok", self)
+        ok = QPushButton(t("ok"), self)
         ok.clicked.connect(self.accept)
         outer.addWidget(ok, 1, 0)

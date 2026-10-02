@@ -8,6 +8,7 @@ from modules.ui.PySide6SampleFrameView import PySide6SampleFrameView
 from modules.ui.SampleFrameController import SampleFrameController
 from modules.ui.SampleWindowController import SampleWindowController
 from modules.util.enum.FileType import FileType
+from modules.util.i18n import t
 from modules.util.ui import pyside6_components
 from modules.util.ui.PySide6UIState import PySide6UIState
 
@@ -22,7 +23,7 @@ class PySide6SampleWindowView(BaseSampleWindowView, QDialog):
         QDialog.__init__(self, parent)
         BaseSampleWindowView.__init__(self, pyside6_components)
 
-        self.setWindowTitle("Sample")
+        self.setWindowTitle(t("Sample"))
         self.resize(1200, 800)
 
         self.ui_state = PySide6UIState(controller.sample)
@@ -54,7 +55,7 @@ class PySide6SampleWindowView(BaseSampleWindowView, QDialog):
         self._progress.setRange(0, 1000)
         outer.addWidget(self._progress, 2, 0)
 
-        sample_btn = QPushButton("sample", self)
+        sample_btn = QPushButton(t("sample"), self)
         def _on_sample():
             # With an external model (manual sample during training) do_sample
             # only enqueues a command for the training thread to execute, so it
