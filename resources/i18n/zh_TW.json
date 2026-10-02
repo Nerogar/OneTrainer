@@ -1030,5 +1030,10 @@
   "Elapsed: {time}": "已用時間：{time}",
   "Loss: {loss}": "Loss：{loss}",
   "Smooth loss: {loss}": "平滑 Loss：{loss}",
-  "Finishes at: {time}": "預計完成：{time}"
+  "Finishes at: {time}": "預計完成：{time}",
+  "Generate preview now": "立即產生預覽圖",
+  "Generate a preview image with the preview prompt at the current training step.": "用預覽提示詞在目前的訓練步數產生一張預覽圖。",
+  "Open preview folder": "開啟預覽圖資料夾",
+  "Step {step}": "步數 {step}",
+  "The first preview appears after the first sampling.": "第一次產生預覽圖後會顯示在這裡。"
 }

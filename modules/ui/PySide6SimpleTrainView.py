@@ -5,6 +5,7 @@ import sys
 import traceback
 from collections.abc import Callable
 
+from modules.modelSampler.BaseModelSampler import ModelSamplerOutput
 from modules.ui.SimpleTrainController import (
     DEFAULT_MODEL_GROUP,
     PresetInfo,
@@ -13,12 +14,14 @@ from modules.ui.SimpleTrainController import (
 )
 from modules.ui.TrainUIController import TrainUIController
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.FileType import FileType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.i18n import t
 from modules.util.ui.pyside6_components import NoScrollComboBox, NoScrollDoubleSpinBox, NoScrollSpinBox
 
-from PySide6.QtCore import QTimer, QUrl
-from PySide6.QtGui import QDesktopServices, QIcon
+from PIL.ImageQt import ImageQt
+from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtGui import QDesktopServices, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -42,6 +45,9 @@ CAPTION_SOURCES = [
 ]
 
 RESOLUTIONS = ["512", "768", "1024"]
+
+PREVIEW_SIZE = 256  # px, the preview image is scaled to fit this square
+MAX_PREVIEWS = 100  # previews kept in memory for browsing; all of them are also saved to disk
 
 
 class PySide6SimpleTrainView(QMainWindow):
@@ -252,6 +258,8 @@ class PySide6SimpleTrainView(QMainWindow):
         bar = QWidget()
         lo = QVBoxLayout(bar)
 
+        lo.addWidget(self._build_preview_panel())
+
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 1)
         self.progress_bar.setValue(0)
@@ -294,6 +302,126 @@ class PySide6SimpleTrainView(QMainWindow):
 
         self._set_training_button_style("idle")
         return bar
+
+    def _build_preview_panel(self) -> QWidget:
+        # live preview of the images sampled during training; hidden until the first one arrives
+        self.preview_box = QGroupBox(t("Preview image"))
+        lo = QHBoxLayout(self.preview_box)
+
+        self.preview_image_label = QLabel()
+        self.preview_image_label.setFixedSize(PREVIEW_SIZE, PREVIEW_SIZE)
+        self.preview_image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.preview_image_label.setStyleSheet("background-color: #202020;")
+        lo.addWidget(self.preview_image_label)
+
+        side = QVBoxLayout()
+        self.preview_caption_label = QLabel("")
+        self.preview_caption_label.setWordWrap(True)
+        side.addWidget(self.preview_caption_label)
+
+        nav = QHBoxLayout()
+        self.preview_prev_button = QPushButton("<")
+        self.preview_prev_button.setFixedWidth(32)
+        self.preview_prev_button.clicked.connect(lambda: self._show_preview(self._preview_index - 1))
+        self.preview_next_button = QPushButton(">")
+        self.preview_next_button.setFixedWidth(32)
+        self.preview_next_button.clicked.connect(lambda: self._show_preview(self._preview_index + 1))
+        self.preview_count_label = QLabel("")
+        nav.addWidget(self.preview_prev_button)
+        nav.addWidget(self.preview_count_label)
+        nav.addWidget(self.preview_next_button)
+        nav.addStretch(1)
+        side.addLayout(nav)
+
+        self.preview_progress = QProgressBar()
+        self.preview_progress.setTextVisible(False)
+        self.preview_progress.setMaximumHeight(8)
+        self.preview_progress.setVisible(False)
+        side.addWidget(self.preview_progress)
+
+        side.addStretch(1)
+
+        self.sample_now_button = QPushButton(t("Generate preview now"))
+        self.sample_now_button.setToolTip(t("Generate a preview image with the preview prompt at the current training step."))
+        self.sample_now_button.clicked.connect(self._sample_now)
+        side.addWidget(self.sample_now_button)
+
+        open_samples_button = QPushButton(t("Open preview folder"))
+        open_samples_button.clicked.connect(self._open_samples_dir)
+        side.addWidget(open_samples_button)
+
+        lo.addLayout(side, 1)
+
+        # (pixmap, caption) of every preview of the current training, newest last
+        self._previews: list[tuple[QPixmap, str]] = []
+        self._preview_index = -1
+        self._last_epoch = 0
+        self._last_max_epoch = 0
+        self._last_step = 0
+
+        self.preview_box.setVisible(False)
+        return self.preview_box
+
+    def _sample_now(self):
+        self.train_controller.sample_now()
+        self.sample_now_button.setEnabled(False)
+        # re-enabled when the image arrives; this fallback covers a sampling that failed
+        QTimer.singleShot(30000, self, lambda: self.sample_now_button.setEnabled(self._is_training()))
+
+    def _open_samples_dir(self):
+        path = os.path.abspath(os.path.join(self.train_config.workspace_dir, "samples"))
+        os.makedirs(path, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+
+    def _show_preview(self, index: int):
+        if not self._previews:
+            return
+        index = max(0, min(index, len(self._previews) - 1))
+        self._preview_index = index
+        pixmap, caption = self._previews[index]
+        self.preview_image_label.setPixmap(pixmap)
+        self.preview_caption_label.setText(caption)
+        self.preview_count_label.setText(f"{index + 1}/{len(self._previews)}")
+        self.preview_prev_button.setEnabled(index > 0)
+        self.preview_next_button.setEnabled(index < len(self._previews) - 1)
+
+    def on_sample_preview(self, sampler_output: ModelSamplerOutput):
+        # called from the training thread
+        if sampler_output.file_type != FileType.IMAGE or sampler_output.data is None:
+            return
+        image = sampler_output.data.copy()
+        self.schedule_on_main_thread(lambda: self._add_preview(image))
+
+    def on_sample_preview_progress(self, step: int, max_step: int):
+        # called from the training thread
+        def update():
+            self.preview_box.setVisible(True)
+            self.preview_progress.setRange(0, max(max_step, 1))
+            self.preview_progress.setValue(step)
+            self.preview_progress.setVisible(step < max_step)
+        self.schedule_on_main_thread(update)
+
+    def _add_preview(self, image):
+        pixmap = QPixmap.fromImage(ImageQt(image.convert("RGBA"))).scaled(
+            PREVIEW_SIZE, PREVIEW_SIZE,
+            Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
+        )
+        caption = t("Epoch {epoch}/{max_epoch}").format(
+            epoch=min(self._last_epoch + 1, max(self._last_max_epoch, 1)), max_epoch=self._last_max_epoch,
+        ) if self._last_max_epoch else ""
+        caption += ("  ·  " if caption else "") + t("Step {step}").format(step=self._last_step)
+        caption += "  ·  " + datetime.datetime.now().strftime("%H:%M:%S")
+
+        # keep following the newest image unless the user is browsing older ones
+        follow = self._preview_index == len(self._previews) - 1
+        self._previews.append((pixmap, caption))
+        if len(self._previews) > MAX_PREVIEWS:
+            self._previews.pop(0)
+            self._preview_index -= 1
+        self.preview_box.setVisible(True)
+        self.preview_progress.setVisible(False)
+        self.sample_now_button.setEnabled(self._is_training() and bool(self.settings.sample_prompt))
+        self._show_preview(len(self._previews) - 1 if follow else self._preview_index)
 
     # --- settings <-> ui ---
 
@@ -613,6 +741,18 @@ class PySide6SimpleTrainView(QMainWindow):
         self.progress_bar.setTextVisible(False)
         self.details_label.setText("")
         self.details_label.setVisible(False)
+        self._previews.clear()
+        self._preview_index = -1
+        self.preview_image_label.clear()
+        self.preview_progress.setVisible(False)
+        # only offer the preview panel when a preview prompt is set
+        has_prompt = bool(self.settings.sample_prompt)
+        self.preview_caption_label.setText(t("The first preview appears after the first sampling."))
+        self.preview_count_label.setText("")
+        self.preview_prev_button.setEnabled(False)
+        self.preview_next_button.setEnabled(False)
+        self.sample_now_button.setEnabled(has_prompt)
+        self.preview_box.setVisible(has_prompt)
         self._set_training_button_style("running")
         self._set_form_enabled(False)
 
@@ -621,6 +761,8 @@ class PySide6SimpleTrainView(QMainWindow):
 
     def on_training_stopped(self, error_caught: bool):
         self.eta_label.setText("")
+        self.sample_now_button.setEnabled(False)
+        self.preview_progress.setVisible(False)
         self._set_training_button_style("idle")
         self._set_form_enabled(True)
         if not error_caught and self.progress_bar.maximum() > 1 \
@@ -644,6 +786,8 @@ class PySide6SimpleTrainView(QMainWindow):
         self.schedule_on_main_thread(update)
 
     def _do_update_progress(self, epoch_step: int, max_step: int, epoch: int, max_epoch: int, eta_str: str | None):
+        self._last_epoch, self._last_max_epoch = epoch, max_epoch
+        self._last_step = epoch * max_step + epoch_step
         total = max(max_step * max_epoch, 1)
         self.progress_bar.setRange(0, total)
         self.progress_bar.setValue(min(epoch * max_step + epoch_step, total))

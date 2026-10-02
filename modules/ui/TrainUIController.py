@@ -286,6 +286,9 @@ class TrainUIController:
         self.training_callbacks = TrainCallbacks(
             on_update_train_progress=self.on_update_train_progress,
             on_update_status=self.on_update_status,
+            # views without a live preview simply don't define these
+            on_sample_default=getattr(self.view, "on_sample_preview", lambda _: None),
+            on_update_sample_default_progress=getattr(self.view, "on_sample_preview_progress", lambda _, __: None),
         )
 
         trainer = create.create_trainer(self.train_config, self.training_callbacks, self.training_commands, reattach=self.view.get_cloud_reattach())
