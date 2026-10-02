@@ -1,3 +1,4 @@
+import datetime
 import os
 import subprocess
 import sys
@@ -263,6 +264,11 @@ class PySide6SimpleTrainView(QMainWindow):
         status_row.addWidget(self.status_label, 1)
         status_row.addWidget(self.eta_label)
         lo.addLayout(status_row)
+
+        self.details_label = QLabel("")
+        self.details_label.setStyleSheet("color: gray;")
+        self.details_label.setVisible(False)
+        lo.addWidget(self.details_label)
 
         buttons = QHBoxLayout()
         advanced_button = QPushButton(t("Advanced mode..."))
@@ -604,6 +610,9 @@ class PySide6SimpleTrainView(QMainWindow):
     def on_training_started(self):
         self.progress_bar.setRange(0, 1)
         self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(False)
+        self.details_label.setText("")
+        self.details_label.setVisible(False)
         self._set_training_button_style("running")
         self._set_form_enabled(False)
 
@@ -627,18 +636,49 @@ class PySide6SimpleTrainView(QMainWindow):
                 # QProgressBar is int32, so count in MB
                 self.progress_bar.setRange(0, total // 2**20)
                 self.progress_bar.setValue(done // 2**20)
+                self.progress_bar.setFormat("%p%")
+                self.progress_bar.setTextVisible(True)
             else:
                 self.progress_bar.setRange(0, 0)  # busy indicator
+                self.progress_bar.setTextVisible(False)
         self.schedule_on_main_thread(update)
 
     def _do_update_progress(self, epoch_step: int, max_step: int, epoch: int, max_epoch: int, eta_str: str | None):
         total = max(max_step * max_epoch, 1)
         self.progress_bar.setRange(0, total)
         self.progress_bar.setValue(min(epoch * max_step + epoch_step, total))
+        self.progress_bar.setFormat(t("Step %v/%m (%p%)"))
+        self.progress_bar.setTextVisible(True)
         text = t("Epoch {epoch}/{max_epoch}").format(epoch=min(epoch + 1, max_epoch), max_epoch=max_epoch)
         if eta_str is not None:
             text += "  ·  " + t("ETA:") + f" {t(eta_str)}"
         self.eta_label.setText(text)
+
+    def on_update_train_details(self, details: dict):
+        self.schedule_on_main_thread(lambda: self._do_update_train_details(details))
+
+    def _do_update_train_details(self, details: dict):
+        parts = [t("Step in epoch: {step}/{max_step}").format(step=details["epoch_step"], max_step=details["max_step"])]
+
+        seconds_per_step = details["seconds_per_step"]
+        if seconds_per_step is not None:
+            speed = f"{seconds_per_step:.2f} s/it" if seconds_per_step >= 1 else f"{1 / seconds_per_step:.2f} it/s"
+            parts.append(t("Speed: {speed}").format(speed=speed))
+
+        parts.append(t("Elapsed: {time}").format(time=details["elapsed"]))
+
+        if details["loss"] is not None:
+            parts.append(t("Loss: {loss}").format(loss=f"{details['loss']:.4f}"))
+        if details["smooth_loss"] is not None:
+            parts.append(t("Smooth loss: {loss}").format(loss=f"{details['smooth_loss']:.4f}"))
+
+        finish_time = details["finish_time"]
+        if finish_time is not None:
+            fmt = "%H:%M" if finish_time.date() == datetime.date.today() else "%m/%d %H:%M"
+            parts.append(t("Finishes at: {time}").format(time=finish_time.strftime(fmt)))
+
+        self.details_label.setText("  ·  ".join(parts))
+        self.details_label.setVisible(True)
 
     # --- helpers ---
 

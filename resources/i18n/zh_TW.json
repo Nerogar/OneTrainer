@@ -1023,5 +1023,12 @@
   "Optional. A single .safetensors or .gguf file, e.g. a finetuned model from ComfyUI's models/diffusion_models folder. Keep the official base model above: it still provides the text encoder and VAE.": "選填。單一 .safetensors 或 .gguf 檔，例如 ComfyUI 的 models/diffusion_models 資料夾中的微調模型。上方的基礎模型請保留官方版本，它仍負責提供文字編碼器和 VAE。",
   "The base model must be a Diffusers folder or a Hugging Face name, not a single file. Put single .safetensors / .gguf files into \"Custom model file\".": "基礎模型必須是 Diffusers 資料夾或 Hugging Face 名稱，不能是單一檔案。單一的 .safetensors／.gguf 檔請填到「自訂模型檔」。",
   "The custom model file does not exist.": "自訂模型檔不存在。",
-  "Found {images} images. {captions} of them have a .txt caption, but captions are taken from the file name.": "找到 {images} 張圖片，其中 {captions} 張有 .txt 描述檔，但目前描述來源是「圖片檔名」，這些描述不會被使用。"
+  "Found {images} images. {captions} of them have a .txt caption, but captions are taken from the file name.": "找到 {images} 張圖片，其中 {captions} 張有 .txt 描述檔，但目前描述來源是「圖片檔名」，這些描述不會被使用。",
+  "Step %v/%m (%p%)": "步數 %v/%m（%p%）",
+  "Step in epoch: {step}/{max_step}": "本輪步數：{step}/{max_step}",
+  "Speed: {speed}": "速度：{speed}",
+  "Elapsed: {time}": "已用時間：{time}",
+  "Loss: {loss}": "Loss：{loss}",
+  "Smooth loss: {loss}": "平滑 Loss：{loss}",
+  "Finishes at: {time}": "預計完成：{time}"
 }
