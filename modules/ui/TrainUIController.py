@@ -19,6 +19,8 @@ from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.download_progress import report_downloads
+from modules.util.i18n import t
 from modules.util.profiling_util import PeakMemoryRecorder
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
@@ -53,6 +55,15 @@ class TrainUIController:
 
     def on_update_status(self, status: str):
         self.view.on_update_status(status)
+
+    def on_download_progress(self, file_name: str, done: int, total: int | None):
+        gb = 1024 ** 3
+        size = f"{done / gb:.2f} / {total / gb:.2f} GB" if total else f"{done / gb:.2f} GB"
+        self.on_update_status(t("Downloading the base model (first time only): {file} {size}").format(
+            file=file_name, size=size))
+        on_download_progress = getattr(self.view, "on_download_progress", None)
+        if on_download_progress is not None:
+            on_download_progress(done, total)
 
     def _calculate_eta_string(self, train_progress: TrainProgress, max_step: int, max_epoch: int) -> str | None:
         assert self.start_time is not None and self.start_total_steps is not None
@@ -244,7 +255,8 @@ class TrainUIController:
 
         trainer = create.create_trainer(self.train_config, self.training_callbacks, self.training_commands, reattach=self.view.get_cloud_reattach())
         try:
-            trainer.start()
+            with report_downloads(self.on_download_progress):
+                trainer.start()
             if self.train_config.cloud.enabled:
                 self.view.sync_cloud_secrets()
 

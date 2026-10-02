@@ -16,6 +16,7 @@ from PySide6.QtGui import QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFrame,
     QGridLayout,
@@ -26,6 +27,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QSpinBox,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -538,6 +540,17 @@ class NoScrollComboBox(QComboBox):
             super().wheelEvent(event)
         else:
             event.ignore()
+
+
+class NoScrollSpinBox(QSpinBox):
+    # same as NoScrollComboBox: the wheel scrolls the page instead of changing the value
+    def wheelEvent(self, event: QWheelEvent):
+        event.ignore()
+
+
+class NoScrollDoubleSpinBox(QDoubleSpinBox):
+    def wheelEvent(self, event: QWheelEvent):
+        event.ignore()
 
 
 def options(
