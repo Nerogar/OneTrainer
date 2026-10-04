@@ -106,6 +106,7 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "warmup_init": False,
         "stochastic_rounding": True,
         "fused_back_pass": False,
+        "foreach": False,
     },
     Optimizer.ADAGRAD: {
         "lr_decay": 0,

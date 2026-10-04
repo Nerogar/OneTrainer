@@ -632,7 +632,11 @@ def create_optimizer(
                 warmup_init=optimizer_config.warmup_init if optimizer_config.warmup_init is not None else False,
             )
 
-            patch_adafactor(optimizer, optimizer_config.stochastic_rounding)
+            # foreach only replaces step(), but fused_back_pass consumes the gradients in step_parameter()
+            if optimizer_config.fused_back_pass and optimizer_config.foreach:
+                raise RuntimeError('"fused_back_pass" is only allowed when "foreach" is disabled')
+
+            patch_adafactor(optimizer, optimizer_config.stochastic_rounding, bool(optimizer_config.foreach))
 
         # CAME Optimizer
         case Optimizer.CAME:

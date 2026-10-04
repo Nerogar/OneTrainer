@@ -42,6 +42,32 @@ def copy_stochastic_(target: Tensor, source: Tensor):
     del result
 
 
+def copy_stochastic_flat_(targets: list[Tensor], source: Tensor):
+    """
+    copies source into targets using stochastic rounding, with the same result as calling copy_stochastic_ on each
+    target in order, but with a few batched kernels instead of four per target
+
+    Args:
+        targets: the target tensors with dtype=bfloat16
+        source: a contiguous 1D tensor with dtype=float32, holding the values of all targets back to back
+    """
+
+    numels = [t.numel() for t in targets]
+    result = torch.empty_like(source, dtype=torch.int32)
+
+    # one draw per target, a single draw over the whole buffer would give a different random stream
+    for r in result.split(numels):
+        r.random_(0, 1 << 16, generator=generator)
+
+    result.add_(source.view(dtype=torch.int32))
+    result.bitwise_and_(-65536)  # -65536 = FFFF0000 as a signed int32
+
+    rounded = result.view(dtype=torch.float32).split(numels)
+    torch._foreach_copy_(targets, [r.view(t.shape) for r, t in zip(rounded, targets, strict=True)])
+
+    del result
+
+
 def add_stochastic_(input: Tensor, other: Tensor, alpha: float = 1.0):
     """
     adds other to input using stochastic rounding
