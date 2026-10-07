@@ -1,5 +1,7 @@
 from collections.abc import Iterable
 
+from modules.util.bf16_stochastic_rounding import add_stochastic_
+
 import torch
 
 
@@ -43,7 +45,12 @@ class EMAModuleWrapper:
         if (optimization_step + 1) % self.update_step_interval == 0:
             for ema_parameter, parameter in zip(self.ema_parameters, parameters, strict=True):
                 if parameter.requires_grad:
-                    if ema_parameter.device == parameter.device:
+                    if ema_parameter.dtype == torch.bfloat16:
+                        # (1 - decay) * (parameter - ema) is mostly below bfloat16 resolution, so a plain add_ rounds the
+                        # update away and the EMA stops moving. Use stochastic rounding, like the optimizers do.
+                        update = parameter.detach().to(ema_parameter.device, torch.float32) - ema_parameter.float()
+                        add_stochastic_(ema_parameter, update.mul_(one_minus_decay))
+                    elif ema_parameter.device == parameter.device:
                         ema_parameter.add_(one_minus_decay * (parameter - ema_parameter))
                     else:
                         # in place calculations to save memory
