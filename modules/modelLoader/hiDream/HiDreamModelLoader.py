@@ -92,7 +92,7 @@ class HiDreamModelLoader(
         )
 
         if include_text_encoder_1:
-            text_encoder_1 = self._load_transformers_sub_module(
+            text_encoder_1 = self._load_text_encoder(
                 CLIPTextModelWithProjection,
                 weight_dtypes.text_encoder,
                 weight_dtypes.train_dtype,
@@ -103,7 +103,7 @@ class HiDreamModelLoader(
             text_encoder_1 = None
 
         if include_text_encoder_2:
-            text_encoder_2 = self._load_transformers_sub_module(
+            text_encoder_2 = self._load_text_encoder(
                 CLIPTextModelWithProjection,
                 weight_dtypes.text_encoder_2,
                 weight_dtypes.train_dtype,
@@ -114,7 +114,7 @@ class HiDreamModelLoader(
             text_encoder_2 = None
 
         if include_text_encoder_3:
-            text_encoder_3 = self._load_transformers_sub_module(
+            text_encoder_3 = self._load_text_encoder(
                 T5EncoderModel,
                 weight_dtypes.text_encoder_3,
                 weight_dtypes.fallback_train_dtype,
@@ -126,6 +126,8 @@ class HiDreamModelLoader(
 
         if include_text_encoder_4:
             if text_encoder_4_model_name:
+                # override repo holds text_encoder_4 at its root, not in a base-model subfolder, so it bypasses
+                # _load_text_encoder (which always loads from a base-repo subfolder) and loads directly
                 text_encoder_4 = self._load_transformers_sub_module(
                     LlamaForCausalLM,
                     weight_dtypes.text_encoder_4,
@@ -133,7 +135,7 @@ class HiDreamModelLoader(
                     text_encoder_4_model_name,
                 )
             else:
-                text_encoder_4 = self._load_transformers_sub_module(
+                text_encoder_4 = self._load_text_encoder(
                     LlamaForCausalLM,
                     weight_dtypes.text_encoder_4,
                     weight_dtypes.train_dtype,
@@ -144,21 +146,13 @@ class HiDreamModelLoader(
         else:
             text_encoder_4 = None
 
-        if vae_model_name:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKL,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                vae_model_name,
-            )
-        else:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKL,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                base_model_name,
-                "vae",
-            )
+        vae = self._load_vae(
+            AutoencoderKL,
+            weight_dtypes.vae,
+            weight_dtypes.train_dtype,
+            base_model_name,
+            vae_model_name,
+        )
 
         transformer = self._load_diffusers_sub_module(
             HiDreamImageTransformer2DModel,

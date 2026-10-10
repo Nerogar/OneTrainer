@@ -87,7 +87,7 @@ class StableDiffusionModelLoader(
             original_noise_scheduler=noise_scheduler,
         )
 
-        text_encoder = self._load_transformers_sub_module(
+        text_encoder = self._load_text_encoder(
             CLIPTextModel,
             weight_dtypes.text_encoder,
             weight_dtypes.train_dtype,
@@ -95,21 +95,13 @@ class StableDiffusionModelLoader(
             "text_encoder",
         )
 
-        if vae_model_name:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKL,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                vae_model_name,
-            )
-        else:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKL,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                base_model_name,
-                "vae",
-            )
+        vae = self._load_vae(
+            AutoencoderKL,
+            weight_dtypes.vae,
+            weight_dtypes.train_dtype,
+            base_model_name,
+            vae_model_name,
+        )
 
         unet = self._load_diffusers_sub_module(
             UNet2DConditionModel,
