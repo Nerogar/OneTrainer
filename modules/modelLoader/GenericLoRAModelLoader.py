@@ -37,6 +37,8 @@ def make_lora_model_loader(
                 model_names: ModelNames,
                 weight_dtypes: ModelWeightDtypes,
                 quantization: QuantizationConfig,
+                stream_from_disk: bool = False,
+                cache_in_ram: dict[str, bool] | None = None,
         ) -> model_class | None:
             base_model_loader = model_loader_class()
             lora_model_loader = lora_loader_class()
@@ -44,11 +46,19 @@ def make_lora_model_loader(
                 embedding_loader = embedding_loader_class()
 
             model = model_class(model_type=model_type)
+            cache_in_ram = cache_in_ram or {}
+            if not stream_from_disk and any(not cache_in_ram.get(part, False) for part in model_type.model_parts()):
+                print("Warning: 'stream from disk' is off, so every component stays fully in RAM; disabling "
+                      "'cache in ram' cannot free it without streaming.")
+            model.cache_in_ram = {
+                part: not stream_from_disk or cache_in_ram.get(part, False)
+                for part in model_type.model_parts()
+            }
             self._load_internal_data(model, model_names.lora)
             model.model_spec = self._load_default_model_spec(model_type)
 
             if model_names.base_model is not None:
-                base_model_loader.load(model, model_type, model_names, weight_dtypes, quantization)
+                base_model_loader.load(model, model_type, model_names, weight_dtypes, quantization, stream_from_disk)
             lora_model_loader.load(model, model_names)
             if embedding_loader_class is not None:
                 embedding_loader.load(model, model_names.lora, model_names)

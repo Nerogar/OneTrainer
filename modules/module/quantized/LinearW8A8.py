@@ -82,33 +82,50 @@ class LinearW8A8(
     QuantizedLinearMixin,
     CompressedWeightMixin,
 ):
-    def __init__(self, dtype: torch.dtype, *args, **kwargs):
+    is_quantized: bool
+
+    def __init__(self, dtype: torch.dtype, compress: bool = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         assert dtype in [torch.int8, torch.float8_e4m3fn]
         self._dtype = dtype
 
-        self.__is_quantized = False
+        self.is_quantized = False
         self.compute_dtype = None
         self.register_buffer("scale", torch.tensor(1.0, dtype=torch.float32))
 
-        self._init_compressed_state()
+        self._init_compressed_state(compress)
 
     def original_weight_shape(self) -> tuple[int, ...]:
         if self._compressed:
             return self._weight_shape
         return self.weight.shape
 
+    def mark_needs_requantization(self):
+        self.is_quantized = False
+        self.mark_needs_recompression()
+
+    def predict_offload_bytes(self) -> int:
+        # weight quantizes tensorwise to int8/float8_e4m3fn (both 1 byte/elem, same shape); bias is left
+        # unchanged. Matches get_offload_tensors (weight + optional bias); the scalar scale buffer is not
+        # offload-counted. _dtype is asserted int8/float8_e4m3fn in __init__, so 1 byte/elem is exact.
+        # a compressed weight offloads as its blob, so the measured length replaces the element count once it exists.
+        weight_bytes = self._compressed_bytes if self._compressed_bytes is not None else self.weight.numel()
+        bias_bytes = self.bias.numel() * self.bias.element_size() if self.bias is not None else 0
+        return weight_bytes + bias_bytes
+
     def unquantized_weight(self, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
+        if not self.is_quantized:
+            return self.weight.detach().to(dtype)
         weight = self._decompress(self.weight.detach()) if self._compressed else self.weight.detach()
         # 'scale' is not offloaded, so it can sit on the train device while 'weight' is parked on the temp device
         return dequantize(weight, self.scale.to(device=weight.device)).to(dtype)
 
     @torch.no_grad()
     def quantize(self, device: torch.device | None = None):
-        if self.__is_quantized:
+        if self.is_quantized:
             return
-        self.__is_quantized = True
+        self.is_quantized = True
 
         weight = self.weight.detach()
         orig_device = weight.device
@@ -125,14 +142,15 @@ class LinearW8A8(
         self.requires_grad_(False)
         self.weight.data = weight
 
-        self.scale.copy_(scale)
+        # keep the scale on the weight's device so the batched int8/fp8 path finds it co-located there
+        self.scale = scale.detach().to(orig_device)
 
         if self.compress:
             self._compress_weight(device=device)
 
     def forward(self, x_orig: torch.Tensor) -> torch.Tensor:
         assert not self.weight.requires_grad
-        assert self.__is_quantized
+        assert self.is_quantized
         x = x_orig.reshape(-1, x_orig.shape[-1])
 
         weight = self._decompress(self.weight.detach()) if self._compressed else self.weight
