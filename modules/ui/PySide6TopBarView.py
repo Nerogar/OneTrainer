@@ -6,6 +6,7 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import pyside6_components
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFileDialog, QWidget
 
 
@@ -37,13 +38,16 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
         pyside6_components._layout(self.frame).setColumnStretch(5, 1)
 
     def _init_preset_display(self):
-        # the "Load Preset" button doubles as the display; a tooltip keeps it
-        # obvious that it opens the preset menu even when it shows a preset name
+        # the "Load Preset" button doubles as the display of current preset
         self.preset_button.setToolTip("Load a preset")
 
     def _set_preset_text(self, text: str):
-        # empty means nothing is loaded: fall back to the button's default label
-        self.preset_button.setText(text or "Load Preset")
+        # empty means nothing is loaded
+        label = text or "Load Preset"
+        # limit width
+        label = self.preset_button.fontMetrics().elidedText(label, Qt.TextElideMode.ElideRight, 240)
+        self.preset_button.setText(label.replace("&", "&&"))
+        self.preset_button.setToolTip(f"Load a preset\n{text}" if text else "Load a preset")
 
     def _forget_dropdown(self, widget):
         lo = pyside6_components._layout(self.frame)

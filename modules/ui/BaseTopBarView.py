@@ -9,9 +9,7 @@ from modules.util.optimizer_util import change_optimizer
 
 
 def preset_name_from_filename(filename: str) -> str | None:
-    # The name we show in the top bar. A preset or config is shown by its file
-    # name without the ".json" ending. "#.json" is the auto-saved "last session"
-    # file, not a real preset, so we show nothing for it.
+    # Show the filename without its extension, dont for last-session "#.json".
     basename = os.path.basename(filename)
     if basename == "#.json":
         return None
@@ -38,10 +36,7 @@ class BaseTopBarView:
     def _show_open_dialog(self, initial_dir: str, callback):
         pass
 
-    # --- preset-name display hooks -----------------------------------------
-    # No-ops by default. The PySide6 top bar overrides them to show the loaded
-    # preset/config name on the "Load Preset" button; the Ctk top bar leaves
-    # the button showing its static text.
+    # PySide6 overrides these hooks to display the preset name; Ctk keeps its default label.
 
     def _init_preset_display(self):
         pass
