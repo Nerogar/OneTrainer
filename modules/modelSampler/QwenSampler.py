@@ -13,7 +13,6 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
-from modules.util.torch_util import torch_gc
 
 import torch
 
@@ -65,7 +64,7 @@ class QwenSampler(BaseModelSampler):
             num_latent_channels = 16
 
             # prepare prompt
-            self.model.text_encoder_to(self.train_device)
+            self.model.materialize_only("text_encoder")
 
             #unlike other models, Qwen benefits from CFG but is still quite good at CFG 1. Optimize for that:
             batch_size = 2 if cfg_scale > 1.0 else 1
@@ -74,9 +73,6 @@ class QwenSampler(BaseModelSampler):
                 batch_size=batch_size,
                 train_device=self.train_device,
             )
-
-            self.model.text_encoder_to(self.temp_device)
-            torch_gc()
 
             # prepare latent image
             latent_image = torch.randn(
@@ -110,7 +106,7 @@ class QwenSampler(BaseModelSampler):
             if torch.all(text_attention_mask):
                 text_attention_mask = None
 
-            self.model.transformer_to(self.train_device)
+            self.model.materialize_only("transformer")
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 latent_model_input = torch.cat([latent_image] * batch_size)
                 expanded_timestep = timestep.expand(batch_size)
@@ -134,9 +130,6 @@ class QwenSampler(BaseModelSampler):
 
                 on_update_progress(i + 1, len(timesteps))
 
-            self.model.transformer_to(self.temp_device)
-
-            torch_gc()
             latent_image = self.model.unpack_latents(
                 latent_image,
                 height // vae_scale_factor,
@@ -144,16 +137,13 @@ class QwenSampler(BaseModelSampler):
             )
 
             # decode
-            self.model.vae_to(self.train_device)
+            self.model.materialize_only("vae")
 
             latents = self.model.unscale_latents(latent_image)
             image = vae.decode(latents, return_dict=False)[0].squeeze(-3)
 
             do_denormalize = [True] * image.shape[0]
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
-
-            self.model.vae_to(self.temp_device)
-            torch_gc()
 
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,

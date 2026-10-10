@@ -3,6 +3,7 @@ from pathlib import Path
 
 from modules.model.IdeogramModel import IdeogramModel
 from modules.modelSaver.mixin.DtypeModelSaverMixin import DtypeModelSaverMixin
+from modules.util.convert_util import convert
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
@@ -38,7 +39,7 @@ class IdeogramModelSaver(
             destination: str,
             dtype: torch.dtype | None,
     ):
-        state_dict = model.transformer.state_dict()
+        state_dict = convert(model.transformer.state_dict(), model.checkpoint_diffusers_to_original())
 
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
         self._convert_state_dict_to_contiguous(save_state_dict)

@@ -11,7 +11,7 @@ from modules.util.ui.pyside6_validation import PySide6FieldValidator, PySide6Pat
 from modules.util.ui.UIState import BaseUIState
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -203,11 +203,14 @@ def entry(
         validator_factory: Callable[..., PySide6FieldValidator] | None = None,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
+        placeholder: str = "",
 ) -> QLineEdit:
     var = ui_state.get_var(var_name)
 
     component = QLineEdit(master)
     component.setMinimumWidth(width)
+    if placeholder:
+        component.setPlaceholderText(placeholder)
     _add(_layout(master), component, row, column, sticky=sticky)
 
     if command:
@@ -252,6 +255,7 @@ def path_entry(
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
         columnspan: int = 1,
+        placeholder: str = "",
 ) -> QWidget:
     frame = QWidget(master)
     frame_lo = QGridLayout(frame)
@@ -268,6 +272,7 @@ def path_entry(
         validator_factory=_path_validator_factory,
         extra_validate=extra_validate,
         required=required,
+        placeholder=placeholder,
     )
 
     dep_trace_ids: list[tuple] = []
@@ -524,6 +529,16 @@ def preset_menu_button(
 # Bound widgets
 # ---------------------------------------------------------------------------
 
+class NoScrollComboBox(QComboBox):
+    # scrolling over a closed combo box is an easy way to accidentally change
+    # its value while just scrolling the surrounding page; only scroll while open
+    def wheelEvent(self, event: QWheelEvent):
+        if self.view().isVisible():
+            super().wheelEvent(event)
+        else:
+            event.ignore()
+
+
 def options(
         master: QWidget,
         row: int,
@@ -534,7 +549,7 @@ def options(
         command: Callable[[str], None] | None = None,
 ) -> QComboBox:
     var = ui_state.get_var(var_name)
-    combo = QComboBox(master)
+    combo = NoScrollComboBox(master)
     combo.addItems(values)
     combo.setCurrentText(str(var.get()))
 
@@ -641,7 +656,7 @@ def options_kv(
                 break
         _updating = False
 
-    combo = QComboBox(master)
+    combo = NoScrollComboBox(master)
     combo.addItems(keys)
     # set initial display from current var value
     for k, v in values:

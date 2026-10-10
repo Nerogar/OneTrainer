@@ -1,0 +1,34 @@
+{
+    "base_model_name": "CalamitousFelicitousness/Ideogram-4-bf16-Diffusers",
+    "batch_size": 2,
+    "learning_rate": 5e-5,
+    "model_type": "IDEOGRAM_4",
+    "output_model_format": "COMFY_LORA",
+    "resolution": "512",
+    "compile": true,
+    "transformer": {
+        "train": true,
+        "weight_dtype": "INT_W8A8"
+    },
+    "unconditional_transformer": {
+        "weight_dtype": "NFLOAT_4",
+        "offload_fraction": 1.0
+    },
+    "text_encoder": {
+        "train": false,
+        "weight_dtype": "NFLOAT_4"
+    },
+    "training_method": "LORA",
+    "vae": {
+        "weight_dtype": "FLOAT_32"
+    },
+    "train_dtype": "BFLOAT_16",
+    "output_dtype": "BFLOAT_16",
+    "layer_filter": "attention,feed_forward",
+    "layer_filter_preset": "attn-mlp",
+    "quantization": {
+        "layer_filter": "layers",
+        "layer_filter_preset": "blocks"
+    },
+    "timestep_distribution": "LOGIT_NORMAL"
+}

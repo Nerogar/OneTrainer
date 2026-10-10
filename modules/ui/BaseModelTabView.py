@@ -6,6 +6,8 @@ from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.PathIOType import PathIOType
 
+from huggingface_hub.constants import HF_HUB_CACHE
+
 
 class BaseModelTabView(ABC):
     def __init__(self, components):
@@ -40,6 +42,7 @@ class BaseModelTabView(ABC):
             has_text_encoder_4="text_encoder_4" in parts,
             allow_override_text_encoder_4="text_encoder_4" in parts,
             has_vae="vae" in parts,
+            include_compressed=model_type.supports_compression(),
         )
         if "effnet_encoder" in parts:
             row = self.__create_effnet_encoder_components(frame, row, ui_state)
@@ -53,20 +56,23 @@ class BaseModelTabView(ABC):
             ui_state,
         )
 
-    def __create_dtype_options(self, include_gguf: bool = False, include_a8: bool = False) -> list[tuple[str, DataType]]:
+    def __create_dtype_options(self, include_gguf: bool = False, include_a8: bool = False,
+                               include_compressed: bool = False) -> list[tuple[str, DataType]]:
         options = [
             ("float32", DataType.FLOAT_32),
             ("bfloat16", DataType.BFLOAT_16),
             ("float16", DataType.FLOAT_16),
             ("float8 (W8)", DataType.FLOAT_8),
-            # ("int8", DataType.INT_8),  # TODO: reactivate when the int8 implementation is fixed in bitsandbytes: https://github.com/bitsandbytes-foundation/bitsandbytes/issues/1332
             ("nfloat4", DataType.NFLOAT_4),
         ]
+
         if include_a8:
-            options += [
-                ("float W8A8", DataType.FLOAT_W8A8),
-                ("int W8A8", DataType.INT_W8A8),
-            ]
+            options.append(("float W8A8", DataType.FLOAT_W8A8))
+            if include_compressed:
+                options.append(("float W8A8 compressed", DataType.FLOAT_W8A8_COMPRESSED))
+            options.append(("int W8A8", DataType.INT_W8A8))
+            if include_compressed:
+                options.append(("int W8A8 compressed", DataType.INT_W8A8_COMPRESSED))
 
         if include_gguf:
             options.append(("GGUF", DataType.GGUF))
@@ -85,6 +91,25 @@ class BaseModelTabView(ABC):
                                  "Go to https://huggingface.co/settings/tokens to create an access token.",
                          wide_tooltip=True)
         self.components.entry(frame, row, 1, ui_state, "secrets.huggingface_token")
+
+        # offline mode
+        self.components.label(frame, row, 3, "Offline Mode",
+                         tooltip="Skip the Hugging Face login and resolve every model from the local cache only. "
+                                 "Enable this when you have no internet connection; only already-downloaded models can be loaded.",
+                         wide_tooltip=True)
+        self.components.switch(frame, row, 4, ui_state, "offline_mode")
+
+        row += 1
+
+        # huggingface cache directory
+        self.components.label(frame, row, 0, "Hugging Face Cache Directory",
+                         tooltip="Directory used to cache Hugging Face model downloads. "
+                                 "Leave empty to use the default Hugging Face cache directory shown as the placeholder.",
+                         wide_tooltip=True)
+        self.components.path_entry(
+            frame, row, 1, ui_state, "huggingface_cache_dir",
+            mode="dir", placeholder=HF_HUB_CACHE,
+        )
 
         row += 1
 
@@ -124,12 +149,13 @@ class BaseModelTabView(ABC):
             has_text_encoder_3: bool = False,
             has_text_encoder_4: bool = False,
             has_vae: bool = False,
+            include_compressed: bool = False,
     ) -> int:
         if has_unet:
             # unet weight dtype
             self.components.label(frame, row, 3, "UNet Data Type",
                              tooltip="The unet weight data type")
-            self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True),
+            self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True, include_compressed=include_compressed),
                                   ui_state, "unet.weight_dtype")
 
             row += 1
@@ -165,7 +191,7 @@ class BaseModelTabView(ABC):
             # transformer weight dtype
             self.components.label(frame, row, 3, "Transformer Data Type",
                              tooltip="The transformer weight data type")
-            self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_gguf=True, include_a8=True),
+            self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_gguf=True, include_a8=True, include_compressed=include_compressed),
                                   ui_state, "transformer.weight_dtype")
 
             row += 1
@@ -174,7 +200,7 @@ class BaseModelTabView(ABC):
             # unconditional transformer weight dtype
             self.components.label(frame, row, 3, "Unconditional Transformer Data Type",
                              tooltip="The weight data type of the unconditional transformer, used for the negative branch of CFG during sampling")
-            self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True),
+            self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True, include_compressed=include_compressed),
                                   ui_state, "unconditional_transformer.weight_dtype")
 
             row += 1

@@ -8,7 +8,7 @@ from modules.util.ui.QtVar import QtVar
 
 from PIL.ImageQt import ImageQt
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QWidget
+from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QWidget
 
 
 class PySide6ConceptTabView(PySide6ConfigListView, BaseConceptTabView):
@@ -59,7 +59,7 @@ class PySide6ConceptTabView(PySide6ConfigListView, BaseConceptTabView):
         self.search_var._bind_widget(lambda v: search_entry.setText(v))
 
         self.filter_var = QtVar("ALL")
-        filter_combo = QComboBox(toolbar)
+        filter_combo = pyside6_components.NoScrollComboBox(toolbar)
         filter_combo.addItems(self._FILTER_TYPES)
         filter_combo.setFixedWidth(150)
         row_lo.addWidget(QLabel("Type:", toolbar))
@@ -125,7 +125,6 @@ class PySide6ConceptWidgetView(BaseConceptWidgetView, QWidget):
         )
 
         self.name_label = QLabel(self._get_display_name(), self)
-        self.name_label.setWordWrap(True)
         self.name_label.setFixedWidth(140)
         self.name_label.move(5, 153)
 

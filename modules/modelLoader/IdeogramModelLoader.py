@@ -31,11 +31,12 @@ class IdeogramModelLoader(
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            vae_model_name: str,
             include_unconditional_transformer: bool,
             quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
-            self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, include_unconditional_transformer, quantization)
+            self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name, include_unconditional_transformer, quantization)
         else:
             raise Exception("not an internal model")
 
@@ -45,6 +46,7 @@ class IdeogramModelLoader(
             model_type: ModelType,
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
+            vae_model_name: str,
             include_unconditional_transformer: bool,
             quantization: QuantizationConfig,
     ):
@@ -89,13 +91,21 @@ class IdeogramModelLoader(
             subfolder="scheduler",
         )
 
-        vae = self._load_diffusers_sub_module(
-            AutoencoderKLFlux2,
-            weight_dtypes.vae,
-            weight_dtypes.train_dtype,
-            base_model_name,
-            "vae",
-        )
+        if vae_model_name:
+            vae = self._load_diffusers_sub_module(
+                AutoencoderKLFlux2,
+                weight_dtypes.vae,
+                weight_dtypes.train_dtype,
+                vae_model_name,
+            )
+        else:
+            vae = self._load_diffusers_sub_module(
+                AutoencoderKLFlux2,
+                weight_dtypes.vae,
+                weight_dtypes.train_dtype,
+                base_model_name,
+                "vae",
+            )
 
         model.model_type = model_type
         model.tokenizer = tokenizer
@@ -129,7 +139,7 @@ class IdeogramModelLoader(
 
         try:
             self.__load_internal(
-                model, model_type, weight_dtypes, model_names.base_model,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
                 model_names.include_unconditional_transformer, quantization,
             )
             return
@@ -138,7 +148,7 @@ class IdeogramModelLoader(
 
         try:
             self.__load_diffusers(
-                model, model_type, weight_dtypes, model_names.base_model,
+                model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model,
                 model_names.include_unconditional_transformer, quantization,
             )
             return

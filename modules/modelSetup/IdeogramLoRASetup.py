@@ -10,25 +10,11 @@ from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
 
-import torch
-
 
 @factory.register(BaseModelSetup, ModelType.IDEOGRAM_4, TrainingMethod.LORA)
 class IdeogramLoRASetup(
     BaseIdeogramSetup,
 ):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
-    ):
-        super().__init__(
-            train_device=train_device,
-            temp_device=temp_device,
-            debug_mode=debug_mode,
-        )
-
     def create_parameters(
             self,
             model: IdeogramModel,
@@ -80,11 +66,14 @@ class IdeogramLoRASetup(
         vae_on_train_device = not config.latent_caching
         text_encoder_on_train_device = not config.latent_caching
 
-        model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
-        model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
-        model.transformer_to(self.train_device)
-        # the unconditional transformer is only needed for sampling; keep it off the train device during training
-        model.unconditional_transformer_to(self.temp_device)
+        parts = ["transformer"]
+        if text_encoder_on_train_device:
+            parts.append("text_encoder")
+        if vae_on_train_device:
+            parts.append("vae")
+        # the unconditional transformer is only needed for sampling; materialize_only() evicts it as it's
+        # not in parts, keeping it off the train device during training
+        model.materialize_only(*parts)
 
         model.text_encoder.eval()
         model.vae.eval()

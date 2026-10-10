@@ -180,6 +180,9 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
             f"Please fix the following errors before training:\n\n{bullet_list}",
         )
 
+    def confirm(self, title: str, message: str) -> bool:
+        return messagebox.askokcancel(title, message)
+
     def open_dataset_tool(self):
         self.wait_window(self.controller.open_dataset_tool(self, CtkCaptionUIView))
 

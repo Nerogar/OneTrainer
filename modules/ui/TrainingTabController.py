@@ -21,6 +21,7 @@ class TrainingTabController:
             ("torch SDPA", AttentionMechanism.SDP),
             ("flash-attn", AttentionMechanism.FLASH),
             ("torch cuDNN", AttentionMechanism.CUDNN),
+            ("torch FlexAttention", AttentionMechanism.FLEX),
         ]
 
     def get_layer_presets(self) -> dict:

@@ -38,7 +38,9 @@ def make_fine_tune_model_saver(
 
             if embedding_saver_class is not None:
                 embedding_model_saver = embedding_saver_class()
-                embedding_model_saver.save_multiple(model, output_model_format, output_model_destination, dtype)
+                embedding_model_format = ModelFormat.INTERNAL if output_model_format == ModelFormat.INTERNAL \
+                    else ModelFormat.SAFETENSORS
+                embedding_model_saver.save_multiple(model, embedding_model_format, output_model_destination, dtype)
 
             if output_model_format == ModelFormat.INTERNAL:
                 self._save_internal_data(model, output_model_destination)
