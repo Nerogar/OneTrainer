@@ -1,6 +1,7 @@
 from modules.ui.BaseSchedulerParamsWindowView import BaseKvParamsView, BaseSchedulerParamsWindowView
 from modules.ui.PySide6ConfigListView import PySide6ConfigListView
 from modules.ui.SchedulerParamsWindowController import KvParamsController, SchedulerParamsWindowController
+from modules.util.i18n import t
 from modules.util.ui import pyside6_components
 from modules.util.ui.PySide6UIState import PySide6UIState
 
@@ -67,7 +68,7 @@ class PySide6SchedulerParamsWindowView(BaseSchedulerParamsWindowView, QDialog):
         # delete on close so entry widgets and the field validators they register globally are freed, not leaked
         self.finished.connect(self.deleteLater)
 
-        self.setWindowTitle("Learning Rate Scheduler Settings")
+        self.setWindowTitle(t("Learning Rate Scheduler Settings"))
         self.resize(800, 500)
 
         outer = QGridLayout(self)
@@ -91,6 +92,6 @@ class PySide6SchedulerParamsWindowView(BaseSchedulerParamsWindowView, QDialog):
 
         outer.addWidget(scroll, 0, 0)
 
-        ok = QPushButton("ok", self)
+        ok = QPushButton(t("ok"), self)
         ok.clicked.connect(self.accept)
         outer.addWidget(ok, 1, 0)

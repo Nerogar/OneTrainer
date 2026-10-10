@@ -1,5 +1,6 @@
 from modules.ui.BaseTimestepDistributionWindowView import BaseTimestepDistributionWindowView
 from modules.ui.TimestepDistributionWindowController import TimestepDistributionWindowController
+from modules.util.i18n import t
 from modules.util.ui import pyside6_components
 
 from matplotlib import pyplot as plt
@@ -15,7 +16,7 @@ class PySide6TimestepDistributionWindowView(BaseTimestepDistributionWindowView, 
         # delete on close so entry widgets and the field validators they register globally are freed, not leaked
         self.finished.connect(self.deleteLater)
 
-        self.setWindowTitle("Timestep Distribution")
+        self.setWindowTitle(t("Timestep Distribution"))
         self.resize(900, 600)
         self._controller = controller
 
@@ -34,13 +35,13 @@ class PySide6TimestepDistributionWindowView(BaseTimestepDistributionWindowView, 
         lo.addWidget(self._canvas, 0, 3, 8, 1)
         self._update_preview()
 
-        update_btn = QPushButton("Update Preview", frame)
+        update_btn = QPushButton(t("Update Preview"), frame)
         update_btn.clicked.connect(self._update_preview)
         lo.addWidget(update_btn, 8, 3)
 
         outer.addWidget(scroll, 0, 0)
 
-        ok = QPushButton("ok", self)
+        ok = QPushButton(t("ok"), self)
         ok.clicked.connect(self.accept)
         outer.addWidget(ok, 1, 0)
 

@@ -1,5 +1,6 @@
 from modules.ui.BaseVideoToolUIView import BaseVideoToolUIView
 from modules.ui.VideoToolUIController import VideoToolUIController
+from modules.util.i18n import t
 from modules.util.image_util import load_image
 from modules.util.ui import pyside6_components
 from modules.util.ui.pyside6_util import QtABCMeta
@@ -33,7 +34,7 @@ class PySide6VideoToolUIView(BaseVideoToolUIView, QDialog, metaclass=QtABCMeta):
 
         ui_state = PySide6UIState(controller.args)
 
-        self.setWindowTitle("Video Tools")
+        self.setWindowTitle(t("Video Tools"))
         self.resize(700, 750)
 
         outer = QGridLayout(self)
@@ -60,7 +61,7 @@ class PySide6VideoToolUIView(BaseVideoToolUIView, QDialog, metaclass=QtABCMeta):
             lo.setColumnStretch(3, 1)
             build_fn(frame, controller, ui_state)
             lo.setRowStretch(lo.rowCount(), 1)
-            tabs.addTab(scroll, name)
+            tabs.addTab(scroll, t(name))
 
         outer.addWidget(self._build_status_bar(), 1, 0)
 
@@ -79,7 +80,7 @@ class PySide6VideoToolUIView(BaseVideoToolUIView, QDialog, metaclass=QtABCMeta):
                 150, 150, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
         )
-        self._preview_caption_label = QLabel("Preview image", frame)
+        self._preview_caption_label = QLabel(t("Preview image"), frame)
         self._preview_caption_label.setWordWrap(True)
 
         preview_col = QWidget(frame)

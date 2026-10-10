@@ -1,5 +1,6 @@
 from modules.ui.BaseConvertModelUIView import BaseConvertModelUIView
 from modules.ui.ConvertModelUIController import ConvertModelUIController
+from modules.util.i18n import t
 from modules.util.ui import pyside6_components
 from modules.util.ui.PySide6UIState import PySide6UIState
 
@@ -15,7 +16,7 @@ class PySide6ConvertModelUIView(BaseConvertModelUIView, QDialog):
         self.ui_state = PySide6UIState(controller.convert_model_args)
         self._dynamic_frame = None
 
-        self.setWindowTitle("Convert models")
+        self.setWindowTitle(t("Convert models"))
         self.resize(600, 380)
 
         _pad = pyside6_components.PAD

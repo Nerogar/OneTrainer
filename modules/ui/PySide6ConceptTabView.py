@@ -2,6 +2,7 @@ from modules.ui.BaseConceptTabView import BaseConceptTabView, BaseConceptWidgetV
 from modules.ui.ConceptTabController import ConceptTabController
 from modules.ui.PySide6ConceptWindowView import PySide6ConceptWindowView
 from modules.ui.PySide6ConfigListView import PySide6ConfigListView
+from modules.util.i18n import t
 from modules.util.ui import pyside6_components
 from modules.util.ui.PySide6UIState import PySide6UIState
 from modules.util.ui.QtVar import QtVar
@@ -47,9 +48,9 @@ class PySide6ConceptTabView(PySide6ConfigListView, BaseConceptTabView):
 
         self.search_var = QtVar("")
         search_entry = QLineEdit(toolbar)
-        search_entry.setPlaceholderText("Filter...")
+        search_entry.setPlaceholderText(t("Filter..."))
         search_entry.setFixedWidth(200)
-        row_lo.addWidget(QLabel("Search:", toolbar))
+        row_lo.addWidget(QLabel(t("Search:"), toolbar))
         row_lo.addWidget(search_entry)
 
         def _on_search(text):
@@ -62,7 +63,7 @@ class PySide6ConceptTabView(PySide6ConfigListView, BaseConceptTabView):
         filter_combo = pyside6_components.NoScrollComboBox(toolbar)
         filter_combo.addItems(self._FILTER_TYPES)
         filter_combo.setFixedWidth(150)
-        row_lo.addWidget(QLabel("Type:", toolbar))
+        row_lo.addWidget(QLabel(t("Type:"), toolbar))
         row_lo.addWidget(filter_combo)
 
         def _on_filter(text):
@@ -72,7 +73,7 @@ class PySide6ConceptTabView(PySide6ConfigListView, BaseConceptTabView):
         self.filter_var._bind_widget(lambda v: filter_combo.setCurrentText(v))
 
         self.show_disabled_var = QtVar(True)
-        show_disabled_cb = QCheckBox("Show Disabled", toolbar)
+        show_disabled_cb = QCheckBox(t("Show Disabled"), toolbar)
         show_disabled_cb.setChecked(True)
         row_lo.addWidget(show_disabled_cb)
 
@@ -82,7 +83,7 @@ class PySide6ConceptTabView(PySide6ConfigListView, BaseConceptTabView):
         show_disabled_cb.stateChanged.connect(_on_show_disabled)
         self.show_disabled_var._bind_widget(lambda v: show_disabled_cb.setChecked(bool(v)))
 
-        clear_btn = QPushButton("Clear", toolbar)
+        clear_btn = QPushButton(t("Clear"), toolbar)
         clear_btn.setFixedWidth(50)
         clear_btn.clicked.connect(self._reset_filters)
         row_lo.addWidget(clear_btn)
