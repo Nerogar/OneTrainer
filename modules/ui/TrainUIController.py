@@ -26,6 +26,9 @@ from modules.util.ui.validation import flush_and_validate_all
 
 import torch
 
+from huggingface_hub import parse_hf_uri
+from huggingface_hub.errors import GatedRepoError
+
 
 class TrainUIController:
     def __init__(self, config: TrainConfig):
@@ -230,12 +233,21 @@ class TrainUIController:
             traceback.print_exc()
             self.view.on_update_status(f"Error generating debug package: {e}")
 
+    def __report_gated_repo_error(self) -> str:
+        model_name = self.train_config.base_model_name
+        if not os.path.exists(model_name):
+            model_name = parse_hf_uri(model_name if "://" in model_name else f"hf://{model_name}").id
+        concise_auth_error = f"Cannot access {Path(model_name).name} on HuggingFace.\nAccess is gated and you are not in the authorized list."
+        print(concise_auth_error)
+        return concise_auth_error
+
     def __training_thread_function(self):
         with PeakMemoryRecorder("training run", enabled=False):
             self.__training_thread_function_impl()
 
     def __training_thread_function_impl(self):
         error_caught = False
+        error_message = "Error: check the console for details"
 
         self.training_callbacks = TrainCallbacks(
             on_update_train_progress=self.on_update_train_progress,
@@ -252,11 +264,14 @@ class TrainUIController:
             self.start_total_steps = None
             self.start_time = time.monotonic()
             trainer.train()
-        except Exception:
+        except Exception as e:
             if self.train_config.cloud.enabled:
                 self.view.sync_cloud_secrets()
             error_caught = True
-            traceback.print_exc()
+            if isinstance(e, GatedRepoError):
+                error_message = self.__report_gated_repo_error()
+            else:
+                traceback.print_exc()
 
         trainer.end()
 
@@ -269,7 +284,7 @@ class TrainUIController:
         torch_gc()
 
         if error_caught:
-            self.on_update_status("Error: check the console for details")
+            self.on_update_status(error_message)
         else:
             self.on_update_status("Stopped")
 
