@@ -20,6 +20,7 @@ from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.profiling_util import PeakMemoryRecorder
+from modules.util.tensorboard_util import TensorboardProcess
 from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ui.validation import flush_and_validate_all
@@ -109,8 +110,9 @@ class TrainUIController:
             tensorboard_args.append("--bind_all")
 
         try:
-            self.always_on_tensorboard_subprocess = subprocess.Popen(tensorboard_args)
+            self.always_on_tensorboard_subprocess = TensorboardProcess(tensorboard_args)
         except Exception:
+            traceback.print_exc()
             self.always_on_tensorboard_subprocess = None
 
     def _stop_always_on_tensorboard(self):
