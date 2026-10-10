@@ -237,7 +237,7 @@ class TrainUIController:
         model_name = self.train_config.base_model_name
         if not os.path.exists(model_name):
             model_name = parse_hf_uri(model_name if "://" in model_name else f"hf://{model_name}").id
-        concise_auth_error = f"Cannot access {Path(model_name).name}.\nAccess is restricted and you are not in the authorized list."
+        concise_auth_error = f"Cannot access {Path(model_name).name} on HuggingFace.\nAccess is gated and you are not in the authorized list."
         print(concise_auth_error)
         return concise_auth_error
 
