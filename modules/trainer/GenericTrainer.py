@@ -32,6 +32,7 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.profiling_util import PeakMemoryRecorder, TorchMemoryRecorder, TorchProfiler
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
+from modules.util.tqdm_util import tqdm
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -40,8 +41,6 @@ from torch.nn import Parameter
 from torch.utils.hooks import RemovableHandle
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
-
-from tqdm import tqdm
 
 # OT_DEBUG_PROFILES=1 dumps a CUDA memory snapshot for the first two steps, where the allocator is still
 # growing, and a profiler trace at steps 10 and 40, past compilation and warmup.
