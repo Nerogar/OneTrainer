@@ -31,6 +31,21 @@ class PySide6TimestepDistributionWindowView(BaseTimestepDistributionWindowView, 
 
         fig, self._ax = plt.subplots()
         self._canvas = FigureCanvasQTAgg(fig)
+
+        palette = self.palette()
+        text_color = palette.text().color().name()
+        background_color = palette.window().color().name()
+        fig.set_facecolor(background_color)
+
+        self._ax.set_facecolor(self.palette().window().color().name())
+        self._ax.spines['bottom'].set_color(text_color)
+        self._ax.spines['left'].set_color(text_color)
+        self._ax.spines['top'].set_color(text_color)
+        self._ax.spines['right'].set_color(text_color)
+        self._ax.tick_params(axis='x', colors=text_color, which="both")
+        self._ax.tick_params(axis='y', colors=text_color, which="both")
+        self._ax.xaxis.label.set_color(text_color)
+        self._ax.yaxis.label.set_color(text_color)
         lo.addWidget(self._canvas, 0, 3, 8, 1)
         self._update_preview()
 
