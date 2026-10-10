@@ -30,7 +30,6 @@ class BaseMuonAdamWindowView:
             'orthogonal_sinkhorn': {'title': 'Orthogonal Sinkhorn', 'tooltip': 'Applies iterative row and column orthogonal projection to make the updates orthogonal to the current weight, leading to robust regularization and better generalization.', 'type': 'bool'},
             'sinkhorn_iterations': {'title': 'Sinkhorn Iterations', 'tooltip': 'Controls the number of iterations for Multi-Normed Sinkhorn. While 1 iteration is often sufficient for convergence and 3 offers a slight refinement, 5 is the default.', 'type': 'int'},
             'normed_momentum': {'title': 'Normalization-then-Momentum (NtM)', 'tooltip': 'Applies the momentum after the optimizer normalization. This makes the momentum scale invariant and tracks the true variance of the normalized gradients.', 'type': 'bool'},
-            'snr_cond': {'title': 'SNR Preconditioning', 'tooltip': 'Applies a Signal-to-Noise Ratio (SNR) precondition to reshape the optimization curve. It prioritizes high-confidence signals and dampens noise. On-the-fly math with zero memory overhead. Requires Normalization-then-Momentum (NtM). ', 'type': 'bool'},
             'geometric_wd': {'title': 'Geometric Weight Decay', 'tooltip': 'Regularizes weights based on the geometric structure of the optimizer. Compatible with cautious weight decay.', 'type': 'bool'},
         }
         # @formatter:on
