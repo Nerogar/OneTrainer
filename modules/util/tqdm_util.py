@@ -26,7 +26,8 @@ class tqdm(_tqdm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        _bars.append(self)
+        if not self.disable:
+            _bars.append(self)
 
     def _clear_status(self, refresh=True):
         #anything written over the status - the training loop's loss - is left standing.
