@@ -1,9 +1,10 @@
+from modules.util.tqdm_util import tqdm
+
 import torch
 import torch._dynamo.callback
 import torch.utils._sympy.functions
 
 from sympy import S
-from tqdm import tqdm
 
 
 #code from https://github.com/pytorch/pytorch/blob/ed82d5fcfd80110565f69130f286c7bfec6db2dc/torch/utils/_sympy/functions.py#L481
@@ -95,7 +96,7 @@ def init_compile():
 def _on_compile_start(args: "torch._dynamo.callback.CallbackArgs") -> None:
     frame_id, _, frame_compile_id = args.compile_id.partition("/")
     direction = "backward" if args.callback_trigger == torch._dynamo.callback.CallbackTrigger.LAZY_BACKWARD else "forward"
-    tqdm.write(f"[torch.compile] compiling kernel {frame_id} {direction} (variant #{frame_compile_id or 0})...")
+    tqdm.show_status(f"compiling kernel {frame_id} {direction} (variant #{frame_compile_id or 0})...")
 
 
 torch._dynamo.callback.on_compile_start(_on_compile_start)

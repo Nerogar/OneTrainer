@@ -12,12 +12,11 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
 from modules.util.image_util import load_image
+from modules.util.tqdm_util import tqdm
 
 import torch
 from torch import nn
 from torchvision.transforms import transforms
-
-from tqdm import tqdm
 
 
 @factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_XL_10_BASE)
