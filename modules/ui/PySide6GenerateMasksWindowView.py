@@ -1,141 +1,154 @@
-import contextlib
-import tkinter as tk
-from tkinter import filedialog
+import threading
 
 from modules.ui.BaseGenerateMasksWindowView import BaseGenerateMasksWindowView
 from modules.ui.GenerateMasksWindowController import GenerateMasksWindowController
-from modules.util.ui.ui_utils import set_window_icon
+from modules.util.ui.pyside6_util import QtABCMeta
 
-import customtkinter as ctk
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QGridLayout,
+    QLabel,
+    QLineEdit,
+    QProgressBar,
+    QPushButton,
+    QWidget,
+)
 
 
-class CtkGenerateMasksWindowView(BaseGenerateMasksWindowView, ctk.CTkToplevel):
-    def __init__(self, parent, controller: GenerateMasksWindowController, path, parent_include_subdirectories, *args, **kwargs):
-        """
-        Window for generating masks for a folder of images
-
-        Parameters:
-            parent (`Tk`): the parent window
-            path (`str`): the path to the folder
-            parent_include_subdirectories (`bool`): whether to include subdirectories. used to set the default value of the include subdirectories checkbox
-        """
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
-
+class PySide6GenerateMasksWindowView(BaseGenerateMasksWindowView, QDialog, metaclass=QtABCMeta):
+    def __init__(self, parent, controller: GenerateMasksWindowController, path, parent_include_subdirectories):
+        QDialog.__init__(self, parent)
         self.controller = controller
-        if path is None:
-            path = ""
+        self._running = False
 
-        self.mode_var = ctk.StringVar(self, "Create if absent")
-        self.modes = ["Replace all masks", "Create if absent", "Add to existing", "Subtract from existing", "Blend with existing"]
-        self.model_var = ctk.StringVar(self, "ClipSeg")
-        self.models = ["ClipSeg", "Rembg", "Rembg-Human", "Hex Color"]
+        self.setWindowTitle("Batch generate masks")
+        self.resize(400, 470)
 
-        self.title("Batch generate masks")
-        self.geometry("360x430")
-        self.resizable(True, True)
+        models = ["ClipSeg", "Rembg", "Rembg-Human", "Hex Color"]
+        modes = ["Replace all masks", "Create if absent", "Add to existing",
+                 "Subtract from existing", "Blend with existing"]
 
-        self.frame = ctk.CTkFrame(self, width=600, height=300)
-        self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        lo = QGridLayout(self)
+        lo.setContentsMargins(10, 10, 10, 10)
+        lo.setColumnStretch(1, 1)
+        row = 0
 
-        self.model_label = ctk.CTkLabel(self.frame, text="Model", width=100)
-        self.model_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.model_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.model_var, values=self.models, dynamic_resizing=False, width=200)
-        self.model_dropdown.grid(row=0, column=1, sticky="w", padx=5, pady=5)
+        self.model_combo = QComboBox(self)
+        self.model_combo.addItems(models)
+        self._add_row(lo, row, "Model", self.model_combo)
+        row += 1
 
-        self.path_label = ctk.CTkLabel(self.frame, text="Folder", width=100)
-        self.path_label.grid(row=1, column=0, sticky="w",padx=5, pady=5)
-        self.path_entry = ctk.CTkEntry(self.frame, width=150)
-        self.path_entry.insert(0, path)
-        self.path_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
-        self.path_button = ctk.CTkButton(self.frame, width=30, text="...", command=lambda: self.browse_for_path(self.path_entry))
-        self.path_button.grid(row=1, column=1, sticky="e", padx=5, pady=5)
+        self.path_edit = QLineEdit(path or "", self)
+        self._add_row(lo, row, "Folder", self._path_row(self.path_edit))
+        row += 1
 
-        self.prompt_label = ctk.CTkLabel(self.frame, text="Prompt", width=100)
-        self.prompt_label.grid(row=2, column=0, sticky="w",padx=5, pady=5)
-        self.prompt_entry = ctk.CTkEntry(self.frame, width=200)
-        self.prompt_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+        self.prompt_edit = QLineEdit(self)
+        self._add_row(lo, row, "Prompt", self.prompt_edit)
+        row += 1
 
-        self.mode_label = ctk.CTkLabel(self.frame, text="Mode", width=100)
-        self.mode_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
-        self.mode_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.mode_var, values=self.modes, dynamic_resizing=False, width=200)
-        self.mode_dropdown.grid(row=3, column=1, sticky="w", padx=5, pady=5)
+        self.mode_combo = QComboBox(self)
+        self.mode_combo.addItems(modes)
+        self.mode_combo.setCurrentText("Create if absent")
+        self._add_row(lo, row, "Mode", self.mode_combo)
+        row += 1
 
-        self.threshold_label = ctk.CTkLabel(self.frame, text="Threshold", width=100)
-        self.threshold_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
-        self.threshold_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="0.0 - 1.0")
-        self.threshold_entry.insert(0, "0.3")
-        self.threshold_entry.grid(row=4, column=1, sticky="w", padx=5, pady=5)
+        self.threshold_edit = QLineEdit("0.3", self)
+        self._add_row(lo, row, "Threshold", self.threshold_edit)
+        row += 1
 
-        self.smooth_label = ctk.CTkLabel(self.frame, text="Smooth", width=100)
-        self.smooth_label.grid(row=5, column=0, sticky="w", padx=5, pady=5)
-        self.smooth_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="5")
-        self.smooth_entry.insert(0, 5)
-        self.smooth_entry.grid(row=5, column=1, sticky="w", padx=5, pady=5)
+        self.smooth_edit = QLineEdit("5", self)
+        self._add_row(lo, row, "Smooth", self.smooth_edit)
+        row += 1
 
-        self.expand_label = ctk.CTkLabel(self.frame, text="Expand", width=100)
-        self.expand_label.grid(row=6, column=0, sticky="w", padx=5, pady=5)
-        self.expand_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="10")
-        self.expand_entry.insert(0, 10)
-        self.expand_entry.grid(row=6, column=1, sticky="w", padx=5, pady=5)
+        self.expand_edit = QLineEdit("10", self)
+        self._add_row(lo, row, "Expand", self.expand_edit)
+        row += 1
 
-        self.alpha_label = ctk.CTkLabel(self.frame, text="Alpha", width=100)
-        self.alpha_label.grid(row=7, column=0, sticky="w", padx=5, pady=5)
-        self.alpha_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="1")
-        self.alpha_entry.insert(0, 1)
-        self.alpha_entry.grid(row=7, column=1, sticky="w", padx=5, pady=5)
+        self.alpha_edit = QLineEdit("1", self)
+        self._add_row(lo, row, "Alpha", self.alpha_edit)
+        row += 1
 
-        self.include_subdirectories_label = ctk.CTkLabel(self.frame, text="Include subfolders", width=100)
-        self.include_subdirectories_label.grid(row=8, column=0, sticky="w", padx=5, pady=5)
-        self.include_subdirectories_var = ctk.BooleanVar(self, parent_include_subdirectories)
-        self.include_subdirectories_switch = ctk.CTkSwitch(self.frame, text="", variable=self.include_subdirectories_var)
-        self.include_subdirectories_switch.grid(row=8, column=1, sticky="w", padx=5, pady=5)
+        self.include_subdirs_check = QCheckBox("Include subfolders", self)
+        self.include_subdirs_check.setChecked(bool(parent_include_subdirectories))
+        lo.addWidget(self.include_subdirs_check, row, 1)
+        row += 1
 
-        self.progress_label = ctk.CTkLabel(self.frame, text="Progress: 0/0", width=100)
-        self.progress_label.grid(row=9, column=0, sticky="w", padx=5, pady=5)
-        self.progress = ctk.CTkProgressBar(self.frame, orientation="horizontal", mode="determinate", width=200)
-        self.progress.grid(row=9, column=1, sticky="w", padx=5, pady=5)
+        self.progress_label = QLabel("Progress: 0/0", self)
+        self.progress_bar = QProgressBar(self)
+        self.progress_bar.setRange(0, 100)
+        lo.addWidget(self.progress_label, row, 0)
+        lo.addWidget(self.progress_bar, row, 1)
+        row += 1
 
-        self.create_masks_button = ctk.CTkButton(self.frame, text="Create Masks", width=310, command=self._on_create_masks)
-        self.create_masks_button.grid(row=10, column=0, columnspan=2, sticky="w", padx=5, pady=5)
+        self.create_button = QPushButton("Create Masks", self)
+        self.create_button.clicked.connect(self._on_create)
+        lo.addWidget(self.create_button, row, 0, 1, 2)
+        row += 1
 
-        self.frame.pack(fill="both", expand=True)
+        lo.setRowStretch(row, 1)
 
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
-        self.after(200, lambda: set_window_icon(self))
+    def _add_row(self, lo, row, label_text, widget):
+        lo.addWidget(QLabel(label_text, self), row, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        lo.addWidget(widget, row, 1)
 
-    def browse_for_path(self, entry_box):
-        # get the path from the user
-        path = filedialog.askdirectory()
-        # set the path to the entry box
-        # delete entry box text
-        entry_box.focus_set()
-        entry_box.delete(0, filedialog.END)
-        entry_box.insert(0, path)
-        self.focus_set()
+    def _path_row(self, edit):
+        frame = QWidget(self)
+        frame_lo = QGridLayout(frame)
+        frame_lo.setContentsMargins(0, 0, 0, 0)
+        frame_lo.setColumnStretch(0, 1)
+        frame_lo.addWidget(edit, 0, 0)
+        browse = QPushButton("...", frame)
+        browse.setFixedWidth(40)
+        browse.clicked.connect(self._browse)
+        frame_lo.addWidget(browse, 0, 1)
+        return frame
+
+    def _browse(self):
+        directory = QFileDialog.getExistingDirectory(self, "Select folder", self.path_edit.text())
+        if directory:
+            self.path_edit.setText(directory)
 
     def set_progress(self, value, max_value):
-        progress = value / max_value
-        self.progress.set(progress)
-        self.progress_label.configure(text=f"{value}/{max_value}")
-        self.progress.update()
+        QTimer.singleShot(0, self, lambda: self._apply_progress(value, max_value))
 
-    def _on_create_masks(self):
-        self.controller.create_masks(
-            model_name=self.model_var.get(),
-            path=self.path_entry.get(),
-            prompt=self.prompt_entry.get(),
-            mode_str=self.mode_var.get(),
-            alpha_str=self.alpha_entry.get(),
-            threshold_str=self.threshold_entry.get(),
-            smooth_str=self.smooth_entry.get(),
-            expand_str=self.expand_entry.get(),
-            include_subdirectories=self.include_subdirectories_var.get(),
-        )
+    def _apply_progress(self, value, max_value):
+        max_value = max(1, max_value)
+        self.progress_bar.setValue(int(value / max_value * 100))
+        self.progress_label.setText(f"Progress: {value}/{max_value}")
 
-    def destroy(self):
-        with contextlib.suppress(tk.TclError):
-            self.grab_release()
+    def _on_create(self):
+        if self._running:
+            return
+        self._running = True
+        self.create_button.setEnabled(False)
 
-        super().destroy()
+        args = {
+            "model_name": self.model_combo.currentText(),
+            "path": self.path_edit.text(),
+            "prompt": self.prompt_edit.text(),
+            "mode_str": self.mode_combo.currentText(),
+            "alpha_str": self.alpha_edit.text(),
+            "threshold_str": self.threshold_edit.text(),
+            "smooth_str": self.smooth_edit.text(),
+            "expand_str": self.expand_edit.text(),
+            "include_subdirectories": self.include_subdirs_check.isChecked(),
+        }
+
+        def worker():
+            try:
+                self.controller.create_masks(**args)
+            except Exception as e:
+                message = str(e)
+                QTimer.singleShot(0, self, lambda: self.progress_label.setText(f"Error: {message}"))
+            finally:
+                QTimer.singleShot(0, self, self._on_done)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_done(self):
+        self._running = False
+        self.create_button.setEnabled(True)
