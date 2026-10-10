@@ -30,7 +30,12 @@ class AdditionalEmbeddingWrapper(metaclass=ABCMeta):
 
         self.is_applied = False
         self.orig_forward = self.orig_module.forward
-        self.orig_median_norm = torch.norm(self.orig_module.weight, dim=1).median().item()
+        # orig_median_norm is only read by normalize_embeddings(), which only touches learned embeddings. A text
+        # encoder left on meta (streamed but not materialized, because none of its embeddings are trained) never
+        # reaches that path, so skip the norm read that would otherwise fail on a meta tensor (#69).
+        self.orig_median_norm = None
+        if not self.orig_module.weight.is_meta:
+            self.orig_median_norm = torch.norm(self.orig_module.weight, dim=1).median().item()
 
     def forward(self, x, *args, **kwargs):
         # ensure that the original weights only contain as many embeddings as the unmodified tokenizer can create

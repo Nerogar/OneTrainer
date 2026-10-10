@@ -7,7 +7,6 @@ from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.convert_util import add_prefix
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
-from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 import torch
 from torch import Tensor
@@ -39,8 +38,6 @@ class AnimaModel(BaseModel):
 
     text_encoder_train_dtype: DataType
 
-    text_encoder_offload_conductor: LayerOffloadConductor | None
-    transformer_offload_conductor: LayerOffloadConductor | None
 
     # persistent lora training data
     transformer_lora: LoRAModuleWrapper | None
@@ -66,8 +63,6 @@ class AnimaModel(BaseModel):
 
         self.text_encoder_train_dtype = DataType.FLOAT_32
 
-        self.text_encoder_offload_conductor = None
-        self.transformer_offload_conductor = None
 
         self.transformer_lora = None
         self.lora_state_dict = None

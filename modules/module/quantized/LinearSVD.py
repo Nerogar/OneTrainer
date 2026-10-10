@@ -1,3 +1,4 @@
+import os
 from abc import abstractmethod
 from contextlib import suppress
 
@@ -51,6 +52,19 @@ def make_svd_linear(linear_class):
             else:
                 return super().unquantized_weight(dtype, device)
 
+        def mark_needs_requantization(self):
+            # reset both the SVD split flag and the parent's base-weight flag so the next quantize() re-runs fully.
+            self.__svd_is_quantized = False
+            super().mark_needs_requantization()
+
+        def predict_offload_bytes(self) -> int:
+            # the residual quantized weight (base quant type) plus the low-rank factors svd_up (out x rank) and
+            # svd_down (rank x in), both in svd_dtype. Sized from the meta skeleton -- the factors don't exist yet.
+            out_features, in_features = self.original_weight_shape()
+            svd_bytes = (out_features * self.rank + self.rank * in_features) \
+                * torch.empty((), dtype=self.svd_dtype).element_size()
+            return super().predict_offload_bytes() + svd_bytes
+
         @torch.no_grad()
         def quantize(self, device: torch.device | None = None):
             if self.__svd_is_quantized:
@@ -73,11 +87,17 @@ def make_svd_linear(linear_class):
                 U, S, Vh = torch.linalg.svd(W, full_matrices=False)
 
                 if self.cache_dir is not None:
+                    # write to a per-process temp then atomically rename in: under multi-GPU every rank quantizes
+                    # concurrently and writes the same hash-named file, so a plain torch.save races and a reader can
+                    # pick up a half-written file. os.replace is atomic on the same filesystem, so a concurrent reader
+                    # sees either no file or a complete one, and multiple writers just overwrite with identical content.
+                    tmp_filename = filename + f".tmp.{os.getpid()}"
                     torch.save((
                         U[:, :self.max_cache_rank].clone(),
                         S[:self.max_cache_rank].clone(),
                         Vh[:self.max_cache_rank, :].clone(),
-                    ), filename)
+                    ), tmp_filename)
+                    os.replace(tmp_filename, filename)
 
             U_r = U[:, :self.rank]
             S_r = S[:self.rank]

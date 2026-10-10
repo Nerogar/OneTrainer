@@ -7,7 +7,6 @@ from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.convert_util import fuse
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
-from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 import torch
 from torch import Tensor
@@ -42,8 +41,6 @@ class ZImageModel(BaseModel):
 
     text_encoder_train_dtype: DataType
 
-    text_encoder_offload_conductor: LayerOffloadConductor | None
-    transformer_offload_conductor: LayerOffloadConductor | None
 
     # persistent lora training data
     text_encoder_lora: LoRAModuleWrapper | None
@@ -68,8 +65,6 @@ class ZImageModel(BaseModel):
 
         self.text_encoder_train_dtype = DataType.FLOAT_32 #TODO
 
-        self.text_encoder_offload_conductor = None
-        self.transformer_offload_conductor = None
 
         self.transformer_lora = None
         self.lora_state_dict = None
