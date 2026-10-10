@@ -75,10 +75,11 @@ class BaseFlux2Setup(
                 text_encoder_output=batch.get('text_encoder_hidden_state'),
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
             )
-            latent_image = model.patchify_latents(batch['latent_image'].float())
-            latent_height = latent_image.shape[-2]
-            latent_width = latent_image.shape[-1]
-            scaled_latent_image = model.scale_latents(latent_image)
+            patchified_latent_image = model.patchify_latents(batch['latent_image'].float())
+            # calculate_timestep_shift patchifies by 2 internally, so its token count is over the raw VAE latent dims.
+            latent_height = batch['latent_image'].shape[-2]
+            latent_width = batch['latent_image'].shape[-1]
+            scaled_latent_image = model.scale_latents(patchified_latent_image)
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
