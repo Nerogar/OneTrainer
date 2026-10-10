@@ -11,26 +11,12 @@ from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
 from modules.util.TrainProgress import TrainProgress
 
-import torch
-
 
 @factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_XL_10_BASE, TrainingMethod.LORA)
 @factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING, TrainingMethod.LORA)
 class StableDiffusionXLLoRASetup(
     BaseStableDiffusionXLSetup,
 ):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
-    ):
-        super().__init__(
-            train_device=train_device,
-            temp_device=temp_device,
-            debug_mode=debug_mode,
-        )
-
     def create_parameters(
             self,
             model: StableDiffusionXLModel,
@@ -142,10 +128,14 @@ class StableDiffusionXLLoRASetup(
             config.train_text_encoder_2_or_embedding() \
             or not config.latent_caching
 
-        model.text_encoder_1_to(self.train_device if text_encoder_1_on_train_device else self.temp_device)
-        model.text_encoder_2_to(self.train_device if text_encoder_2_on_train_device else self.temp_device)
-        model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
-        model.unet_to(self.train_device)
+        parts = ["unet"]
+        if text_encoder_1_on_train_device:
+            parts.append("text_encoder")
+        if text_encoder_2_on_train_device:
+            parts.append("text_encoder_2")
+        if vae_on_train_device:
+            parts.append("vae")
+        model.materialize_only(*parts)
 
         if config.text_encoder.train:
             model.text_encoder_1.train()

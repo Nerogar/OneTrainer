@@ -6,6 +6,8 @@ from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 
 import torch
 
+from tqdm import tqdm
+
 
 def is_enabled() -> bool:
     return torch.distributed.is_available() and torch.distributed.is_initialized()
@@ -149,7 +151,7 @@ def parameter_divergence(params: list[torch.Tensor], train_device: torch.device)
 def warn_parameter_divergence(params: list[torch.Tensor], train_device: torch.device):
     divergence = parameter_divergence(params, train_device)
     if divergence is not None and divergence > 0:
-        print(f"\n\nWARNING: Parameter divergence between GPUs of {divergence}\n\n")
+        tqdm.write(f"WARNING: Parameter divergence between GPUs of {divergence}")
 
 
 @torch.no_grad()

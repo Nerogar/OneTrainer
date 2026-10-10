@@ -44,6 +44,9 @@ class BaseTrainUIView(ABC):
     def show_validation_errors(self, errors: list[str]): pass
 
     @abstractmethod
+    def confirm(self, title: str, message: str) -> bool: pass
+
+    @abstractmethod
     def wait_window(self, window): pass
 
     @abstractmethod
