@@ -187,6 +187,9 @@ class ModelType(Enum):
     def is_video_model(self) -> bool:
         return self.is_hunyuan_video() #incase we add more video models in the future
 
+    def supports_compression(self) -> bool:
+        return not (self.is_stable_diffusion() or self.is_stable_diffusion_xl() or self.is_wuerstchen())
+
     def model_parts(self) -> tuple[str, ...]:
         return _MODEL_PARTS[self]
 

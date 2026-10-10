@@ -11,25 +11,11 @@ from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
 from modules.util.TrainProgress import TrainProgress
 
-import torch
-
 
 @factory.register(BaseModelSetup, ModelType.QWEN, TrainingMethod.LORA)
 class QwenLoRASetup(
     BaseQwenSetup,
 ):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
-    ):
-        super().__init__(
-            train_device=train_device,
-            temp_device=temp_device,
-            debug_mode=debug_mode,
-        )
-
     def create_parameters(
             self,
             model: QwenModel,
@@ -101,9 +87,12 @@ class QwenLoRASetup(
             config.train_text_encoder_or_embedding() \
             or not config.latent_caching
 
-        model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
-        model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
-        model.transformer_to(self.train_device)
+        parts = ["transformer"]
+        if text_encoder_on_train_device:
+            parts.append("text_encoder")
+        if vae_on_train_device:
+            parts.append("vae")
+        model.materialize_only(*parts)
 
         if config.text_encoder.train:
             model.text_encoder.train()
