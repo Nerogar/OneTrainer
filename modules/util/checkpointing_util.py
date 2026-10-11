@@ -233,6 +233,9 @@ class BoundaryOffloadCheckpointLayer(BaseCheckpointLayer):
             self.conductor.after_layer(self.layer_index, list(args))
             return output
 
+        if not self.checkpointing:
+            raise NotImplementedError("offloading requires gradient checkpointing")
+
         if self.layer_index == 0:
             self.conductor.start_forward(backward_follows=True)
 
@@ -349,7 +352,7 @@ def enable_checkpointing(
     # can already hold a different layer's weights: plausible but wrong gradients, not an error. The
     # recompute re-reads the weights after the layer has been loaded back in. Compiled blocks escape this
     # today (AOTAutograd passes parameters as graph inputs, read at call time), but that is a calling
-    # convention and not a guarantee. Frozen parts run no backward through the block and are exempt.
+    # convention and not a guarantee. Frozen parts are checked at runtime because they can still carry gradients.
     if offload and not checkpointing and part.train:
         raise NotImplementedError("offloading requires gradient checkpointing")
 
