@@ -183,9 +183,9 @@ def __quantized_linear_class_and_kwargs(dtype: DataType):
     elif dtype.quantize_fp8():
         return LinearFp8, {}
     elif dtype.quantize_intW8A8():
-        return LinearW8A8, {'dtype': torch.int8}
+        return LinearW8A8, {'dtype': torch.int8, 'compress': dtype.is_compressed()}
     elif dtype.quantize_fpW8A8():
-        return LinearW8A8, {'dtype': torch.float8_e4m3fn}
+        return LinearW8A8, {'dtype': torch.float8_e4m3fn, 'compress': dtype.is_compressed()}
     elif dtype == DataType.GGUF_A8_INT:
         return LinearGGUFA8, {'dtype': torch.int8}
     elif dtype == DataType.GGUF_A8_FLOAT:
@@ -279,25 +279,23 @@ def is_quantized_parameter(
     return False
 
 
-def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataType, config: TrainConfig, compress: bool = False):
+def quantize_layers(module: nn.Module, device: torch.device, train_dtype: DataType, config: TrainConfig):
     if module is None:
         return
     child_modules = list(module.modules())
 
-    compressible = [m for m in child_modules if isinstance(m, CompressedWeightMixin)]
-    if compress and not nvcomp_util.available():
+    compressible = [m for m in child_modules if isinstance(m, CompressedWeightMixin) and m.compress]
+    if compressible and not nvcomp_util.available():
         raise RuntimeError("a compressed weight data type is selected but nvCOMP is not available")
-    for m in compressible:
-        m.compress = compress
 
     for _ in multi.master_first(): #avoid cache writing conflicts
         for child_module in tqdm(child_modules, desc="Quantizing model weights", total=len(child_modules), delay=5, smoothing=0.1):
-            if isinstance(child_module, (QuantizedModuleMixin, GGUFLinear)):
+            if isinstance(child_module, QuantizedModuleMixin | GGUFLinear):
                 child_module.compute_dtype = train_dtype.torch_dtype()
             if isinstance(child_module, QuantizedModuleMixin):
                 child_module.quantize(device=device)
 
-    if multi.is_master() and compress:
+    if multi.is_master() and compressible:
         uncompressed = sum(m.uncompressed_bytes() for m in compressible)
         compressed = sum(m.weight.nbytes for m in compressible)
         if uncompressed > 0:

@@ -82,7 +82,7 @@ class LinearW8A8(
     QuantizedLinearMixin,
     CompressedWeightMixin,
 ):
-    def __init__(self, dtype: torch.dtype, *args, **kwargs):
+    def __init__(self, dtype: torch.dtype, *args, compress: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
 
         assert dtype in [torch.int8, torch.float8_e4m3fn]
@@ -93,6 +93,7 @@ class LinearW8A8(
         self.register_buffer("scale", torch.tensor(1.0, dtype=torch.float32))
 
         self._init_compressed_state()
+        self.compress = compress
 
     def original_weight_shape(self) -> tuple[int, ...]:
         if self._compressed:
