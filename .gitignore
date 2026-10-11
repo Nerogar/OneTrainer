@@ -19,6 +19,9 @@ debug*.py
 config.json
 secrets.json
 *.zip
+# excludes all but then whitelists default json presets
+/training_presets/**/*.json
+!/training_presets/**/#*.json
 
 # environments
 /.venv*
