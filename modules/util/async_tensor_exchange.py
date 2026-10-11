@@ -14,18 +14,23 @@ class AsyncTensorExchange:
         self.pending_key = None
 
     def exchange(self, value: torch.Tensor, key):
+        previous_value, previous_key = self.drain()
+
+        self.pin.copy_(value, non_blocking=(self.event is not None))
+        if self.event is not None:
+            self.event.record(torch.cuda.current_stream(value.device))
+        self.pending_key = key
+
+        return previous_value, previous_key
+
+    def drain(self):
+        """Wait for and consume the pending copy without submitting another one."""
         previous_value, previous_key = None, None
         if self.pending_key is not None:
             if self.event is not None:
                 self.event.synchronize()
-            # no event on non-CUDA devices, but there's also no async copy to wait for there:
-            # non_blocking below is only True when self.event is set, so copy_() blocks until
-            # done and self.pin is already fully written by the time we get here
+            # Non-CUDA copies in exchange() block, so their host buffer is already ready.
             previous_value, previous_key = self.pin.clone(), self.pending_key
-
-        self.pin.copy_(value, non_blocking=(self.event is not None))
-        if self.event is not None:
-            self.event.record()
-        self.pending_key = key
+            self.pending_key = None
 
         return previous_value, previous_key

@@ -635,11 +635,33 @@ class GenericTrainer(BaseTrainer):
 
         accum_loss_exchange = AsyncTensorExchange(train_device)
 
+        def report_loss(loss_cpu, loss_step, progress_bar=None):
+            nonlocal ema_loss, ema_loss_steps
+            if loss_cpu is None:
+                return
+
+            loss_value = loss_cpu.item()
+            if math.isnan(loss_value):
+                raise RuntimeError("Training loss became NaN. This may be due to invalid parameters, precision issues, or a bug in the loss computation.")
+
+            self.tensorboard.add_scalar("loss/train_step", loss_value, loss_step)
+            ema_loss = ema_loss or loss_value
+            ema_loss_steps += 1
+            ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
+            ema_loss = (ema_loss * ema_loss_decay) + (loss_value * (1 - ema_loss_decay))
+            if progress_bar is not None:
+                progress_bar.set_postfix({
+                    'loss': loss_value,
+                    'smooth loss': ema_loss,
+                })
+            self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, loss_step)
+
         epochs = range(train_progress.epoch, self.config.epochs, 1)
 
         for _epoch in tqdm(epochs, desc="epoch") if multi.is_master() else epochs:
             multi.sync_commands(self.commands)
             if self.commands.get_stop_command():
+                report_loss(*accum_loss_exchange.drain())
                 return
             self.callbacks.on_update_status("Starting epoch/caching")
 
@@ -795,20 +817,8 @@ class GenericTrainer(BaseTrainer):
                             )
 
                             accum_loss_cpu, accum_loss_step = accum_loss_exchange.exchange(accum_loss, train_progress.global_step)
-                            if accum_loss_cpu is not None:  # runs one step behind to avoid cuda sync
-                                if math.isnan(accum_loss_cpu.item()):
-                                    raise RuntimeError("Training loss became NaN. This may be due to invalid parameters, precision issues, or a bug in the loss computation.")
-
-                                self.tensorboard.add_scalar("loss/train_step", accum_loss_cpu.item(), accum_loss_step)
-                                ema_loss = ema_loss or accum_loss_cpu.item()
-                                ema_loss_steps += 1
-                                ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
-                                ema_loss = (ema_loss * ema_loss_decay) + (accum_loss_cpu.item() * (1 - ema_loss_decay))
-                                step_tqdm.set_postfix({
-                                    'loss': accum_loss_cpu.item(),
-                                    'smooth loss': ema_loss,
-                                })
-                                self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, accum_loss_step)
+                            # Runs one update behind to avoid synchronizing the current step.
+                            report_loss(accum_loss_cpu, accum_loss_step, step_tqdm)
 
                         accum_loss = 0.0
                         self.model_setup.after_optimizer_step(self.model, self.config, train_progress)
@@ -835,13 +845,18 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
 
                 if self.commands.get_stop_command():
+                    report_loss(*accum_loss_exchange.drain())
                     return
 
             train_progress.next_epoch()
             self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
 
             if self.commands.get_stop_command():
+                report_loss(*accum_loss_exchange.drain())
                 return
+
+        # Check and log the last update before the caller saves the final model.
+        report_loss(*accum_loss_exchange.drain())
 
     def end(self):
         if self.one_step_trained:
