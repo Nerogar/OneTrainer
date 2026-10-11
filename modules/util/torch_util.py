@@ -16,17 +16,17 @@ torch_version = packaging.version.parse(torch.__version__)
 
 
 def supports_mem_pool(device: torch.device) -> bool:
-    return device.type == "cuda"
+    return device.type == "cuda" and torch.cuda.memory.get_allocator_backend() == "native"
 
 
 def create_mem_pool(device: torch.device):
-    # a dedicated MemPool the caller can allocate into; None on devices without MemPool support (cpu/mps)
+    # a dedicated MemPool the caller can allocate into; None on unsupported devices or allocators (cpu/mps)
     return torch.cuda.MemPool() if supports_mem_pool(device) else None
 
 
-def mem_pool_context(mem_pool):
-    # route allocations made in this context into the given MemPool; no-op when it is None
-    return torch.cuda.use_mem_pool(mem_pool) if mem_pool is not None else nullcontext()
+def mem_pool_context(mem_pool, device: torch.device):
+    # route allocations made in this context into the given MemPool; no-op when it is None. Ensure "cuda" works
+    return torch.cuda.use_mem_pool(mem_pool, device=device.index) if mem_pool is not None else nullcontext()
 
 
 def state_dict_has_prefix(state_dict: dict | None, prefix: str):

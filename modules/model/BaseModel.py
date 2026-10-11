@@ -163,7 +163,7 @@ class BaseModel(metaclass=ABCMeta):
             pool = self._mem_pools.get(stem)
             if pool is None:
                 pool = self._mem_pools[stem] = create_mem_pool(device)
-            with mem_pool_context(pool):
+            with mem_pool_context(pool, device):
                 if component is not None:
                     component.to(device=device)
                 if lora is not None:

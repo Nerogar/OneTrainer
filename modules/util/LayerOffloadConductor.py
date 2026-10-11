@@ -247,7 +247,7 @@ class StaticLayerAllocator:
             # create the cache tensor inside the MemPool so it lands in the pool's isolated segments. the buffers
             # are allocated lazily here (allocate_cache only sizes them), so the pool context wraps this
             # allocation rather than allocate_cache.
-            with mem_pool_context(self.__mem_pool):
+            with mem_pool_context(self.__mem_pool, self.device):
                 self.cache_tensors[cache_tensor_index] = \
                     torch.zeros((self.cache_tensor_size,), dtype=torch.int8, device=self.device)
 
