@@ -121,12 +121,11 @@ class StableDiffusion3ModelLoader(
             vae_model_name,
         )
 
-        transformer = self._load_diffusers_sub_module(
+        transformer = self._load_transformer(
             SD3Transformer2DModel,
-            weight_dtypes.transformer,
-            weight_dtypes.train_dtype,
+            weight_dtypes,
             base_model_name,
-            "transformer",
+            "",
             quantization,
         )
 

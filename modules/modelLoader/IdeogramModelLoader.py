@@ -50,12 +50,11 @@ class IdeogramModelLoader(
             include_unconditional_transformer: bool,
             quantization: QuantizationConfig,
     ):
-        transformer = self._load_diffusers_sub_module(
+        transformer = self._load_transformer(
             Ideogram4Transformer2DModel,
-            weight_dtypes.transformer,
-            weight_dtypes.train_dtype,
+            weight_dtypes,
             base_model_name,
-            "transformer",
+            "",
             quantization,
         )
         # the unconditional transformer is frozen and only used for the negative branch of the dual-network CFG at
