@@ -73,6 +73,7 @@ class BaseModelTabView(ABC):
             options.append(("int W8A8", DataType.INT_W8A8))
             if include_compressed:
                 options.append(("int W8A8 compressed", DataType.INT_W8A8_COMPRESSED))
+            options.append(("int W8A8 tilewise", DataType.INT_W8A8_TILEWISE))
 
         if include_gguf:
             options.append(("GGUF", DataType.GGUF))

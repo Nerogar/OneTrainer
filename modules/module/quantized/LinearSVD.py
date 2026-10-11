@@ -1,6 +1,6 @@
-from abc import abstractmethod
 from contextlib import suppress
 
+from modules.module.quantized.mixin.LoRAFusableLinearMixin import LoRAFusableLinearMixin
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 
@@ -10,13 +10,10 @@ import torch
 class BaseLinearSVD(
     QuantizedModuleMixin,
     QuantizedLinearMixin,
+    LoRAFusableLinearMixin,
 ):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-    @abstractmethod
-    def forward_with_lora(self, x: torch.Tensor, lora_down: torch.nn.Linear, lora_up: torch.nn.Linear, dropout: torch.nn.Dropout, alpha: float) -> torch.Tensor:
-        pass
 
 def _get_tensor_hash(t: torch.Tensor) -> str:
     t = t.flatten().to(torch.float32)
@@ -105,20 +102,44 @@ def make_svd_linear(linear_class):
             x_up = torch.nn.functional.linear(x_down, self.svd_up)
             return x_up + super().forward(x)
 
-        def forward_with_lora(self, x: torch.Tensor, lora_down: torch.nn.Linear, lora_up: torch.nn.Linear, dropout: torch.nn.Dropout, alpha: float) -> torch.Tensor:
+        def forward_with_lora(self, x: torch.Tensor, lora_down: torch.Tensor, lora_up: torch.Tensor, dropout: torch.nn.Dropout, alpha: torch.Tensor) -> torch.Tensor:
             assert self.__svd_is_quantized
             assert not self.svd_down.requires_grad and not self.svd_up.requires_grad
-            assert lora_down.bias is None and lora_up.bias is None
 
-            lora_rank = lora_down.weight.shape[0]
-            down_merged = torch.cat([lora_down.weight, self.svd_down], dim=0)
+            lora_rank = lora_down.shape[0]
+            flat = x.reshape(-1, x.shape[-1])
+            from modules.module.quantized.LinearW8A8 import LinearW8A8
+            #the fused kernel needs a LinearW8A8 base and enough tokens to beat the dense merge below
+            if flat.shape[0] > 16 and isinstance(self, LinearW8A8):
+                y = self.__fused_forward_with_lora(flat, lora_down, lora_up, dropout, alpha)
+                return y.reshape(x.shape[:-1] + (y.shape[-1], ))
+
+            #autocast casts the merged matrix to the compute dtype for the matmul anyway, so cast the
+            #halves before the cat instead of building an f32 buffer to narrow again
+            down_merged = torch.cat([lora_down.to(self.compute_dtype), self.svd_down.to(self.compute_dtype)], dim=0)
             x_down = torch.nn.functional.linear(x, down_merged)
             if dropout.p > 0.0 and self.training:
                 x_down[..., :lora_rank] = dropout(x_down[..., :lora_rank])
 
-            lora_up_scaled = lora_up.weight * (alpha / lora_rank)
-            up_merged = torch.cat([lora_up_scaled, self.svd_up], dim=1)
+            lora_up_scaled = (lora_up * (alpha / lora_rank)).to(self.compute_dtype)
+            up_merged = torch.cat([lora_up_scaled, self.svd_up.to(self.compute_dtype)], dim=1)
             x_up = torch.nn.functional.linear(x_down, up_merged)
             return x_up + super().forward(x)
+
+        #fuse both low-rank branches into the residual mm's epilogue: concat the LoRA and SVD
+        #down/up into one rank r_lora + r_svd operand, alpha folded into the LoRA up-block only
+        #and a dropout mask that's 1 on the svd columns, so only LoRA drops. x is 2D (flattened)
+        def __fused_forward_with_lora(self, x: torch.Tensor, lora_down: torch.Tensor, lora_up: torch.Tensor, dropout: torch.nn.Dropout, alpha: torch.Tensor) -> torch.Tensor:
+            lora_rank = lora_down.shape[0]
+
+            down_merged = torch.cat([lora_down.to(self.compute_dtype), self.svd_down.to(self.compute_dtype)], dim=0)
+            up_fused = torch.cat([(lora_up * (alpha / lora_rank)).to(self.compute_dtype), self.svd_up.to(self.compute_dtype)], dim=1).T
+            dropout_mask = None
+            if dropout.training and dropout.p > 0:
+                svd_rank = self.svd_down.shape[0]
+                lora_mask = dropout(torch.ones(x.shape[0], lora_rank, device=x.device, dtype=self.compute_dtype))
+                dropout_mask = torch.cat([lora_mask, torch.ones(x.shape[0], svd_rank, device=x.device, dtype=self.compute_dtype)], dim=1)
+
+            return self._fused_lora_forward(x, down_merged, up_fused, dropout_mask)
 
     return LinearSVD
