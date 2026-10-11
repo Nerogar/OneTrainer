@@ -9,6 +9,7 @@ from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleM
 from modules.util.config.TrainConfig import QuantizationConfig, TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.ModuleFilter import ModuleFilter
+from modules.util.tqdm_util import tqdm
 
 import torch
 from torch import Tensor, nn
@@ -16,7 +17,6 @@ from torch import Tensor, nn
 from diffusers.quantizers.gguf.utils import GGUFLinear, dequantize_gguf_tensor
 
 import accelerate
-from tqdm import tqdm
 
 try:
     from modules.module.quantized.LinearNf4 import LinearNf4
@@ -73,6 +73,14 @@ def quantize_fp8_axiswise(x: Tensor, dim: int) -> tuple[Tensor, Tensor]:
     scale = quantize_fp8_axiswise_get_scale(x, dim)
     q = quantize_fp8(x, scale)
     return q, scale
+
+def quantize_axiswise(x: Tensor, dim: int, dtype: torch.dtype) -> tuple[Tensor, Tensor]:
+    if dtype == torch.int8:
+        return quantize_int8_axiswise(x, dim)
+    elif dtype == torch.float8_e4m3fn:
+        return quantize_fp8_axiswise(x, dim)
+    else:
+        raise NotImplementedError(f"{dtype} is not an 8-bit quantization dtype")
 
 def dequantize(q: Tensor, scale: float | Tensor) -> Tensor:
     return q.float() * scale
