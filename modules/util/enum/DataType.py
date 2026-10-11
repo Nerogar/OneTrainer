@@ -14,6 +14,8 @@ class DataType(Enum):
     NFLOAT_4 = 'NFLOAT_4'
     FLOAT_W8A8 = 'FLOAT_W8A8'
     INT_W8A8 = 'INT_W8A8'
+    INT_W8A8_CONVROT = 'INT_W8A8_CONVROT'
+    INT_W8A8_CONVROT_COMPRESSED = 'INT_W8A8_CONVROT_COMPRESSED'
     FLOAT_W8A8_COMPRESSED = 'FLOAT_W8A8_COMPRESSED'
     INT_W8A8_COMPRESSED = 'INT_W8A8_COMPRESSED'
     GGUF = 'GGUF'
@@ -51,18 +53,22 @@ class DataType(Enum):
                 return DataType.FLOAT_W8A8
             case DataType.INT_W8A8_COMPRESSED:
                 return DataType.INT_W8A8
+            case DataType.INT_W8A8_CONVROT_COMPRESSED:
+                return DataType.INT_W8A8_CONVROT
             case _:
                 return self
 
     def is_compressed(self):
         return self in [DataType.FLOAT_W8A8_COMPRESSED,
-                        DataType.INT_W8A8_COMPRESSED]
+                        DataType.INT_W8A8_COMPRESSED,
+                        DataType.INT_W8A8_CONVROT_COMPRESSED]
 
     def is_quantized(self):
         return self.uncompressed() in [DataType.FLOAT_8,
                                        DataType.INT_8,
                                        DataType.FLOAT_W8A8,
                                        DataType.INT_W8A8,
+                                       DataType.INT_W8A8_CONVROT,
                                        DataType.NFLOAT_4]
 
     def is_gguf(self):
@@ -81,6 +87,9 @@ class DataType(Enum):
 
     def quantize_intW8A8(self):
         return self.uncompressed() == DataType.INT_W8A8
+
+    def quantize_intW8A8_convrot(self):
+        return self.uncompressed() == DataType.INT_W8A8_CONVROT
 
     def quantize_nf4(self):
         return self == DataType.NFLOAT_4
