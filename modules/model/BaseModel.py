@@ -162,13 +162,13 @@ class BaseModel(metaclass=ABCMeta):
             pool = self._mem_pools.get(stem)
             if pool is None:
                 pool = self._mem_pools[stem] = create_mem_pool(device)
-            with mem_pool_context(pool):
+            with mem_pool_context(pool, device):
                 if component is not None:
                     component.to(device=device)
                 if lora is not None:
                     lora.to(device=device)
         else:
-            # the target has no MemPool (CPU): move normally and drop this stem's pool from the earlier GPU move,
+            # the target has no MemPool (CPU) support: move normally and drop this stem's pool from the earlier GPU move,
             # so evict()'s torch_gc can release its segments
             if component is not None:
                 component.to(device=device)
