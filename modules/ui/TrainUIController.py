@@ -20,7 +20,7 @@ from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.profiling_util import PeakMemoryRecorder
-from modules.util.torch_util import torch_gc
+from modules.util.torch_util import print_fragmentation, torch_gc
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ui.validation import flush_and_validate_all
 
@@ -258,8 +258,8 @@ class TrainUIController:
             error_caught = True
             traceback.print_exc()
         finally:
-            # print_fragmentation("training run, at stop")
-            pass
+            if self.train_config.debug_mode or os.environ.get("OT_DEBUG_PROFILES"):
+                print_fragmentation("training run, at stop")
 
         trainer.end()
 
@@ -272,7 +272,8 @@ class TrainUIController:
         torch_gc()
 
         # after trainer.end() + torch_gc: quantifies the reserved-but-unallocated that persists through unload
-        # print_fragmentation("training run, after unload")
+        if self.train_config.debug_mode or os.environ.get("OT_DEBUG_PROFILES"):
+            print_fragmentation("training run, after unload")
 
         if error_caught:
             self.on_update_status("Error: check the console for details")

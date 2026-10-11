@@ -1,3 +1,4 @@
+import os
 from abc import ABCMeta
 from contextlib import nullcontext
 from uuid import uuid4
@@ -11,7 +12,7 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.modelSpec.ModelSpec import ModelSpec
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
-from modules.util.torch_util import device_equals, torch_gc
+from modules.util.torch_util import device_equals, print_fragmentation, torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -115,7 +116,8 @@ class BaseModel(metaclass=ABCMeta):
         for part in parts or self.model_type.model_parts():
             self._move_part(part, self.temp_device)
         torch_gc()
-        # print_fragmentation(f"evict({', '.join(parts) or 'all'})")
+        if (self.train_config is not None and self.train_config.debug_mode) or os.environ.get("OT_DEBUG_PROFILES"):
+            print_fragmentation(f"evict({', '.join(parts) or 'all'})")
 
     def materialize_only(self, *parts: str):
         # Materialize exactly `parts` on train_device; evict every other component in ModelType.model_parts()
