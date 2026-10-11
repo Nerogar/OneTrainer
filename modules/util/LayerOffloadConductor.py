@@ -247,7 +247,7 @@ class StaticLayerAllocator:
             # create the cache tensor inside the MemPool so it lands in the pool's isolated segments. the buffers
             # are allocated lazily here (allocate_cache only sizes them), so the pool context wraps this
             # allocation rather than allocate_cache.
-            with mem_pool_context(self.__mem_pool):
+            with mem_pool_context(self.__mem_pool, device=self.device):
                 self.cache_tensors[cache_tensor_index] = \
                     torch.zeros((self.cache_tensor_size,), dtype=torch.int8, device=self.device)
 
@@ -1012,7 +1012,7 @@ class LayerOffloadConductor:
                 # there fragments it and strands the region when the remainder is evicted. A weight from cpu/temp (warm
                 # cache_in_ram re-activate) lands in the pool directly; one already on the train device is relocated
                 # with a clone.
-                with mem_pool_context(pool):
+                with mem_pool_context(pool, device=device):
                     return t.clone() if device_equals(t.device, device) else t.to(device=device)
 
             return t.to(device=device)
@@ -1029,7 +1029,7 @@ class LayerOffloadConductor:
         pool = self.__train_device_layer_allocator.mem_pool
 
         def pool_clone(tensor):
-            with mem_pool_context(pool):
+            with mem_pool_context(pool, device=tensor.device):
                 return tensor.clone()
 
         layer_modules = {module for layer in self.__layers for module in layer.modules()}

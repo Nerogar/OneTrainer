@@ -191,7 +191,7 @@ def stream_module_from_checkpoint(
             target = _intended_float_dtype(sub_module, module_name, tensor_name, dtype, train_dtype, keep_in_fp32_modules)
             if target is not None:
                 value = value.to(dtype=target)
-        with mem_pool_context(dest_pool_for(sub_module)):
+        with mem_pool_context(dest_pool_for(sub_module), device=device):
             set_module_tensor_to_device(sub_module, tensor_name, device, value=value, dtype=value.dtype)
         # quantize outside the pool context so a quantized module's dequant scratch stays in the default pool
         if quantize:
@@ -251,7 +251,7 @@ def stream_module_from_checkpoint(
             target_module = module.get_submodule(parent_path)
             if target_module._parameters[target_name].is_meta:
                 source = module.get_parameter(source_key)
-                with mem_pool_context(dest_pool_for(target_module)):
+                with mem_pool_context(dest_pool_for(target_module), device=device):
                     set_module_tensor_to_device(
                         target_module, target_name, device, value=source.detach().clone(), dtype=source.dtype)
                 if quantize:
@@ -264,7 +264,7 @@ def stream_module_from_checkpoint(
             for buffer_name in sub_module._non_persistent_buffers_set:
                 buffer = sub_module._buffers.get(buffer_name)
                 if buffer is not None and not buffer.is_meta:
-                    with mem_pool_context(dest_pool_for(sub_module)):
+                    with mem_pool_context(dest_pool_for(sub_module), device=device):
                         sub_module._buffers[buffer_name] = buffer.to(device)
 
     # a tensor whose key did not resolve stays on the meta skeleton, and would only surface deep inside the first

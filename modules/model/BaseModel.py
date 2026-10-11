@@ -164,67 +164,67 @@ class BaseModel(metaclass=ABCMeta):
         self.materialize_only(*self.model_type.text_encoder_parts())
 
     def _move_part(self, part: str, device: torch.device) -> bool:
-        # Move a component (`part`, or `part_1` for the first of several split text encoders) and its LoRA. The
-        # dispatch below routes through an offload conductor and/or a disk-stream materialize closure if present.
-        # Returns whether any weight actually moved: each of the three paths is idempotent and a repeat call is
-        # common (materialize_only states a set, not a delta), so the caller needs to know whether this one did
-        # anything before paying for a collection.
-        stem = f"{part}_1" if hasattr(self, f"{part}_1") else part
+            # Move a component (`part`, or `part_1` for the first of several split text encoders) and its LoRA. The
+            # dispatch below routes through an offload conductor and/or a disk-stream materialize closure if present.
+            # Returns whether any weight actually moved: each of the three paths is idempotent and a repeat call is
+            # common (materialize_only states a set, not a delta), so the caller needs to know whether this one did
+            # anything before paying for a collection.
+            stem = f"{part}_1" if hasattr(self, f"{part}_1") else part
 
-        conductor = self.offload_conductor.get(stem)
-        materialize_fn = self.materialize_fn.get(stem)
-        cache_in_ram = self.cache_in_ram.get(stem, True)
+            conductor = self.offload_conductor.get(stem)
+            materialize_fn = self.materialize_fn.get(stem)
+            cache_in_ram = self.cache_in_ram.get(stem, True)
 
-        moved = False
-        if conductor is not None:
-            if device_equals(device, self.temp_device):
-                to_meta = materialize_fn is not None and not cache_in_ram
-                moved = conductor.evict(to_meta=to_meta)
-            else:
-                assert device_equals(device, self.train_device), f"unexpected device {device} for part {part}"
+            moved = False
+            if conductor is not None:
+                if device_equals(device, self.temp_device):
+                    to_meta = materialize_fn is not None and not cache_in_ram
+                    moved = conductor.evict(to_meta=to_meta)
+                else:
+                    assert device_equals(device, self.train_device), f"unexpected device {device} for part {part}"
+                    train_dtype = getattr(self, f"{stem}_train_dtype", self.train_dtype)
+                    moved = conductor.materialize(
+                        train_dtype, name=part, materialize_fn=materialize_fn,
+                        cache_in_ram=cache_in_ram)
+            elif materialize_fn is not None:
+                streamed_component = getattr(self, stem)
                 train_dtype = getattr(self, f"{stem}_train_dtype", self.train_dtype)
-                moved = conductor.materialize(
-                    train_dtype, name=part, materialize_fn=materialize_fn,
-                    cache_in_ram=cache_in_ram)
-        elif materialize_fn is not None:
-            streamed_component = getattr(self, stem)
-            train_dtype = getattr(self, f"{stem}_train_dtype", self.train_dtype)
-            moved = stream_module_to(
-                streamed_component, device, materialize_fn, train_dtype,
-                cache_in_ram=cache_in_ram, name=part, temp_device=self.temp_device)
+                moved = stream_module_to(
+                    streamed_component, device, materialize_fn, train_dtype,
+                    cache_in_ram=cache_in_ram, name=part, temp_device=self.temp_device)
 
-        # move into the shared stem pool: the base component itself (unless a conductor or stream owns its move) plus
-        # the LoRA. getattr(self, stem) is None for a part in model_parts() that was never populated (e.g. an omitted
-        # text encoder), so it drops out below.
-        to_move = []
-        if conductor is None and materialize_fn is None:
-            to_move.append(getattr(self, stem))
-        lora = getattr(self, f"{stem}_lora", None)
-        to_move.append(lora)
-        to_move = [module for module in to_move if module is not None]
-        if not to_move:
-            return moved
+            # move into the shared stem pool: the base component itself (unless a conductor or stream owns its move) plus
+            # the LoRA. getattr(self, stem) is None for a part in model_parts() that was never populated (e.g. an omitted
+            # text encoder), so it drops out below.
+            to_move = []
+            if conductor is None and materialize_fn is None:
+                to_move.append(getattr(self, stem))
+            lora = getattr(self, f"{stem}_lora", None)
+            to_move.append(lora)
+            to_move = [module for module in to_move if module is not None]
+            if not to_move:
+                return moved
 
-        moved |= any(not _module_is_on(module, device) for module in to_move)
+            moved |= any(not _module_is_on(module, device) for module in to_move)
 
-        if supports_mem_pool(device):
-            # The component (when not conductor/stream-managed) and its LoRA share a per-stem MemPool so both release
-            # together on evict, keeping the LoRA's small tensors from pinning freed default-pool segments across the
-            # part's evict/reload cycle. A conductor keeps its own pool, so the stem pool then holds only the LoRA.
-            pool = self._mem_pools.get(stem)
-            if pool is None:
-                pool = self._mem_pools[stem] = create_mem_pool(device)
-            with mem_pool_context(pool):
+            if supports_mem_pool(device):
+                # The component (when not conductor/stream-managed) and its LoRA share a per-stem MemPool so both release
+                # together on evict, keeping the LoRA's small tensors from pinning freed default-pool segments across the
+                # part's evict/reload cycle. A conductor keeps its own pool, so the stem pool then holds only the LoRA.
+                pool = self._mem_pools.get(stem)
+                if pool is None:
+                    pool = self._mem_pools[stem] = create_mem_pool(device)
+                with mem_pool_context(pool, device=device):
+                    for module in to_move:
+                        module.to(device=device)
+            else:
+                # the target has no MemPool (CPU): move normally and drop this stem's pool from the earlier GPU move,
+                # so evict()'s torch_gc can release its segments
                 for module in to_move:
                     module.to(device=device)
-        else:
-            # the target has no MemPool (CPU): move normally and drop this stem's pool from the earlier GPU move,
-            # so evict()'s torch_gc can release its segments
-            for module in to_move:
-                module.to(device=device)
-            self._mem_pools.pop(stem, None)
+                self._mem_pools.pop(stem, None)
 
-        return moved
+            return moved
 
     def eval(self):
         # Put every present component on eval(); driven by the same part registry as materialize()/evict().
