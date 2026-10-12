@@ -111,8 +111,8 @@ def build_muon_adam_key_fn(
     return param_map
 
 def split_parameters_for_muon(
+    model: BaseModel,
     parameters: list[dict],
-    layer_key_fn: dict[int, str],
     config: TrainConfig,
 ) -> tuple[list[dict], bool]:
     """
@@ -122,6 +122,8 @@ def split_parameters_for_muon(
     optimizer_config = config.optimizer
 
     has_adam_params = False
+    layer_key_fn = build_muon_adam_key_fn(model, config)
+
     if layer_key_fn:
         for group in parameters:
             for p in group['params']:
