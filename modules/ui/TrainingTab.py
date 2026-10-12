@@ -707,7 +707,7 @@ class TrainingTab:
             row += 1
 
         components.label(frame, row, 0, "CEP Gamma",
-                         tooltip="Conditional Embedding Perturbation. Inject a slight noise into the TEs outputs to enhance the quality, diversity, and fidelity of the generated images. Gamma controls perturbation noise magnitude, paper's default is 1.")
+                         tooltip="Conditional Embedding Perturbation. Inject a slight noise into the TEs outputs to enhance the quality, diversity, and fidelity of the generated images. Gamma controls perturbation noise magnitude, recommended value: 0.02 (2% noise).")
         components.entry(frame, row, 1, self.ui_state, "cep_gamma", required=True)
         row += 1
 
