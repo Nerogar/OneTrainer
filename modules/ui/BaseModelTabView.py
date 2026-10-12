@@ -35,6 +35,7 @@ class BaseModelTabView(ABC):
             has_transformer="transformer" in parts,
             allow_override_transformer=controller.supports_override_transformer(),
             has_unconditional_transformer="unconditional_transformer" in parts,
+            allow_override_unconditional_transformer=hasattr(controller, "supports_override_unconditional_transformer") and controller.supports_override_unconditional_transformer(),
             has_text_encoder=not model_type.has_multiple_text_encoders(),
             has_text_encoder_1=model_type.has_multiple_text_encoders(),
             has_text_encoder_2="text_encoder_2" in parts,
@@ -142,6 +143,7 @@ class BaseModelTabView(ABC):
             has_transformer: bool = False,
             allow_override_transformer: bool = False,
             has_unconditional_transformer: bool = False,
+            allow_override_unconditional_transformer: bool = False,
             allow_override_text_encoder_4: bool = False,
             has_text_encoder: bool = False,
             has_text_encoder_1: bool = False,
@@ -197,10 +199,19 @@ class BaseModelTabView(ABC):
             row += 1
 
         if has_unconditional_transformer:
+            if allow_override_unconditional_transformer:
+                # unconditional transformer model
+                self.components.label(frame, row, 0, "Override Uncond. Transformer / GGUF",
+                                 tooltip="Can be used to override the unconditional transformer in the base model. Safetensors and GGUF files are supported.")
+                self.components.path_entry(
+                    frame, row, 1, ui_state, "unconditional_transformer.model_name",
+                    mode="file", path_modifier=path_util.json_path_modifier
+                )
+
             # unconditional transformer weight dtype
             self.components.label(frame, row, 3, "Unconditional Transformer Data Type",
                              tooltip="The weight data type of the unconditional transformer, used for the negative branch of CFG during sampling")
-            self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_a8=True, include_compressed=include_compressed),
+            self.components.options_kv(frame, row, 4, self.__create_dtype_options(include_gguf=True, include_a8=True, include_compressed=include_compressed),
                                   ui_state, "unconditional_transformer.weight_dtype")
 
             row += 1
