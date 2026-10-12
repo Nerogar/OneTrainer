@@ -14,10 +14,6 @@ from modules.util.checkpointing_util import (
     enable_checkpointing_for_mistral_encoder_layers,
 )
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
-from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.quantization_util import quantize_layers
-from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -45,34 +41,12 @@ class BaseErnieSetup(
             model: ErnieModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
-            model.transformer_offload_conductor = \
-                enable_checkpointing_for_ernie_transformer(model.transformer, config)
-            model.text_encoder_offload_conductor = \
-                enable_checkpointing_for_mistral_encoder_layers(model.text_encoder, config)
+        super().setup_optimizations(model, config)
+        self._setup_model_part(model, config, "transformer", config.transformer, enable_checkpointing_for_ernie_transformer)
+        self._setup_model_part(model, config, "text_encoder", config.text_encoder, enable_checkpointing_for_mistral_encoder_layers, disable_fp16_autocast=True)
+        self._setup_model_part(model, config, "vae", config.vae)
 
-        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().transformer,
-            config.weight_dtypes().text_encoder,
-            config.weight_dtypes().vae,
-            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-        ], config.enable_autocast_cache)
-
-        model.text_encoder_autocast_context, model.text_encoder_train_dtype = \
-            disable_fp16_autocast_context(
-                self.train_device,
-                config.train_dtype,
-                config.fallback_train_dtype,
-                [
-                    config.weight_dtypes().text_encoder,
-                    config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-                ],
-                config.enable_autocast_cache,
-            )
-
-        quantize_layers(model.text_encoder, self.train_device, model.text_encoder_train_dtype, config)
-        quantize_layers(model.vae, self.train_device, model.train_dtype, config)
-        quantize_layers(model.transformer, self.train_device, model.train_dtype, config)
+        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=True)
 
     def predict(
             self,
@@ -105,10 +79,11 @@ class BaseErnieSetup(
                 )
 
             # Patchify: [B, 32, H, W] -> [B, 128, H/2, W/2]
-            latent_image = model.patchify_latents(batch['latent_image'].float())
-            latent_height = latent_image.shape[-2]
-            latent_width = latent_image.shape[-1]
-            scaled_latent_image = model.scale_latents(latent_image)
+            patchified_latent_image = model.patchify_latents(batch['latent_image'].float())
+            # calculate_timestep_shift patchifies by 2 internally, so its token count is over the raw VAE latent dims.
+            latent_height = batch['latent_image'].shape[-2]
+            latent_width = batch['latent_image'].shape[-1]
+            scaled_latent_image = model.scale_latents(patchified_latent_image)
 
             latent_noise = self._create_noise(scaled_latent_image, config, generator)
 
@@ -175,7 +150,5 @@ class BaseErnieSetup(
         ).mean()
 
     def prepare_text_caching(self, model: ErnieModel, config: TrainConfig):
-        model.to(self.temp_device)
-        model.text_encoder_to(self.train_device)
+        model.materialize_only("text_encoder")
         model.eval()
-        torch_gc()

@@ -86,7 +86,9 @@ class WuerstchenModelSaver(
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 self.__save_diffusers(model, output_model_destination, dtype)
-            case ModelFormat.SAFETENSORS:
+            case ModelFormat.LEGACY_SAFETENSORS:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)
+            case _:
+                raise NotImplementedError(f"Unsupported output format: {output_model_format}")

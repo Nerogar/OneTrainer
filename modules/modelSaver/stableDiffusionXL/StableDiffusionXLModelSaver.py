@@ -52,7 +52,8 @@ class StableDiffusionXLModelSaver(
             model.unet.state_dict(),
             model.text_encoder_1.state_dict(),
             model.text_encoder_2.state_dict(),
-            model.noise_scheduler
+            model.noise_scheduler,
+            model.checkpoint_diffusers_to_original(),
         )
         save_state_dict = self._convert_state_dict_dtype(state_dict, dtype)
         self._convert_state_dict_to_contiguous(save_state_dict)
@@ -82,7 +83,9 @@ class StableDiffusionXLModelSaver(
         match output_model_format:
             case ModelFormat.DIFFUSERS:
                 self.__save_diffusers(model, output_model_destination, dtype)
-            case ModelFormat.SAFETENSORS:
+            case ModelFormat.LEGACY_SAFETENSORS | ModelFormat.ORIGINAL_SINGLE_FILE:
                 self.__save_safetensors(model, output_model_destination, dtype)
             case ModelFormat.INTERNAL:
                 self.__save_internal(model, output_model_destination)
+            case _:
+                raise NotImplementedError(f"Unsupported output format: {output_model_format}")

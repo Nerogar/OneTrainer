@@ -18,8 +18,23 @@ def main():
     commands = TrainCommands()
 
     train_config = TrainConfig.default_values()
+
+    if args.preset_path is not None:
+        with open(args.preset_path, "r") as f:
+            train_config.from_dict(json.load(f), migrate=False)
+
     with open(args.config_path, "r") as f:
-        train_config.from_dict(json.load(f))
+        train_config.from_dict(json.load(f), migrate=args.preset_path is None)
+
+    for config_value in args.config_values or []:
+        key, _, value = config_value.partition("=")
+        *parent_keys, leaf_key = key.split(".")
+        target = train_config
+        for parent_key in parent_keys:
+            target = getattr(target, parent_key)
+        if target.types[leaf_key] is bool:
+            value = value.lower() in ("true", "1", "yes")
+        target.from_dict({leaf_key: value}, migrate=False)
 
     try:
         with open("secrets.json" if args.secrets_path is None else args.secrets_path, "r") as f:

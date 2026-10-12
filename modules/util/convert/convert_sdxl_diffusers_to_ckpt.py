@@ -1,86 +1,17 @@
 import modules.util.convert.convert_diffusers_to_ckpt_util as util
+from modules.util.convert_util import add_prefix, convert
 
 import torch
 
 from diffusers import DDIMScheduler
 
 
-def __map_unet_down_blocks(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
-    out_states = {}
-
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "1.0"), util.combine(in_prefix, "0.resnets.0"))
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "2.0"), util.combine(in_prefix, "0.resnets.1"))
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "3.0.op"), util.combine(in_prefix, "0.downsamplers.0.conv"))
-
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "4.0"), util.combine(in_prefix, "1.resnets.0"))
-    out_states |= util.map_unet_transformer(in_states, util.combine(out_prefix, "4.1"), util.combine(in_prefix, "1.attentions.0"), 2)
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "5.0"), util.combine(in_prefix, "1.resnets.1"))
-    out_states |= util.map_unet_transformer(in_states, util.combine(out_prefix, "5.1"), util.combine(in_prefix, "1.attentions.1"), 2)
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "6.0.op"), util.combine(in_prefix, "1.downsamplers.0.conv"))
-
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "7.0"), util.combine(in_prefix, "2.resnets.0"))
-    out_states |= util.map_unet_transformer(in_states, util.combine(out_prefix, "7.1"), util.combine(in_prefix, "2.attentions.0"), 10)
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "8.0"), util.combine(in_prefix, "2.resnets.1"))
-    out_states |= util.map_unet_transformer(in_states, util.combine(out_prefix, "8.1"), util.combine(in_prefix, "2.attentions.1"), 10)
-
-    return out_states
-
-
-def __map_unet_mid_block(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
-    out_states = {}
-
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "0"), util.combine(in_prefix, "resnets.0"))
-    out_states |= util.map_unet_transformer(in_states, util.combine(out_prefix, "1"), util.combine(in_prefix, "attentions.0"), 10)
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "2"), util.combine(in_prefix, "resnets.1"))
-
-    return out_states
-
-
-def __map_unet_up_block(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
-    out_states = {}
-
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "0.0"), util.combine(in_prefix, "0.resnets.0"))
-    out_states |= util.map_unet_transformer(in_states, util.combine(out_prefix, "0.1"), util.combine(in_prefix, "0.attentions.0"), 10)
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "1.0"), util.combine(in_prefix, "0.resnets.1"))
-    out_states |= util.map_unet_transformer(in_states, util.combine(out_prefix, "1.1"), util.combine(in_prefix, "0.attentions.1"), 10)
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "2.0"), util.combine(in_prefix, "0.resnets.2"))
-    out_states |= util.map_unet_transformer(in_states, util.combine(out_prefix, "2.1"), util.combine(in_prefix, "0.attentions.2"), 10)
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "2.2.conv"), util.combine(in_prefix, "0.upsamplers.0.conv"))
-
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "3.0"), util.combine(in_prefix, "1.resnets.0"))
-    out_states |= util.map_unet_transformer(in_states, util.combine(out_prefix, "3.1"), util.combine(in_prefix, "1.attentions.0"), 2)
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "4.0"), util.combine(in_prefix, "1.resnets.1"))
-    out_states |= util.map_unet_transformer(in_states, util.combine(out_prefix, "4.1"), util.combine(in_prefix, "1.attentions.1"), 2)
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "5.0"), util.combine(in_prefix, "1.resnets.2"))
-    out_states |= util.map_unet_transformer(in_states, util.combine(out_prefix, "5.1"), util.combine(in_prefix, "1.attentions.2"), 2)
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "5.2.conv"), util.combine(in_prefix, "1.upsamplers.0.conv"))
-
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "6.0"), util.combine(in_prefix, "2.resnets.0"))
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "7.0"), util.combine(in_prefix, "2.resnets.1"))
-    out_states |= util.map_unet_resnet_block(in_states, util.combine(out_prefix, "8.0"), util.combine(in_prefix, "2.resnets.2"))
-
-    return out_states
-
-
-def __map_unet(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
-    out_states = {}
-
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "input_blocks.0.0"), util.combine(in_prefix, "conv_in"))
-
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "time_embed.0"), util.combine(in_prefix, "time_embedding.linear_1"))
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "time_embed.2"), util.combine(in_prefix, "time_embedding.linear_2"))
-
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "label_emb.0.0"), util.combine(in_prefix, "add_embedding.linear_1"))
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "label_emb.0.2"), util.combine(in_prefix, "add_embedding.linear_2"))
-
-    out_states |= __map_unet_down_blocks(in_states, util.combine(out_prefix, "input_blocks"), util.combine(in_prefix, "down_blocks"))
-    out_states |= __map_unet_mid_block(in_states, util.combine(out_prefix, "middle_block"), util.combine(in_prefix, "mid_block"))
-    out_states |= __map_unet_up_block(in_states, util.combine(out_prefix, "output_blocks"), util.combine(in_prefix, "up_blocks"))
-
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "out.0"), util.combine(in_prefix, "conv_norm_out"))
-    out_states |= util.map_wb(in_states, util.combine(out_prefix, "out.2"), util.combine(in_prefix, "conv_out"))
-
-    return out_states
+def __map_unet(unet_state_dict: dict, out_prefix: str, conversion: list) -> dict:
+    # the diffusers -> original/sgm UNet key map is provided by the caller
+    # (model.checkpoint_diffusers_to_original(), == the LoRA body for SDXL since there is no fusion).
+    # Verified byte-identical to the old hand-rolled __map_unet_* helpers.
+    sgm_state_dict = convert(unet_state_dict, conversion, strict=True)
+    return convert(sgm_state_dict, add_prefix(out_prefix), strict=False)
 
 
 def __map_text_encoder_1(in_states: dict, out_prefix: str, in_prefix: str) -> dict:
@@ -150,11 +81,12 @@ def convert_sdxl_diffusers_to_ckpt(
         text_encoder_1_state_dict: dict,
         text_encoder_2_state_dict: dict,
         noise_scheduler: DDIMScheduler,
+        conversion: list,
 ) -> dict:
     state_dict = {}
 
     state_dict |= util.map_vae(vae_state_dict, "first_stage_model", "")
-    state_dict |= __map_unet(unet_state_dict, "model.diffusion_model", "")
+    state_dict |= __map_unet(unet_state_dict, "model.diffusion_model", conversion)
     state_dict |= __map_text_encoder_1(text_encoder_1_state_dict, "conditioner.embedders.0.transformer", "")
     state_dict |= __map_text_encoder_2(text_encoder_2_state_dict, "conditioner.embedders.1", "text_model")
     state_dict |= util.map_noise_scheduler(noise_scheduler)

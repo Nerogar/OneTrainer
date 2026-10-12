@@ -11,8 +11,6 @@ from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
 from modules.util.TrainProgress import TrainProgress
 
-import torch
-
 
 @factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15, TrainingMethod.LORA)
 @factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.LORA)
@@ -25,18 +23,6 @@ import torch
 class StableDiffusionLoRASetup(
     BaseStableDiffusionSetup,
 ):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
-    ):
-        super().__init__(
-            train_device=train_device,
-            temp_device=temp_device,
-            debug_mode=debug_mode,
-        )
-
     def create_parameters(
             self,
             model: StableDiffusionModel,
@@ -77,13 +63,13 @@ class StableDiffusionLoRASetup(
         if config.train_any_embedding():
             model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te")
+        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
         model.text_encoder_lora = LoRAModuleWrapper(
-            model.text_encoder, "lora_te", config
+            model.text_encoder, "text_encoder", config
         ) if create_te else None
 
         model.unet_lora = LoRAModuleWrapper(
-            model.unet, "lora_unet", config, config.layer_filter.split(",")
+            model.unet, "unet", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:
@@ -125,10 +111,14 @@ class StableDiffusionLoRASetup(
             or config.train_any_embedding() \
             or not config.latent_caching
 
-        model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
-        model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
-        model.unet_to(self.train_device)
-        model.depth_estimator_to(self.temp_device)
+        parts = ["unet"]
+        if text_encoder_on_train_device:
+            parts.append("text_encoder")
+        if vae_on_train_device:
+            parts.append("vae")
+        model.materialize_only(*parts)
+        if model.depth_estimator is not None:
+            model.depth_estimator.to(self.temp_device)
 
         if config.text_encoder.train:
             model.text_encoder.train()

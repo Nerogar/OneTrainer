@@ -1,7 +1,2 @@
-# ignores everything except the builtin config files starting with #
-*
-!.gitignore
-!\#*
-
-# #.json is an exception (from the exception). This file stores the ui state from a previous run.
+# per-machine last-session state, regenerated every run, never meant to be shared
 \#.json

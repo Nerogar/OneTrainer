@@ -13,6 +13,8 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModelNames import ModelNames
 from modules.util.torch_util import default_device
 
+import torch
+
 
 def main():
     args = SampleArgs.parse_args()
@@ -22,9 +24,13 @@ def main():
     train_config = TrainConfig.default_values()
     train_config.optimizer.optimizer = None
     train_config.ema = EMAMode.OFF
+    train_config.train_device = str(device)
+    train_config.temp_device = "cpu"
+
+    temp_device = torch.device(train_config.temp_device)
 
     model_loader = create.create_model_loader(args.model_type, training_method=training_method)
-    model_setup = create.create_model_setup(args.model_type, device, device, training_method=training_method)
+    model_setup = create.create_model_setup(args.model_type, device, temp_device, training_method=training_method)
 
     print("Loading model " + args.base_model_name)
     weight_dtypes = args.weight_dtypes()
@@ -32,19 +38,19 @@ def main():
     model = model_loader.load(
         model_type=args.model_type,
         model_names=ModelNames(base_model=args.base_model_name),
-        weight_dtypes=weight_dtypes
+        weight_dtypes=weight_dtypes,
+        quantization=train_config.quantization,
     )
     model.train_config = train_config
 
     model_setup.setup_model(model, train_config)
 
-    model.to(device)
     model.eval()
     model.train_dtype = args.weight_dtype
 
     model_sampler = create.create_model_sampler(
         train_device=device,
-        temp_device=device,
+        temp_device=temp_device,
         model=model,
         model_type=args.model_type,
     )

@@ -4,14 +4,17 @@ script_imports()
 
 from uuid import uuid4
 
-from modules.util import create
+from modules.util import create, huggingface_util
 from modules.util.args.ConvertModelArgs import ConvertModelArgs
+from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ModelNames import EmbeddingName, ModelNames
 
 
 def main():
     args = ConvertModelArgs.parse_args()
+
+    huggingface_util.configure_hub(args.huggingface_token)
 
     model_loader = create.create_model_loader(model_type=args.model_type, training_method=args.training_method)
     model_saver = create.create_model_saver(model_type=args.model_type, training_method=args.training_method)
@@ -24,15 +27,18 @@ def main():
                 base_model=args.input_name,
             ),
             weight_dtypes=args.weight_dtypes(),
+            quantization=QuantizationConfig.default_values(),
         )
     elif args.training_method in [TrainingMethod.LORA, TrainingMethod.EMBEDDING]:
         model = model_loader.load(
             model_type=args.model_type,
             model_names=ModelNames(
+                base_model=args.base_model_name or None,
                 lora=args.input_name,
                 embedding=EmbeddingName(str(uuid4()), args.input_name),
             ),
             weight_dtypes=args.weight_dtypes(),
+            quantization=QuantizationConfig.default_values(),
         )
     else:
         raise Exception("could not load model: " + args.input_name)

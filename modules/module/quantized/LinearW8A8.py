@@ -1,4 +1,5 @@
 
+from modules.module.quantized.mixin.CompressedWeightMixin import CompressedWeightMixin
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.mm_8bit import mm_8bit as mm_8bit
@@ -47,40 +48,41 @@ def fp8_backward_axiswise(output: Tensor, weight: Tensor, weight_scale: Tensor) 
     return mm_res.float().mul_(weight_scale * output_scale).to(output.dtype)
 
 
-class LinearInt8Function(torch.autograd.Function):
+class LinearW8A8Function(torch.autograd.Function):
+    #int8 and fp8 differ only in which math runs, and the quantized weight already carries the dtype
     @staticmethod
     def forward(ctx, x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
+        # `weight` is the decompressed weight, so saving it keeps a full-size copy alive until backward.
+        # Under reentrant checkpointing that copy lives only inside the recomputed segment, and not saving
+        # it would cost a second decode: there is no partitioner, so recompute would decode once for the
+        # forward and backward would decode again.
+        # TODO once offloading uses non-reentrant checkpointing, consider not saving the decompressed
+        # weight and decoding in backward() instead.
         ctx.save_for_backward(weight, weight_scale)
-        return int8_forward_tokenwise(x, weight, weight_scale, bias, compute_dtype)
+        if weight.dtype == torch.int8:
+            return int8_forward_tokenwise(x, weight, weight_scale, bias, compute_dtype)
+        else:
+            return fp8_forward_tokenwise(x, weight, weight_scale, bias, compute_dtype)
 
     @staticmethod
     def backward(ctx, output: Tensor):
         if ctx.needs_input_grad != (True, False, False, False, False):
-            raise NotImplementedError("Int A8W8 cannot be used for full finetuning")
+            raise NotImplementedError("Int/Float A8W8 cannot be used for full finetuning")
 
         weight, weight_scale = ctx.saved_tensors
-        return int8_backward_axiswise(output, weight, weight_scale), None, None, None, None
+        if weight.dtype == torch.int8:
+            return int8_backward_axiswise(output, weight, weight_scale), None, None, None, None
+        else:
+            return fp8_backward_axiswise(output, weight, weight_scale), None, None, None, None
 
-class LinearFp8Function(torch.autograd.Function):
-    @staticmethod
-    def forward(ctx, x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
-        ctx.save_for_backward(weight, weight_scale)
-        return fp8_forward_tokenwise(x, weight, weight_scale, bias, compute_dtype)
-
-    @staticmethod
-    def backward(ctx, output: Tensor):
-        if ctx.needs_input_grad != (True, False, False, False, False):
-            raise NotImplementedError("Float A8W8 cannot be used for full finetuning")
-
-        weight, weight_scale = ctx.saved_tensors
-        return fp8_backward_axiswise(output, weight, weight_scale), None, None, None, None
 
 class LinearW8A8(
     nn.Linear,
     QuantizedModuleMixin,
     QuantizedLinearMixin,
+    CompressedWeightMixin,
 ):
-    def __init__(self, dtype, *args, **kwargs):
+    def __init__(self, dtype: torch.dtype, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         assert dtype in [torch.int8, torch.float8_e4m3fn]
@@ -90,11 +92,17 @@ class LinearW8A8(
         self.compute_dtype = None
         self.register_buffer("scale", torch.tensor(1.0, dtype=torch.float32))
 
+        self._init_compressed_state()
+
     def original_weight_shape(self) -> tuple[int, ...]:
+        if self._compressed:
+            return self._weight_shape
         return self.weight.shape
 
     def unquantized_weight(self, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
-        return dequantize(self.weight.detach(), self.scale).to(dtype)
+        weight = self._decompress(self.weight.detach()) if self._compressed else self.weight.detach()
+        # 'scale' is not offloaded, so it can sit on the train device while 'weight' is parked on the temp device
+        return dequantize(weight, self.scale.to(device=weight.device)).to(dtype)
 
     @torch.no_grad()
     def quantize(self, device: torch.device | None = None):
@@ -119,18 +127,20 @@ class LinearW8A8(
 
         self.scale.copy_(scale)
 
+        if self.compress:
+            self._compress_weight(device=device)
+
     def forward(self, x_orig: torch.Tensor) -> torch.Tensor:
         assert not self.weight.requires_grad
         assert self.__is_quantized
         x = x_orig.reshape(-1, x_orig.shape[-1])
 
+        weight = self._decompress(self.weight.detach()) if self._compressed else self.weight
+
         if x.shape[0] > 16:
-            if self._dtype == torch.int8:
-                y = LinearInt8Function.apply(x, self.weight, self.scale, self.bias, self.compute_dtype)
-            else:
-                y = LinearFp8Function.apply(x, self.weight, self.scale, self.bias, self.compute_dtype)
+            y = LinearW8A8Function.apply(x, weight, self.scale, self.bias, self.compute_dtype)
         else:
-            w = dequantize(self.weight.detach(), self.scale)
+            w = dequantize(weight.detach(), self.scale)
             y = torch.nn.functional.linear(x, w, self.bias)
 
         return y.reshape(x_orig.shape[:-1] + (y.shape[-1], ))

@@ -1,5 +1,6 @@
 import json
 import os.path
+from pathlib import Path
 from typing import Any
 
 
@@ -57,3 +58,8 @@ def is_supported_video_extension(extension: str) -> bool:
 
 def supported_caption_extensions() -> set[str]:
     return SUPPORTED_CAPTION_EXTENSIONS
+
+
+def json_path_modifier(x: str | Path) -> Path:
+    x = Path(x).absolute()
+    return x.parent if x.suffix == ".json" else x
