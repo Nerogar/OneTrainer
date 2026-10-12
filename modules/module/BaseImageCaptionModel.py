@@ -59,7 +59,7 @@ class BaseImageCaptionModel(metaclass=ABCMeta):
 
         def __is_supported_image_extension(path: Path) -> bool:
             ext = path.suffix
-            return path_util.is_supported_image_extension(ext) and '-masklabel.png' not in path.name
+            return path_util.is_supported_image_extension(ext) and not path_util.is_mask_filename(path.name)
 
         recursive_prefix = "" if not include_subdirectories else "**/"
         return [str(p) for p in sample_dir.glob(f'{recursive_prefix}*') if __is_supported_image_extension(p)]

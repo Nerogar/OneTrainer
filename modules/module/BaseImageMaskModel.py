@@ -15,9 +15,9 @@ from tqdm import tqdm
 
 
 class MaskSample:
-    def __init__(self, filename: str, device: torch.device):
+    def __init__(self, filename: str, device: torch.device, variant: int = 0):
         self.image_filename = filename
-        self.mask_filename = os.path.splitext(filename)[0] + "-masklabel.png"
+        self.mask_filename = path_util.mask_path_for(filename, variant)
         self.device = device
 
         self.image = None
@@ -122,7 +122,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
 
         def __is_supported_image_extension(path: Path) -> bool:
             ext = path.suffix
-            return path_util.is_supported_image_extension(ext) and '-masklabel.png' not in path.name
+            return path_util.is_supported_image_extension(ext) and not path_util.is_mask_filename(path.name)
 
         recursive_prefix = "" if not include_subdirectories else "**/"
         return [str(p) for p in sample_dir.glob(f'{recursive_prefix}*') if __is_supported_image_extension(p)]
@@ -136,7 +136,8 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             alpha: float = 1.0,
             threshold: float = 0.3,
             smooth_pixels: int = 5,
-            expand_pixels: int = 10
+            expand_pixels: int = 10,
+            variant: int = 0
     ):
         """
         Masks a sample
@@ -154,6 +155,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             threshold (`float`): threshold for including pixels in the mask
             smooth_pixels (`int`): radius of a smoothing operation applied to the generated mask
             expand_pixels (`int`): amount of expansion of the generated mask in all directions
+            variant (`int`): the mask variant to read and write, 0 for the original '-masklabel.png'
         """
 
     def mask_images(
@@ -165,6 +167,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             threshold: float = 0.3,
             smooth_pixels: int = 5,
             expand_pixels: int = 10,
+            variant: int = 0,
             progress_callback: Callable[[int, int], None] = None,
             error_callback: Callable[[str], None] = None,
     ):
@@ -184,6 +187,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             threshold (`float`): threshold for including pixels in the mask
             smooth_pixels (`int`): radius of a smoothing operation applied to the generated mask
             expand_pixels (`int`): amount of expansion of the generated mask in all directions
+            variant (`int`): the mask variant to read and write, 0 for the original '-masklabel.png'
             progress_callback (`Callable[[int, int], None]`): called after every processed image
             error_callback (`Callable[[str], None]`): called for every exception
         """
@@ -192,7 +196,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             progress_callback(0, len(filenames))
         for i, filename in enumerate(tqdm(filenames)):
             try:
-                self.mask_image(filename, prompts, mode, alpha, threshold, smooth_pixels, expand_pixels)
+                self.mask_image(filename, prompts, mode, alpha, threshold, smooth_pixels, expand_pixels, variant)
             except Exception:
                 if error_callback is not None:
                     error_callback(filename)
@@ -208,6 +212,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             smooth_pixels: int = 5,
             expand_pixels: int = 10,
             alpha: float = 1.0,
+            variant: int = 0,
             progress_callback: Callable[[int, int], None] = None,
             error_callback: Callable[[str], None] = None,
             include_subdirectories: bool = False,
@@ -228,6 +233,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             threshold (`float`): threshold for including pixels in the mask
             smooth_pixels (`int`): radius of a smoothing operation applied to the generated mask
             expand_pixels (`int`): amount of expansion of the generated mask in all directions
+            variant (`int`): the mask variant to read and write, 0 for the original '-masklabel.png'
             progress_callback (`Callable[[int, int], None]`): called after every processed image
             error_callback (`Callable[[str], None]`): called for every exception
             include_subdirectories (`bool`): whether to include subdirectories when processing samples
@@ -242,6 +248,7 @@ class BaseImageMaskModel(metaclass=ABCMeta):
             threshold=threshold,
             smooth_pixels=smooth_pixels,
             expand_pixels=expand_pixels,
+            variant=variant,
             progress_callback=progress_callback,
             error_callback=error_callback,
         )
