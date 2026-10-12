@@ -4,10 +4,10 @@ from modules.ui.BaseTopBarView import BaseTopBarView
 from modules.ui.TopBarController import TopBarController
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.ui import pyside6_components, theme
+from modules.util.ui import pyside6_components
+from modules.util.ui.pyside6_util import get_theme_controller
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QFileDialog, QPushButton, QWidget
+from PySide6.QtWidgets import QFileDialog, QPushButton, QWidget
 
 
 class PySide6TopBarView(BaseTopBarView, QWidget):
@@ -34,20 +34,14 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
         self.build(self.frame, master, controller, ui_state,
                    change_model_type_callback, change_training_method_callback, load_preset_callback)
 
-        # Theme switch. Lives in the PySide6 view, not the shared BaseTopBarView: the ctk top bar
-        # has no color scheme to switch. A text glyph follows the palette's ButtonText.
+        # PySide6-only theme toggle; the glyph follows the palette's ButtonText.
         self.theme_button = pyside6_components.button(
-            self.frame, 0, 8, "◐", self.__toggle_theme,
+            self.frame, 0, 8, "◐", get_theme_controller().toggle,
             tooltip="Switch between light and dark mode", sticky="v",
         )
-        # Square and icon-sized: the grid stretches a button to its column otherwise. The side
-        # comes from a text-less button so the glyph's own metrics don't set it.
+        # Use an empty button's height for a fixed square size, independent of glyph metrics.
         side = QPushButton().sizeHint().height()
         self.theme_button.setFixedSize(side, side)
-
-    def __toggle_theme(self):
-        app = QApplication.instance()
-        theme.apply_theme(app, dark=app.styleHints().colorScheme() != Qt.ColorScheme.Dark)
 
     def _setup_frame_column_weight(self):
         pyside6_components._layout(self.frame).setColumnStretch(5, 1)
