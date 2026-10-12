@@ -1,7 +1,6 @@
 import os
 
 from PySide6.QtCore import QObject, QSettings, Qt, Signal, Slot
-from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
 # Lets reviewers whose OS never reports dark still see the dark theme, by pretending it did.
@@ -30,6 +29,12 @@ _BASE_STYLESHEET = """
 """
 
 _LIGHT_STYLESHEET = """
+    QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit {
+        background-color: white;
+    }
+    QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QTextEdit:disabled, QPlainTextEdit:disabled {
+        background-color: #e0e0e0;
+    }
     QProgressBar {
         background-color: #c8c8c8;
     }
@@ -40,11 +45,6 @@ def apply_theme(app: QApplication) -> None:
     # system-following preference into an explicit light-mode override.
     is_dark = app.styleHints().colorScheme() == Qt.ColorScheme.Dark
 
-    palette = app.palette()
-    if not is_dark:
-        palette.setColor(QPalette.ColorRole.Base, QColor("white"))
-        palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Base, QColor("#e0e0e0"))
-    app.setPalette(palette)
     app.setStyleSheet(_BASE_STYLESHEET if is_dark else _BASE_STYLESHEET + _LIGHT_STYLESHEET)
 
 
