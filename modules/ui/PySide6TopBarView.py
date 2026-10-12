@@ -6,6 +6,7 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import pyside6_components, theme
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QFileDialog, QPushButton, QWidget
 
 
@@ -45,7 +46,8 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
         self.theme_button.setFixedSize(side, side)
 
     def __toggle_theme(self):
-        theme.apply_theme(QApplication.instance(), dark=not theme.is_dark_theme)
+        app = QApplication.instance()
+        theme.apply_theme(app, dark=app.styleHints().colorScheme() != Qt.ColorScheme.Dark)
 
     def _setup_frame_column_weight(self):
         pyside6_components._layout(self.frame).setColumnStretch(5, 1)
