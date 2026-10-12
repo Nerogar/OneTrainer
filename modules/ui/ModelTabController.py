@@ -26,7 +26,11 @@ class ModelTabController:
             or model_type.is_qwen()
             or model_type.is_anima()
             or model_type.is_hunyuan_video()
+            or model_type.is_ideogram()
         )
+
+    def supports_override_unconditional_transformer(self) -> bool:
+        return self.train_config.model_type.is_ideogram()
 
     def get_output_formats(self) -> list[tuple[str, ModelFormat]]:
         labels = {
