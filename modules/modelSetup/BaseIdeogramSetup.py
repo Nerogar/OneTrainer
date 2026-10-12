@@ -87,6 +87,11 @@ class BaseIdeogramSetup(
             )
             max_text_tokens = text_encoder_output.shape[1]
 
+            if config.cep_gamma > 0 and not deterministic:
+                text_encoder_output = self._apply_conditional_embedding_perturbation(
+                    text_encoder_output, config.cep_gamma, generator
+                )
+
             # patchify [B, 32, H, W] -> packed (B, num_image_tokens, 128), then bn-normalize in packed space (the
             # sampler scales the packed sequence the same way).
             packed_latent_image = model.patchify_latents(latent_image.float())
