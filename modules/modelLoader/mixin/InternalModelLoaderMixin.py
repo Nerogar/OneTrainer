@@ -28,6 +28,7 @@ class InternalModelLoaderMixin(metaclass=ABCMeta):
                     epoch_sample=meta['train_progress']['epoch_sample'],
                     global_step=meta['train_progress']['global_step'],
                 )
+                resumed_tb_subdir = meta.get('tensorboard_subdir', None)
 
             # optimizer
             with contextlib.suppress(FileNotFoundError):
@@ -40,3 +41,4 @@ class InternalModelLoaderMixin(metaclass=ABCMeta):
 
             # meta
             model.train_progress = train_progress
+            model.resumed_tensorboard_subdir = resumed_tb_subdir
