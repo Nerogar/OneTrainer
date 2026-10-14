@@ -89,24 +89,10 @@ def make_quant_rot_linear(linear_class):
         def _rotatable(self) -> bool:
             return self.is_rotatable
 
-        def mark_needs_requantization(self):
-            # reset the rotation flag so the next quantize() re-derives O from the raw weight.
-            self.__quant_rot_is_quantized = False
-            super().mark_needs_requantization()
-
-        def predict_offload_bytes(self) -> int:
-            base = super().predict_offload_bytes()
-            if self.__rotatable:
-                in_features = self.original_weight_shape()[-1]
-                blocks = in_features // self.__quant_rot_block_size
-                base += blocks * self.__quant_rot_block_size ** 2 * torch.empty((), dtype=self.__quant_rot_dtype).element_size()
-            return base
-
         @torch.no_grad()
         def quantize(self, device: torch.device | None = None):
             if self.__quant_rot_is_quantized:
                 return
-            self.__quant_rot_is_quantized = True
 
             if self.__rotatable:
                 W = super().unquantized_weight(torch.float32, self.weight.device)
@@ -119,6 +105,10 @@ def make_quant_rot_linear(linear_class):
                 self.weight.data = rotated
                 del W, rot
 
+            # set the flag only once the rotation work has succeeded: on a failure the module
+            # would otherwise be left rotated (weight.data = W @ O^T) with an empty quant_rot,
+            # and forward would silently apply the weight without O^T.
+            self.__quant_rot_is_quantized = True
             super().quantize(device=device)
 
         def forward(self, x: Tensor) -> Tensor:
@@ -147,7 +137,7 @@ def make_quant_rot_linear(linear_class):
                 x_base = x
             # super() dispatches to the quantized base (LinearW8A8 / LinearSVD / LinearNf4) forward,
             # which applies the stored (rotated, quantized) weight; with SVDQuant it also adds the SVD
-            # low-rank part in the original input space.
+            # low-rank part, which acts on the same rotated input x_base (A @ (x @ O^T)).
             base = super().forward(x_base)
             ld = lora_up(dropout(lora_down(x)))
             return base + ld * (alpha / lora_down.weight.shape[0])

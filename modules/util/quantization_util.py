@@ -212,8 +212,8 @@ def replace_linear_with_quantized_layers(
                 raise ValueError("The OFT orthogonal pre-rotation cannot be used with GGUF. GGUF is loaded pre-quantized from a file; the unquantized weights must be available to derive the rotation.")
             if not issubclass(linear_class, QuantizedLinearMixin):
                 raise ValueError("The OFT orthogonal pre-rotation needs a quantized linear type with the QuantizedLinearMixin interface. The selected data type has no raw-weight quantization hook (e.g. bitsandbytes int8); pick a different data type.")
-            # Composes with SVDQuant: the SVD split runs first (on the raw weight), then the rotation
-            # is derived from and applied to the SVD residual, so both outlier absorbers stack.
+            # Composes with SVDQuant: the rotation is derived from and applied to the raw weight
+            # first, then the SVD split runs on the rotated weight, so both outlier absorbers stack.
             linear_class = make_quant_rot_linear(linear_class)
             kwargs.update({'quant_rot_block_size': quantization.quant_rot_block_size,
                            'quant_rot_dtype': quantization.quant_rot_dtype.torch_dtype()})
