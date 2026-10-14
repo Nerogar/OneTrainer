@@ -10,25 +10,19 @@ class TestQuantizationCacheDir(unittest.TestCase):
             "workspace-cache/run/quantization",
         )
 
-    def test_stale_value_overwritten_by_rebind(self):
-        # Reproduce #1707: a baked-in path from a prior run must not win after
-        # cache_dir changes (Save As / duplicated config).
-        stale = "workspace-cache/A/quantization"
-        new_cache_dir = "workspace-cache/B"
+    def test_trailing_slash_normalized(self):
+        self.assertEqual(
+            path_util.quantization_cache_dir("workspace-cache/run/"),
+            "workspace-cache/run/quantization",
+        )
 
-        class Quantization:
-            cache_dir = stale
-
-        class Config:
-            cache_dir = new_cache_dir
-            quantization = Quantization()
-
-        config = Config()
-        # Fixed call-site semantics (always rebind, no None-guard):
-        config.quantization.cache_dir = path_util.quantization_cache_dir(config.cache_dir)
-
-        self.assertEqual(config.quantization.cache_dir, "workspace-cache/B/quantization")
-        self.assertNotEqual(config.quantization.cache_dir, stale)
+    def test_helper_ignores_prior_baked_in_path(self):
+        # Call sites must always assign from this helper (no None-guard), so a
+        # previously baked-in path from another run cannot win after cache_dir changes.
+        previous = "workspace-cache/A/quantization"
+        rebound = path_util.quantization_cache_dir("workspace-cache/B")
+        self.assertNotEqual(rebound, previous)
+        self.assertEqual(rebound, "workspace-cache/B/quantization")
 
 
 if __name__ == "__main__":

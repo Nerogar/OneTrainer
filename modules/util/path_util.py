@@ -66,10 +66,5 @@ def json_path_modifier(x: str | Path) -> Path:
 
 
 def quantization_cache_dir(cache_dir: str) -> str:
-    """Return the quantization cache path for a run's cache_dir.
-
-    Always derive this at use time. ``quantization.cache_dir`` is not exposed in the
-    UI, so a one-shot ``None``-guard left a stale path after Save As when only
-    ``cache_dir`` was updated (see issue #1707).
-    """
-    return cache_dir + "/quantization"
+    """Derived from cache_dir at use time; quantization.cache_dir is not user-editable."""
+    return canonical_join(cache_dir, "quantization")

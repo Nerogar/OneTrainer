@@ -128,8 +128,7 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("loading the model")
 
-        # Always rebind: quantization.cache_dir is not UI-editable, so a None-guard
-        # left a stale path after config duplication / Save As (#1707).
+        # derived, never trust the stored value
         self.config.quantization.cache_dir = path_util.quantization_cache_dir(self.config.cache_dir)
         os.makedirs(self.config.quantization.cache_dir, exist_ok=True)
 

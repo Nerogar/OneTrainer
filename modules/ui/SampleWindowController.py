@@ -82,8 +82,7 @@ class SampleWindowController:
             else:
                 print("No backup found, loading without backup...")
 
-        # Always rebind: quantization.cache_dir is not UI-editable, so a None-guard
-        # left a stale path after config duplication / Save As (#1707).
+        # derived, never trust the stored value
         self.initial_train_config.quantization.cache_dir = path_util.quantization_cache_dir(
             self.initial_train_config.cache_dir
         )
