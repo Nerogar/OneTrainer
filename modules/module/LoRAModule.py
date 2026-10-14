@@ -8,6 +8,7 @@ from typing import Any
 from modules.module.FusedModule import FusedModuleGroup, check_fusion_match, discover_fused_groups
 from modules.module.oft_utils import OFTRotationModule
 from modules.module.quantized.LinearSVD import BaseLinearSVD
+from modules.module.quantized.LinearQuantRot import BaseLinearQuantRot
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
 from modules.util.lokr_utils import factorization, make_kron, rebuild_tucker
@@ -570,7 +571,7 @@ class LoRAModule(PeftBase):
 
     def forward(self, x, *args, **kwargs):
         self.check_initialized()
-        if isinstance(self.orig_module, BaseLinearSVD):
+        if isinstance(self.orig_module, (BaseLinearSVD, BaseLinearQuantRot)):
             return self.orig_module.forward_with_lora(x, self.lora_down, self.lora_up, self.dropout, self.alpha)
 
         return self.orig_forward(x) + self.delta_forward(x, *args, **kwargs)
@@ -606,6 +607,7 @@ class OFTModule(PeftBase):
         self.oft_scaled = oft_scaled
         self.dropout_probability = kwargs.pop('dropout_probability', 0.0)
         self.oft_R = None
+        self.quant_rot_forward: Any | None = None
         self.adjustment_info = None
 
 
@@ -677,12 +679,26 @@ class OFTModule(PeftBase):
 
         nn.init.zeros_(self.oft_R.weight)
 
+        # When the base layer is an OFT-quant-rotation linear with the same block size, fold its
+        # O^T input rotation into OFT's R: one block-matmul on the activations instead of two,
+        # and the module is called via forward_rotated_input (no O^T). The reference is captured
+        # here (pre-hook), so it stays the module's own method even after hooking replaces forward.
+        # With a different block size the two rotations stay separate: the module's own forward
+        # applies its O^T to the already-OFT-rotated input (still computes W R^T x).
+        if (isinstance(self.orig_module, BaseLinearQuantRot)
+                and self.orig_module.is_rotatable
+                and self.orig_module.quant_rot_block_size == self.oft_block_size):
+            self.oft_R.set_merge_rot_source(self.orig_module)
+            self.quant_rot_forward = self.orig_module.forward_rotated_input
+
     def forward(self, x, *args, **kwargs):
         self.check_initialized()
 
         # For Linear layers, rotating the input is mathematically equivalent to rotating the weights.
         if isinstance(self.orig_module, nn.Linear):
             rotated_x = self.oft_R(x)
+            if self.quant_rot_forward is not None:
+                return self.quant_rot_forward(rotated_x, *args, **kwargs)
             return self.orig_forward(rotated_x, *args, **kwargs)
 
         scaling_factor = 2 * math.sqrt(self.oft_R.block_size - 1) if self.oft_scaled else 1

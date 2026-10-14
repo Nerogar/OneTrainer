@@ -171,6 +171,7 @@ def replace_linear_with_quantized_layers(
 ):
     from modules.module.quantized.LinearFp8 import LinearFp8
     from modules.module.quantized.LinearGGUFA8 import LinearGGUFA8
+    from modules.module.quantized.LinearQuantRot import make_quant_rot_linear
     from modules.module.quantized.LinearSVD import make_svd_linear
     from modules.module.quantized.LinearW8A8 import LinearW8A8
 
@@ -206,6 +207,16 @@ def replace_linear_with_quantized_layers(
             kwargs.update({'rank': quantization.svd_rank,
                            'svd_dtype': quantization.svd_dtype.torch_dtype(),
                            'cache_dir': quantization.cache_dir})
+        if quantization.quant_rot_dtype != DataType.NONE and quantization.quant_rot_block_size > 0:
+            if dtype.is_gguf():
+                raise ValueError("The OFT orthogonal pre-rotation cannot be used with GGUF. GGUF is loaded pre-quantized from a file; the unquantized weights must be available to derive the rotation.")
+            if not issubclass(linear_class, QuantizedLinearMixin):
+                raise ValueError("The OFT orthogonal pre-rotation needs a quantized linear type with the QuantizedLinearMixin interface. The selected data type has no raw-weight quantization hook (e.g. bitsandbytes int8); pick a different data type.")
+            # Composes with SVDQuant: the SVD split runs first (on the raw weight), then the rotation
+            # is derived from and applied to the SVD residual, so both outlier absorbers stack.
+            linear_class = make_quant_rot_linear(linear_class)
+            kwargs.update({'quant_rot_block_size': quantization.quant_rot_block_size,
+                           'quant_rot_dtype': quantization.quant_rot_dtype.torch_dtype()})
         quant_filters = [
             ModuleFilter(pattern, use_regex=quantization.layer_filter_regex)
             for pattern in quantization.layer_filter.split(",")
@@ -237,9 +248,13 @@ def is_quantized_parameter(
         parameter_name: str,
 ) -> bool:
     from modules.module.quantized.LinearFp8 import LinearFp8
+    from modules.module.quantized.LinearQuantRot import BaseLinearQuantRot
     from modules.module.quantized.LinearSVD import BaseLinearSVD
     from modules.module.quantized.LinearW8A8 import LinearW8A8
 
+    if isinstance(module, BaseLinearQuantRot):
+        if parameter_name == "quant_rot":
+            return True
     if isinstance(module, BaseLinearSVD):
         if parameter_name in ["svd_up", "svd_down"]:
             return True
@@ -301,6 +316,7 @@ def get_weight_shape(module: nn.Linear) -> torch.Size:
     return torch.Size((module.out_features, module.in_features))
 
 def get_offload_tensors(module: nn.Module) -> list[torch.Tensor]:
+    from modules.module.quantized.LinearQuantRot import BaseLinearQuantRot
     from modules.module.quantized.LinearSVD import BaseLinearSVD
 
     tensors = []
@@ -315,6 +331,8 @@ def get_offload_tensors(module: nn.Module) -> list[torch.Tensor]:
     if isinstance(module, BaseLinearSVD):
         tensors += [module.svd_up]
         tensors += [module.svd_down]
+    if isinstance(module, BaseLinearQuantRot) and module.quant_rot.numel() > 0:
+        tensors += [module.quant_rot]
 
     return tensors
 
