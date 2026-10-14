@@ -5,7 +5,7 @@ from modules.model.BaseModel import BaseModel
 from modules.modelSampler.BaseModelSampler import (
     BaseModelSampler,
 )
-from modules.util import create
+from modules.util import create, path_util
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.compile_util import init_compile
@@ -82,9 +82,11 @@ class SampleWindowController:
             else:
                 print("No backup found, loading without backup...")
 
-        if self.initial_train_config.quantization.cache_dir is None:
-            self.initial_train_config.quantization.cache_dir = self.initial_train_config.cache_dir + "/quantization"
-            os.makedirs(self.initial_train_config.quantization.cache_dir, exist_ok=True)
+        # derived, never trust the stored value
+        self.initial_train_config.quantization.cache_dir = path_util.quantization_cache_dir(
+            self.initial_train_config.cache_dir
+        )
+        os.makedirs(self.initial_train_config.quantization.cache_dir, exist_ok=True)
 
         model = model_loader.load(
             model_type=self.initial_train_config.model_type,

@@ -63,3 +63,8 @@ def supported_caption_extensions() -> set[str]:
 def json_path_modifier(x: str | Path) -> Path:
     x = Path(x).absolute()
     return x.parent if x.suffix == ".json" else x
+
+
+def quantization_cache_dir(cache_dir: str) -> str:
+    """Derived from cache_dir at use time; quantization.cache_dir is not user-editable."""
+    return canonical_join(cache_dir, "quantization")
