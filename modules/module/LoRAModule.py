@@ -7,8 +7,8 @@ from typing import Any
 
 from modules.module.FusedModule import FusedModuleGroup, check_fusion_match, discover_fused_groups
 from modules.module.oft_utils import OFTRotationModule
-from modules.module.quantized.LinearSVD import BaseLinearSVD
 from modules.module.quantized.LinearQuantRot import BaseLinearQuantRot
+from modules.module.quantized.LinearSVD import BaseLinearSVD
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import PeftType
 from modules.util.lokr_utils import factorization, make_kron, rebuild_tucker

@@ -1,9 +1,8 @@
-import torch
-import torch.nn.functional as F
-from torch import Tensor, nn
-
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
+
+import torch
+from torch import Tensor, nn
 
 
 def _right_multiply_blocks(x: Tensor, rot: Tensor, transpose: bool) -> Tensor:
