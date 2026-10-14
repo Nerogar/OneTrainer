@@ -90,6 +90,11 @@ class BaseLoraTabView:
                                   tooltip="Applies a scaling factor to the learned weights. This ensures that the effective learning rate remains consistent across different block sizes. Without this, different block sizes require significantly different learning rates.")
             self.components.switch(master, 2, 4, ui_state, "oft_scaled")
 
+            # Matrix Exponential Mode
+            self.components.label(master, 3, 3, "Matrix Exponential Mode",
+                                  tooltip="Changes OFT parameterization from Cayley transform to Matrix Exponential. Provides a uniform effective learning rates across all rotation angles, avoiding Cayley metric distortion. While Maintaining the same overhead.")
+            self.components.switch(master, 3, 4, ui_state, "oft_matrix_exp")
+
             # Dropout Percentage
             self.components.label(master, 2, 0, "Dropout Probability",
                                   tooltip="Dropout probability. This percentage of the rotated adapter nodes that will be randomly restored to the base model initial statue. Helps with overfitting. 0 disables, 1 maximum.")
