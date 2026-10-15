@@ -69,7 +69,14 @@ class OFTRotationModule(nn.Module):
         self.register_buffer("rows", rows, persistent=False)
         self.register_buffer("cols", cols, persistent=False)
         self.dropout = MultiplicativeDropoutLayer(p=dropout_probability)
+        # Set via set_merge_rot_source: the LinearQuantRot module whose O^T input rotation is
+        # folded into this module's R, so its quantized module can skip applying O^T itself.
+        # Held in a list so nn.Module.__setattr__ does not register it as a submodule.
+        self._merge_rot_source = None
 
+
+    def set_merge_rot_source(self, source):
+        self._merge_rot_source = [source] if source is not None else None
 
     def _pytorch_skew_symmetric(self, vec, block_size):
         batch_size = vec.shape[0]
@@ -142,7 +149,20 @@ class OFTRotationModule(nn.Module):
         batch_dims = x.shape[:-1]
         x_reshaped = x.reshape(*batch_dims, rank, self.block_size)
 
-        if self.block_share:
+        # Ensure rotation matrix matches the input activation dtype
+        orth_rotate = orth_rotate.to(x_reshaped.dtype)
+
+        if self._merge_rot_source is not None:
+            # Merged quantization rotation: apply M_k = R_k @ O_k^T in a single block-matmul.
+            # The module computes (x @ M) @ O^T @ (W @ O^T)^T = x @ R @ O^T @ O @ W^T = W R^T x,
+            # so the quantized module's own O^T application is skipped. matmul broadcasts the
+            # single shared R block onto all O_k when block_share is on.
+            merge_rot = self._merge_rot_source[0].quant_rot
+            orth_rotate = torch.matmul(
+                orth_rotate,
+                merge_rot.transpose(-1, -2).to(dtype=orth_rotate.dtype, device=orth_rotate.device))
+            x_rotated_reshaped = torch.einsum("...rk,rkc->...rc", x_reshaped, orth_rotate)
+        elif self.block_share:
             orth_rotate = orth_rotate.repeat(rank, 1, 1)
             x_rotated_reshaped = torch.einsum("...rk,rkc->...rc", x_reshaped, orth_rotate)
         else:
