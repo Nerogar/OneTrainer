@@ -1,10 +1,7 @@
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
-from modules.util.convert.lora.convert_hunyuan_video_lora import convert_hunyuan_video_lora_key_sets
-from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
-from modules.util.enum.ModelFormat import ModelFormat
+from modules.util.convert_lora_util import convert_to_mixture
 
-import torch
 from torch import Tensor
 
 
@@ -14,8 +11,8 @@ class HunyuanVideoLoRASaver(
     def __init__(self):
         super().__init__()
 
-    def _get_convert_key_sets(self, model: HunyuanVideoModel) -> list[LoraConversionKeySet] | None:
-        return convert_hunyuan_video_lora_key_sets()
+    def _convert_legacy(self, model: HunyuanVideoModel, state_dict: dict[str, Tensor]) -> dict[str, Tensor]:
+        return convert_to_mixture(state_dict)
 
     def _get_state_dict(
             self,
@@ -45,12 +42,3 @@ class HunyuanVideoLoRASaver(
                     state_dict[f"bundle_emb.{placeholder}.clip_l_out"] = embedding.text_encoder_2_embedding.output_vector
 
         return state_dict
-
-    def save(
-            self,
-            model: HunyuanVideoModel,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
-    ):
-        self._save(model, output_model_format, output_model_destination, dtype)

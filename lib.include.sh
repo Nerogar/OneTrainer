@@ -24,7 +24,7 @@ export OT_CONDA_CMD="${OT_CONDA_CMD:-${CONDA_EXE:-conda}}"
 export OT_CONDA_ENV="${OT_CONDA_ENV:-conda_env}"
 export OT_PYTHON_CMD="${OT_PYTHON_CMD:-python}"
 export OT_PYTHON_VENV="${OT_PYTHON_VENV:-venv}"
-export OT_PREFER_VENV="${OT_PREFER_VENV:-false}"
+export OT_PREFER_VENV="${OT_PREFER_VENV:-true}"
 export OT_LAZY_UPDATES="${OT_LAZY_UPDATES:-false}"
 export OT_CUDA_LOWMEM_MODE="${OT_CUDA_LOWMEM_MODE:-false}"
 export OT_PLATFORM_REQUIREMENTS="${OT_PLATFORM_REQUIREMENTS:-detect}"
@@ -321,6 +321,33 @@ function run_pip_in_active_env {
     fi
 }
 
+# Chooses between the CUDA 13 (default) and CUDA 12.6 (legacy) requirements,
+# based on whether the NVIDIA driver is new enough to support CUDA 13.
+# NOTE: If nvidia-smi tells us nothing (missing, or its header doesn't have a
+# "CUDA Version" line), we keep the CUDA 13 default.
+function get_cuda_requirements_path {
+    local default_reqs="requirements-cuda.txt"
+    local legacy_reqs="requirements-cuda-legacy.txt"
+
+    # Locate nvidia-smi, including WSL's out-of-PATH copy.
+    local smi="nvidia-smi"
+    if ! can_exec "${smi}"; then
+        smi="/usr/lib/wsl/lib/nvidia-smi"
+        can_exec "${smi}" || { echo "${default_reqs}"; return; }
+    fi
+
+    # Max CUDA version the driver supports, parsed from the nvidia-smi header
+    # (e.g. "CUDA Version: 13.0"). Below major version 13 means too old.
+    local driver_cuda="$("${smi}" 2>/dev/null | grep -oE 'CUDA Version: [0-9]+\.[0-9]+' | grep -oE '[0-9]+\.[0-9]+' | head -n1)"
+    if [[ -n "${driver_cuda}" ]] && (( ${driver_cuda%%.*} < 13 )); then
+        print_warning "Your NVIDIA driver only supports up to CUDA ${driver_cuda}, so OneTrainer will install the legacy CUDA 12.6 build of PyTorch. Updating your NVIDIA driver is recommended to use the faster CUDA 13 build."
+        echo "${legacy_reqs}"
+        return
+    fi
+
+    echo "${default_reqs}"
+}
+
 # Determines which requirements.txt file we need to install.
 function get_platform_requirements_path {
     # NOTE: The user can override our platform detection via the environment.
@@ -336,7 +363,7 @@ function get_platform_requirements_path {
             #  "nvcc": CUDA SDK compiler. Not included in the drivers.
             #  "/usr/lib/wsl/lib/nvidia-smi": WSL's NVIDIA path (isn't in $PATH).
             # SEE: https://docs.nvidia.com/cuda/wsl-user-guide/
-            platform_reqs="requirements-cuda.txt"
+            platform_reqs="$(get_cuda_requirements_path)"
         elif [[ -e "/dev/kfd" ]]; then
             # AMD graphics.
             platform_reqs="requirements-rocm.txt"

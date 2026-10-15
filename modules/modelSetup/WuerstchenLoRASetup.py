@@ -11,24 +11,12 @@ from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
 from modules.util.TrainProgress import TrainProgress
 
-import torch
 
-
+@factory.register(BaseModelSetup, ModelType.WUERSTCHEN_2, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_CASCADE_1, TrainingMethod.LORA)
 class WuerstchenLoRASetup(
     BaseWuerstchenSetup,
 ):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
-    ):
-        super().__init__(
-            train_device=train_device,
-            temp_device=temp_device,
-            debug_mode=debug_mode,
-        )
-
     def create_parameters(
             self,
             model: WuerstchenModel,
@@ -73,13 +61,13 @@ class WuerstchenLoRASetup(
         if config.train_any_embedding():
             model.prior_text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_prior_te")
+        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
         model.prior_text_encoder_lora = LoRAModuleWrapper(
-            model.prior_text_encoder, "lora_prior_te", config
+            model.prior_text_encoder, "text_encoder", config
         ) if create_te else None
 
         model.prior_prior_lora = LoRAModuleWrapper(
-            model.prior_prior, "lora_prior_unet", config, config.layer_filter.split(",")
+            model.prior_prior, "prior", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:
@@ -98,7 +86,6 @@ class WuerstchenLoRASetup(
         model.prior_prior_lora.to(dtype=config.lora_weight_dtype.torch_dtype())
         model.prior_prior_lora.hook_to_module()
 
-        self._remove_added_embeddings_from_tokenizer(model.prior_tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
 
@@ -112,20 +99,19 @@ class WuerstchenLoRASetup(
             config: TrainConfig,
     ):
         effnet_on_train_device = not config.latent_caching
-
-        if model.model_type.is_wuerstchen_v2():
-            model.decoder_text_encoder_to(self.temp_device)
-        model.decoder_decoder_to(self.temp_device)
-        model.decoder_vqgan_to(self.temp_device)
-        model.effnet_encoder_to(self.train_device if effnet_on_train_device else self.temp_device)
-
         text_encoder_on_train_device = \
             config.text_encoder.train \
             or config.train_any_embedding() \
             or not config.latent_caching
 
-        model.prior_text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
-        model.prior_prior_to(self.train_device)
+        # decoder/decoder_text_encoder/decoder_vqgan are never needed during prior training; materialize_only()
+        # evicts them (decoder_text_encoder only exists in model_parts() for Wuerstchen v2, not Stable Cascade)
+        parts = ["prior"]
+        if text_encoder_on_train_device:
+            parts.append("text_encoder")
+        if effnet_on_train_device:
+            parts.append("effnet_encoder")
+        model.materialize_only(*parts)
 
         if model.model_type.is_wuerstchen_v2():
             model.decoder_text_encoder.eval()
@@ -153,6 +139,3 @@ class WuerstchenLoRASetup(
             self._normalize_output_embeddings(model.all_prior_text_encoder_embeddings())
             model.prior_embedding_wrapper.normalize_embeddings()
         self.__setup_requires_grad(model, config)
-
-factory.register(BaseModelSetup, WuerstchenLoRASetup, ModelType.WUERSTCHEN_2, TrainingMethod.LORA)
-factory.register(BaseModelSetup, WuerstchenLoRASetup, ModelType.STABLE_CASCADE_1, TrainingMethod.LORA)

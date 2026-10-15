@@ -59,24 +59,6 @@ class HunyuanVideoModelLoader(
             include_text_encoder_2: bool,
             quantization: QuantizationConfig,
     ):
-        diffusers_sub = []
-        transformers_sub = []
-
-        if not transformer_model_name:
-            diffusers_sub.append("transformer")
-        if include_text_encoder_1:
-            transformers_sub.append("text_encoder")
-        if include_text_encoder_2:
-            transformers_sub.append("text_encoder_2")
-        if not vae_model_name:
-            diffusers_sub.append("vae")
-
-        self._prepare_sub_modules(
-            base_model_name,
-            diffusers_modules=diffusers_sub,
-            transformers_modules=transformers_sub,
-        )
-
         if include_text_encoder_1:
             tokenizer_1 = LlamaTokenizerFast.from_pretrained(
                 base_model_name,

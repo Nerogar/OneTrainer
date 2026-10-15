@@ -1,14 +1,12 @@
 import os
 import traceback
 
-from modules.model.BaseModel import BaseModel
 from modules.model.ZImageModel import ZImageModel
 from modules.modelLoader.GenericFineTuneModelLoader import make_fine_tune_model_loader
 from modules.modelLoader.GenericLoRAModelLoader import make_lora_model_loader
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.modelLoader.mixin.LoRALoaderMixin import LoRALoaderMixin
 from modules.util.config.TrainConfig import QuantizationConfig
-from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -60,19 +58,6 @@ class ZImageModelLoader(
             vae_model_name: str,
             quantization: QuantizationConfig,
     ):
-        diffusers_sub = []
-        transformers_sub = ["text_encoder"]
-        if not transformer_model_name:
-            diffusers_sub.append("transformer")
-        if not vae_model_name:
-            diffusers_sub.append("vae")
-
-        self._prepare_sub_modules(
-            base_model_name,
-            diffusers_modules=diffusers_sub,
-            transformers_modules=transformers_sub,
-        )
-
         tokenizer = Qwen2Tokenizer.from_pretrained(
             base_model_name,
             subfolder="tokenizer",
@@ -90,12 +75,6 @@ class ZImageModelLoader(
             base_model_name,
             "text_encoder",
         )
-
-        #TODO this is a tied weight. The dtype conversion code in _load_transformers_sub_module
-        #currently does not support tied weights. Reconstruct but clone, because the quantization code
-        #doesn't support tied weights either:
-        text_encoder.lm_head.weight = type(text_encoder.lm_head.weight)(text_encoder.model.embed_tokens.weight)
-
 
         if vae_model_name:
             vae = self._load_diffusers_sub_module(
@@ -199,8 +178,6 @@ class ZImageLoRALoader(
     def __init__(self):
         super().__init__()
 
-    def _get_convert_key_sets(self, model: BaseModel) -> list[LoraConversionKeySet] | None:
-        return None
 
     def load(
             self,

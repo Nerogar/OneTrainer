@@ -11,7 +11,6 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
-from modules.util.torch_util import torch_gc
 
 import torch
 
@@ -19,6 +18,8 @@ from PIL import Image
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.WUERSTCHEN_2)
+@factory.register(BaseModelSampler, ModelType.STABLE_CASCADE_1)
 class WuerstchenSampler(BaseModelSampler):
     def __init__(
             self,
@@ -48,7 +49,7 @@ class WuerstchenSampler(BaseModelSampler):
             on_update_progress,
     ):
         # prepare prompt
-        self.model.prior_text_encoder_to(self.train_device)
+        self.model.materialize_only("text_encoder")
 
         prompt_embedding, pooled_prompt_embedding = self.model.encode_text(
             text=prompt,
@@ -67,9 +68,6 @@ class WuerstchenSampler(BaseModelSampler):
         if self.model_type.is_stable_cascade():
             combined_pooled_prompt_embedding = torch.cat([pooled_negative_prompt_embedding, pooled_prompt_embedding]) \
                 .to(dtype=self.model.prior_train_dtype.torch_dtype())
-
-        self.model.prior_text_encoder_to(self.temp_device)
-        torch_gc()
 
         # prepare timesteps
         prior_noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
@@ -93,7 +91,7 @@ class WuerstchenSampler(BaseModelSampler):
 
         clip_img = torch.zeros(size=(2, 1, 768), dtype=self.model.prior_train_dtype.torch_dtype(), device=combined_prompt_embedding.device)
 
-        self.model.prior_prior_to(self.train_device)
+        self.model.materialize_only("prior")
         for i, timestep in enumerate(tqdm(timesteps[:-1], desc="sampling")):
             timestep = torch.stack([timestep]).to(dtype=self.model.prior_train_dtype.torch_dtype())
 
@@ -132,9 +130,6 @@ class WuerstchenSampler(BaseModelSampler):
 
             on_update_progress(i + 1, len(timesteps))
 
-        self.model.prior_prior_to(self.temp_device)
-        torch_gc()
-
         if self.model_type.is_wuerstchen_v2():
             latent_image = latent_image * 42.0 - 1.0
 
@@ -159,9 +154,9 @@ class WuerstchenSampler(BaseModelSampler):
     ):
         # prepare prompt
         if self.model_type.is_wuerstchen_v2():
-            self.model.decoder_text_encoder_to(self.train_device)
+            self.model.materialize_only("decoder_text_encoder")
         elif self.model_type.is_stable_cascade():
-            self.model.prior_text_encoder_to(self.train_device)
+            self.model.materialize_only("text_encoder")
         tokenizer_output = decoder_tokenizer(
             prompt,
             padding='max_length',
@@ -186,12 +181,6 @@ class WuerstchenSampler(BaseModelSampler):
         if self.model_type.is_stable_cascade():
             prompt_embedding = text_encoder_output.text_embeds.unsqueeze(1)
 
-        if self.model_type.is_wuerstchen_v2():
-            self.model.decoder_text_encoder_to(self.temp_device)
-        elif self.model_type.is_stable_cascade():
-            self.model.prior_text_encoder_to(self.temp_device)
-        torch_gc()
-
         # prepare timesteps
         decoder_noise_scheduler.set_timesteps(10, device=self.train_device)
         timesteps = decoder_noise_scheduler.timesteps
@@ -212,7 +201,7 @@ class WuerstchenSampler(BaseModelSampler):
         if "generator" in set(inspect.signature(decoder_noise_scheduler.step).parameters.keys()):
             extra_step_kwargs["generator"] = generator
 
-        self.model.decoder_decoder_to(self.train_device)
+        self.model.materialize_only("decoder")
         for i, timestep in enumerate(tqdm(timesteps[:-1], desc="sampling")):
             timestep = torch.stack([timestep]).to(dtype=self.model.prior_train_dtype.torch_dtype())
 
@@ -245,9 +234,6 @@ class WuerstchenSampler(BaseModelSampler):
             ).prev_sample
 
             on_update_progress(i + 1, len(timesteps))
-
-        self.model.decoder_decoder_to(self.temp_device)
-        torch_gc()
 
         return latent_image
 
@@ -320,15 +306,12 @@ class WuerstchenSampler(BaseModelSampler):
             )
 
             # decode vqgan
-            self.model.decoder_vqgan_to(self.train_device)
+            self.model.materialize_only("decoder_vqgan")
 
             latents = decoder_vqgan.config.scale_factor * latent_image
             image_tensor = decoder_vqgan.decode(latents).sample.clamp(0, 1)
             image_array = image_tensor.permute(0, 2, 3, 1).cpu().squeeze().float().numpy()
             image_array = (image_array * 255).round().astype("uint8")
-
-            self.model.decoder_vqgan_to(self.temp_device)
-            torch_gc()
 
         return ModelSamplerOutput(
             file_type=FileType.IMAGE,
@@ -365,6 +348,3 @@ class WuerstchenSampler(BaseModelSampler):
         )
 
         on_sample(sampler_output)
-
-factory.register(BaseModelSampler, WuerstchenSampler, ModelType.WUERSTCHEN_2)
-factory.register(BaseModelSampler, WuerstchenSampler, ModelType.STABLE_CASCADE_1)

@@ -25,6 +25,7 @@ class ModelNames:
             include_text_encoder_2: bool = True,
             include_text_encoder_3: bool = True,
             include_text_encoder_4: bool = True,
+            include_unconditional_transformer: bool = True,
     ):
         self.base_model = base_model
         self.prior_model = prior_model
@@ -40,6 +41,7 @@ class ModelNames:
         self.include_text_encoder_2 = include_text_encoder_2
         self.include_text_encoder_3 = include_text_encoder_3
         self.include_text_encoder_4 = include_text_encoder_4
+        self.include_unconditional_transformer = include_unconditional_transformer
 
     def all_embedding(self):
         if self.embedding is not None:
