@@ -31,7 +31,6 @@ from modules.util.lr_scheduler_util import (
 )
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer.adafactor_extensions import patch_adafactor
-from modules.util.optimizer.adam_extensions import patch_adam
 from modules.util.optimizer.adamw_extensions import patch_adamw
 from modules.util.optimizer.muon_util import split_parameters_for_muon
 from modules.util.TrainProgress import TrainProgress
@@ -161,46 +160,6 @@ def create_optimizer(
                 differentiable=optimizer_config.differentiable if optimizer_config.differentiable is not None else False,
             )
 
-        # SGD_8BIT Optimizer
-        case Optimizer.SGD_8BIT:
-            import bitsandbytes as bnb
-            optimizer = bnb.optim.SGD8bit(
-                params=parameters,
-                lr=config.learning_rate,
-                momentum=optimizer_config.momentum if optimizer_config.momentum is not None else 0,
-                dampening=optimizer_config.dampening if optimizer_config.dampening is not None else 0,
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
-                nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
-            )
-
-        # ADAM Optimizer
-        case Optimizer.ADAM:
-            if optimizer_config.stochastic_rounding \
-                    and (optimizer_config.fused or optimizer_config.foreach):
-                raise RuntimeError('"stochastic_rounding" is only allowed when "fused" and "foreach" are disabled')
-
-            if optimizer_config.fused_back_pass \
-                    and (optimizer_config.fused or optimizer_config.foreach):
-                raise RuntimeError('"fused_back_pass" is only allowed when "fused" and "foreach" are disabled')
-
-            optimizer = torch.optim.Adam(
-                params=parameters,
-                lr=config.learning_rate,
-                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
-                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
-                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
-                amsgrad=optimizer_config.amsgrad if optimizer_config.amsgrad is not None else False,
-                foreach=optimizer_config.foreach if optimizer_config.foreach is not None else False,
-                maximize=optimizer_config.maximize if optimizer_config.maximize is not None else False,
-                capturable=optimizer_config.capturable if optimizer_config.capturable is not None else False,
-                differentiable=optimizer_config.differentiable if optimizer_config.differentiable is not None else False,
-                fused=optimizer_config.fused if optimizer_config.fused is not None else False,
-            )
-
-            if optimizer_config.stochastic_rounding or optimizer_config.fused_back_pass:
-                patch_adam(optimizer, optimizer_config.stochastic_rounding)
-
         # ADAMW Optimizer
         case Optimizer.ADAMW:
             if optimizer_config.stochastic_rounding \
@@ -228,22 +187,6 @@ def create_optimizer(
 
             if optimizer_config.stochastic_rounding or optimizer_config.fused_back_pass:
                 patch_adamw(optimizer, optimizer_config.stochastic_rounding)
-
-        # ADAM_8BIT Optimizer
-        case Optimizer.ADAM_8BIT:
-            import bitsandbytes as bnb
-            optimizer = bnb.optim.Adam(
-                params=parameters,
-                lr=config.learning_rate,
-                betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
-                       optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
-                eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
-                min_8bit_size=optimizer_config.min_8bit_size if optimizer_config.min_8bit_size is not None else 4096,
-                percentile_clipping=optimizer_config.percentile_clipping if optimizer_config.percentile_clipping is not None else 100,
-                block_wise=optimizer_config.block_wise if optimizer_config.block_wise is not None else True,
-                is_paged=optimizer_config.is_paged if optimizer_config.is_paged is not None else False,
-            )
 
         # ADAMW_8BIT Optimizer
         case Optimizer.ADAMW_8BIT:
@@ -429,22 +372,6 @@ def create_optimizer(
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 1e-2,
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
-                warmup_steps=config.learning_rate_warmup_steps,
-                r=optimizer_config.r if optimizer_config.r is not None else 0,
-                weight_lr_power=optimizer_config.weight_lr_power if optimizer_config.weight_lr_power is not None else 2.0,
-                foreach=optimizer_config.foreach if optimizer_config.foreach is not None else False
-            )
-
-        # Schedule-free SGD
-        case Optimizer.SCHEDULE_FREE_SGD:
-            if config.model_type.is_wuerstchen_v2() or config.model_type.is_stable_cascade():
-                raise NotImplementedError("Cannot use schedule-free optimizers with Wuerstchen models.")
-            from schedulefree import SGDScheduleFree
-            optimizer = SGDScheduleFree(
-                params=parameters,
-                lr=config.learning_rate,
-                momentum=optimizer_config.momentum if optimizer_config.momentum is not None else 0,
-                weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 0,
                 warmup_steps=config.learning_rate_warmup_steps,
                 r=optimizer_config.r if optimizer_config.r is not None else 0,
                 weight_lr_power=optimizer_config.weight_lr_power if optimizer_config.weight_lr_power is not None else 2.0,

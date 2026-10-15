@@ -7,10 +7,6 @@ class Optimizer(Enum):
     # Sorted by origin (BNB / torch first), then by adapter name, then interleaved by variant.
 
     # 32 bit is torch and not bnb
-    ADAM = 'ADAM'
-    ADAM_8BIT = 'ADAM_8BIT'
-
-    # 32 bit is torch and not bnb
     ADAMW = 'ADAMW'
     ADAMW_8BIT = 'ADAMW_8BIT'
     ADAMW_ADV = 'ADAMW_ADV'
@@ -36,12 +32,10 @@ class Optimizer(Enum):
 
     # 32 bit is torch and not bnb
     SGD = 'SGD'
-    SGD_8BIT = 'SGD_8BIT'
     SIGNSGD_ADV = 'SIGNSGD_ADV'
 
     # Schedule-free optimizers
     SCHEDULE_FREE_ADAMW = 'SCHEDULE_FREE_ADAMW'
-    SCHEDULE_FREE_SGD = 'SCHEDULE_FREE_SGD'
 
     # Prodigy
     PRODIGY = 'PRODIGY'
@@ -76,7 +70,6 @@ class Optimizer(Enum):
     def is_schedule_free(self):
         return self in [
             self.SCHEDULE_FREE_ADAMW,
-            self.SCHEDULE_FREE_SGD,
             self.PRODIGY_PLUS_SCHEDULE_FREE,
         ]
 
@@ -85,7 +78,6 @@ class Optimizer(Enum):
             Optimizer.ADAFACTOR,
             Optimizer.CAME,
             Optimizer.CAME_8BIT,
-            Optimizer.ADAM,
             Optimizer.ADAMW,
             Optimizer.ADAMW_ADV,
             Optimizer.ADOPT_ADV,
