@@ -40,6 +40,11 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 STREAM_READER_THREADS = 4
 
 
+def _stream_read_backend() -> str:
+    # Windows charges commit for whole-file copy-on-write mappings. pread owns each tensor's buffer instead.
+    return "pread" if os.name == "nt" else "mmap"
+
+
 def __stream_reader(
         tid: int,
         nthreads: int,
@@ -49,25 +54,33 @@ def __stream_reader(
         out_queue: queue.Queue,
         done,
         stop: threading.Event,
+        open_lock,
 ):
-    # prefetch reader thread: reads a stripe of the work list into host RAM and feeds the bounded queue. Each thread
-    # owns its safe_open handles (a handle is not safe for concurrent get_tensor). stop lets the main thread break the
-    # stripe early on abort/OOM, so no reader is left executing inside safetensors when the stream unwinds.
-    thread_handles: dict[str, object] = {}
+    # Each reader owns at most one shard handle. Explicit closure also releases storage when an exception's
+    # traceback keeps this frame alive. The queue bounds tensor count, including neither blocked producers nor casts.
+    backend = _stream_read_backend()
     try:
-        for i in range(tid, len(work), nthreads):
-            if stop.is_set():
-                break
-            item = work[i]
-            path = key_to_file[item[0]]
-            handle = thread_handles.get(path)
-            if handle is None:
-                handle = thread_handles[path] = safe_open(path, framework="pt", device="cpu")
-            # cache key is the renamed module-layout key; the file stores the original, so read by the original
-            # (identity when no rename map was built).
-            read_key = source_key_map.get(item[0], item[0]) if source_key_map else item[0]
-            # get_tensor returns a lazy mmap view; .clone() forces the read off disk into host RAM
-            out_queue.put((item, handle.get_tensor(read_key).clone()))
+        with contextlib.ExitStack() as handles:
+            current_path = None
+            handle = None
+            for i in range(tid, len(work), nthreads):
+                if stop.is_set():
+                    break
+                item = work[i]
+                path = key_to_file[item[0]]
+                if path != current_path:
+                    handles.close()
+                    handle = None
+                    # safetensors 0.8 still briefly maps the shard to parse metadata with pread. Serialize opens
+                    # so only one constructor per stream incurs that transient whole-shard commit charge.
+                    with open_lock if backend == "pread" else contextlib.nullcontext():
+                        handle = handles.enter_context(safe_open(path, framework="pt", device="cpu", backend=backend))
+                    current_path = path
+                read_key = source_key_map.get(item[0], item[0]) if source_key_map else item[0]
+                # mmap needs a clone to detach from the shard; pread already returns independently owned storage.
+                value = handle.get_tensor(read_key) if backend == "pread" else handle.get_tensor(read_key).clone()
+                out_queue.put((item, value))
+                del value
     except Exception as e:
         out_queue.put(e)
     finally:
@@ -93,17 +106,18 @@ def _intended_float_dtype(
         module_name: str,
         tensor_name: str,
         dtype: DataType,
-        train_dtype: DataType,
+        train_dtype: DataType | None,
         keep_in_fp32_modules: list[str],
+        fallback_dtype: DataType = DataType.BFLOAT_16,
 ) -> torch.dtype | None:
-    # target dtype for a streamed float tensor, or None to leave it unchanged. A param the quantizer will pack keeps
-    # its dtype (the quantizer converts it); keep-in-fp32 modules and a quantized component's leftover params go to
-    # train_dtype; everything else to the weight dtype.
+    # Shared resident/streamed policy. None leaves quantizer-owned values, or unresolved training dtypes, unchanged.
     if is_quantized_parameter(module, tensor_name):
         return None
-    if dtype.is_quantized() or module_name in keep_in_fp32_modules:
-        # a caller without a train_dtype yet (budget sizing) gets None -> the budget over-estimates these from the
-        # fp32 skeleton; the stream-time caller always passes a real train_dtype.
+    if module_name in keep_in_fp32_modules:
+        return train_dtype.torch_dtype() if train_dtype is not None else None
+    if dtype.is_quantized() and type(module) is nn.Linear:
+        return fallback_dtype.torch_dtype()
+    if dtype.is_quantized():
         return train_dtype.torch_dtype() if train_dtype is not None else None
     return dtype.torch_dtype()
 
@@ -111,8 +125,11 @@ def _intended_float_dtype(
 def _stamp_skeleton_float_dtypes(
         sub_module: nn.Module,
         dtype: DataType,
-        train_dtype: DataType,
+        train_dtype: DataType | None,
         keep_in_fp32_modules: list[str],
+        fallback_dtype: DataType = DataType.BFLOAT_16,
+        *,
+        key_prefix: str = "",
 ):
     # stamp each meta-skeleton float param with the dtype the stream will give it, so the offload VRAM budget (which
     # sizes the still-meta skeleton) measures the real post-load footprint, not init_empty_weights' fp32 default. Free:
@@ -120,11 +137,13 @@ def _stamp_skeleton_float_dtypes(
     # as the stream-time cast so the two agree; quantized weights are left alone (sized via predict_offload_bytes).
     # Buffers are not stamped: they never enter the offload budget.
     for name, module in sub_module.named_modules():
-        module_name = name.split(".")[-1]
+        lookup_name = ".".join(p for p in name.split(".") if p != "checkpoint")
+        module_name = ".".join(p for p in (key_prefix, lookup_name) if p).split(".")[-1]
         for tensor_name, param in module.named_parameters(recurse=False):
-            if not torch.is_floating_point(param):
+            if not param.is_meta or not torch.is_floating_point(param):
                 continue
-            target = _intended_float_dtype(module, module_name, tensor_name, dtype, train_dtype, keep_in_fp32_modules)
+            target = _intended_float_dtype(
+                module, module_name, tensor_name, dtype, train_dtype, keep_in_fp32_modules, fallback_dtype)
             if target is not None and param.dtype != target:
                 param.data = param.data.to(dtype=target)
 
@@ -142,6 +161,7 @@ def stream_module_from_checkpoint(
         source_key_map: dict[str, str] | None = None,
         part_name: str | None = None,
         dest_pool=None,
+        fallback_dtype: DataType = DataType.BFLOAT_16,
 ):
     # Fill a meta skeleton by streaming its checkpoint weights one tensor at a time, so the full checkpoint never lands
     # in RAM. key_prefix scopes the lookup to one sub-module; keys stay checkpoint-absolute. dest_pool routes
@@ -152,10 +172,10 @@ def stream_module_from_checkpoint(
     # flat work list of every checkpoint-backed skeleton tensor, so the reader threads below can drive the reads.
     work = []  # (key, sub_module, tensor_name, is_buffer, module_name)
     for name, sub_module in module.named_modules():
-        module_name = name.split(".")[-1]
         # gradient checkpointing in compile mode wraps each block in a CheckpointLayer, inserting a "checkpoint"
         # level into the live path; the checkpoint keys have none, so strip it before lookup (as LoRAModule does).
         lookup_name = ".".join(p for p in name.split(".") if p != "checkpoint")
+        module_name = ".".join(p for p in (key_prefix, lookup_name) if p).split(".")[-1]
         for tensor_name, param in list(sub_module.named_parameters(recurse=False)):
             key = ".".join(p for p in (key_prefix, lookup_name, tensor_name) if p)
             if key in key_to_file and param.is_meta:
@@ -188,7 +208,8 @@ def stream_module_from_checkpoint(
         # tensors that will be quantized stay at their original dtype (the quantizer converts them); everything else is
         # cast to its intended dtype here.
         if torch.is_floating_point(value):
-            target = _intended_float_dtype(sub_module, module_name, tensor_name, dtype, train_dtype, keep_in_fp32_modules)
+            target = _intended_float_dtype(
+                sub_module, module_name, tensor_name, dtype, train_dtype, keep_in_fp32_modules, fallback_dtype)
             if target is not None:
                 value = value.to(dtype=target)
         with mem_pool_context(dest_pool_for(sub_module), device=device):
@@ -199,20 +220,18 @@ def stream_module_from_checkpoint(
         if bar is not None:
             bar.update(1)
 
-    # reader threads stripe the work list into host RAM and feed a bounded queue; the main thread drains it and does
-    # H2D + inline quantize on the default stream. Both the parallel reads and overlapping them with the GPU work are
-    # wins. Each reader clones the tensor off its mmap and drops its safetensors handles when it exits (right after its
-    # stripe), so the file mmaps are released early rather than pinned until first use -- keeps page-cache pressure
-    # down. Tensors may land out of order -- place() addresses each by name and inline quant is order-free.
+    # Readers prefetch independently owned tensors while the main thread performs H2D + inline quantization.
+    # Tensors may land out of order; placement addresses them by name.
     nthreads = STREAM_READER_THREADS
     out_queue: queue.Queue = queue.Queue(maxsize=2 * nthreads)
     done = object()
     stop = threading.Event()
+    open_lock = threading.Lock()
 
     threads = [
         threading.Thread(
             target=__stream_reader,
-            args=(tid, nthreads, work, key_to_file, source_key_map, out_queue, done, stop),
+            args=(tid, nthreads, work, key_to_file, source_key_map, out_queue, done, stop, open_lock),
             name=f"stream-reader-{tid}", daemon=True,
         )
         for tid in range(nthreads)
@@ -410,17 +429,11 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
 
             if torch.is_floating_point(old_value):
                 old_type = type(old_value)
-                if not is_quantized_parameter(module, tensor_name):
-                    if module_name in keep_in_fp32_modules:
-                        value = value.to(dtype=train_dtype.torch_dtype())
-                    elif dtype.is_quantized() and type(module) is nn.Linear:
-                        # a plain Linear that the quantization layer filter excluded
-                        fallback_dtype = quantization.fallback_dtype if quantization is not None else DataType.BFLOAT_16
-                        value = value.to(dtype=fallback_dtype.torch_dtype())
-                    elif dtype.is_quantized():
-                        value = value.to(dtype=train_dtype.torch_dtype())
-                    else:
-                        value = value.to(dtype=dtype.torch_dtype())
+                fallback_dtype = quantization.fallback_dtype if quantization is not None else DataType.BFLOAT_16
+                target = _intended_float_dtype(
+                    module, module_name, tensor_name, dtype, train_dtype, keep_in_fp32_modules, fallback_dtype)
+                if target is not None:
+                    value = value.to(dtype=target)
 
                 new_value = old_type(value)
 
@@ -582,7 +595,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 f"No safetensors weights found for '{location}' (looked for {model_filename} and {fp16_filename}). "
                 f"Only pickle .bin checkpoints are present, which are not supported; convert the model to "
                 f"safetensors.")
-        with safe_open(full_filename, framework="pt") as f:
+        with safe_open(full_filename, framework="pt", backend=_stream_read_backend()) as f:
             for key in f.keys():  # noqa: SIM118 -- safe_open handle, not a dict
                 key_to_file[key] = full_filename
 
@@ -639,9 +652,10 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
 
         keep_in_fp32_modules = module_type._keep_in_fp32_modules or []
         replace_linear_with_quantized_layers(sub_module, dtype, keep_in_fp32_modules, quantization, copy_parameters=False)
+        fallback_dtype = quantization.fallback_dtype if quantization is not None else DataType.BFLOAT_16
         # stamp with train_dtype=None: the per-part train_dtype is only known at materialize, so keep-in-fp32 and
         # quantized-leftover params stay fp32 in the skeleton (a safe budget over-estimate); see _intended_float_dtype
-        _stamp_skeleton_float_dtypes(sub_module, dtype, None, keep_in_fp32_modules)
+        _stamp_skeleton_float_dtypes(sub_module, dtype, None, keep_in_fp32_modules, fallback_dtype)
 
         key_to_file = self.__resolve_shard_key_to_file(
             pretrained_model_name_or_path, subfolder,
@@ -657,7 +671,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             sub_module._fix_state_dict_keys_on_load(key_to_file)
 
         return self.__finish_sub_module_load(
-            sub_module, dtype, train_dtype, keep_in_fp32_modules, key_to_file)
+            sub_module, dtype, train_dtype, keep_in_fp32_modules, key_to_file, quantization=quantization)
 
     def __finish_sub_module_load(
             self,
@@ -667,19 +681,26 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             keep_in_fp32_modules: list[str],
             key_to_file: dict[str, str],
             source_key_map: dict[str, str] | None = None,
+            *,
+            quantization: QuantizationConfig | None = None,
     ):
         tied_weights_keys = getattr(sub_module, "_tied_weights_keys", None)
+        fallback_dtype = quantization.fallback_dtype if quantization is not None else DataType.BFLOAT_16
 
         # module/key_prefix let the layer-offload conductor reuse this same closure to stream one layer at a time
         # (module=that layer, key_prefix=its path in the checkpoint) as well as the non-layer remainder
         # (module=the whole sub-module, key_prefix=""). Whole-module callers pass neither and stream everything.
         def materialize_fn(
                 module: nn.Module, device: torch.device, train_dtype: DataType, key_prefix: str = "",
-                part_name: str | None = None, dest_pool=None):
+                part_name: str | None = None, dest_pool=None, *, prepare_only: bool = False):
+            _stamp_skeleton_float_dtypes(
+                module, dtype, train_dtype, keep_in_fp32_modules, fallback_dtype, key_prefix=key_prefix)
+            if prepare_only:
+                return
             stream_module_from_checkpoint(
                 module, device, key_to_file, dtype, train_dtype,
                 keep_in_fp32_modules, tied_weights_keys, quantize=True, key_prefix=key_prefix,
-                source_key_map=source_key_map, part_name=part_name, dest_pool=dest_pool)
+                source_key_map=source_key_map, part_name=part_name, dest_pool=dest_pool, fallback_dtype=fallback_dtype)
 
         return sub_module, materialize_fn
 
@@ -703,17 +724,10 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
                 if value is not None and torch.is_floating_point(value):
                     old_type = type(value)
                     if not is_quantized_parameter(module, tensor_name):
-                        if module_name in keep_in_fp32_modules:
-                            value = value.to(dtype=train_dtype.torch_dtype())
-                        elif dtype.is_quantized() and type(module) is nn.Linear:
-                            # a plain Linear that the quantization layer filter excluded
-                            fallback_dtype = quantization.fallback_dtype if quantization is not None else DataType.BFLOAT_16
-                            value = value.to(dtype=fallback_dtype.torch_dtype())
-                        elif dtype.is_quantized():
-                            value = value.to(dtype=train_dtype.torch_dtype())
-                        else:
-                            value = value.to(dtype=dtype.torch_dtype())
-
+                        fallback_dtype = quantization.fallback_dtype if quantization is not None else DataType.BFLOAT_16
+                        target = _intended_float_dtype(
+                            module, module_name, tensor_name, dtype, train_dtype, keep_in_fp32_modules, fallback_dtype)
+                        value = value.to(dtype=target)
                         value = old_type(value)
 
                         if is_buffer:

@@ -214,7 +214,7 @@ class StaticLayerAllocator:
             # host/pinned cache, disk-streaming with cache_in_ram off: layers stream+quantize straight from the
             # checkpoint and evict back to meta, so no resident copy ever coexists with the pinned cache -- none of the
             # peak-doubling that justifies chunking below. A single large pinned buffer is fine: pin_tensor_ page-locks
-            # the existing scattered pages in place, and the CPU allocator has no pool to fragment. Same as the GPU cache.
+            # the existing scattered pages in place.
             num_cache_tensors = 1
         else:
             # host/pinned cache, resident model (classic offload, or streaming with cache_in_ram on): the chunks are
@@ -766,6 +766,9 @@ class LayerOffloadConductor:
         log("to train device")
 
         try:
+            if streaming:
+                # Resolve meta parameter dtypes before predicting layer bytes or allocating either offload arena.
+                materialize_fn(self.__module, self.__train_device, train_dtype, prepare_only=True)
             self.__measure_compressed_sizes(materialize_fn, train_dtype, name)
 
             self.__offload_strategy = LayerOffloadStrategy(self.__layers, self.__layer_offload_fraction)

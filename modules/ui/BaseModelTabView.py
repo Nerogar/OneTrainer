@@ -130,7 +130,7 @@ class BaseModelTabView(ABC):
 
         # stream from disk
         self.components.label(frame, row, 0, "Stream From Disk",
-                         tooltip="Uses the streaming model loader to stream frozen weights from disk to VRAM on demand, greatly reducing RAM usage. Only turn off if you hit compatibility issues.")
+                         tooltip="Streams tensors from disk in small groups, applying quantization as they load when enabled, to reduce peak RAM usage during loading. Turn off if you encounter compatibility issues.")
         self.components.switch(frame, row, 1, ui_state, "stream_from_disk")
 
         row += 1
