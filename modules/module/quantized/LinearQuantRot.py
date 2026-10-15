@@ -131,10 +131,7 @@ def make_quant_rot_linear(linear_class):
             # self.forward) because self.forward is replaced by the adapter hook once applied.
             assert self.__quant_rot_is_quantized
             assert lora_down.bias is None and lora_up.bias is None
-            if self._rotatable():
-                x_base = _right_multiply_blocks(x, self.quant_rot, transpose=True)
-            else:
-                x_base = x
+            x_base = _right_multiply_blocks(x, self.quant_rot, transpose=True) if self._rotatable() else x
             # super() dispatches to the quantized base (LinearW8A8 / LinearSVD / LinearNf4) forward,
             # which applies the stored (rotated, quantized) weight; with SVDQuant it also adds the SVD
             # low-rank part, which acts on the same rotated input x_base (A @ (x @ O^T)).
