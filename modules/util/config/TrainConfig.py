@@ -110,7 +110,7 @@ class TrainOptimizerConfig(BaseConfig):
     use_schedulefree: True
     use_orthograd: False
     nnmf_factor: False
-    orthogonal_gradient: False
+    orthogonal_gradient: str
     use_atan2: False
     beta1_warmup: int
     min_beta1: float
@@ -151,23 +151,41 @@ class TrainOptimizerConfig(BaseConfig):
             data,
             config_version=1,
             config_migrations={
-                0: self.__migration_0
+                0: self.__migration_0,
             }
         )
 
     def __migration_0(self, data: dict) -> dict:
-        migrated_data = data.copy()
+        def migrate_settings(settings: dict, optimizer) -> dict:
+            settings = settings.copy()
+            sp = settings.get("state_precision")
+            valid_sp = {"auto", "factored", "fp32", "fp16", "bf16_sr", "int8_sr"}
+            if sp is not None and sp not in valid_sp:
+                print(f"WARN: invalid optimizer state_precision '{sp}' in config, falling back to 'auto'.")
+                settings["state_precision"] = "auto"
 
-        sp = migrated_data.get("state_precision")
-        valid_sp = {"auto", "factored", "fp32", "fp16", "bf16_sr", "int8_sr"}
-        if sp is not None and sp not in valid_sp:
-            print(f"WARN: invalid optimizer state_precision '{sp}' in config, falling back to 'auto'.")
-            migrated_data["state_precision"] = "auto"
+            # orthogonal_gradient was a bool before adv_optm 2.5 made it a mode string.
+            ortho = settings.get("orthogonal_gradient")
+            if isinstance(ortho, bool):
+                settings["orthogonal_gradient"] = "flattened" if ortho else "disabled"
 
-        # orthogonal_gradient was a bool before adv_optm 2.5 made it a mode string
-        og_ortho = migrated_data.get("orthogonal_gradient")
-        if isinstance(og_ortho, bool):
-            migrated_data["orthogonal_gradient"] = "flattened" if og_ortho else "disabled"
+            if str(optimizer) in {
+                "ADAMW_ADV", "ADOPT_ADV", "SIGNSGD_ADV", "MUON_ADV", "ADAMUON_ADV",
+            } and settings.get("nnmf_factor", False):
+                # Preserve an explicitly selected non-default storage format.
+                if settings.get("state_precision", "auto") in (None, "auto"):
+                    settings["state_precision"] = "factored"
+                settings["nnmf_factor"] = False
+            return settings
+
+        migrated_data = migrate_settings(data, data.get("optimizer", self.optimizer))
+
+        # plain dict, so BaseConfig doesnt run migrations
+        adam_config = migrated_data.get("muon_adam_config")
+        if isinstance(adam_config, dict) and adam_config and adam_config.get("__version", 0) < 1:
+            adam_config = migrate_settings(adam_config, Optimizer.ADAMW_ADV)
+            adam_config["__version"] = 1
+            migrated_data["muon_adam_config"] = adam_config
 
         return migrated_data
 

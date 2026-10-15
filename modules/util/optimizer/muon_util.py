@@ -122,7 +122,7 @@ def split_parameters_for_muon(
     optimizer_config = config.optimizer
 
     has_adam_params = False
-    layer_key_fn = build_muon_adam_key_fn(model, config)
+    layer_key_fn = build_muon_adam_key_fn(model, config) if optimizer_config.MuonWithAuxAdam else None
 
     if layer_key_fn:
         for group in parameters:
