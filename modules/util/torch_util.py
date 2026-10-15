@@ -8,7 +8,7 @@ from typing import Any
 import torch
 
 import accelerate
-import packaging
+import packaging.version
 from packaging.version import Version
 
 accelerator = accelerate.Accelerator()
@@ -146,7 +146,7 @@ def tensors_to_device_(
         device: torch.device,
         include_parameter_indices: list[int] | None = None,
         non_blocking: bool = False,
-        allocator: Callable[[torch.tensor], torch.tensor] | None = None,
+        allocator: Callable[[torch.Tensor], torch.Tensor] | None = None,
 ) -> bool:
     tensor_transferred = False
 
@@ -180,6 +180,7 @@ def replace_tensors_(
         include_parameter_indices: list[int] | None = None,
 ):
     if isinstance(target_data, torch.Tensor) and include_parameter_indices is None:
+        assert isinstance(source_data, torch.Tensor)
         target_data.data = source_data.data
     elif isinstance(target_data, list | tuple):
         for i, elem in enumerate(target_data):
@@ -240,7 +241,7 @@ def unpin_module(
     return module._apply(convert)
 
 
-def device_equals(device1: torch.device, device2: torch.device) -> bool:
+def device_equals(device1: torch.device | None, device2: torch.device | None) -> bool:
     return device1 is not None and device2 is not None \
         and device1.type == device2.type \
         and (0 if device1.index is None else device1.index) == (0 if device2.index is None else device2.index)
@@ -293,7 +294,7 @@ def torch_sync():
         packaging.version.parse(torch.__version__)
 
 
-def create_stream_context(stream: torch.cuda.Stream) -> torch.cuda.StreamContext | nullcontext:
+def create_stream_context(stream: torch.cuda.Stream | None) -> torch.cuda.StreamContext | nullcontext:
     if isinstance(stream, torch.cuda.Stream):
         return torch.cuda.StreamContext(stream)
     return nullcontext()
