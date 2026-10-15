@@ -319,9 +319,9 @@ class TrainUI(ctk.CTk):
                          tooltip="Enable multi-GPU training")
         components.switch(frame, 12, 1, self.ui_state, "multi_gpu")
 
-        components.label(frame, 13, 2, "Device Indexes",
+        components.label(frame, 12, 2, "Device Indexes",
                          tooltip="Multi-GPU: A comma-separated list of device indexes. If empty, all your GPUs are used. With a list such as \"0,1,3,4\" you can omit a GPU, for example an on-board graphics GPU.")
-        components.entry(frame, 13, 3, self.ui_state, "device_indexes")
+        components.entry(frame, 12, 3, self.ui_state, "device_indexes")
 
         components.label(frame, 14, 0, "Gradient Reduce Precision",
                          tooltip="WEIGHT_DTYPE: Reduce gradients between GPUs in your weight data type; can be imprecise, but more efficient than float32\n"
@@ -475,11 +475,6 @@ class TrainUI(ctk.CTk):
         components.label(frame, 5, 0, "Skip First",
                          tooltip="Start saving automatically after this interval has elapsed")
         components.entry(frame, 5, 1, self.ui_state, "save_skip_first", width=50, sticky="nw")
-
-        # save filename prefix
-        components.label(frame, 6, 0, "Save Filename Prefix",
-                         tooltip="The prefix for filenames used when saving the model during training")
-        components.entry(frame, 6, 1, self.ui_state, "save_filename_prefix")
 
         frame.pack(fill="both", expand=1)
         return frame
