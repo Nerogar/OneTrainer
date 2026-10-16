@@ -110,14 +110,10 @@ class TrainOptimizerConfig(BaseConfig):
     use_schedulefree: True
     use_orthograd: False
     nnmf_factor: False
-    orthogonal_gradient: False
+    orthogonal_gradient: str
     use_atan2: False
-    use_AdEMAMix: False
-    beta3_ema: float
-    alpha_grad: float
     beta1_warmup: int
     min_beta1: float
-    Simplified_AdEMAMix: False
     kourkoutas_beta: False
     schedulefree_c: float
     ns_steps: int
@@ -136,11 +132,62 @@ class TrainOptimizerConfig(BaseConfig):
     accelerated_ns: False
     cautious_wd: False
     approx_mars: False
-    auto_kappa_p: False
     compile: False
+    spectral_normalization: bool
+    stochastic_sign: bool
+    centered_wd: float
+    centered_wd_mode: str
+    factored_2nd: bool
+    fisher_wd: bool
+    state_precision: str
+    orthogonal_sinkhorn: bool
+    sinkhorn_iterations: int
+    normed_momentum: bool
+    nesterov_coef: float
+    geometric_wd: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super().__init__(data)
+        super().__init__(
+            data,
+            config_version=1,
+            config_migrations={
+                0: self.__migration_0,
+            }
+        )
+
+    def __migration_0(self, data: dict) -> dict:
+        def migrate_settings(settings: dict, optimizer) -> dict:
+            settings = settings.copy()
+            sp = settings.get("state_precision")
+            valid_sp = {"auto", "factored", "fp32", "fp16", "bf16_sr", "int8_sr"}
+            if sp is not None and sp not in valid_sp:
+                print(f"WARN: invalid optimizer state_precision '{sp}' in config, falling back to 'auto'.")
+                settings["state_precision"] = "auto"
+
+            # orthogonal_gradient was a bool before adv_optm 2.5 made it a mode string.
+            ortho = settings.get("orthogonal_gradient")
+            if isinstance(ortho, bool):
+                settings["orthogonal_gradient"] = "flattened" if ortho else "disabled"
+
+            if str(optimizer) in {
+                "ADAMW_ADV", "ADOPT_ADV", "SIGNSGD_ADV", "MUON_ADV", "ADAMUON_ADV",
+            } and settings.get("nnmf_factor", False):
+                # Preserve an explicitly selected non-default storage format.
+                if settings.get("state_precision", "auto") in (None, "auto"):
+                    settings["state_precision"] = "factored"
+                settings["nnmf_factor"] = False
+            return settings
+
+        migrated_data = migrate_settings(data, data.get("optimizer", self.optimizer))
+
+        # plain dict, so BaseConfig doesnt run migrations
+        adam_config = migrated_data.get("muon_adam_config")
+        if isinstance(adam_config, dict) and adam_config and adam_config.get("__version", 0) < 1:
+            adam_config = migrate_settings(adam_config, Optimizer.ADAMW_ADV)
+            adam_config["__version"] = 1
+            migrated_data["muon_adam_config"] = adam_config
+
+        return migrated_data
 
     @staticmethod
     def default_values():
@@ -223,14 +270,10 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("use_schedulefree", True, bool, True))
         data.append(("use_orthograd", False, bool, False))
         data.append(("nnmf_factor", False, bool, False))
-        data.append(("orthogonal_gradient", False, bool, False))
+        data.append(("orthogonal_gradient", "disabled", str, False))
         data.append(("use_atan2", False, bool, False))
-        data.append(("use_AdEMAMix", False, bool, False))
-        data.append(("beta3_ema", None, float, True))
-        data.append(("alpha_grad", None, float, True))
         data.append(("beta1_warmup", None, int, True))
         data.append(("min_beta1", None, float, True))
-        data.append(("Simplified_AdEMAMix", False, bool, False))
         data.append(("kourkoutas_beta", False, bool, False))
         data.append(("schedulefree_c", None, float, True))
         data.append(("ns_steps", None, int, True))
@@ -249,8 +292,19 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("accelerated_ns", False, bool, False))
         data.append(("cautious_wd", False, bool, False))
         data.append(("approx_mars", False, bool, False))
-        data.append(("auto_kappa_p", False, bool, False))
         data.append(("compile", False, bool, False))
+        data.append(("spectral_normalization", False, bool, False))
+        data.append(("stochastic_sign", False, bool, False))
+        data.append(("centered_wd", 0.0, float, False))
+        data.append(("centered_wd_mode", "full", str, False))
+        data.append(("factored_2nd", False, bool, False))
+        data.append(("fisher_wd", False, bool, False))
+        data.append(("state_precision", "auto", str, False))
+        data.append(("orthogonal_sinkhorn", False, bool, False))
+        data.append(("sinkhorn_iterations", None, int, True))
+        data.append(("normed_momentum", False, bool, False))
+        data.append(("nesterov_coef", None, float, True))
+        data.append(("geometric_wd", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
