@@ -122,7 +122,8 @@ def __replace_linear_layers(
     if isinstance(parent_module, (nn.ModuleList, nn.Sequential, nn.ModuleDict)):
         for key, module in (parent_module.items() if isinstance(parent_module, nn.ModuleDict) else enumerate(parent_module)):
             if isinstance(module, convert_type):
-                matches = filters is None or len(filters) == 0 or any(f.matches(name_prefix) for f in filters)
+                key_name = key if name_prefix == "" else f"{name_prefix}.{key}"
+                matches = filters is None or len(filters) == 0 or any(f.matches(key_name) for f in filters)
                 fn = construct_fn if matches else fallback_construct_fn
                 if fn is None:
                     continue
