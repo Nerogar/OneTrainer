@@ -8,7 +8,7 @@ from modules.util.ui import pyside6_components
 from modules.util.ui.pyside6_util import get_theme_controller
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFileDialog, QPushButton, QWidget
+from PySide6.QtWidgets import QFileDialog, QMessageBox, QPushButton, QWidget
 
 
 class PySide6TopBarView(BaseTopBarView, QWidget):
