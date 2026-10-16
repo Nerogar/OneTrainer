@@ -154,7 +154,7 @@ function get_platform {
             if awk "BEGIN{exit !(${driver_cuda} >= 13.0)}"; then
                 platform="cuda13"
             else
-                print_warning "Detected CUDA version ${driver_cuda}, Updating to a driver that supports CUDA 13 is recommended."
+                print_warning "Detected CUDA version ${driver_cuda}. Updating to a driver that supports CUDA 13 is recommended."
                 platform="cuda12"
             fi
         elif [[ -e "/dev/kfd" ]]; then

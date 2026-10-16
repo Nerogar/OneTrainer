@@ -96,13 +96,13 @@ function Get-Platform {
         Write-OTDebug "NVIDIA GPU detected via nvidia-smi."
         $smiOutput = (& nvidia-smi 2>$null) -join "`n"
         $driverCuda = $null
-        if ($smiOutput -match 'CUDA Version:\s*([0-9]+\.[0-9]+)') {
+        if ($smiOutput -match 'CUDA (?:UMD )?Version:\s*([0-9]+\.[0-9]+)') {
             $driverCuda = [double]$Matches[1]
         }
         if ($driverCuda -ge 13.0) {
             return "cuda13"
         }
-        Write-OTWarning "Detected CUDA version $driverCuda, Updating to a driver that supports CUDA 13 is recommended."
+        Write-OTWarning "Detected CUDA version $driverCuda. Updating to a driver that supports CUDA 13 is recommended."
         return "cuda12"
     }
 
