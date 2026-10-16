@@ -9,6 +9,7 @@ from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleM
 from modules.util.config.TrainConfig import QuantizationConfig, TrainConfig
 from modules.util.enum.DataType import DataType
 from modules.util.ModuleFilter import ModuleFilter
+from modules.util.tqdm_util import tqdm
 
 import torch
 from torch import Tensor, nn
@@ -16,7 +17,6 @@ from torch import Tensor, nn
 from diffusers.quantizers.gguf.utils import GGUFLinear, dequantize_gguf_tensor
 
 import accelerate
-from tqdm import tqdm
 
 try:
     from modules.module.quantized.LinearNf4 import LinearNf4
