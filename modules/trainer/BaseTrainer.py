@@ -1,5 +1,7 @@
 import os
 import sys
+import shutil
+import subprocess
 from abc import ABCMeta, abstractmethod
 
 from modules.model.BaseModel import BaseModel
@@ -82,7 +84,7 @@ class BaseTrainer(
             self.config.training_method
         )
     def _start_tensorboard(self):
-        tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
+        tensorboard_executable = shutil.which("tensorboard")
         tensorboard_log_dir = os.path.join(self.config.workspace_dir, "tensorboard")
 
         tensorboard_args = [

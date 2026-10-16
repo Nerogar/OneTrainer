@@ -49,5 +49,7 @@ class BaseModelLoader(metaclass=ABCMeta):
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
             quantization: QuantizationConfig,
+            stream_from_disk: bool = False,
+            cache_in_ram: dict[str, bool] | None = None,
     ) -> BaseModel | None:
         pass

@@ -16,6 +16,7 @@ from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
 from modules.util import create, huggingface_util, path_util
+from modules.util.async_tensor_exchange import AsyncTensorExchange
 from modules.util.bf16_stochastic_rounding import set_seed as bf16_stochastic_rounding_set_seed
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
@@ -136,6 +137,8 @@ class GenericTrainer(BaseTrainer):
             model_names=model_names,
             weight_dtypes=self.config.weight_dtypes(),
             quantization=self.config.quantization,
+            stream_from_disk=self.config.stream_from_disk,
+            cache_in_ram=self.config.cache_in_ram(),
         )
         self.model.train_config = self.config
 
@@ -633,14 +636,39 @@ class GenericTrainer(BaseTrainer):
         has_gradient = False
 
         lr_scheduler = None
-        accumulated_loss = torch.tensor(0.0, device=train_device)
+        accum_loss = torch.tensor(0.0, device=train_device)
         ema_loss = None
         ema_loss_steps = 0
+
+        accum_loss_exchange = AsyncTensorExchange(train_device)
+
+        def report_loss(loss_cpu, loss_step, progress_bar=None):
+            nonlocal ema_loss, ema_loss_steps
+            if loss_cpu is None:
+                return
+
+            loss_value = loss_cpu.item()
+            if math.isnan(loss_value):
+                raise RuntimeError("Training loss became NaN. This may be due to invalid parameters, precision issues, or a bug in the loss computation.")
+
+            self.tensorboard.add_scalar("loss/train_step", loss_value, loss_step)
+            ema_loss = ema_loss or loss_value
+            ema_loss_steps += 1
+            ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
+            ema_loss = (ema_loss * ema_loss_decay) + (loss_value * (1 - ema_loss_decay))
+            if progress_bar is not None:
+                progress_bar.set_postfix({
+                    'loss': loss_value,
+                    'smooth loss': ema_loss,
+                })
+            self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, loss_step)
+
         epochs = range(train_progress.epoch, self.config.epochs, 1)
 
         for _epoch in tqdm(epochs, desc="epoch") if multi.is_master() else epochs:
             multi.sync_commands(self.commands)
             if self.commands.get_stop_command():
+                report_loss(*accum_loss_exchange.drain())
                 return
             self.callbacks.on_update_status("Starting epoch/caching")
 
@@ -663,7 +691,9 @@ class GenericTrainer(BaseTrainer):
                 torch.clear_autocast_cache()
                 self.model.optimizer.train()
 
-            torch_gc()
+            # no torch_gc here: setup_train_device above ends in materialize_only(), which collects whenever a
+            # part actually moved. On an epoch that changed nothing (the usual case once the caches are warm)
+            # there is nothing to reclaim, and this collection cost ~350ms of the epoch gap on a large model.
 
             if lr_scheduler is None:
                 lr_scheduler = create.create_lr_scheduler(
@@ -764,7 +794,7 @@ class GenericTrainer(BaseTrainer):
                     has_gradient = True
                     detached_loss = loss.detach()
                     multi.reduce_tensor_mean(detached_loss)
-                    accumulated_loss += detached_loss
+                    accum_loss += detached_loss
 
                     if self.__is_update_step(train_progress):
                         if self.config.fused_gradient_reduce:
@@ -795,22 +825,11 @@ class GenericTrainer(BaseTrainer):
                                 self.model, self.config, lr_scheduler, self.tensorboard
                             )
 
-                            accumulated_loss_cpu = accumulated_loss.item()
-                            if math.isnan(accumulated_loss_cpu):
-                                raise RuntimeError("Training loss became NaN. This may be due to invalid parameters, precision issues, or a bug in the loss computation.")
+                            accum_loss_cpu, accum_loss_step = accum_loss_exchange.exchange(accum_loss, train_progress.global_step)
+                            # Runs one update behind to avoid synchronizing the current step.
+                            report_loss(accum_loss_cpu, accum_loss_step, step_tqdm)
 
-                            self.tensorboard.add_scalar("loss/train_step",accumulated_loss_cpu , train_progress.global_step)
-                            ema_loss = ema_loss or accumulated_loss_cpu
-                            ema_loss_steps += 1
-                            ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
-                            ema_loss = (ema_loss * ema_loss_decay) + (accumulated_loss_cpu * (1 - ema_loss_decay))
-                            step_tqdm.set_postfix({
-                                'loss': accumulated_loss_cpu,
-                                'smooth loss': ema_loss,
-                            })
-                            self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, train_progress.global_step)
-
-                        accumulated_loss = 0.0
+                        accum_loss = 0.0
                         self.model_setup.after_optimizer_step(self.model, self.config, train_progress)
 
                         if self.model.ema:
@@ -835,13 +854,18 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
 
                 if self.commands.get_stop_command():
+                    report_loss(*accum_loss_exchange.drain())
                     return
 
             train_progress.next_epoch()
             self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
 
             if self.commands.get_stop_command():
+                report_loss(*accum_loss_exchange.drain())
                 return
+
+        # Check and log the last update before the caller saves the final model.
+        report_loss(*accum_loss_exchange.drain())
 
     def end(self):
         if self.one_step_trained:
