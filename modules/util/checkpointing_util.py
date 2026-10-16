@@ -245,6 +245,14 @@ def enable_checkpointing(
         lists, # if there are multiple entries in this list, they must be in the exact order they are executed - otherwise offloading fails
         supports_offloading: bool = True,
 ) -> LayerOffloadConductor | None:
+    # A full fine-tune updates the base weights, but meta-eviction (stream_from_disk + cache_in_ram off) re-streams
+    # them from the checkpoint on each use, discarding those updates. Reject that combo.
+    if config.stream_from_disk and config.part_trained_in_place(part) and not part.cache_in_ram:
+        raise NotImplementedError(
+            "a fully fine-tuned component cannot stream from disk without keeping it cached in RAM: it re-streams "
+            "weights from the checkpoint on each use, discarding training updates. Enable 'Cache In RAM' for this "
+            "component")
+
     if not part.checkpointing_or_offloading_enabled() and not compile:
         return None
 

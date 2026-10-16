@@ -1,4 +1,4 @@
-import datetime
+import datetime as dt
 import json
 import os
 import subprocess
@@ -73,7 +73,7 @@ class TrainUIController:
 
         total_eta = spent_total / steps_done_this_session * remaining_steps
 
-        td = datetime.timedelta(seconds=total_eta)
+        td = dt.timedelta(seconds=total_eta)
         days = td.days
         hours, remainder = divmod(td.seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
