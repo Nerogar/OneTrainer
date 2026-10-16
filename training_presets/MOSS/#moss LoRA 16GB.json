@@ -1,0 +1,33 @@
+{
+ "base_model_name": "OpenMOSS-Team/MOSS-Image-Base",
+ "batch_size": 1,
+ "learning_rate": 0.0003,
+ "model_type": "MOSS",
+ "output_model_format": "DIFFUSERS_LORA",
+ "resolution": "512",
+ "attention_mechanism": "CUDNN",
+ "compile": true,
+ "transformer": {
+  "train": true,
+  "weight_dtype": "INT_W8A8",
+  "offload_fraction": 0.3
+ },
+ "text_encoder": {
+  "train": false,
+  "weight_dtype": "FLOAT_8"
+ },
+ "training_method": "LORA",
+ "vae": {
+  "weight_dtype": "FLOAT_32"
+ },
+ "train_dtype": "BFLOAT_16",
+ "weight_dtype": "BFLOAT_16",
+ "output_dtype": "BFLOAT_16",
+ "timestep_distribution": "LOGIT_NORMAL",
+ "layer_filter": "q,k,v,o,ffn_up_gate,ffn_down",
+ "layer_filter_preset": "attn-mlp",
+ "quantization": {
+  "layer_filter": "q,k,v,o,ffn_up_gate,ffn_down",
+  "layer_filter_preset": "attn-mlp"
+ }
+}

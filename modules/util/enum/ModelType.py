@@ -42,6 +42,7 @@ class ModelType(Enum):
 
     ANIMA = 'ANIMA'
     KREA_2 = 'KREA_2'
+    MOSS = 'MOSS'
 
     Z_IMAGE = 'Z_IMAGE'
 
@@ -111,6 +112,9 @@ class ModelType(Enum):
     def is_krea2(self):
         return self == ModelType.KREA_2
 
+    def is_moss(self):
+        return self == ModelType.MOSS
+
     def is_sana(self):
         return self == ModelType.SANA
 
@@ -177,6 +181,7 @@ class ModelType(Enum):
             or self.is_qwen() \
             or self.is_anima() \
             or self.is_krea2() \
+            or self.is_moss() \
             or self.is_sana() \
             or self.is_hunyuan_video() \
             or self.is_hi_dream() \
@@ -204,7 +209,8 @@ class ModelType(Enum):
                 or self.is_sana() \
                 or self.is_hunyuan_video() \
                 or self.is_hi_dream() \
-                or self.is_chroma():
+                or self.is_chroma() \
+                or self.is_moss():
             return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA, TrainingMethod.EMBEDDING)
         if self.is_qwen() or self.is_z_image() or self.is_flux_2() or self.is_ernie() \
                 or self.is_anima() or self.is_krea2() or self.is_ideogram():
@@ -251,7 +257,7 @@ class ModelType(Enum):
             formats.append(ModelFormat.ORIGINAL_SINGLE_FILE)
         elif (self.is_flux_1() or self.is_flux_2() or self.is_chroma() or self.is_hunyuan_video()
                 or self.is_hi_dream() or self.is_pixart() or self.is_qwen() or self.is_ernie()
-                or self.is_z_image() or self.is_anima() or self.is_krea2() or self.is_ideogram()):
+                or self.is_z_image() or self.is_anima() or self.is_krea2() or self.is_moss() or self.is_ideogram()):
             formats.append(ModelFormat.ORIGINAL_TRANSFORMER)
         if self.is_z_image():
             formats.append(ModelFormat.COMFY_TRANSFORMER)
@@ -314,6 +320,7 @@ _MODEL_PARTS: dict[ModelType, tuple[str, ...]] = {
     ModelType.CHROMA_1: ("transformer", "text_encoder", "vae"),
     ModelType.QWEN: ("transformer", "text_encoder", "vae"),
     ModelType.KREA_2: ("transformer", "text_encoder", "vae"),
+    ModelType.MOSS: ("transformer", "text_encoder", "vae"),
     ModelType.Z_IMAGE: ("transformer", "text_encoder", "vae"),
     ModelType.ERNIE: ("transformer", "text_encoder", "vae"),
     ModelType.IDEOGRAM_4: ("transformer", "text_encoder", "unconditional_transformer", "vae"),

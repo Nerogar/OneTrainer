@@ -24,6 +24,7 @@ from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 from transformers.models.mistral.modeling_mistral import MistralDecoderLayer
 from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import Qwen2_5_VLDecoderLayer
 from transformers.models.qwen3.modeling_qwen3 import Qwen3DecoderLayer
+from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5DecoderLayer
 from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLTextDecoderLayer
 from transformers.models.t5.modeling_t5 import T5Block
 
@@ -519,6 +520,25 @@ def enable_checkpointing_for_krea2_transformer(
         (model.text_fusion.layerwise_blocks, ["hidden_states"]),
         (model.text_fusion.refiner_blocks,   ["hidden_states"]),
         (model.transformer_blocks,           ["hidden_states"]),
+    ])
+
+def enable_checkpointing_for_moss_transformer(
+        model: nn.Module,
+        config: TrainConfig,
+        part: TrainModelPartConfig,
+) -> LayerOffloadConductor | None:
+    # MOSSImageTransformer _Block takes (x, rope, modulation).
+    return enable_checkpointing(model, config, part, config.compile, [
+        (model.layers, ["x"]),
+    ])
+
+def enable_checkpointing_for_moss_encoder_layers(
+        model: nn.Module,
+        config: TrainConfig,
+        part: TrainModelPartConfig,
+) -> LayerOffloadConductor | None:
+    return enable_checkpointing(model, config, part, False, [
+        (Qwen3_5DecoderLayer, []),  # no activation offloading: this encoder is never trained
     ])
 
 def enable_checkpointing_for_qwen3vl_encoder_layers(
