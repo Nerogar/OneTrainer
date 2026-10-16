@@ -1,7 +1,5 @@
 import os
-import sys
 import shutil
-import subprocess
 from abc import ABCMeta, abstractmethod
 
 from modules.model.BaseModel import BaseModel

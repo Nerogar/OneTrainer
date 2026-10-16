@@ -11,7 +11,7 @@ def script_imports(allow_zluda: bool = True):
         # Return unused pages promptly, including while the UI is idle. Set this before importing torch;
         # explicit user allocator settings take precedence. This does not change the CUDA allocator.
         os.environ.setdefault('MIMALLOC_PURGE_DELAY', '0')
-    
+
     # Suppress the Triton startup warning and leftover xformers installations warnings.
     # Filter out the Triton warning on startup.
     # xformers is not installed anymore, but might still exist for some installations.
