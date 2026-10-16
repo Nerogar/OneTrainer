@@ -665,7 +665,9 @@ class GenericTrainer(BaseTrainer):
 
         epochs = range(train_progress.epoch, self.config.epochs, 1)
 
-        for _epoch in tqdm(epochs, desc="epoch") if multi.is_master() else epochs:
+        if multi.is_master():
+            epochs = tqdm(epochs, desc="epoch", initial=train_progress.epoch, total=self.config.epochs)
+        for _epoch in epochs:
             multi.sync_commands(self.commands)
             if self.commands.get_stop_command():
                 report_loss(*accum_loss_exchange.drain())
