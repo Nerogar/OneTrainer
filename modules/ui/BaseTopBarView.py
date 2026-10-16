@@ -2,6 +2,7 @@ from abc import abstractmethod
 from collections.abc import Callable
 
 from modules.util import path_util
+from modules.util.config.TrainConfig import RemovedOptimizerError
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.optimizer_util import change_optimizer
@@ -25,6 +26,10 @@ class BaseTopBarView:
 
     @abstractmethod
     def _show_open_dialog(self, initial_dir: str, callback):
+        pass
+
+    @abstractmethod
+    def _show_config_error(self, message: str):
         pass
 
     def build(
@@ -118,7 +123,11 @@ class BaseTopBarView:
         self._show_save_dialog("training_configs", self.controller.save_config_to_path)
 
     def __load_current_config(self, filename):
-        loaded_config = self.controller.load_config_from_file(filename)
+        try:
+            loaded_config = self.controller.load_config_from_file(filename)
+        except RemovedOptimizerError as error:
+            self._show_config_error(str(error))
+            return
         if loaded_config is None:
             return
 

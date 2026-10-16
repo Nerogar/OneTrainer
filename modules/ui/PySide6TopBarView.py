@@ -6,7 +6,7 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import pyside6_components
 
-from PySide6.QtWidgets import QFileDialog, QWidget
+from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
 
 class PySide6TopBarView(BaseTopBarView, QWidget):
@@ -35,6 +35,9 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
 
     def _setup_frame_column_weight(self):
         pyside6_components._layout(self.frame).setColumnStretch(5, 1)
+
+    def _show_config_error(self, message: str):
+        QMessageBox.critical(self, "Cannot Load Config", message)
 
     def _forget_dropdown(self, widget):
         lo = pyside6_components._layout(self.frame)

@@ -32,6 +32,10 @@ from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.torch_util import default_device
 
 
+class RemovedOptimizerError(ValueError):
+    pass
+
+
 class TrainOptimizerConfig(BaseConfig):
     optimizer: Optimizer
     adam_w_mode: bool
@@ -600,6 +604,22 @@ class TrainConfig(BaseConfig):
                 10: self.__migration_10,
             }
         )
+
+    def from_dict(self, data: dict, migrate: bool = True) -> 'TrainConfig':
+        optimizer = data.get('optimizer')
+        if isinstance(optimizer, dict):
+            optimizer = optimizer.get('optimizer')
+        if isinstance(optimizer, str) and optimizer in {
+            'DADAPT_ADA_GRAD', 'DADAPT_ADAM', 'DADAPT_ADAN', 'DADAPT_LION', 'DADAPT_SGD',
+            'ADAGRAD', 'ADAGRAD_8BIT', 'TIGER', 'YOGI',
+            'ADAM', 'ADAM_8BIT', 'SGD_8BIT', 'SCHEDULE_FREE_SGD',
+        }:
+            raise RemovedOptimizerError(
+                f"Optimizer '{optimizer}' is no longer supported. "
+                "Choose a supported optimizer and review its learning rate before loading this config."
+            )
+        super().from_dict(data, migrate=migrate)
+        return self
 
     def __migration_0(self, data: dict) -> dict:
         optimizer_settings = {}
