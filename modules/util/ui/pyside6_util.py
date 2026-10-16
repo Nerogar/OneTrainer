@@ -1,4 +1,6 @@
+import ctypes
 import locale
+import logging
 import os
 import signal
 import sys
@@ -38,6 +40,12 @@ def create_application() -> OneTrainerApplication:
     # active and Ctrl+C would be ignored.
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
+    if sys.platform == "win32":
+        try:
+            ctypes.OleDLL("shell32").SetCurrentProcessExplicitAppUserModelID(ctypes.c_wchar_p("OneTrainer.OneTrainer"))
+        except OSError:
+            logging.getLogger(__name__).warning("Could not set the Windows taskbar identity", exc_info=True)
+
     app = OneTrainerApplication(sys.argv)
     app.setOrganizationName("OneTrainer")
     app.setApplicationName("OneTrainer")
@@ -64,3 +72,35 @@ def create_application() -> OneTrainerApplication:
     app.theme_controller = ThemeController(app, QSettings())
 
     return app
+
+
+def set_windows_taskbar_icon(window: QWidget) -> None:
+    if sys.platform != "win32":
+        return
+
+    from ctypes import wintypes
+
+    try:
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        user32.SendMessageW.restype = ctypes.c_ssize_t
+        user32.CopyIcon.argtypes = [wintypes.HICON]
+        user32.CopyIcon.restype = wintypes.HICON
+        user32.DestroyIcon.argtypes = [wintypes.HICON]
+        set_class_icon = user32.SetClassLongPtrW if ctypes.sizeof(ctypes.c_void_p) == 8 else user32.SetClassLongW
+        set_class_icon.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+        set_class_icon.restype = ctypes.c_size_t
+        hwnd = int(window.winId())
+        # Replace Qt's generic class icons with copies that live until process exit.
+        for icon_type, index in ((1, -14), (0, -34)):
+            handle = user32.CopyIcon(user32.SendMessageW(hwnd, 0x7F, icon_type, 0))  # WM_GETICON
+            if not handle:
+                raise ctypes.WinError(ctypes.get_last_error())
+            ctypes.set_last_error(0)
+            previous = set_class_icon(hwnd, index, handle)
+            if not previous and ctypes.get_last_error():
+                error = ctypes.WinError(ctypes.get_last_error())
+                user32.DestroyIcon(handle)
+                raise error
+    except OSError:
+        logging.getLogger(__name__).warning("Could not set the Windows taskbar icon", exc_info=True)
