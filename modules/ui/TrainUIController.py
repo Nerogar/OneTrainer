@@ -21,7 +21,7 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.profiling_util import PeakMemoryRecorder
 from modules.util.tensorboard_util import TensorboardProcess
-from modules.util.torch_util import torch_gc
+from modules.util.torch_util import print_fragmentation, torch_gc
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ui.validation import flush_and_validate_all
 
@@ -274,6 +274,9 @@ class TrainUIController:
                 error_message = self.__report_gated_repo_error()
             else:
                 traceback.print_exc()
+        finally:
+            if self.train_config.debug_mode or os.environ.get("OT_DEBUG_PROFILES") == "1":
+                print_fragmentation("training run, at stop")
 
         trainer.end()
 
@@ -284,6 +287,10 @@ class TrainUIController:
         self.training_commands = None
         torch.clear_autocast_cache()
         torch_gc()
+
+        # after trainer.end() + torch_gc: quantifies the reserved-but-unallocated that persists through unload
+        if self.train_config.debug_mode or os.environ.get("OT_DEBUG_PROFILES") == "1":
+            print_fragmentation("training run, after unload")
 
         if error_caught:
             self.on_update_status(error_message)
