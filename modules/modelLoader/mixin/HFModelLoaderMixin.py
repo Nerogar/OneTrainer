@@ -27,8 +27,11 @@ from transformers.core_model_loading import rename_source_key
 
 import accelerate
 import huggingface_hub
+from huggingface_hub import constants as hf_constants
+from huggingface_hub import parse_hf_uri
+from huggingface_hub.errors import HfUriError
+from huggingface_hub.utils import EntryNotFoundError, HfHubHTTPError, RepositoryNotFoundError
 from accelerate.utils import set_module_tensor_to_device
-from huggingface_hub.utils import EntryNotFoundError
 from safetensors import safe_open
 from safetensors.torch import load_file
 from tqdm import tqdm
@@ -301,6 +304,54 @@ def stream_module_from_checkpoint(
 class HFModelLoaderMixin(metaclass=ABCMeta):
     def __init__(self):
         super().__init__()
+        self.__validated_hf_repositories: set[str] = set()
+
+    @staticmethod
+    def __normalize_hf_repo_id(repo_id: str) -> str:
+        if not repo_id.startswith(("http://", "https://")):
+            return repo_id
+
+        try:
+            uri = parse_hf_uri(repo_id)
+        except HfUriError:
+            return repo_id
+
+        if uri.type != "model":
+            raise ValueError(f"Expected a Hugging Face model URL, got a {uri.type} URL.")
+
+        return uri.id
+
+    def _validate_hf_repo_access(
+            self,
+            repo_id: str | None,
+    ):
+        if not repo_id \
+                or os.path.exists(repo_id) \
+                or hf_constants.HF_HUB_OFFLINE:
+            return
+
+        repo_id = self.__normalize_hf_repo_id(repo_id)
+        if repo_id in self.__validated_hf_repositories:
+            return
+
+        token = huggingface_hub.get_token()
+        if token is not None:
+            try:
+                huggingface_hub.whoami(token=token, cache=True)
+            except HfHubHTTPError as e:
+                if e.response.status_code == 401:
+                    raise ValueError("Invalid Hugging Face token.") from None
+                raise
+
+        try:
+            huggingface_hub.auth_check(
+                repo_id=repo_id,
+                repo_type="model",
+                token=token,
+            )
+        except RepositoryNotFoundError as e:
+            raise e.with_traceback(None) from None
+        self.__validated_hf_repositories.add(repo_id)
 
     # ===== LEGACY (non-streaming) load path -- used only when Stream From Disk is off =====
     def __load_sub_module_legacy(
@@ -473,6 +524,8 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             subfolder: str = "",
             stream_from_disk: bool | None = None,
     ):
+        self._validate_hf_repo_access(pretrained_model_name_or_path)
+        
         # stream_from_disk None means the caller never streams this sub-module, and a bare module is returned.
         # Passing True or False marks the call site as stream-capable and always returns a
         # (sub_module, materialize_fn) pair -- materialize_fn None when not streaming -- so that caller needs no
@@ -611,6 +664,8 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             quantization: QuantizationConfig | None = None,
             stream_from_disk: bool | None = None,
     ):
+        self._validate_hf_repo_access(pretrained_model_name_or_path)
+
         # stream_from_disk None means the caller never streams this sub-module, and a bare module is returned.
         # Passing True or False marks the call site as stream-capable and always returns a
         # (sub_module, materialize_fn) pair -- materialize_fn None when not streaming -- so that caller needs no
