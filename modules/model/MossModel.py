@@ -87,11 +87,22 @@ class MossModel(BaseModel):
         self.additional_embeddings = []
         self.adjoint_tokens = {}
 
+    def fusion_groups(self) -> list | None:
+        # MOSS fuses the DiT block q/k/v into one qkv Linear per layer; everything else in the
+        # transformer -- text_embedder, time_embedding, shared_block_modulation, proj.o, ffn_up_gate,
+        # ffn_down, final layers -- already matches the native checkpoint's naming.
+        return [
+            ("layers.{i}.proj", ["q", "k", "v"], "qkv", "qkv"),
+        ]
+
     def diffusers_to_original(self) -> list | None:
-        # MOSS's native checkpoint is a strict rename-free mapping of the MOSSImageTransformer state
-        # dict (see MOSSImageTransformer.load_training_state_dict), so the diffusers and original
-        # formats are identical.
-        return None
+        # MOSS's native (ComfyUI/original) checkpoint is identical to diffusers except for the q/k/v
+        # fusion handled by the checkpoint pre-stage (fusion_groups above, proj.q/k/v -> proj.qkv).
+        # After that fusion, every name already matches the native layout, so a single catch-all
+        # identity pattern covers the body.
+        return [
+            ("{path}", "{path}"),
+        ]
 
     def create_pipeline(self) -> DiffusionPipeline:
         return MOSSImagePipeline(
