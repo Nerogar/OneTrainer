@@ -183,6 +183,8 @@ def __quantized_linear_class_and_kwargs(dtype: DataType):
     if dtype.quantize_nf4():
         return LinearNf4, {}
     elif dtype.quantize_int8():
+        # FIXME: Linear8bitLt requires input_features/output_features, but __create_linear_layer passes
+        # in_features/out_features, so primary and fallback INT_8 construction currently raises TypeError.
         return bnb.nn.Linear8bitLt, {'has_fp16_weights': False}
     elif dtype.quantize_fp8():
         return LinearFp8, {}

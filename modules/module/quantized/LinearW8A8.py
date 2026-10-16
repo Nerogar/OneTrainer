@@ -84,7 +84,7 @@ class LinearW8A8(
 ):
     is_quantized: bool
 
-    def __init__(self, dtype: torch.dtype, compress: bool = False, *args, **kwargs):
+    def __init__(self, dtype: torch.dtype, *args, compress: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
 
         assert dtype in [torch.int8, torch.float8_e4m3fn]
