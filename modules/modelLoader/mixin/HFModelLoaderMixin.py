@@ -27,11 +27,11 @@ from transformers.core_model_loading import rename_source_key
 
 import accelerate
 import huggingface_hub
+from accelerate.utils import set_module_tensor_to_device
 from huggingface_hub import constants as hf_constants
 from huggingface_hub import parse_hf_uri
 from huggingface_hub.errors import HfUriError
 from huggingface_hub.utils import EntryNotFoundError, HfHubHTTPError, RepositoryNotFoundError
-from accelerate.utils import set_module_tensor_to_device
 from safetensors import safe_open
 from safetensors.torch import load_file
 from tqdm import tqdm
@@ -525,7 +525,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             stream_from_disk: bool | None = None,
     ):
         self._validate_hf_repo_access(pretrained_model_name_or_path)
-        
+
         # stream_from_disk None means the caller never streams this sub-module, and a bare module is returned.
         # Passing True or False marks the call site as stream-capable and always returns a
         # (sub_module, materialize_fn) pair -- materialize_fn None when not streaming -- so that caller needs no
