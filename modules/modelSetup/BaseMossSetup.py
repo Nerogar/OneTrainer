@@ -30,8 +30,8 @@ class BaseMossSetup(
     metaclass=ABCMeta
 ):
     LAYER_PRESETS = {
-        "attn-mlp": ["q", "k", "v", "o", "ffn_up_gate", "ffn_down"],
-        "attn-only": ["q", "k", "v", "o"],
+        "attn-mlp": ["proj.q", "proj.k", "proj.v", "proj.o", "proj.ffn_up_gate", "proj.ffn_down"],
+        "attn-only": ["proj.q", "proj.k", "proj.v", "proj.o"],
         "blocks": ["layers"],
         "full": [],
     }
