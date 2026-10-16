@@ -8,7 +8,6 @@ from modules.util import factory, path_util
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.OutputPipelineModule import OutputPipelineModule
@@ -55,12 +54,9 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
             temp_device: torch.device,
             config: TrainConfig,
     ):
-        model.to(self.temp_device)
-
-        model.vae_to(train_device)
+        model.materialize_only("vae")
 
         model.eval()
-        torch_gc()
 
     def __enumerate_input_modules(self, config: TrainConfig) -> list:
         supported_extensions = path_util.supported_image_extensions()
@@ -248,7 +244,7 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         debug_dir = os.path.join(config.debug_dir, "dataloader")
 
         def before_save_fun():
-            model.vae_to(self.train_device)
+            model.materialize("vae")
 
         decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae)
         upscale_mask = ScaleImage(in_name='latent_mask', out_name='decoded_mask', factor=8)

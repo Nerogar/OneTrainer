@@ -7,7 +7,6 @@ from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
-from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 import torch
 from torch import Tensor
@@ -38,8 +37,6 @@ class QwenModel(BaseModel):
 
     text_encoder_train_dtype: DataType
 
-    text_encoder_offload_conductor: LayerOffloadConductor | None
-    transformer_offload_conductor: LayerOffloadConductor | None
 
     # persistent lora training data
     text_encoder_lora: LoRAModuleWrapper | None
@@ -64,18 +61,10 @@ class QwenModel(BaseModel):
 
         self.text_encoder_train_dtype = DataType.FLOAT_32
 
-        self.text_encoder_offload_conductor = None
-        self.transformer_offload_conductor = None
 
         self.text_encoder_lora = None
         self.transformer_lora = None
         self.lora_state_dict = None
-
-    def adapters(self) -> list[LoRAModuleWrapper]:
-        return [a for a in [
-            self.text_encoder_lora,
-            self.transformer_lora,
-        ] if a is not None]
 
     def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
         # Single Qwen2.5-VL TE (Comfy's QwenImageTEModel is a single qwen25_7b).
@@ -86,37 +75,6 @@ class QwenModel(BaseModel):
                 ModelFormat.COMFY_LORA: "text_encoders.qwen25_7b.transformer",
             }),
         ]
-
-    def vae_to(self, device: torch.device):
-        self.vae.to(device=device)
-
-    def text_encoder_to(self, device: torch.device): #TODO share more code between models
-        if self.text_encoder_offload_conductor is not None:
-            self.text_encoder_offload_conductor.to(device)
-        else:
-            self.text_encoder.to(device=device)
-
-        if self.text_encoder_lora is not None:
-            self.text_encoder_lora.to(device)
-
-    def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None:
-            self.transformer_offload_conductor.to(device)
-        else:
-            self.transformer.to(device=device)
-
-        if self.transformer_lora is not None:
-            self.transformer_lora.to(device)
-
-    def to(self, device: torch.device):
-        self.vae_to(device)
-        self.text_encoder_to(device)
-        self.transformer_to(device)
-
-    def eval(self):
-        self.vae.eval()
-        self.text_encoder.eval()
-        self.transformer.eval()
 
     def create_pipeline(self) -> DiffusionPipeline:
         return QwenImagePipeline(
