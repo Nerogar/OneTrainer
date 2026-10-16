@@ -8,7 +8,7 @@ from modules.util.ui import pyside6_components
 from modules.util.ui.pyside6_util import get_theme_controller
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFileDialog, QPushButton, QWidget
+from PySide6.QtWidgets import QFileDialog, QMessageBox, QPushButton, QWidget
 
 
 class PySide6TopBarView(BaseTopBarView, QWidget):
@@ -46,6 +46,9 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
 
     def _setup_frame_column_weight(self):
         pyside6_components._layout(self.frame).setColumnStretch(5, 1)
+
+    def _show_config_error(self, message: str):
+        QMessageBox.critical(self, "Cannot Load Config", message)
 
     def _init_preset_display(self):
         # the "Load Preset" button doubles as the display of current preset

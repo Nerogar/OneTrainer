@@ -4,15 +4,7 @@ import torch
 
 
 class Optimizer(Enum):
-    # Sorted by origin (BNB / torch first, then DADAPT), then by adapter name, then interleaved by variant.
-
-    # BNB Standard & 8-bit
-    ADAGRAD = 'ADAGRAD'
-    ADAGRAD_8BIT = 'ADAGRAD_8BIT'
-
-    # 32 bit is torch and not bnb
-    ADAM = 'ADAM'
-    ADAM_8BIT = 'ADAM_8BIT'
+    # Sorted by origin (BNB / torch first), then by adapter name, then interleaved by variant.
 
     # 32 bit is torch and not bnb
     ADAMW = 'ADAMW'
@@ -46,14 +38,6 @@ class Optimizer(Enum):
 
     # Schedule-free optimizers
     SCHEDULE_FREE_ADAMW = 'SCHEDULE_FREE_ADAMW'
-    SCHEDULE_FREE_SGD = 'SCHEDULE_FREE_SGD'
-
-    # DADAPT
-    DADAPT_ADA_GRAD = 'DADAPT_ADA_GRAD'
-    DADAPT_ADAM = 'DADAPT_ADAM'
-    DADAPT_ADAN = 'DADAPT_ADAN'
-    DADAPT_LION = 'DADAPT_LION'
-    DADAPT_SGD = 'DADAPT_SGD'
 
     # Prodigy
     PRODIGY = 'PRODIGY'
@@ -74,18 +58,11 @@ class Optimizer(Enum):
 
     #Pytorch Optimizers
     ADABELIEF = 'ADABELIEF'
-    TIGER = 'TIGER'
     AIDA = 'AIDA'
-    YOGI = 'YOGI'
 
     @property
     def is_adaptive(self):
         return self in [
-            self.DADAPT_SGD,
-            self.DADAPT_ADAM,
-            self.DADAPT_ADAN,
-            self.DADAPT_ADA_GRAD,
-            self.DADAPT_LION,
             self.PRODIGY,
             self.PRODIGY_PLUS_SCHEDULE_FREE,
             self.PRODIGY_ADV,
@@ -95,7 +72,6 @@ class Optimizer(Enum):
     def is_schedule_free(self):
         return self in [
             self.SCHEDULE_FREE_ADAMW,
-            self.SCHEDULE_FREE_SGD,
             self.PRODIGY_PLUS_SCHEDULE_FREE,
         ]
 
@@ -117,7 +93,6 @@ class Optimizer(Enum):
             Optimizer.ADAFACTOR,
             Optimizer.CAME,
             Optimizer.CAME_8BIT,
-            Optimizer.ADAM,
             Optimizer.ADAMW,
             Optimizer.ADAMW_ADV,
             Optimizer.ADOPT_ADV,

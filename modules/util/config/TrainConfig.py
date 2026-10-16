@@ -32,6 +32,10 @@ from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.torch_util import default_device
 
 
+class RemovedOptimizerError(ValueError):
+    pass
+
+
 class TrainOptimizerConfig(BaseConfig):
     optimizer: Optimizer
     adam_w_mode: bool
@@ -58,10 +62,7 @@ class TrainOptimizerConfig(BaseConfig):
     fused: bool
     fused_back_pass: bool
     growth_rate: float
-    initial_accumulator_value: int
-    initial_accumulator: float
     is_paged: bool
-    log_every: int
     lr_decay: float
     max_unorm: float
     maximize: bool
@@ -69,7 +70,6 @@ class TrainOptimizerConfig(BaseConfig):
     quant_block_size: int
     momentum: float
     nesterov: bool
-    no_prox: bool
     optim_bits: int
     percentile_clipping: int
     r: float
@@ -219,10 +219,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("fused", False, bool, False))
         data.append(("fused_back_pass", False, bool, False))
         data.append(("growth_rate", None, float, True))
-        data.append(("initial_accumulator_value", None, int, True))
-        data.append(("initial_accumulator", None, float, True))
         data.append(("is_paged", False, bool, False))
-        data.append(("log_every", None, int, True))
         data.append(("lr_decay", None, float, True))
         data.append(("max_unorm", None, float, True))
         data.append(("maximize", False, bool, False))
@@ -230,7 +227,6 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("quant_block_size", None, int, True))
         data.append(("momentum", None, float, True))
         data.append(("nesterov", False, bool, False))
-        data.append(("no_prox", False, bool, False))
         data.append(("optim_bits", None, int, True))
         data.append(("percentile_clipping", None, int, True))
         data.append(("r", None, float, True))
@@ -668,6 +664,22 @@ class TrainConfig(BaseConfig):
                 10: self.__migration_10,
             }
         )
+
+    def from_dict(self, data: dict, migrate: bool = True) -> 'TrainConfig':
+        optimizer = data.get('optimizer')
+        if isinstance(optimizer, dict):
+            optimizer = optimizer.get('optimizer')
+        if isinstance(optimizer, str) and optimizer in {
+            'DADAPT_ADA_GRAD', 'DADAPT_ADAM', 'DADAPT_ADAN', 'DADAPT_LION', 'DADAPT_SGD',
+            'ADAGRAD', 'ADAGRAD_8BIT', 'TIGER', 'YOGI',
+            'ADAM', 'ADAM_8BIT', 'SGD_8BIT', 'SCHEDULE_FREE_SGD',
+        }:
+            raise RemovedOptimizerError(
+                f"Optimizer '{optimizer}' is no longer supported. "
+                "Choose a supported optimizer and review its learning rate before loading this config."
+            )
+        super().from_dict(data, migrate=migrate)
+        return self
 
     def __migration_0(self, data: dict) -> dict:
         optimizer_settings = {}
