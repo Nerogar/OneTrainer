@@ -74,6 +74,9 @@ class IdeogramLoRASetup(
         # the unconditional transformer is only needed for sampling; materialize_only() evicts it as it's
         # not in parts, keeping it off the train device during training
         model.materialize_only(*parts)
+        # keep VAE batch-norm stats on the train device: scale_latents reads them every step,
+        # and .to(cuda) from an offloaded VAE would block-sync the stream each step.
+        model.vae.bn.to(self.train_device)
 
         model.text_encoder.eval()
         model.vae.eval()

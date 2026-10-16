@@ -1,6 +1,5 @@
 import os
-import subprocess
-import sys
+import shutil
 from abc import ABCMeta, abstractmethod
 
 from modules.model.BaseModel import BaseModel
@@ -12,6 +11,7 @@ from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.tensorboard_util import TensorboardProcess
 from modules.util.TimedActionMixin import TimedActionMixin
 from modules.util.TrainProgress import TrainProgress
 
@@ -23,7 +23,7 @@ class BaseTrainer(
     metaclass=ABCMeta,
 ):
 
-    tensorboard_subprocess: subprocess.Popen
+    tensorboard_subprocess: TensorboardProcess
 
     def __init__(self, config: TrainConfig, callbacks: TrainCallbacks, commands: TrainCommands):
         super().__init__()
@@ -82,7 +82,7 @@ class BaseTrainer(
             self.config.training_method
         )
     def _start_tensorboard(self):
-        tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
+        tensorboard_executable = shutil.which("tensorboard")
         tensorboard_log_dir = os.path.join(self.config.workspace_dir, "tensorboard")
 
         tensorboard_args = [
@@ -97,7 +97,7 @@ class BaseTrainer(
         if self.config.tensorboard_expose:
             tensorboard_args.append("--bind_all")
 
-        self.tensorboard_subprocess = subprocess.Popen(tensorboard_args)
+        self.tensorboard_subprocess = TensorboardProcess(tensorboard_args)
 
     def _stop_tensorboard(self):
         self.tensorboard_subprocess.kill()
