@@ -73,10 +73,10 @@ class MossSampler(BaseModelSampler):
                 train_device=self.train_device,
             )
 
-            # prepare latent image: the MOSS transformer consumes the VAE latents at full
-            # spatial resolution (no 2x2 packing), 128 channels, 4D
+            # prepare latent image: the MOSS transformer consumes the 2x2-packed VAE latents
+            # at 1/16 image scale, 128 channels, 4D
             latent_image = torch.randn(
-                size=(1, num_latent_channels, 1, height // vae_scale_factor, width // vae_scale_factor),
+                size=(1, num_latent_channels, height // vae_scale_factor, width // vae_scale_factor),
                 generator=generator,
                 device=self.train_device,
                 dtype=torch.float32,
@@ -113,11 +113,9 @@ class MossSampler(BaseModelSampler):
 
             self.model.materialize_only("vae")
 
-            # decode: denormalize latents with the VAE's batch-norm statistics, then unfold
-            # the 128-channel latents into 32 channels at 2x spatial resolution for the VAE
+            # decode: unscale_latents denormalizes with the VAE's batch-norm statistics and
+            # unpacks the 128-channel latents into 32 channels at 2x spatial resolution
             latents = self.model.unscale_latents(latent_image).to(dtype=vae.dtype)
-            b, c, h, w = latents.shape
-            latents = latents.reshape(b, c // 4, 2, 2, h, w).permute(0, 1, 4, 2, 5, 3).reshape(b, c // 4, 2 * h, 2 * w)
             image = vae.decode(latents, return_dict=False)[0].clamp(-1, 1)
 
             do_denormalize = [True] * image.shape[0]
