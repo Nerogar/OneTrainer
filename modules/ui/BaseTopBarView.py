@@ -40,7 +40,7 @@ class BaseTopBarView:
     @abstractmethod
     def _show_config_error(self, message: str):
         pass
-      
+
     # PySide6 overrides these hooks to display the preset name; Ctk keeps its default label.
 
     def _init_preset_display(self):

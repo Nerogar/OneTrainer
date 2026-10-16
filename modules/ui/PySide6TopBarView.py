@@ -49,7 +49,7 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
 
     def _show_config_error(self, message: str):
         QMessageBox.critical(self, "Cannot Load Config", message)
-        
+
     def _init_preset_display(self):
         # the "Load Preset" button doubles as the display of current preset
         self.preset_button.setToolTip("Load a preset")
