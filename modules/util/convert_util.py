@@ -10,22 +10,23 @@ import parse
 # hanging straight off the module, or two segments (a param segment + this tail). Grouped by that arity, NOT
 # by value type -- scaled_oft is a marker buffer, not a weight, but it is two-segment (oft_R.scaled_oft) so
 # it lives with .weight.
-SINGLE_SEGMENT_SUFFIXES = (".alpha", ".dora_scale")
+SINGLE_SEGMENT_SUFFIXES = (".alpha", ".dora_scale", ".dora_log_multiplier")
 DOUBLE_SEGMENT_SUFFIXES = (".weight", ".scaled_oft")
 
 # The single-segment adapter factors (LoHa hada_*, LoKr lokr_*) serialize as one bare param segment with no
 # .weight, so both sides detect them by prefix (their exact names vary: hada_w1_a, lokr_w2_b, ...). LoRA/OFT
-# params always end in .weight/.scaled_oft and are caught by DOUBLE_SEGMENT_SUFFIXES first, so they are NOT
-# factors -- they instead ride the broader supported-param allowlist below (which also lists lora_/oft_).
+# rotation params end in .weight/.scaled_oft and are caught by DOUBLE_SEGMENT_SUFFIXES first; DoRA-OFT's
+# magnitude is covered by SINGLE_SEGMENT_SUFFIXES. Neither belongs to the factor prefixes.
 FACTOR_PREFIXES = ("hada_", "lokr_")
 
-# The adapter param-name families OneTrainer trains: LoRA/DoRA (lora_*, alpha, dora_scale), OFT (oft_*), plus
-# the LoHa/LoKr factors. This is the closed allowlist the loader checks positively so any foreign LyCORIS
+# The adapter param-name families OneTrainer trains: LoRA/DoRA (lora_*, alpha, dora_scale),
+# OFT/DoRA-OFT (oft_*, dora_log_multiplier), plus the LoHa/LoKr factors.
+# This is the closed allowlist the loader checks positively so any foreign LyCORIS
 # algorithm (GLoRA, IA3, full-diff, norm, tlora, ...) is rejected with no per-algorithm table to maintain.
 # The factor prefixes are reused from FACTOR_PREFIXES (not re-listed) so a new factor algorithm is added in
 # exactly one place.
 SUPPORTED_PARAM_PREFIXES = ("lora_", "oft_", *FACTOR_PREFIXES)
-SUPPORTED_PARAM_SCALARS = {"alpha", "dora_scale"}
+SUPPORTED_PARAM_SCALARS = {suffix.removeprefix(".") for suffix in SINGLE_SEGMENT_SUFFIXES}
 
 
 @dataclass
@@ -384,7 +385,8 @@ def chunk_swap(diffusers: str, original: str):
     # the diffusers and original namespaces (e.g. an adaLN modulation projection). Handles both a full
     # weight and a LoRA adapter from one definition: the swapped output dim lives in .weight/.bias for a
     # full tensor and in .lora_up.weight for a LoRA, so those are swapped; a DoRA magnitude (.dora_scale) is
-    # swapped via swap_dora_scale_chunks. .lora_down.weight/.alpha (and any other suffix) carry no output dim
+    # swapped via swap_dora_scale_chunks. DoRA-OFT's log multiplier always carries the output dim.
+    # .lora_down.weight/.alpha (and any other suffix) carry no output dim
     # and rename unchanged via the trailing catch-all. In a given conversion only one of the two full/LoRA
     # shapes is present, so the unused rules never fire. A convert_fn can't see the key, so the swap-vs-rename
     # split has to be by suffix. Every swap fn is its own inverse, so these reverse for free.
@@ -393,5 +395,6 @@ def chunk_swap(diffusers: str, original: str):
         (diffusers + ".bias",           original + ".bias",           swap_chunks, swap_chunks),
         (diffusers + ".lora_up.weight", original + ".lora_up.weight", swap_chunks, swap_chunks),
         (diffusers + ".dora_scale",     original + ".dora_scale",     swap_dora_scale_chunks, swap_dora_scale_chunks),
+        (diffusers + ".dora_log_multiplier", original + ".dora_log_multiplier", swap_chunks, swap_chunks),
         (diffusers, original),
     ]

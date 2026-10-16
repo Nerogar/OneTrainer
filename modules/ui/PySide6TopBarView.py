@@ -5,8 +5,10 @@ from modules.ui.TopBarController import TopBarController
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import pyside6_components
+from modules.util.ui.pyside6_util import get_theme_controller
 
-from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QFileDialog, QPushButton, QWidget
 
 
 class PySide6TopBarView(BaseTopBarView, QWidget):
@@ -33,11 +35,32 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
         self.build(self.frame, master, controller, ui_state,
                    change_model_type_callback, change_training_method_callback, load_preset_callback)
 
+        # PySide6-only theme toggle; the glyph follows the palette's ButtonText.
+        self.theme_button = pyside6_components.button(
+            self.frame, 0, 8, "◐", get_theme_controller().toggle,
+            tooltip="Switch between light and dark mode", sticky="v",
+        )
+        # Use an empty button's height for a fixed square size, independent of glyph metrics.
+        side = QPushButton().sizeHint().height()
+        self.theme_button.setFixedSize(side, side)
+
     def _setup_frame_column_weight(self):
         pyside6_components._layout(self.frame).setColumnStretch(5, 1)
 
     def _show_config_error(self, message: str):
         QMessageBox.critical(self, "Cannot Load Config", message)
+        
+    def _init_preset_display(self):
+        # the "Load Preset" button doubles as the display of current preset
+        self.preset_button.setToolTip("Load a preset")
+
+    def _set_preset_text(self, text: str):
+        # empty means nothing is loaded
+        label = text or "Load Preset"
+        # limit width
+        label = self.preset_button.fontMetrics().elidedText(label, Qt.TextElideMode.ElideRight, 240)
+        self.preset_button.setText(label.replace("&", "&&"))
+        self.preset_button.setToolTip(f"Load a preset\n{text}" if text else "Load a preset")
 
     def _forget_dropdown(self, widget):
         lo = pyside6_components._layout(self.frame)

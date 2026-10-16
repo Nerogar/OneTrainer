@@ -1,4 +1,6 @@
+import contextlib
 import gc
+import time
 from collections.abc import Callable
 from contextlib import nullcontext
 from typing import Any
@@ -13,6 +15,36 @@ accelerator = accelerate.Accelerator()
 default_device = accelerator.device
 
 torch_version = packaging.version.parse(torch.__version__)
+
+@contextlib.contextmanager
+def timed(label: str, enabled: bool = True):
+    # wall-clock timing around a block; sync the compute device before and after so the measurement includes the
+    # async device transfer + (re)quantization rather than just the launch overhead. Forces a cuda sync per block,
+    # so enable only for ad-hoc profiling, not on the hot per-step path.
+    if not enabled:
+        yield
+        return
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+    start = time.perf_counter()
+    yield
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+    print(f"[timing] {label}: {time.perf_counter() - start:.3f}s")
+
+
+def supports_mem_pool(device: torch.device) -> bool:
+    return device.type == "cuda" and torch.cuda.memory.get_allocator_backend() == "native"
+
+
+def create_mem_pool(device: torch.device):
+    # a dedicated MemPool the caller can allocate into; None on unsupported devices or allocators (cpu/mps)
+    return torch.cuda.MemPool() if supports_mem_pool(device) else None
+
+
+def mem_pool_context(mem_pool, device: torch.device):
+    # route allocations made in this context into the given MemPool; no-op when it is None. Ensure "cuda" works
+    return torch.cuda.use_mem_pool(mem_pool, device=device.index) if mem_pool is not None else nullcontext()
 
 
 def state_dict_has_prefix(state_dict: dict | None, prefix: str):
@@ -231,6 +263,26 @@ def torch_gc():
 
     if torch.backends.mps.is_available():
         torch.mps.empty_cache()
+
+
+def print_fragmentation(label: str):
+    # Live (not peak) snapshot of allocator fragmentation for the current device. reserved-allocated is the total free
+    # memory the allocator holds but hasn't handed out; ext_frag is how shattered that free space is -- the fraction
+    # NOT in the single largest contiguous hole. An OOM is about contiguity, not total free bytes, so ext_frag near 1
+    # (free memory in many small holes) is the fragmentation that blocks a large allocation even when free > request.
+    if not torch.cuda.is_available():
+        return
+    segments = torch.cuda.memory_snapshot()
+    reserved = sum(s["total_size"] for s in segments)
+    allocated = sum(b["size"] for s in segments for b in s["blocks"] if b["state"] == "active_allocated")
+    free_total = reserved - allocated
+    largest_free = max(
+        (b["size"] for s in segments for b in s["blocks"] if b["state"] != "active_allocated"),
+        default=0)
+    ext_frag = 1 - largest_free / free_total if free_total > 0 else 0.0
+    gib = 1024 ** 3
+    print(f"[fragmentation] {label}: allocated={allocated / gib:.2f} GiB reserved={reserved / gib:.2f} GiB "
+          f"free={free_total / gib:.2f} GiB largest_free={largest_free / gib:.2f} GiB ext_frag={ext_frag:.1%}")
 
 
 def torch_sync():
