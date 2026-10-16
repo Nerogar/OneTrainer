@@ -1,4 +1,5 @@
 from abc import ABCMeta
+from collections.abc import Callable
 from contextlib import nullcontext
 from uuid import uuid4
 
@@ -6,12 +7,14 @@ from modules.module.EMAModule import EMAModuleWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.convert_util import qkv_fusion
+from modules.util.disk_stream import stream_module_to
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
+from modules.util.LayerOffloadConductor import LayerOffloadConductor
 from modules.util.modelSpec.ModelSpec import ModelSpec
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
-from modules.util.torch_util import device_equals, torch_gc
+from modules.util.torch_util import create_mem_pool, device_equals, mem_pool_context, supports_mem_pool, torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -19,6 +22,21 @@ from torch import Tensor
 from torch.optim import Optimizer
 
 from transformers import PreTrainedTokenizer
+
+
+def _module_is_on(module: torch.nn.Module | LoRAModuleWrapper, device: torch.device) -> bool:
+    # Read a module's residency off its first tensor (parameters first, buffers for a parameterless module).
+    # module.to() is already a per-tensor no-op when the device matches, but whether it moved anything has to be
+    # known before the call to decide whether the collection afterwards is worth running. One tensor is enough:
+    # the modules asked here are moved as a unit by the branch below, so they are never split across devices.
+    # Both callers are duck-typed on .to(): a LoRAModuleWrapper is not an nn.Module, returns a plain list from
+    # parameters() (hence iter(), not next() on it directly) and has no buffers() at all.
+    tensor = next(iter(module.parameters()), None)
+    if tensor is None and hasattr(module, "buffers"):
+        tensor = next(iter(module.buffers()), None)
+    if tensor is None:
+        return True  # nothing to move, so it is trivially where it was asked to be
+    return device_equals(tensor.device, device)
 
 
 class BaseModelEmbedding:
@@ -79,6 +97,9 @@ class BaseModel(metaclass=ABCMeta):
     embedding_state_dicts: dict[str, dict[str, Tensor]] | None
     autocast_context: torch.autocast | nullcontext
     train_dtype: DataType
+    cache_in_ram: dict[str, bool]
+    offload_conductor: dict[str, LayerOffloadConductor]
+    materialize_fn: dict[str, Callable]
 
     def __init__(
             self,
@@ -86,6 +107,9 @@ class BaseModel(metaclass=ABCMeta):
     ):
         self.model_type = model_type
         self.parameters = None
+        self.cache_in_ram = {}
+        self.offload_conductor = {}
+        self.materialize_fn = {}
         self.optimizer = None
         self.optimizer_state_dict = None
         self.param_group_mapping = None
@@ -96,6 +120,8 @@ class BaseModel(metaclass=ABCMeta):
         self.embedding_state_dicts = {}
         self.autocast_context = nullcontext()
         self.train_dtype = DataType.FLOAT_32
+
+        self._mem_pools = {}
 
     @property
     def train_device(self) -> torch.device:
@@ -112,9 +138,15 @@ class BaseModel(metaclass=ABCMeta):
 
     def evict(self, *parts: str):
         # Move `parts` onto temp_device. No parts given -> every component in ModelType.model_parts().
+        # Collect once at the end, and only if something was actually freed: materialize_only() evicts every
+        # part it doesn't want on every call, so most evictions here are of parts that are already evicted and
+        # have nothing to reclaim. Each part reports whether it moved rather than the model tracking residency,
+        # so the answer always comes from the component that did (or didn't) do the move.
+        moved = False
         for part in parts or self.model_type.model_parts():
-            self._move_part(part, self.temp_device)
-        torch_gc()
+            moved |= self._move_part(part, self.temp_device)
+        if moved:
+            torch_gc()
 
     def materialize_only(self, *parts: str):
         # Materialize exactly `parts` on train_device; evict every other component in ModelType.model_parts()
@@ -131,28 +163,68 @@ class BaseModel(metaclass=ABCMeta):
         # call this before encode_text, which reads every text encoder the model has.
         self.materialize_only(*self.model_type.text_encoder_parts())
 
-    def _move_part(self, part: str, device: torch.device):
-        # The generic per-component move: `part` (or `part_1` for the first of several split text encoders),
-        # its LoRA (`{part}_lora`), and its layer-offload conductor (`{part}_offload_conductor`), if present.
+    def _move_part(self, part: str, device: torch.device) -> bool:
+        # Move a component (`part`, or `part_1` for the first of several split text encoders) and its LoRA. The
+        # dispatch below routes through an offload conductor and/or a disk-stream materialize closure if present.
+        # Returns whether any weight actually moved: each of the three paths is idempotent and a repeat call is
+        # common (materialize_only states a set, not a delta), so the caller needs to know whether this one did
+        # anything before paying for a collection.
         stem = f"{part}_1" if hasattr(self, f"{part}_1") else part
 
-        conductor = getattr(self, f"{stem}_offload_conductor", None)
+        conductor = self.offload_conductor.get(stem)
+        materialize_fn = self.materialize_fn.get(stem)
+        cache_in_ram = self.cache_in_ram.get(stem, True)
+
+        moved = False
         if conductor is not None:
             if device_equals(device, self.temp_device):
-                conductor.evict()
+                to_meta = materialize_fn is not None and not cache_in_ram
+                moved = conductor.evict(to_meta=to_meta)
             else:
                 assert device_equals(device, self.train_device), f"unexpected device {device} for part {part}"
-                conductor.materialize()
-        else:
-            component = getattr(self, stem)  # raises if `part` doesn't name a real attribute
-            # None when the part is excluded from training (e.g. a text encoder with include_text_encoder off):
-            # it stays in model_parts() but the loader never populated it, so there is nothing to move.
-            if component is not None:
-                component.to(device=device)
+                train_dtype = getattr(self, f"{stem}_train_dtype", self.train_dtype)
+                moved = conductor.materialize(
+                    train_dtype, name=part, materialize_fn=materialize_fn,
+                    cache_in_ram=cache_in_ram)
+        elif materialize_fn is not None:
+            streamed_component = getattr(self, stem)
+            train_dtype = getattr(self, f"{stem}_train_dtype", self.train_dtype)
+            moved = stream_module_to(
+                streamed_component, device, materialize_fn, train_dtype,
+                cache_in_ram=cache_in_ram, name=part, temp_device=self.temp_device)
 
+        # move into the shared stem pool: the base component itself (unless a conductor or stream owns its move) plus
+        # the LoRA. getattr(self, stem) is None for a part in model_parts() that was never populated (e.g. an omitted
+        # text encoder), so it drops out below.
+        to_move = []
+        if conductor is None and materialize_fn is None:
+            to_move.append(getattr(self, stem))
         lora = getattr(self, f"{stem}_lora", None)
-        if lora is not None:
-            lora.to(device)
+        to_move.append(lora)
+        to_move = [module for module in to_move if module is not None]
+        if not to_move:
+            return moved
+
+        moved |= any(not _module_is_on(module, device) for module in to_move)
+
+        if supports_mem_pool(device):
+            # The component (when not conductor/stream-managed) and its LoRA share a per-stem MemPool so both release
+            # together on evict, keeping the LoRA's small tensors from pinning freed default-pool segments across the
+            # part's evict/reload cycle. A conductor keeps its own pool, so the stem pool then holds only the LoRA.
+            pool = self._mem_pools.get(stem)
+            if pool is None:
+                pool = self._mem_pools[stem] = create_mem_pool(device)
+            with mem_pool_context(pool):
+                for module in to_move:
+                    module.to(device=device)
+        else:
+            # the target has no MemPool (CPU): move normally and drop this stem's pool from the earlier GPU move,
+            # so evict()'s torch_gc can release its segments
+            for module in to_move:
+                module.to(device=device)
+            self._mem_pools.pop(stem, None)
+
+        return moved
 
     def eval(self):
         # Put every present component on eval(); driven by the same part registry as materialize()/evict().
