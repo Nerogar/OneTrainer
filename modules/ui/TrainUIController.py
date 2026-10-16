@@ -258,7 +258,7 @@ class TrainUIController:
             error_caught = True
             traceback.print_exc()
         finally:
-            if self.train_config.debug_mode or os.environ.get("OT_DEBUG_PROFILES"):
+            if self.train_config.debug_mode or os.environ.get("OT_DEBUG_PROFILES") == "1":
                 print_fragmentation("training run, at stop")
 
         trainer.end()
@@ -272,7 +272,7 @@ class TrainUIController:
         torch_gc()
 
         # after trainer.end() + torch_gc: quantifies the reserved-but-unallocated that persists through unload
-        if self.train_config.debug_mode or os.environ.get("OT_DEBUG_PROFILES"):
+        if self.train_config.debug_mode or os.environ.get("OT_DEBUG_PROFILES") == "1":
             print_fragmentation("training run, after unload")
 
         if error_caught:

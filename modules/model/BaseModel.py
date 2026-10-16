@@ -116,7 +116,7 @@ class BaseModel(metaclass=ABCMeta):
         for part in parts or self.model_type.model_parts():
             self._move_part(part, self.temp_device)
         torch_gc()
-        if (self.train_config is not None and self.train_config.debug_mode) or os.environ.get("OT_DEBUG_PROFILES"):
+        if (self.train_config is not None and self.train_config.debug_mode) or os.environ.get("OT_DEBUG_PROFILES") == "1":
             print_fragmentation(f"evict({', '.join(parts) or 'all'})")
 
     def materialize_only(self, *parts: str):
