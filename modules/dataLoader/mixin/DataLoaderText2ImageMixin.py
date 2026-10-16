@@ -4,13 +4,13 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import Callable
 
 import modules.util.multi_gpu_util as multi
+from modules.dataLoader.DropTags import DropTags
 from modules.model.BaseModel import BaseModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.util import path_util
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
-from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.OutputPipelineModule import OutputPipelineModule
@@ -22,7 +22,6 @@ from mgds.pipelineModules.CollectPaths import CollectPaths
 from mgds.pipelineModules.DiskCache import DiskCache
 from mgds.pipelineModules.DistributedSampler import DistributedSampler
 from mgds.pipelineModules.DownloadHuggingfaceDatasets import DownloadHuggingfaceDatasets
-from mgds.pipelineModules.DropTags import DropTags
 from mgds.pipelineModules.GenerateImageLike import GenerateImageLike
 from mgds.pipelineModules.GenerateMaskedConditioningImage import GenerateMaskedConditioningImage
 from mgds.pipelineModules.GetFilename import GetFilename
@@ -274,10 +273,8 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
     ):
         if before_cache_image_fun is None:
             def prepare_vae():
-                model.to(self.temp_device)
-                model.vae_to(self.train_device)
+                model.materialize_only("vae")
                 model.eval()
-                torch_gc()
             before_cache_image_fun = prepare_vae
 
         sort_names = output_names + ['concept']
@@ -340,10 +337,8 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
 
         if before_cache_image_fun is None:
             def prepare_vae():
-                model.to(self.temp_device)
-                model.vae_to(self.train_device)
+                model.materialize_only("vae")
                 model.eval()
-                torch_gc()
             before_cache_image_fun = prepare_vae
 
         def before_cache_text_fun():

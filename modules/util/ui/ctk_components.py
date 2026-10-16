@@ -59,13 +59,14 @@ def entry(
         validator_factory: Callable[..., FieldValidator] | None = None,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
+        placeholder: str = "",
 ):
     var = ui_state.get_var(var_name)
     trace_id = None
     if command:
         trace_id = ui_state.add_var_trace(var_name, command)
 
-    component = ctk.CTkEntry(master, textvariable=var, width=width)
+    component = ctk.CTkEntry(master, textvariable=var, width=width, placeholder_text=placeholder)
     component.grid(row=row, column=column, padx=PAD, pady=PAD, sticky=sticky)
 
     if validator_factory is not None:
@@ -123,6 +124,7 @@ def path_entry(
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
         columnspan: int = 1,
+        placeholder: str = "",
 ):
     frame = ctk.CTkFrame(master, fg_color="transparent")
     frame.grid(row=row, column=column, padx=0, pady=0, sticky="new", columnspan=columnspan)
@@ -137,6 +139,7 @@ def path_entry(
         validator_factory=_path_validator_factory,
         extra_validate=extra_validate,
         required=required,
+        placeholder=placeholder,
     )
 
     trace_ids = []

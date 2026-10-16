@@ -121,13 +121,6 @@ class StableDiffusionXLModel(BaseModel):
         self.sd_config = None
         self.sd_config_filename = None
 
-    def adapters(self) -> list[LoRAModuleWrapper]:
-        return [a for a in [
-            self.text_encoder_1_lora,
-            self.text_encoder_2_lora,
-            self.unet_lora,
-        ] if a is not None]
-
     def diffusers_to_original(self) -> list | None:
         # SDXL UNet diffusers -> original/sgm key map, convert()-native (bare sgm names, no top prefix).
         # SDXL has NO qkv fusion, so this is a pure key rename. Spatial-transformer (attention) blocks have
@@ -198,48 +191,6 @@ class StableDiffusionXLModel(BaseModel):
     def all_text_encoder_2_embeddings(self) -> list[BaseModelEmbedding]:
         return [embedding.text_encoder_2_embedding for embedding in self.additional_embeddings] \
                + ([self.embedding.text_encoder_2_embedding] if self.embedding is not None else [])
-
-    def vae_to(self, device: torch.device):
-        self.vae.to(device=device)
-
-    def text_encoder_to(self, device: torch.device):
-        self.text_encoder_1.to(device=device)
-        self.text_encoder_2.to(device=device)
-
-        if self.text_encoder_1_lora is not None:
-            self.text_encoder_1_lora.to(device)
-
-        if self.text_encoder_2_lora is not None:
-            self.text_encoder_2_lora.to(device)
-
-    def text_encoder_1_to(self, device: torch.device):
-        self.text_encoder_1.to(device=device)
-
-        if self.text_encoder_1_lora is not None:
-            self.text_encoder_1_lora.to(device)
-
-    def text_encoder_2_to(self, device: torch.device):
-        self.text_encoder_2.to(device=device)
-
-        if self.text_encoder_2_lora is not None:
-            self.text_encoder_2_lora.to(device)
-
-    def unet_to(self, device: torch.device):
-        self.unet.to(device=device)
-
-        if self.unet_lora is not None:
-            self.unet_lora.to(device)
-
-    def to(self, device: torch.device):
-        self.vae_to(device)
-        self.text_encoder_to(device)
-        self.unet_to(device)
-
-    def eval(self):
-        self.vae.eval()
-        self.text_encoder_1.eval()
-        self.text_encoder_2.eval()
-        self.unet.eval()
 
     def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
         return StableDiffusionXLPipeline(

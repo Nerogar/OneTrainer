@@ -203,11 +203,14 @@ def entry(
         validator_factory: Callable[..., PySide6FieldValidator] | None = None,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
+        placeholder: str = "",
 ) -> QLineEdit:
     var = ui_state.get_var(var_name)
 
     component = QLineEdit(master)
     component.setMinimumWidth(width)
+    if placeholder:
+        component.setPlaceholderText(placeholder)
     _add(_layout(master), component, row, column, sticky=sticky)
 
     if command:
@@ -252,6 +255,7 @@ def path_entry(
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
         columnspan: int = 1,
+        placeholder: str = "",
 ) -> QWidget:
     frame = QWidget(master)
     frame_lo = QGridLayout(frame)
@@ -268,6 +272,7 @@ def path_entry(
         validator_factory=_path_validator_factory,
         extra_validate=extra_validate,
         required=required,
+        placeholder=placeholder,
     )
 
     dep_trace_ids: list[tuple] = []

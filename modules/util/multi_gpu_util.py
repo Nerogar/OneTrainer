@@ -3,6 +3,7 @@ from collections import deque
 from modules.util.bf16_stochastic_rounding import copy_stochastic_
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.enum.GradientReducePrecision import GradientReducePrecision
+from modules.util.tqdm_util import tqdm
 
 import torch
 
@@ -149,7 +150,7 @@ def parameter_divergence(params: list[torch.Tensor], train_device: torch.device)
 def warn_parameter_divergence(params: list[torch.Tensor], train_device: torch.device):
     divergence = parameter_divergence(params, train_device)
     if divergence is not None and divergence > 0:
-        print(f"\n\nWARNING: Parameter divergence between GPUs of {divergence}\n\n")
+        tqdm.write(f"WARNING: Parameter divergence between GPUs of {divergence}")
 
 
 @torch.no_grad()

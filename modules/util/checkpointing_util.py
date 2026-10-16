@@ -243,14 +243,39 @@ def enable_checkpointing(
         part: TrainModelPartConfig,
         compile: bool,
         lists, # if there are multiple entries in this list, they must be in the exact order they are executed - otherwise offloading fails
-        offload_enabled: bool = True,
+        supports_offloading: bool = True,
 ) -> LayerOffloadConductor | None:
+    # A full fine-tune updates the base weights, but meta-eviction (stream_from_disk + cache_in_ram off) re-streams
+    # them from the checkpoint on each use, discarding those updates. Reject that combo.
+    if config.stream_from_disk and config.part_trained_in_place(part) and not part.cache_in_ram:
+        raise NotImplementedError(
+            "a fully fine-tuned component cannot stream from disk without keeping it cached in RAM: it re-streams "
+            "weights from the checkpoint on each use, discarding training updates. Enable 'Cache In RAM' for this "
+            "component")
+
+    # simplex is a layer-offloading mode, so with layer offloading off there is no conductor to give the buffer to
+    # and the switch does nothing -- a stale setting rather than a bad one, so read it as inactive instead of
+    # rejecting the combinations below against constraints that would never apply.
+    simplex = part.simplex_offloading and supports_offloading and part.offload_fraction > 0
+    if simplex:
+        if config.part_trained_in_place(part):
+            raise NotImplementedError(
+                "a fully fine-tuned component cannot use 'Simplex Offloading': its weights live in a RAM buffer that "
+                "is filled from the checkpoint, so in-place training updates would be discarded. Disable 'Simplex "
+                "Offloading' for this component")
+        if not config.stream_from_disk:
+            raise NotImplementedError(
+                "'Simplex Offloading' requires 'Stream From Disk': the RAM buffer is filled from the streamed "
+                "weights. Enable 'Stream From Disk' on the model page, or disable 'Simplex Offloading' for this "
+                "component")
+
     if not part.checkpointing_or_offloading_enabled() and not compile:
         return None
 
-    # a conductor exists iff this part actually offloads (and the component supports conductor offloading)
-    offload = offload_enabled and part.offloading_enabled()
-    conductor = LayerOffloadConductor(model, config, part) if offload else None
+    # a conductor exists iff this part actually offloads: the user enabled it (part.offloading_enabled()) and the
+    # architecture can be driven by the conductor (supports_offloading).
+    offload = supports_offloading and part.offloading_enabled()
+    conductor = LayerOffloadConductor(model, config, part, simplex=simplex) if offload else None
     checkpointing = part.checkpointing_enabled()
 
     # a trained part always has grad flowing through it, so offloading without checkpointing is guaranteed to hit
@@ -298,12 +323,12 @@ def enable_checkpointing_for_basic_transformer_blocks(
         model: nn.Module,
         config: TrainConfig,
         part: TrainModelPartConfig,
-        offload_enabled: bool,
+        supports_offloading: bool = True,
 ) -> LayerOffloadConductor | None:
     return enable_checkpointing(model, config, part, config.compile, [
             (BasicTransformerBlock  ,        []),
         ],
-        offload_enabled = offload_enabled,
+        supports_offloading = supports_offloading,
     )
 
 def enable_checkpointing_for_clip_encoder_layers(
@@ -313,7 +338,7 @@ def enable_checkpointing_for_clip_encoder_layers(
 ):
     return enable_checkpointing(model, config, part, False, [
         (CLIPEncoderLayer, []), # No activation offloading for text encoders, because the output might be taken from the middle of the network
-    ], offload_enabled=False) # CLIP is non-offloadable; keep it plain-checkpointed so a migrated offload_fraction can't build a self-activating conductor
+    ], supports_offloading=False) # CLIP is non-offloadable; keep it plain-checkpointed so a migrated offload_fraction can't build a self-activating conductor
 
 def enable_checkpointing_for_t5_encoder_layers(
         model: nn.Module,

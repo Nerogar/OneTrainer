@@ -1,4 +1,4 @@
-import datetime
+import datetime as dt
 import json
 import os
 import subprocess
@@ -19,11 +19,16 @@ from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.torch_util import torch_gc
+from modules.util.profiling_util import PeakMemoryRecorder
+from modules.util.tensorboard_util import TensorboardProcess
+from modules.util.torch_util import print_fragmentation, torch_gc
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ui.validation import flush_and_validate_all
 
 import torch
+
+from huggingface_hub import parse_hf_uri
+from huggingface_hub.errors import GatedRepoError
 
 
 class TrainUIController:
@@ -38,6 +43,10 @@ class TrainUIController:
         self.current_workspace_dir = config.workspace_dir
         self.start_time: float | None = None
         self.start_total_steps: int | None = None
+
+        # the currently open sample window, or None. Tracked so a second click doesn't spawn a
+        # second (non-modal) window - the sample tool isn't designed to run two instances at once.
+        self.sample_window = None
 
     def on_update_train_progress(self, train_progress: TrainProgress, max_step: int, max_epoch: int):
         # capture session start on first progress update
@@ -65,7 +74,7 @@ class TrainUIController:
 
         total_eta = spent_total / steps_done_this_session * remaining_steps
 
-        td = datetime.timedelta(seconds=total_eta)
+        td = dt.timedelta(seconds=total_eta)
         days = td.days
         hours, remainder = divmod(td.seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -104,8 +113,9 @@ class TrainUIController:
             tensorboard_args.append("--bind_all")
 
         try:
-            self.always_on_tensorboard_subprocess = subprocess.Popen(tensorboard_args)
+            self.always_on_tensorboard_subprocess = TensorboardProcess(tensorboard_args)
         except Exception:
+            traceback.print_exc()
             self.always_on_tensorboard_subprocess = None
 
     def _stop_always_on_tensorboard(self):
@@ -160,16 +170,25 @@ class TrainUIController:
         ).create_window(parent, view_cls)
 
     def open_sampling_tool(self, parent, view_cls):
+        if self.sample_window is not None:
+            parent.show_window(self.sample_window)  # re-focus the one already open
+            return
         if not self.training_callbacks and not self.training_commands:
             controller = SampleWindowController(
                 self.train_config,
                 use_external_model=False,
             )
-            window = view_cls(parent, controller)
-            parent.show_window(window)
-            parent.connect_window_closed(window, torch_gc)
+            self.sample_window = view_cls(parent, controller)
+            parent.show_window(self.sample_window)
+            def on_closed():
+                self.sample_window = None
+                torch_gc()
+            parent.connect_window_closed(self.sample_window, on_closed)
 
     def open_manual_sample_window(self, parent, view_cls):
+        if self.sample_window is not None:
+            parent.show_window(self.sample_window)  # re-focus the one already open
+            return
         training_callbacks = self.training_callbacks
         training_commands = self.training_commands
 
@@ -180,9 +199,12 @@ class TrainUIController:
                 callbacks=training_callbacks,
                 commands=training_commands,
             )
-            window = view_cls(parent, controller)
-            parent.show_window(window)
-            parent.connect_window_closed(window, lambda: training_callbacks.set_on_sample_custom())
+            self.sample_window = view_cls(parent, controller)
+            parent.show_window(self.sample_window)
+            def on_closed():
+                self.sample_window = None
+                training_callbacks.set_on_sample_custom()
+            parent.connect_window_closed(self.sample_window, on_closed)
 
     def sample_now(self):
         train_commands = self.training_commands
@@ -213,8 +235,21 @@ class TrainUIController:
             traceback.print_exc()
             self.view.on_update_status(f"Error generating debug package: {e}")
 
+    def __report_gated_repo_error(self) -> str:
+        model_name = self.train_config.base_model_name
+        if not os.path.exists(model_name):
+            model_name = parse_hf_uri(model_name if "://" in model_name else f"hf://{model_name}").id
+        concise_auth_error = f"Cannot access {Path(model_name).name} on HuggingFace.\nAccess is gated and you are not in the authorized list."
+        print(concise_auth_error)
+        return concise_auth_error
+
     def __training_thread_function(self):
+        with PeakMemoryRecorder("training run", enabled=False):
+            self.__training_thread_function_impl()
+
+    def __training_thread_function_impl(self):
         error_caught = False
+        error_message = "Error: check the console for details"
 
         self.training_callbacks = TrainCallbacks(
             on_update_train_progress=self.on_update_train_progress,
@@ -231,11 +266,17 @@ class TrainUIController:
             self.start_total_steps = None
             self.start_time = time.monotonic()
             trainer.train()
-        except Exception:
+        except Exception as e:
             if self.train_config.cloud.enabled:
                 self.view.sync_cloud_secrets()
             error_caught = True
-            traceback.print_exc()
+            if isinstance(e, GatedRepoError):
+                error_message = self.__report_gated_repo_error()
+            else:
+                traceback.print_exc()
+        finally:
+            if self.train_config.debug_mode or os.environ.get("OT_DEBUG_PROFILES") == "1":
+                print_fragmentation("training run, at stop")
 
         trainer.end()
 
@@ -247,8 +288,12 @@ class TrainUIController:
         torch.clear_autocast_cache()
         torch_gc()
 
+        # after trainer.end() + torch_gc: quantifies the reserved-but-unallocated that persists through unload
+        if self.train_config.debug_mode or os.environ.get("OT_DEBUG_PROFILES") == "1":
+            print_fragmentation("training run, after unload")
+
         if error_caught:
-            self.on_update_status("Error: check the console for details")
+            self.on_update_status(error_message)
         else:
             self.on_update_status("Stopped")
 
@@ -265,6 +310,10 @@ class TrainUIController:
             errors = flush_and_validate_all()
             if errors:
                 self.view.show_validation_errors(errors)
+                return
+
+            if self.train_config.clear_cache_before_training and self.train_config.latent_caching \
+                    and not self.view.confirm("Clear Cache Before Training", "Clear cache?"):
                 return
 
             self.view.on_training_started()

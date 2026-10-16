@@ -29,10 +29,11 @@ from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import pyside6_components
-from modules.util.ui.pyside6_util import QtABCMeta
+from modules.util.ui.pyside6_settings import MainWindowSettings
+from modules.util.ui.pyside6_util import QtABCMeta, get_theme_controller
 from modules.util.ui.PySide6UIState import PySide6UIState
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QSettings, QSignalBlocker, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QFileDialog, QGridLayout, QMainWindow, QMessageBox, QTabWidget, QWidget
 
@@ -95,6 +96,8 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         self.workspace_dir_trace_id = self.ui_state.add_var_trace(
             "workspace_dir", self.controller._on_workspace_dir_change_trace
         )
+        self.window_settings = MainWindowSettings(self, self.tabview, self._tab_widgets, QSettings())
+        self.window_settings.restore()
 
     def closeEvent(self, event):
         if self.controller.training_thread is not None and self.controller.training_thread.is_alive():
@@ -108,6 +111,7 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         self.top_bar_component.save_default()
         self.controller._stop_always_on_tensorboard()
         self.ui_state.remove_var_trace("workspace_dir", self.workspace_dir_trace_id)
+        self.window_settings.save()
         event.accept()
 
     # --- BaseTrainUIView abstract method implementations ---
@@ -153,6 +157,10 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         bullet_list = "\n".join(f"• {e}" for e in errors)
         QMessageBox.critical(self, "Cannot Start Training",
                              f"Please fix the following errors before training:\n\n{bullet_list}")
+
+    def confirm(self, title: str, message: str) -> bool:
+        buttons = QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
+        return QMessageBox.question(self, title, message, buttons) == QMessageBox.StandardButton.Ok
 
     def open_dataset_tool(self):
         self.wait_window(self.controller.open_dataset_tool(self, PySide6CaptionUIView))
@@ -220,7 +228,23 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         lo.setColumnStretch(1, 1)
         lo.setColumnStretch(3, 1)
         self.build_general_tab_content(frame, self.controller, self.ui_state)
+        row = lo.rowCount()
+        pyside6_components.label(frame, row, 0, "Theme", tooltip="Application appearance, saved independently of training presets")
+        self.theme_dropdown = pyside6_components.NoScrollComboBox(frame)
+        for label, preference in (("Dark", "dark"), ("Light", "light"), ("Match system", "system")):
+            self.theme_dropdown.addItem(label, preference)
+        theme_controller = get_theme_controller()
+        self._update_theme_dropdown(theme_controller.preference)
+        self.theme_dropdown.currentIndexChanged.connect(
+            lambda _: theme_controller.set_preference(self.theme_dropdown.currentData())
+        )
+        theme_controller.preference_changed.connect(self._update_theme_dropdown)
+        pyside6_components._add(lo, self.theme_dropdown, row, 1)
         pyside6_components._pack_form(frame)
+
+    def _update_theme_dropdown(self, preference: str):
+        with QSignalBlocker(self.theme_dropdown):
+            self.theme_dropdown.setCurrentIndex(self.theme_dropdown.findData(preference))
 
     def _configure_data_frame(self, frame):
         lo = pyside6_components._layout(frame)
