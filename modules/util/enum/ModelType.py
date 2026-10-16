@@ -356,6 +356,7 @@ _TRAINABLE_PARTS: dict[ModelType, tuple[str, ...]] = {
     ModelType.CHROMA_1: ("transformer", "text_encoder"),
     ModelType.QWEN: ("transformer", "text_encoder"),
     ModelType.KREA_2: ("transformer",),
+    ModelType.MOSS: ("transformer",),
     ModelType.Z_IMAGE: ("transformer",),
     ModelType.ERNIE: ("transformer",),
     ModelType.IDEOGRAM_4: ("transformer",),
