@@ -104,12 +104,13 @@ class _TextBlock(nn.Module):
         self.ffn_down = nn.Linear(ffn_dim, dim)
 
     def forward(self, x, rope):
-        q, k, v = self.qkv(self.norm1(x)).chunk(3, -1)
+        dtype = x.dtype
+        q, k, v = self.qkv(self.norm1(x)).to(dtype).chunk(3, -1)
         q = self.q_norm(q.unflatten(-1, (self.heads, -1))).flatten(2)
         k = self.k_norm(k.unflatten(-1, (self.heads, -1))).flatten(2)
-        x = x + self.proj(_attention(q, k, v, rope, self.heads))
+        x = x + self.proj(_attention(q, k, v, rope, self.heads)).to(dtype)
         y = self.norm2(x)
-        return x + self.ffn_down(_situ(self.ffn_up(y), self.ffn_gate(y)))
+        return x + self.ffn_down(_situ(self.ffn_up(y), self.ffn_gate(y))).to(dtype)
 
 
 class _TextProjection(nn.Module):
@@ -119,7 +120,7 @@ class _TextProjection(nn.Module):
         self.blocks = nn.ModuleList([_TextBlock(dim, ffn_dim, heads) for _ in range(2)])
 
     def forward(self, x, rope):
-        x = self.proj(x.to(self.proj.weight.dtype))
+        x = self.proj(x.to(x.dtype)).to(x.dtype)
         for block in self.blocks:
             x = block(x, rope)
         return x
@@ -140,14 +141,15 @@ class _Block(nn.Module):
     def forward(self, x, rope, modulation):
         shift_a, scale_a, gate_a, shift_f, scale_f, gate_f = modulation.unbind(1)
         y = self.norm1(x) * (1 + scale_a[:, None]) + shift_a[:, None]
-        dtype = self.proj['q'].weight.dtype
+        dtype = x.dtype
         y = y.to(dtype)
-        q = self.q_norm(self.proj['q'](y).unflatten(-1, (self.heads, -1))).flatten(2)
-        k = self.k_norm(self.proj['k'](y).unflatten(-1, (self.heads, -1))).flatten(2)
-        x = x + self.proj['o'](_attention(q, k, self.proj['v'](y), rope, self.heads)) * gate_a[:, None]
+        q = self.q_norm(self.proj['q'](y).to(dtype).unflatten(-1, (self.heads, -1))).flatten(2)
+        k = self.k_norm(self.proj['k'](y).to(dtype).unflatten(-1, (self.heads, -1))).flatten(2)
+        v = self.proj['v'](y).to(dtype)
+        x = x + self.proj['o'](_attention(q, k, v, rope, self.heads)).to(dtype) * gate_a[:, None]
         y = self.norm2(x) * (1 + scale_f[:, None]) + shift_f[:, None]
-        hidden, gate = self.proj['ffn_up_gate'](y.to(dtype)).chunk(2, -1)
-        return x + self.proj['ffn_down'](_situ(hidden, gate)) * gate_f[:, None]
+        hidden, gate = self.proj['ffn_up_gate'](y.to(dtype)).to(dtype).chunk(2, -1)
+        return x + self.proj['ffn_down'](_situ(hidden, gate)).to(dtype) * gate_f[:, None]
 
 
 class _RoPE(nn.Module):
