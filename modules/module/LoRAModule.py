@@ -721,6 +721,7 @@ class OFTModule(PeftBase):
     def dropout(self):
         return self.oft_R.dropout
 
+
 class DoRAOFTModule(OFTModule):
     """
     DoRA applied to OFT.
@@ -761,13 +762,17 @@ class DoRAOFTModule(OFTModule):
         # Apply Exponential DoRA Scale (exp(0) = Multiplies by 1.0 at step 0)
         multiplier = torch.exp(self.dora_log_multiplier).to(result.dtype)
         if isinstance(self.orig_module, nn.Conv2d):
-            multiplier = multiplier.view(1, -1, 1, 1)
+            # Broadcast over spatial dimensions for both batched and unbatched inputs.
+            multiplier = multiplier.view(-1, 1, 1)
 
         bias = self.orig_module.bias
         if bias is not None:
-            bias_view = bias.view(1, -1, 1, 1) if isinstance(self.orig_module, nn.Conv2d) else bias
+            # autocast can produce fp16/bf16 output from an fp32 base layer. keep the
+            # bias correction in that output dtype to avoid promoting the full activation.
+            bias = bias.to(result.dtype)
+            bias_view = bias.view(-1, 1, 1) if isinstance(self.orig_module, nn.Conv2d) else bias
 
-            # This equivalent to (result - bias) * m + bias, but
+            # This is equivalent to (result - bias) * m + bias, but
             # eliminates VRAM overhead by calculating the bias shift on the tiny bias tensor.
             # y_{dora} = y * m + b * (1 - m)
             bias_term = bias_view * (1.0 - multiplier)
@@ -776,6 +781,7 @@ class DoRAOFTModule(OFTModule):
             result = result * multiplier
 
         return result
+
 
 class DoRAModule(LoRAModule):
     """Weight-decomposed low rank adaptation.
@@ -909,7 +915,6 @@ class LoRAModuleWrapper:
         self.peft_type = config.peft_type
         self.rank = config.lora_rank
         self.alpha = config.lora_alpha
-        dora_oft = config.dora_oft
         self.lokr_dim = config.lokr_dim
         # per-model qkv fusion groups (group_pattern, [leaf_suffixes], fused_suffix, original_suffix).
         self.fusion_spec = fusion_spec
@@ -949,12 +954,12 @@ class LoRAModuleWrapper:
             self.additional_args = [self.rank, self.alpha]
             self.additional_kwargs = {}
         elif self.peft_type == PeftType.OFT_2:
-            if dora_oft:
-                 self.klass = DoRAOFTModule
-                 self.dummy_klass = DummyDoRAOFTModule
+            if config.dora_oft:
+                self.klass = DoRAOFTModule
+                self.dummy_klass = DummyDoRAOFTModule
             else:
-                 self.klass = OFTModule
-                 self.dummy_klass = DummyOFTModule
+                self.klass = OFTModule
+                self.dummy_klass = DummyOFTModule
 
             self.additional_args = [
                 config.oft_block_size,
