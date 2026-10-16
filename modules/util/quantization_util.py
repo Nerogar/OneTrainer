@@ -340,7 +340,7 @@ def get_offload_tensors(module: nn.Module) -> list[torch.Tensor]:
     tensors = []
 
     if bnb is not None:
-        if isinstance(module, LinearNf4):
+        if isinstance(module, LinearNf4) and module.quant_state is not None:
             tensors += [module.quant_state.absmax]
     if isinstance(module, nn.Linear | nn.Conv2d):
         tensors += [module.weight]
