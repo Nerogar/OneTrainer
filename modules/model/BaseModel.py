@@ -15,7 +15,14 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.LayerOffloadConductor import LayerOffloadConductor
 from modules.util.modelSpec.ModelSpec import ModelSpec
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
-from modules.util.torch_util import device_equals, print_fragmentation, create_mem_pool, device_equals, mem_pool_context, supports_mem_pool, torch_gc
+from modules.util.torch_util import (
+    create_mem_pool,
+    device_equals,
+    mem_pool_context,
+    print_fragmentation,
+    supports_mem_pool,
+    torch_gc,
+)
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -144,7 +151,7 @@ class BaseModel(metaclass=ABCMeta):
         # have nothing to reclaim. Each part reports whether it moved rather than the model tracking residency,
         # so the answer always comes from the component that did (or didn't) do the move.
         moved = False
-        
+
         for part in parts or self.model_type.model_parts():
             moved |= self._move_part(part, self.temp_device)
         if moved:
