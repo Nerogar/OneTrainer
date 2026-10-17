@@ -1,26 +1,54 @@
 import locale
+import os
 import signal
 import sys
 from abc import ABCMeta
+from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPalette
+from modules.util.ui.theme import ThemeController
+
+from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication, QStyleFactory, QWidget
 
+if TYPE_CHECKING:
+    # pyside6 stubs omit qts runtime metaclass; expose ABCMeta to type checkers.
+    QtABCMeta = ABCMeta
+else:
+    # reachable at runtime
+    class QtABCMeta(type(QWidget), ABCMeta):
+        # Combine Qt Shiboken metaclass with ABCMeta at runtime.
+        pass
 
-class QtABCMeta(type(QWidget), ABCMeta):
-    # Combined metaclass that resolves the conflict between Qt's Shiboken metaclass and ABCMeta.
-    pass
+
+class OneTrainerApplication(QApplication):
+    theme_controller: ThemeController
 
 
-def create_application() -> QApplication:
+def get_theme_controller() -> ThemeController:
+    app = QApplication.instance()
+    if not isinstance(app, OneTrainerApplication):
+        raise RuntimeError("The OneTrainer application has not been created")
+    return app.theme_controller
+
+
+def create_application() -> OneTrainerApplication:
     # Restore the OS default SIGINT handler so Ctrl+C terminates the process
     # directly at the C level. Qt's event loop blocks inside C++, so Python's
     # own SIGINT handler would never get a chance to run while app.exec() is
     # active and Ctrl+C would be ignored.
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-    app = QApplication(sys.argv)
+    app = OneTrainerApplication(sys.argv)
+    app.setOrganizationName("OneTrainer")
+    app.setApplicationName("OneTrainer")
+    # On desktops without the xdg-desktop-portal Settings interface, Qt spams two
+    # "qt.qpa.theme.gnome: dbus reply error ... org.freedesktop.portal.Settings"
+    # lines while probing for the system color scheme. Silence just that category;
+    # the rules string is read when Qt's logging initializes at QApplication init.
+    _gnome_theme_rule = "qt.qpa.theme.gnome=false"
+    existing_rules = os.environ.get("QT_LOGGING_RULES")
+    os.environ["QT_LOGGING_RULES"] = f"{existing_rules};{_gnome_theme_rule}" if existing_rules else _gnome_theme_rule
+
     # QApplication initializes the C locale from the environment (setlocale(LC_ALL, "")), which sets LC_NUMERIC
     # to a locale whose decimal separator may be a comma. C libraries then misparse '.' floats: protobuf's upb
     # backend rejects sentencepiece's schema ("Invalid default '0.9995'"), breaking every sentencepiece tokenizer
@@ -32,36 +60,7 @@ def create_application() -> QApplication:
     # controls via OS theme APIs, which breaks once an application stylesheet
     # is set, producing a flatter look than Fusion's own stylesheet-aware painting.
     app.setStyle(QStyleFactory.create("Fusion"))
-    app.styleHints().setColorScheme(Qt.ColorScheme.Light)
 
-    palette = app.palette()
-    palette.setColor(QPalette.ColorRole.Base, QColor("white"))
-    palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Base, QColor("#e0e0e0"))
-    app.setPalette(palette)
-
-    app.setStyleSheet("""
-        QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit {
-            padding: 2px 2px;
-        }
-        QCheckBox::indicator {
-            width: 16px;
-            height: 16px;
-        }
-        QProgressBar {
-            background-color: #c8c8c8;
-        }
-        QToolButton {
-            padding-top: 0px;
-            padding-bottom: 0px;
-            padding-right: 40px;
-        }
-        QToolButton::menu-indicator {
-            subcontrol-origin: padding;
-            subcontrol-position: right center;
-            width: 12px;
-            height: 12px;
-            right: 10px;
-        }
-    """)
+    app.theme_controller = ThemeController(app, QSettings())
 
     return app

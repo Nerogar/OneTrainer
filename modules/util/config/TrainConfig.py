@@ -32,6 +32,10 @@ from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.torch_util import default_device
 
 
+class RemovedOptimizerError(ValueError):
+    pass
+
+
 class TrainOptimizerConfig(BaseConfig):
     optimizer: Optimizer
     adam_w_mode: bool
@@ -58,10 +62,7 @@ class TrainOptimizerConfig(BaseConfig):
     fused: bool
     fused_back_pass: bool
     growth_rate: float
-    initial_accumulator_value: int
-    initial_accumulator: float
     is_paged: bool
-    log_every: int
     lr_decay: float
     max_unorm: float
     maximize: bool
@@ -69,7 +70,6 @@ class TrainOptimizerConfig(BaseConfig):
     quant_block_size: int
     momentum: float
     nesterov: bool
-    no_prox: bool
     optim_bits: int
     percentile_clipping: int
     r: float
@@ -110,14 +110,10 @@ class TrainOptimizerConfig(BaseConfig):
     use_schedulefree: True
     use_orthograd: False
     nnmf_factor: False
-    orthogonal_gradient: False
+    orthogonal_gradient: str
     use_atan2: False
-    use_AdEMAMix: False
-    beta3_ema: float
-    alpha_grad: float
     beta1_warmup: int
     min_beta1: float
-    Simplified_AdEMAMix: False
     kourkoutas_beta: False
     schedulefree_c: float
     ns_steps: int
@@ -136,11 +132,62 @@ class TrainOptimizerConfig(BaseConfig):
     accelerated_ns: False
     cautious_wd: False
     approx_mars: False
-    auto_kappa_p: False
     compile: False
+    spectral_normalization: bool
+    stochastic_sign: bool
+    centered_wd: float
+    centered_wd_mode: str
+    factored_2nd: bool
+    fisher_wd: bool
+    state_precision: str
+    orthogonal_sinkhorn: bool
+    sinkhorn_iterations: int
+    normed_momentum: bool
+    nesterov_coef: float
+    geometric_wd: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
-        super().__init__(data)
+        super().__init__(
+            data,
+            config_version=1,
+            config_migrations={
+                0: self.__migration_0,
+            }
+        )
+
+    def __migration_0(self, data: dict) -> dict:
+        def migrate_settings(settings: dict, optimizer) -> dict:
+            settings = settings.copy()
+            sp = settings.get("state_precision")
+            valid_sp = {"auto", "factored", "fp32", "fp16", "bf16_sr", "int8_sr"}
+            if sp is not None and sp not in valid_sp:
+                print(f"WARN: invalid optimizer state_precision '{sp}' in config, falling back to 'auto'.")
+                settings["state_precision"] = "auto"
+
+            # orthogonal_gradient was a bool before adv_optm 2.5 made it a mode string.
+            ortho = settings.get("orthogonal_gradient")
+            if isinstance(ortho, bool):
+                settings["orthogonal_gradient"] = "flattened" if ortho else "disabled"
+
+            if str(optimizer) in {
+                "ADAMW_ADV", "ADOPT_ADV", "SIGNSGD_ADV", "MUON_ADV", "ADAMUON_ADV",
+            } and settings.get("nnmf_factor", False):
+                # Preserve an explicitly selected non-default storage format.
+                if settings.get("state_precision", "auto") in (None, "auto"):
+                    settings["state_precision"] = "factored"
+                settings["nnmf_factor"] = False
+            return settings
+
+        migrated_data = migrate_settings(data, data.get("optimizer", self.optimizer))
+
+        # plain dict, so BaseConfig doesnt run migrations
+        adam_config = migrated_data.get("muon_adam_config")
+        if isinstance(adam_config, dict) and adam_config and adam_config.get("__version", 0) < 1:
+            adam_config = migrate_settings(adam_config, Optimizer.ADAMW_ADV)
+            adam_config["__version"] = 1
+            migrated_data["muon_adam_config"] = adam_config
+
+        return migrated_data
 
     @staticmethod
     def default_values():
@@ -172,10 +219,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("fused", False, bool, False))
         data.append(("fused_back_pass", False, bool, False))
         data.append(("growth_rate", None, float, True))
-        data.append(("initial_accumulator_value", None, int, True))
-        data.append(("initial_accumulator", None, float, True))
         data.append(("is_paged", False, bool, False))
-        data.append(("log_every", None, int, True))
         data.append(("lr_decay", None, float, True))
         data.append(("max_unorm", None, float, True))
         data.append(("maximize", False, bool, False))
@@ -183,7 +227,6 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("quant_block_size", None, int, True))
         data.append(("momentum", None, float, True))
         data.append(("nesterov", False, bool, False))
-        data.append(("no_prox", False, bool, False))
         data.append(("optim_bits", None, int, True))
         data.append(("percentile_clipping", None, int, True))
         data.append(("r", None, float, True))
@@ -223,14 +266,10 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("use_schedulefree", True, bool, True))
         data.append(("use_orthograd", False, bool, False))
         data.append(("nnmf_factor", False, bool, False))
-        data.append(("orthogonal_gradient", False, bool, False))
+        data.append(("orthogonal_gradient", "disabled", str, False))
         data.append(("use_atan2", False, bool, False))
-        data.append(("use_AdEMAMix", False, bool, False))
-        data.append(("beta3_ema", None, float, True))
-        data.append(("alpha_grad", None, float, True))
         data.append(("beta1_warmup", None, int, True))
         data.append(("min_beta1", None, float, True))
-        data.append(("Simplified_AdEMAMix", False, bool, False))
         data.append(("kourkoutas_beta", False, bool, False))
         data.append(("schedulefree_c", None, float, True))
         data.append(("ns_steps", None, int, True))
@@ -249,8 +288,19 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("accelerated_ns", False, bool, False))
         data.append(("cautious_wd", False, bool, False))
         data.append(("approx_mars", False, bool, False))
-        data.append(("auto_kappa_p", False, bool, False))
         data.append(("compile", False, bool, False))
+        data.append(("spectral_normalization", False, bool, False))
+        data.append(("stochastic_sign", False, bool, False))
+        data.append(("centered_wd", 0.0, float, False))
+        data.append(("centered_wd_mode", "full", str, False))
+        data.append(("factored_2nd", False, bool, False))
+        data.append(("fisher_wd", False, bool, False))
+        data.append(("state_precision", "auto", str, False))
+        data.append(("orthogonal_sinkhorn", False, bool, False))
+        data.append(("sinkhorn_iterations", None, int, True))
+        data.append(("normed_momentum", False, bool, False))
+        data.append(("nesterov_coef", None, float, True))
+        data.append(("geometric_wd", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
@@ -269,7 +319,9 @@ class TrainModelPartConfig(BaseConfig):
     guidance_scale: float
     gradient_checkpointing: bool
     offload_fraction: float
+    simplex_offloading: bool
     activation_offloading: bool
+    cache_in_ram: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -309,7 +361,9 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("guidance_scale", 1.0, float, False))
         data.append(("gradient_checkpointing", True, bool, False))
         data.append(("offload_fraction", 0.0, float, False))
+        data.append(("simplex_offloading", False, bool, False))
         data.append(("activation_offloading", False, bool, False))
+        data.append(("cache_in_ram", True, bool, False))
 
         return TrainModelPartConfig(data)
 
@@ -349,6 +403,7 @@ class QuantizationConfig(BaseConfig):
     layer_filter: str
     layer_filter_preset: str
     layer_filter_regex: bool
+    fallback_dtype: DataType
     svd_dtype: DataType
     svd_rank: int
     cache_dir: str
@@ -361,6 +416,7 @@ class QuantizationConfig(BaseConfig):
         data.append(("layer_filter", "", str, False))
         data.append(("layer_filter_preset", "full", str, False))
         data.append(("layer_filter_regex", False, bool, False))
+        data.append(("fallback_dtype", DataType.BFLOAT_16, DataType, False))
         data.append(("svd_dtype", DataType.NONE, DataType, False))
         data.append(("svd_rank", 16, int, False))
         data.append(("cache_dir", None, str, True))
@@ -402,6 +458,7 @@ class TrainConfig(BaseConfig):
     async_offloading: bool
     force_circular_padding: bool
     compile: bool
+    stream_from_disk: bool
 
     # data settings
     concept_file_name: str
@@ -545,6 +602,7 @@ class TrainConfig(BaseConfig):
     # oft
     oft_block_size: int
     oft_block_share: bool
+    dora_oft: bool
     oft_scaled: bool
 
     # lokr
@@ -608,6 +666,22 @@ class TrainConfig(BaseConfig):
                 10: self.__migration_10,
             }
         )
+
+    def from_dict(self, data: dict, migrate: bool = True) -> 'TrainConfig':
+        optimizer = data.get('optimizer')
+        if isinstance(optimizer, dict):
+            optimizer = optimizer.get('optimizer')
+        if isinstance(optimizer, str) and optimizer in {
+            'DADAPT_ADA_GRAD', 'DADAPT_ADAM', 'DADAPT_ADAN', 'DADAPT_LION', 'DADAPT_SGD',
+            'ADAGRAD', 'ADAGRAD_8BIT', 'TIGER', 'YOGI',
+            'ADAM', 'ADAM_8BIT', 'SGD_8BIT', 'SCHEDULE_FREE_SGD',
+        }:
+            raise RemovedOptimizerError(
+                f"Optimizer '{optimizer}' is no longer supported. "
+                "Choose a supported optimizer and review its learning rate before loading this config."
+            )
+        super().from_dict(data, migrate=migrate)
+        return self
 
     def __migration_0(self, data: dict) -> dict:
         optimizer_settings = {}
@@ -891,6 +965,18 @@ class TrainConfig(BaseConfig):
             self.embedding_weight_dtype,
         )
 
+    def cache_in_ram(self) -> dict[str, bool]:
+        return {part: getattr(self, part).cache_in_ram for part in self.model_type.model_parts()}
+
+    def part_trained_in_place(self, part: TrainModelPartConfig) -> bool:
+        # True iff a FINE_TUNE run updates this part's base weights. 'train' defaults True even for parts the
+        # architecture can't train (e.g. a frozen text encoder), so also require the model type to list the part as
+        # trainable. Gates the offload/streaming modes that would silently discard in-place weight updates.
+        if self.training_method != TrainingMethod.FINE_TUNE or not part.train:
+            return False
+        name = next((p for p in self.model_type.model_parts() if getattr(self, p) is part), None)
+        return name in self.model_type.trainable_parts()
+
     def model_names(self) -> ModelNames:
         return ModelNames(
             base_model=self.base_model_name,
@@ -1046,6 +1132,7 @@ class TrainConfig(BaseConfig):
         data.append(("async_offloading", True, bool, False))
         data.append(("force_circular_padding", False, bool, False))
         data.append(("compile", False, bool, False))
+        data.append(("stream_from_disk", True, bool, False))
 
         # data settings
         data.append(("concept_file_name", "training_concepts/concepts.json", str, False))
@@ -1239,6 +1326,7 @@ class TrainConfig(BaseConfig):
         # oft
         data.append(("oft_block_size", 32, int, False))
         data.append(("oft_block_share", False, bool, False))
+        data.append(("dora_oft", False, bool, False))
         data.append(("oft_scaled", False, bool, False))
 
         # lokr

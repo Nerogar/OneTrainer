@@ -309,7 +309,7 @@ def reverse_legacy(state_dict: dict[str, Tensor], conversion: list, native_modul
 
 def _split_value_suffix(key: str) -> tuple[str, str]:
     # split a key into (module path, value suffix). Mirrors kohya_flatten: the suffix is .alpha /
-    # .dora_scale (one segment) or .<param>.weight / .oft_R.scaled_oft (two segments). Keys with neither
+    # .dora_scale / .dora_log_multiplier (one segment) or .<param>.weight / .oft_R.scaled_oft (two segments). Keys with neither
     # (bundle_emb.*) have no module path -> empty suffix, whole key is the "module".
     if key.endswith(SINGLE_SEGMENT_SUFFIXES):
         suffix = key[key.rfind("."):]
