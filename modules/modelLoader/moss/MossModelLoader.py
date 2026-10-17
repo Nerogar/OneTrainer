@@ -1,4 +1,3 @@
-import json
 import os
 import traceback
 
@@ -57,10 +56,10 @@ class MossModelLoader(
             subfolder="tokenizer",
         )
 
-        # MOSS ships its scheduler config alongside a copy of its pipeline file; instantiate
-        # the scheduler from that config using the in-OneTrainer pipeline class
-        with open(os.path.join(base_model_name, "scheduler", "scheduler_config.json")) as f:
-            model.noise_scheduler = MOSSImageScheduler.from_config(json.load(f))
+        model.noise_scheduler = MOSSImageScheduler.from_pretrained(
+            base_model_name,
+            subfolder="scheduler",
+        )
 
         model.text_encoder, model.materialize_fn["text_encoder"] = self._load_text_encoder(
             Qwen3_5Model,
