@@ -42,6 +42,7 @@ class ModelType(Enum):
 
     ANIMA = 'ANIMA'
     KREA_2 = 'KREA_2'
+    MOSS = 'MOSS'
 
     Z_IMAGE = 'Z_IMAGE'
 
@@ -111,6 +112,9 @@ class ModelType(Enum):
     def is_krea2(self):
         return self == ModelType.KREA_2
 
+    def is_moss(self):
+        return self == ModelType.MOSS
+
     def is_sana(self):
         return self == ModelType.SANA
 
@@ -177,6 +181,7 @@ class ModelType(Enum):
             or self.is_qwen() \
             or self.is_anima() \
             or self.is_krea2() \
+            or self.is_moss() \
             or self.is_sana() \
             or self.is_hunyuan_video() \
             or self.is_hi_dream() \
@@ -204,7 +209,8 @@ class ModelType(Enum):
                 or self.is_sana() \
                 or self.is_hunyuan_video() \
                 or self.is_hi_dream() \
-                or self.is_chroma():
+                or self.is_chroma() \
+                or self.is_moss():
             return (TrainingMethod.FINE_TUNE, TrainingMethod.LORA, TrainingMethod.EMBEDDING)
         if self.is_qwen() or self.is_z_image() or self.is_flux_2() or self.is_ernie() \
                 or self.is_anima() or self.is_krea2() or self.is_ideogram():
@@ -218,6 +224,9 @@ class ModelType(Enum):
     def text_encoder_parts(self) -> tuple[str, ...]:
         # the text encoder components, named "text_encoder"/"text_encoder_2"/... by convention (see below).
         return tuple(part for part in _MODEL_PARTS[self] if part.startswith("text_encoder"))
+
+    def trainable_parts(self) -> tuple[str, ...]:
+        return _TRAINABLE_PARTS[self]
 
     def supported_lora_formats(self) -> list[ModelFormat]:
         formats = [
@@ -248,7 +257,7 @@ class ModelType(Enum):
             formats.append(ModelFormat.ORIGINAL_SINGLE_FILE)
         elif (self.is_flux_1() or self.is_flux_2() or self.is_chroma() or self.is_hunyuan_video()
                 or self.is_hi_dream() or self.is_pixart() or self.is_qwen() or self.is_ernie()
-                or self.is_z_image() or self.is_anima() or self.is_krea2() or self.is_ideogram()):
+                or self.is_z_image() or self.is_anima() or self.is_krea2() or self.is_moss() or self.is_ideogram()):
             formats.append(ModelFormat.ORIGINAL_TRANSFORMER)
         if self.is_z_image():
             formats.append(ModelFormat.COMFY_TRANSFORMER)
@@ -311,9 +320,46 @@ _MODEL_PARTS: dict[ModelType, tuple[str, ...]] = {
     ModelType.CHROMA_1: ("transformer", "text_encoder", "vae"),
     ModelType.QWEN: ("transformer", "text_encoder", "vae"),
     ModelType.KREA_2: ("transformer", "text_encoder", "vae"),
+    ModelType.MOSS: ("transformer", "text_encoder", "vae"),
     ModelType.Z_IMAGE: ("transformer", "text_encoder", "vae"),
     ModelType.ERNIE: ("transformer", "text_encoder", "vae"),
     ModelType.IDEOGRAM_4: ("transformer", "text_encoder", "unconditional_transformer", "vae"),
+}
+
+# subset of _MODEL_PARTS the architecture allows a run to train, for both LoRA and fine-tuning -- the parts each setup
+# routes through _setup_model_part_requires_grad. Parts omitted here (VAE everywhere; the text encoder on the newer
+# transformer models; Ideogram's unconditional_transformer; Wuerstchen's decoder stack) are architecture-frozen.
+_TRAINABLE_PARTS: dict[ModelType, tuple[str, ...]] = {
+    ModelType.STABLE_DIFFUSION_15: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_15_INPAINTING: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_20: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_20_BASE: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_20_INPAINTING: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_20_DEPTH: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_21: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_21_BASE: ("unet", "text_encoder"),
+    ModelType.STABLE_DIFFUSION_3: ("transformer", "text_encoder", "text_encoder_2", "text_encoder_3"),
+    ModelType.STABLE_DIFFUSION_35: ("transformer", "text_encoder", "text_encoder_2", "text_encoder_3"),
+    ModelType.STABLE_DIFFUSION_XL_10_BASE: ("unet", "text_encoder", "text_encoder_2"),
+    ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING: ("unet", "text_encoder", "text_encoder_2"),
+    ModelType.WUERSTCHEN_2: ("prior", "text_encoder"),
+    ModelType.STABLE_CASCADE_1: ("prior", "text_encoder"),
+    ModelType.PIXART_ALPHA: ("transformer", "text_encoder"),
+    ModelType.PIXART_SIGMA: ("transformer", "text_encoder"),
+    ModelType.FLUX_DEV_1: ("transformer", "text_encoder", "text_encoder_2"),
+    ModelType.FLUX_FILL_DEV_1: ("transformer", "text_encoder", "text_encoder_2"),
+    ModelType.FLUX_2: ("transformer",),
+    ModelType.ANIMA: ("transformer",),
+    ModelType.SANA: ("transformer", "text_encoder"),
+    ModelType.HUNYUAN_VIDEO: ("transformer", "text_encoder", "text_encoder_2"),
+    ModelType.HI_DREAM_FULL: ("transformer", "text_encoder", "text_encoder_2", "text_encoder_3", "text_encoder_4"),
+    ModelType.CHROMA_1: ("transformer", "text_encoder"),
+    ModelType.QWEN: ("transformer", "text_encoder"),
+    ModelType.KREA_2: ("transformer",),
+    ModelType.MOSS: ("transformer",),
+    ModelType.Z_IMAGE: ("transformer",),
+    ModelType.ERNIE: ("transformer",),
+    ModelType.IDEOGRAM_4: ("transformer",),
 }
 
 

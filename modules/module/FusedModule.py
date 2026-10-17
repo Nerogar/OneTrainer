@@ -59,6 +59,11 @@ class _FusedLinear(nn.Linear, QuantizedLinearMixin):
     def unquantized_weight(self, dtype: torch.dtype, device: torch.device) -> Tensor:
         return torch.cat([get_unquantized_weight(leaf, dtype, device) for leaf in self._leaves], dim=0)
 
+    def mark_needs_requantization(self):
+        # Synthetic fused linear owns no packed weight of its own (it delegates to the leaves), so there is
+        # no quantized flag to reset. Satisfies the QuantizedLinearMixin ABC.
+        pass
+
 
 class FusedModuleGroup:
     # Type-independent fused-qkv adapter. One inner peft module of the configured type is built on a

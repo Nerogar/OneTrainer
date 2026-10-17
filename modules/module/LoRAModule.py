@@ -722,6 +722,67 @@ class OFTModule(PeftBase):
         return self.oft_R.dropout
 
 
+class DoRAOFTModule(OFTModule):
+    """
+    DoRA applied to OFT.
+    Since OFT (Orthogonal Finetuning) applies a rotation R such that W_new = W_orig @ R^T,
+    and R is orthogonal, the norm of the weight rows (output features) is preserved.
+    ||W_new|| = ||W_orig||.
+    """
+    dora_log_multiplier: nn.Parameter | None
+
+    def __init__(self, *args, **kwargs):
+        self.dora_log_multiplier = None
+        super().__init__(*args, **kwargs)
+
+    def initialize_weights(self):
+        super().initialize_weights()
+
+        # Calculate multiplier shape
+        out_dim = self.shape[0]
+        multiplier_shape = (out_dim,)
+
+        # Initialize dora_log_multiplier to 0.0 (exp(0) = 1.0 multiplier)
+        self.dora_log_multiplier = nn.Parameter(
+            torch.zeros(
+                multiplier_shape,
+                device=self.orig_module.weight.device
+            )
+        )
+
+    def check_initialized(self):
+        super().check_initialized()
+        assert self.dora_log_multiplier is not None
+
+    def forward(self, x, *args, **kwargs):
+        # Get the standard OFT output
+        # result = W_orig @ R^T @ x + bias
+        result = super().forward(x, *args, **kwargs)
+
+        # Apply Exponential DoRA Scale (exp(0) = Multiplies by 1.0 at step 0)
+        multiplier = torch.exp(self.dora_log_multiplier).to(result.dtype)
+        if isinstance(self.orig_module, nn.Conv2d):
+            # Broadcast over spatial dimensions for both batched and unbatched inputs.
+            multiplier = multiplier.view(-1, 1, 1)
+
+        bias = self.orig_module.bias
+        if bias is not None:
+            # autocast can produce fp16/bf16 output from an fp32 base layer. keep the
+            # bias correction in that output dtype to avoid promoting the full activation.
+            bias = bias.to(result.dtype)
+            bias_view = bias.view(-1, 1, 1) if isinstance(self.orig_module, nn.Conv2d) else bias
+
+            # This is equivalent to (result - bias) * m + bias, but
+            # eliminates VRAM overhead by calculating the bias shift on the tiny bias tensor.
+            # y_{dora} = y * m + b * (1 - m)
+            bias_term = bias_view * (1.0 - multiplier)
+            result = result * multiplier + bias_term
+        else:
+            result = result * multiplier
+
+        return result
+
+
 class DoRAModule(LoRAModule):
     """Weight-decomposed low rank adaptation.
 
@@ -827,6 +888,7 @@ DummyLoRAModule = LoRAModule.make_dummy()
 DummyDoRAModule = DoRAModule.make_dummy()
 DummyLoHaModule = LoHaModule.make_dummy()
 DummyOFTModule = OFTModule.make_dummy()
+DummyDoRAOFTModule = DoRAOFTModule.make_dummy()
 DummyLoKrModule = LoKrModule.make_dummy()
 
 
@@ -892,8 +954,13 @@ class LoRAModuleWrapper:
             self.additional_args = [self.rank, self.alpha]
             self.additional_kwargs = {}
         elif self.peft_type == PeftType.OFT_2:
-            self.klass = OFTModule
-            self.dummy_klass = DummyOFTModule
+            if config.dora_oft:
+                self.klass = DoRAOFTModule
+                self.dummy_klass = DummyDoRAOFTModule
+            else:
+                self.klass = OFTModule
+                self.dummy_klass = DummyOFTModule
+
             self.additional_args = [
                 config.oft_block_size,
                 config.oft_block_share,

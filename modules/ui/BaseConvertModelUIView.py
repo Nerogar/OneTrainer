@@ -35,6 +35,7 @@ class BaseConvertModelUIView:
             ("QwenImage", ModelType.QWEN), #TODO does this just work? HiDream is not here
             ("Anima", ModelType.ANIMA),
             ("Krea 2", ModelType.KREA_2),
+            ("MOSS", ModelType.MOSS),
             ("ZImage", ModelType.Z_IMAGE),
             ("Ideogram 4", ModelType.IDEOGRAM_4),
         ], ui_state, "model_type", command=on_model_or_method_change)
