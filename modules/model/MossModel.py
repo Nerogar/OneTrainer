@@ -129,10 +129,13 @@ class MossModel(BaseModel):
             if isinstance(text, str):
                 text = [text]
 
+            # the encoder is causal, so real-token hidden states are identical with or
+            # without padding -- pad only to the batch max ('longest') instead of
+            # PROMPT_MAX_LENGTH to avoid encoding ~4000 pad tokens per caption.
             tokens_out = self.tokenizer(
                 [format_moss_prompt(self.tokenizer, t) for t in text],
                 truncation=True,
-                padding='max_length',
+                padding='longest',
                 max_length=PROMPT_MAX_LENGTH,
                 return_tensors='pt',
             )

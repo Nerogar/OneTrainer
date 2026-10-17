@@ -30,6 +30,46 @@ def _moss_chat_messages(text: str) -> list[dict]:
     return [{'role': 'user', 'content': text}]
 
 
+class MossTokenize(Tokenize):
+    """Tokenize without padding to max_length.
+
+    The Qwen text encoder is causal, so the hidden states of the real tokens are
+    identical with or without trailing padding. mgds' Tokenize always pads to
+    max_length, which makes the encoder burn ~4000 pad tokens per caption and
+    is what makes text caching painfully slow. This subclass tokenizes
+    unpadded ('longest'); format_text/suffix_text/expand_mask are not used by
+    the MOSS pipeline, so they are intentionally not re-implemented here.
+    """
+
+    def get_item(self, variation: int, index: int, requested_name: str = None) -> dict:
+        text = self._get_previous_item(variation, self.in_name, index)
+
+        with self.tokenizer_lock:
+            if self.apply_chat_template is not None:
+                messages = self.apply_chat_template(text)
+                text = self.tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    **self.apply_chat_template_kwargs,
+                )
+
+            tokenizer_output = self.tokenizer(
+                text,
+                padding='longest',
+                truncation=True,
+                max_length=self.max_token_length,
+                return_tensors="pt",
+            )
+
+        tokens = tokenizer_output.input_ids.to(self.pipeline.device)
+        mask = tokenizer_output.attention_mask.to(self.pipeline.device)
+
+        return {
+            self.tokens_out_name: tokens.squeeze(dim=0),
+            self.mask_out_name: mask.squeeze(dim=0),
+        }
+
+
 @factory.register(BaseDataLoader, ModelType.MOSS)
 class MossBaseDataLoader(
     BaseDataLoader,
@@ -41,8 +81,11 @@ class MossBaseDataLoader(
         image_sample = SampleVAEDistribution(in_name='latent_image_distribution', out_name='latent_image', mode='mean')
         downscale_mask = ScaleImage(in_name='mask', out_name='latent_mask', factor=1 / 16)
         # MOSS prompts are wrapped in the chat template (user turn, generation prompt, thinking enabled)
-        tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=PROMPT_MAX_LENGTH,
-                                   apply_chat_template=_moss_chat_messages, apply_chat_template_kwargs={'add_generation_prompt': True, 'enable_thinking': True})
+        # the Qwen encoder is causal, so real-token hidden states are identical with or
+        # without padding -- tokenize unpadded ('longest') to avoid encoding ~4000 pad
+        # tokens per caption, which is what makes text caching painfully slow.
+        tokenize_prompt = MossTokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=PROMPT_MAX_LENGTH,
+                                        apply_chat_template=_moss_chat_messages, apply_chat_template_kwargs={'add_generation_prompt': True, 'enable_thinking': True})
         # single last hidden state, no crop, encoder default position ids
         encode_prompt = EncodeQwenText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask',
                                        text_encoder=model.text_encoder, hidden_state_output_index=-1, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype(),
