@@ -1,6 +1,5 @@
 import os
 import traceback
-import torch 
 
 from modules.model.Krea2Model import Krea2Model
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
