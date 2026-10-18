@@ -161,13 +161,14 @@ channels = ["conda-forge"]
 platforms = [
     { name = "linux-cuda13", platform = "linux-64", glibc = "2.34", cuda = "13.0" },
     { name = "linux-cuda12", platform = "linux-64", glibc = "2.34", cuda = "12.6" },
+    { name = "linux-rocm", platform = "linux-64", glibc = "2.34", amdgpu = true },
     { name = "linux-generic", platform = "linux-64", glibc = "2.34" },
     { name = "win-cuda13", platform = "win-64", cuda = "13.0" },
     { name = "win-cuda12", platform = "win-64", cuda = "12.6" },
     { name = "win-generic", platform = "win-64" },
     { name = "macos-generic", platform = "osx-arm64", macos = "15.0" },
 ]
-requires-pixi = ">=0.71.2"
+requires-pixi = ">=0.82.0"
 
 [tool.pixi.tasks]
 train = { cmd = "python scripts/train.py", cwd = "." }
@@ -186,7 +187,7 @@ platforms = ["linux-cuda12", "win-cuda12"]
 extra-index-urls = ["https://download.pytorch.org/whl/cu126"]
 
 [tool.pixi.feature.rocm]
-platforms = ["linux-generic"]
+platforms = ["linux-rocm"]
 
 [tool.pixi.feature.rocm.pypi-options]
 extra-index-urls = ["https://download.pytorch.org/whl/rocm7.2"]
