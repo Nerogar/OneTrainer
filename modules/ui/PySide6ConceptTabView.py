@@ -125,7 +125,6 @@ class PySide6ConceptWidgetView(BaseConceptWidgetView, QWidget):
         )
 
         self.name_label = QLabel(self._get_display_name(), self)
-        self.name_label.setWordWrap(True)
         self.name_label.setFixedWidth(140)
         self.name_label.move(5, 153)
 
