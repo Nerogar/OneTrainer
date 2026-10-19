@@ -91,8 +91,8 @@ class CtkConceptWindowView(BaseConceptWindowView, ctk.CTkToplevel):
         # text augmentation tab
         text_aug_frame = ctk.CTkScrollableFrame(tabview.add("text augmentation"), fg_color="transparent")
         text_aug_frame.grid_columnconfigure(0, weight=0)
-        text_aug_frame.grid_columnconfigure(1, weight=0)
-        text_aug_frame.grid_columnconfigure(2, weight=0)
+        text_aug_frame.grid_columnconfigure(1, weight=1)
+        text_aug_frame.grid_columnconfigure(2, weight=1)
         text_aug_frame.grid_columnconfigure(3, weight=1)
         self.build_text_augmentation_tab(text_aug_frame, controller, text_ui_state)
         text_aug_frame.pack(fill="both", expand=1)

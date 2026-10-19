@@ -10,7 +10,6 @@ from modules.modelSetup.BaseWuerstchenSetup import BaseWuerstchenSetup
 from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
-from modules.util.torch_util import torch_gc
 from modules.util.TrainProgress import TrainProgress
 
 from mgds.pipelineModules.DecodeTokens import DecodeTokens
@@ -74,10 +73,8 @@ class WuerstchenBaseDataLoader(
         ]
 
         def before_cache_image_fun():
-            model.to(self.temp_device)
-            model.effnet_encoder_to(self.train_device)
+            model.materialize_only("effnet_encoder")
             model.eval()
-            torch_gc()
 
         return self._cache_modules_from_names(
             model, model_setup,
@@ -109,10 +106,8 @@ class WuerstchenBaseDataLoader(
                 output_names.append('pooled_text_encoder_output')
 
         def before_cache_image_fun():
-            model.to(self.temp_device)
-            model.effnet_encoder_to(self.train_device)
+            model.materialize_only("effnet_encoder")
             model.eval()
-            torch_gc()
 
         return self._output_modules_from_out_names(
             model, model_setup,

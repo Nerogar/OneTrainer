@@ -7,7 +7,6 @@ from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.convert_util import add_prefix
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
-from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 import torch
 from torch import Tensor
@@ -39,8 +38,6 @@ class AnimaModel(BaseModel):
 
     text_encoder_train_dtype: DataType
 
-    text_encoder_offload_conductor: LayerOffloadConductor | None
-    transformer_offload_conductor: LayerOffloadConductor | None
 
     # persistent lora training data
     transformer_lora: LoRAModuleWrapper | None
@@ -66,16 +63,9 @@ class AnimaModel(BaseModel):
 
         self.text_encoder_train_dtype = DataType.FLOAT_32
 
-        self.text_encoder_offload_conductor = None
-        self.transformer_offload_conductor = None
 
         self.transformer_lora = None
         self.lora_state_dict = None
-
-    def adapters(self) -> list[LoRAModuleWrapper]:
-        return [a for a in [
-            self.transformer_lora,
-        ] if a is not None]
 
     def _diffusers_to_dit(self) -> list:
         # the netless diffusers CosmosTransformer3DModel -> Anima DiT rename (the inverse of diffusers'
@@ -130,35 +120,22 @@ class AnimaModel(BaseModel):
         # kohya-ss loads the DiT with the net. wrapper stripped -> the netless body.
         return self._diffusers_to_dit()
 
-    def vae_to(self, device: torch.device):
-        self.vae.to(device=device)
+    def materialize(self, *parts: str):
+        super().materialize(*parts)
+        # text_conditioner isn't in ModelType.model_parts(); it always travels with text_encoder.
+        if "text_encoder" in parts:
+            self.text_conditioner.to(device=self.train_device)
 
-    def text_encoder_to(self, device: torch.device):
-        if self.text_encoder_offload_conductor is not None:
-            self.text_encoder_offload_conductor.to(device)
-        else:
-            self.text_encoder.to(device=device)
-        self.text_conditioner.to(device=device)
-
-    def transformer_to(self, device: torch.device):
-        if self.transformer_offload_conductor is not None:
-            self.transformer_offload_conductor.to(device)
-        else:
-            self.transformer.to(device=device)
-
-        if self.transformer_lora is not None:
-            self.transformer_lora.to(device)
-
-    def to(self, device: torch.device):
-        self.vae_to(device)
-        self.text_encoder_to(device)
-        self.transformer_to(device)
+    def evict(self, *parts: str):
+        super().evict(*parts)
+        # evict() with no parts means "evict all", which includes text_encoder.
+        if not parts or "text_encoder" in parts:
+            self.text_conditioner.to(device=self.temp_device)
 
     def eval(self):
-        self.vae.eval()
-        self.text_encoder.eval()
+        super().eval()
+        # text_conditioner isn't in ModelType.model_parts(); it always travels with text_encoder.
         self.text_conditioner.eval()
-        self.transformer.eval()
 
     def create_pipeline(self):
         pipe = AnimaAutoBlocks().init_pipeline()

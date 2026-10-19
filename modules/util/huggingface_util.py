@@ -1,4 +1,5 @@
 import contextlib
+import os
 from collections.abc import Callable
 
 import huggingface_hub
@@ -11,6 +12,10 @@ def configure_hub(
         cache_dir: str = "",
         on_status: Callable[[str], None] | None = None,
 ):
+    # hf_xet's adaptive controller ramps download concurrency to 64, and the connection pool follows, saturating
+    # a consumer link. A fixed value stops the ramp.
+    os.environ.setdefault("HF_XET_FIXED_DOWNLOAD_CONCURRENCY", "8")
+
     # huggingface_hub reads HF_HUB_OFFLINE and HF_HUB_CACHE from the environment into module constants at import
     # time, and every downstream call reads those constants at call time. transformers and diffusers don't expose
     # a parameter on the internal requests they make (e.g. transformers queries model_info() while loading a
