@@ -74,12 +74,17 @@ class BaseModelTabView(ABC):
             if include_compressed:
                 options.append(("int W8A8 compressed", DataType.INT_W8A8_COMPRESSED))
 
+            options += [
+                ("bfloat16 A8 int", DataType.BFLOAT_16_A8_INT),
+                ("bfloat16 A8 float", DataType.BFLOAT_16_A8_FLOAT),
+            ]
+
         if include_gguf:
             options.append(("GGUF", DataType.GGUF))
             if include_a8:
                 options += [
-                    ("GGUF A8 float", DataType.GGUF_A8_FLOAT),
                     ("GGUF A8 int", DataType.GGUF_A8_INT),
+                    ("GGUF A8 float", DataType.GGUF_A8_FLOAT),
                 ]
 
         return options
