@@ -35,27 +35,27 @@ def int8_backward_act_axiswise(output: Tensor, weight: Tensor) -> Tensor:
     w_8, w_scale = quantize_int8_axiswise(weight, dim=0)
     #almost always, grad outputs are already contiguous and this is a no-op. But there are some grad outputs from SDXL that are non-contiguous:
     output_8 = output_8.contiguous()
-    mm_res = mm_8bit(output_8, w_8)
+    mm_res = mm_8bit(output_8, w_8, out_dtype=torch.int32)
     # rescale in FP32 before casting to avoid overflowing or rounding the unscaled accumulator
     return mm_res.float().mul_(w_scale).mul_(output_scale).to(output.dtype)
 
 def fp8_backward_act_axiswise(output: Tensor, weight: Tensor) -> Tensor:
     output_8, output_scale = quantize_fp8_axiswise(output, dim=-1)
     w_8, w_scale = quantize_fp8_axiswise(weight, dim=0)
-    mm_res = mm_8bit(output_8.contiguous(), w_8)
+    mm_res = mm_8bit(output_8.contiguous(), w_8, out_dtype=torch.float32)
     return mm_res.float().mul_(w_scale).mul_(output_scale).to(output.dtype)
 
 def int8_backward_weight_axiswise(output: Tensor, x: Tensor) -> Tensor:
     output_8, output_scale = quantize_int8_axiswise(output, dim=0)
     x_8, x_scale = quantize_int8_axiswise(x, dim=0)
     #TODO could be more efficient using a kernel that accepts a non-contiguous lhs matrix
-    mm_res = mm_8bit(output_8.T.contiguous(), x_8)
+    mm_res = mm_8bit(output_8.T.contiguous(), x_8, out_dtype=torch.int32)
     return mm_res.float().mul_(output_scale.T).mul_(x_scale).to(x.dtype)
 
 def fp8_backward_weight_axiswise(output: Tensor, x: Tensor) -> Tensor:
     output_8, output_scale = quantize_fp8_axiswise(output, dim=0)
     x_8, x_scale = quantize_fp8_axiswise(x, dim=0)
-    mm_res = mm_8bit(output_8.T.contiguous(), x_8)
+    mm_res = mm_8bit(output_8.T.contiguous(), x_8, out_dtype=torch.float32)
     return mm_res.float().mul_(output_scale.T).mul_(x_scale).to(x.dtype)
 
 
