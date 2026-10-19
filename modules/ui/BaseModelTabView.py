@@ -71,8 +71,10 @@ class BaseModelTabView(ABC):
             if include_compressed:
                 options.append(("float W8A8 compressed", DataType.FLOAT_W8A8_COMPRESSED))
             options.append(("int W8A8", DataType.INT_W8A8))
+            options.append(("int W8A8 convrot", DataType.INT_W8A8_CONVROT))
             if include_compressed:
                 options.append(("int W8A8 compressed", DataType.INT_W8A8_COMPRESSED))
+                options.append(("int W8A8 convrot compressed", DataType.INT_W8A8_CONVROT_COMPRESSED))
 
             options += [
                 ("bfloat16 A8 int", DataType.BFLOAT_16_A8_INT),

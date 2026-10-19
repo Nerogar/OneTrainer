@@ -2,6 +2,7 @@ from modules.module.quantized.mixin.CompressedWeightMixin import CompressedWeigh
 from modules.module.quantized.mixin.LoRAFusableLinearMixin import LoRAFusableLinearMixin
 from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearMixin
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
+from modules.util.hadamard_util import block_hadamard
 from modules.util.mm_8bit import mm_8bit as mm_8bit
 from modules.util.quantization_util import (
     dequantize,
@@ -9,6 +10,7 @@ from modules.util.quantization_util import (
     quantize_fp8_axiswise,
     quantize_fp8_tensorwise_chunked,
     quantize_int8_axiswise,
+    quantize_int8_hadamard_chunked,
     quantize_int8_tensorwise_chunked,
 )
 
@@ -70,7 +72,7 @@ backward_tokenwise_lora = backward_tokenwise_lora_epiloguescaled_triton
 
 class LinearW8A8Function(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
+    def forward(ctx, x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype, rotation_block_size: int) -> Tensor:
         # `weight` is the decompressed weight, so saving it keeps a full-size copy alive until backward.
         # Under reentrant checkpointing that copy lives only inside the recomputed segment, and not saving
         # it would cost a second decode: there is no partitioner, so recompute would decode once for the
@@ -78,15 +80,21 @@ class LinearW8A8Function(torch.autograd.Function):
         # TODO once offloading uses non-reentrant checkpointing, consider not saving the decompressed
         # weight and decoding in backward() instead.
         ctx.save_for_backward(weight, weight_scale)
+        ctx.rotation_block_size = rotation_block_size
+        if rotation_block_size:
+            x = block_hadamard(x.float(), rotation_block_size)
         return forward_tokenwise(x, weight, weight_scale, bias, compute_dtype)
 
     @staticmethod
     def backward(ctx, output: Tensor):
-        if ctx.needs_input_grad != (True, False, False, False, False):
+        if ctx.needs_input_grad != (True, False, False, False, False, False):
             raise NotImplementedError("Int/Float A8W8 cannot be used for full finetuning")
 
         weight, weight_scale = ctx.saved_tensors
-        return backward_tokenwise(output, weight, weight_scale), None, None, None, None
+        grad_x = backward_tokenwise(output, weight, weight_scale)
+        if ctx.rotation_block_size:
+            grad_x = block_hadamard(grad_x, ctx.rotation_block_size)
+        return grad_x, None, None, None, None, None
 
 
 class LinearW8A8LoRAFunction(torch.autograd.Function):
@@ -94,13 +102,16 @@ class LinearW8A8LoRAFunction(torch.autograd.Function):
     #dgrad folds into the backward epilogue and the (M, out) product is never materialized. The weight is
     #the already decompressed one, as in LinearW8A8Function
     @staticmethod
-    def forward(ctx, x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype, lora_down: Tensor, lora_up: Tensor, dropout_mask: Tensor | None) -> Tensor:
+    def forward(ctx, x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype, lora_down: Tensor, lora_up: Tensor, dropout_mask: Tensor | None, rotation_block_size: int) -> Tensor:
         x_down = torch.nn.functional.linear(x, lora_down)
         if dropout_mask is not None:
             x_down = x_down * dropout_mask
         #backward runs outside autocast, so x is saved in x_down's dtype: grad_lora_down is a
         #compute-dtype product there, as it is in the unfused path where autocast casts x
         ctx.save_for_backward(weight, weight_scale, x.to(x_down.dtype), lora_down, lora_up, dropout_mask, x_down)
+        ctx.rotation_block_size = rotation_block_size
+        if rotation_block_size:
+            x = block_hadamard(x.float(), rotation_block_size)
         return forward_tokenwise_lora(x, weight, weight_scale, bias, compute_dtype, x_down, lora_up)
 
     @staticmethod
@@ -116,10 +127,17 @@ class LinearW8A8LoRAFunction(torch.autograd.Function):
             grad_x_down_pre = grad_output @ lora_up.T
             if dropout_mask is not None:
                 grad_x_down_pre = grad_x_down_pre * dropout_mask
-        grad_x = backward_tokenwise_lora(grad_output, weight, weight_scale, grad_x_down_pre, lora_down) if needs_x else None
+        grad_x = None
+        if needs_x:
+            if ctx.rotation_block_size:
+                # The base dgrad is in the rotated basis; the adapter dgrad is not.
+                grad_x = block_hadamard(backward_tokenwise(grad_output, weight, weight_scale), ctx.rotation_block_size)
+                grad_x = grad_x + grad_x_down_pre @ lora_down.to(grad_x_down_pre.dtype)
+            else:
+                grad_x = backward_tokenwise_lora(grad_output, weight, weight_scale, grad_x_down_pre, lora_down)
         grad_lora_down = (grad_x_down_pre.T @ x).to(lora_down.dtype) if needs_down else None
         grad_lora_up = x_down.T @ grad_output if needs_up else None
-        return grad_x, None, None, None, None, grad_lora_down, grad_lora_up, None
+        return grad_x, None, None, None, None, grad_lora_down, grad_lora_up, None, None
 
 
 class LinearW8A8(
@@ -131,11 +149,14 @@ class LinearW8A8(
 ):
     is_quantized: bool
 
-    def __init__(self, dtype: torch.dtype, *args, compress: bool = False, **kwargs):
+    def __init__(self, dtype: torch.dtype, *args, compress: bool = False, convrot: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
 
         assert dtype in [torch.int8, torch.float8_e4m3fn]
         self._dtype = dtype
+        if convrot and dtype != torch.int8:
+            raise ValueError("CONVROT requires INT8 weights and activations")
+        self.rotation_block_size = 128 if convrot else 0
 
         self.is_quantized = False
         self.compute_dtype = None
@@ -166,19 +187,22 @@ class LinearW8A8(
             return self.weight.detach().to(dtype)
         weight = self._decompress(self.weight.detach()) if self._compressed else self.weight.detach()
         # 'scale' is not offloaded, so it can sit on the train device while 'weight' is parked on the temp device
-        return dequantize(weight, self.scale.to(device=weight.device)).to(dtype)
+        weight = dequantize(weight, self.scale.to(device=weight.device))
+        if self.rotation_block_size:
+            weight = block_hadamard(weight, self.rotation_block_size)
+        return weight.to(dtype)
 
     @torch.no_grad()
     def quantize(self, device: torch.device | None = None):
         if self.is_quantized:
             return
-        self.is_quantized = True
-
         weight = self.weight.detach()
         orig_device = weight.device
         if device is not None:
             weight = weight.to(device=device)
-        if self._dtype == torch.int8:
+        if self.rotation_block_size:
+            weight, scale = quantize_int8_hadamard_chunked(weight, self.rotation_block_size)
+        elif self._dtype == torch.int8:
             weight, scale = quantize_int8_tensorwise_chunked(weight)
         else:
             weight, scale = quantize_fp8_tensorwise_chunked(weight)
@@ -194,6 +218,7 @@ class LinearW8A8(
 
         if self.compress:
             self._compress_weight(device=device)
+        self.is_quantized = True
 
     def forward(self, x_orig: torch.Tensor) -> torch.Tensor:
         assert not self.weight.requires_grad
@@ -203,10 +228,15 @@ class LinearW8A8(
         weight = self._decompress(self.weight.detach()) if self._compressed else self.weight
 
         if x.shape[0] > 16:
-            y = LinearW8A8Function.apply(x, weight, self.scale, self.bias, self.compute_dtype)
+            y = LinearW8A8Function.apply(x, weight, self.scale, self.bias, self.compute_dtype, self.rotation_block_size)
         else:
             w = dequantize(weight.detach(), self.scale)
-            y = torch.nn.functional.linear(x, w, self.bias)
+            if self.rotation_block_size:
+                x = block_hadamard(x.float(), self.rotation_block_size)
+                bias = self.bias.float() if self.bias is not None else None
+                y = torch.nn.functional.linear(x, w, bias).to(self.compute_dtype or x_orig.dtype)
+            else:
+                y = torch.nn.functional.linear(x, w, self.bias)
 
         return y.reshape(x_orig.shape[:-1] + (y.shape[-1], ))
 
@@ -232,7 +262,7 @@ class LinearW8A8(
     def _fused_lora_forward(self, x: Tensor, lora_down: Tensor, lora_up: Tensor, dropout_mask: Tensor | None) -> Tensor:
         assert not self.weight.requires_grad
         weight = self._decompress(self.weight.detach()) if self._compressed else self.weight
-        return LinearW8A8LoRAFunction.apply(x, weight, self.scale, self.bias, self.compute_dtype, lora_down, lora_up, dropout_mask)
+        return LinearW8A8LoRAFunction.apply(x, weight, self.scale, self.bias, self.compute_dtype, lora_down, lora_up, dropout_mask, self.rotation_block_size)
 
 def run_benchmark(fn, desc, steps=10000, warmup=500, compile=False):
     if compile:

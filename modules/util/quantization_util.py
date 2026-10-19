@@ -9,6 +9,7 @@ from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearM
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.config.TrainConfig import QuantizationConfig, TrainConfig
 from modules.util.enum.DataType import DataType
+from modules.util.hadamard_util import block_hadamard
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.tqdm_util import tqdm
 
@@ -53,6 +54,22 @@ def quantize_int8_tensorwise_chunked(x: Tensor) -> tuple[Tensor, Tensor]:
     rows = max(1, _QUANTIZE_CHUNK_ELEMENTS // x[0].numel())
     for i in range(0, x.shape[0], rows):
         q[i:i + rows] = quantize_int8(x[i:i + rows], scale)
+    return q, scale
+
+
+def quantize_int8_hadamard_chunked(x: Tensor, block_size: int) -> tuple[Tensor, Tensor]:
+    # Two passes retain a single tensorwise scale without a full fp32 rotated weight.
+    rows = max(1, _QUANTIZE_CHUNK_ELEMENTS // x.shape[-1])
+    abs_max = torch.zeros((), device=x.device, dtype=torch.float32)
+    for i in range(0, x.shape[0], rows):
+        rotated = block_hadamard(x[i:i + rows].float(), block_size)
+        min_val, max_val = torch.aminmax(rotated)
+        abs_max = torch.maximum(abs_max, torch.maximum(max_val, -min_val))
+    scale = (abs_max / 127.0).clamp(min=1e-30)
+    q = torch.empty_like(x, dtype=torch.int8)
+    for i in range(0, x.shape[0], rows):
+        rotated = block_hadamard(x[i:i + rows].float(), block_size)
+        q[i:i + rows] = quantize_int8(rotated, scale)
     return q, scale
 
 def quantize_int8_axiswise_get_scale(x: Tensor, dim: int) -> Tensor:
@@ -154,7 +171,8 @@ def __replace_linear_layers(
     if isinstance(parent_module, nn.ModuleList | nn.Sequential | nn.ModuleDict):
         for key, module in (parent_module.items() if isinstance(parent_module, nn.ModuleDict) else enumerate(parent_module)):
             if isinstance(module, convert_type):
-                matches = filters is None or len(filters) == 0 or any(f.matches(name_prefix) for f in filters)
+                key_name = str(key) if name_prefix == "" else f"{name_prefix}.{key}"
+                matches = filters is None or len(filters) == 0 or any(f.matches(key_name) for f in filters)
                 fn = construct_fn if matches else fallback_construct_fn
                 if fn is None:
                     continue
@@ -231,7 +249,8 @@ def __quantized_linear_class_and_kwargs(dtype: DataType):
     elif dtype.quantize_fp8():
         return LinearFp8, {}
     elif dtype.quantize_intW8A8():
-        return LinearW8A8, {'dtype': torch.int8, 'compress': dtype.is_compressed()}
+        return LinearW8A8, {'dtype': torch.int8, 'compress': dtype.is_compressed(),
+                            'convrot': dtype.quantize_intW8A8_convrot()}
     elif dtype.quantize_fpW8A8():
         return LinearW8A8, {'dtype': torch.float8_e4m3fn, 'compress': dtype.is_compressed()}
     elif dtype == DataType.GGUF_A8_INT:
