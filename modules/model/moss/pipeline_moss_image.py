@@ -84,10 +84,6 @@ def _rotate(x, rope):
     return x * cos + torch.cat((-b, a), -1) * sin
 
 
-
-_ATTENTION_BACKENDS = {'native', 'flash', '_native_cudnn', 'flex'}
-
-
 def _attention(q, k, v, rope, heads, backend=None):
     # q, k, v arrive as [B, S, dim]; reshape to the packed [B, S, H, hd] layout and apply RoPE.
     shape = (*q.shape[:2], heads, q.shape[-1] // heads)
@@ -233,8 +229,6 @@ class MOSSImageTransformer(ModelMixin, ConfigMixin):
 
     def set_attention_backend(self, backend: str):
         """Select the attention kernel for every DiT block."""
-        if backend not in _ATTENTION_BACKENDS:
-            raise ValueError(f'backend={backend!r} must be one of: {", ".join(_ATTENTION_BACKENDS)}')
         for module in self.modules():
             if isinstance(module, (_TextBlock, _Block)):
                 module.attention_backend = backend
