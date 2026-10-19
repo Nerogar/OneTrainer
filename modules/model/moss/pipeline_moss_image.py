@@ -1,4 +1,4 @@
-# Copied from: https://huggingface.co/OpenMOSS-Team/MOSS-Image-Base/
+# Modified from: https://huggingface.co/OpenMOSS-Team/MOSS-Image-Base/
 
 """MOSSImage modeling and text-to-image pipeline (no Motor/TorchTitan imports).
 
@@ -43,8 +43,8 @@ from pathlib import Path
 
 import torch
 from torch import nn
-from torch.nn import functional as F
 from diffusers import AutoencoderKLFlux2, DiffusionPipeline, FlowMatchEulerDiscreteScheduler
+from diffusers.models.attention_dispatch import dispatch_attention_fn
 from diffusers.schedulers.scheduling_utils import SchedulerMixin  # Required by custom-component discovery.
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.image_processor import VaeImageProcessor
@@ -84,18 +84,28 @@ def _rotate(x, rope):
     return x * cos + torch.cat((-b, a), -1) * sin
 
 
-def _attention(q, k, v, rope, heads):
+
+_ATTENTION_BACKENDS = {'native', 'flash', '_native_cudnn', 'flex'}
+
+
+def _attention(q, k, v, rope, heads, backend=None):
+    # q, k, v arrive as [B, S, dim]; reshape to the packed [B, S, H, hd] layout and apply RoPE.
     shape = (*q.shape[:2], heads, q.shape[-1] // heads)
-    q = _rotate(q.reshape(shape), rope).transpose(1, 2)
-    k = _rotate(k.reshape(shape), rope).transpose(1, 2)
-    v = v.reshape(shape).transpose(1, 2)
-    return F.scaled_dot_product_attention(q.to(v.dtype), k.to(v.dtype), v).transpose(1, 2).flatten(2)
+    q = _rotate(q.reshape(shape), rope)
+    k = _rotate(k.reshape(shape), rope)
+    v = v.reshape(shape)
+    q, k, v = q.to(v.dtype), k.to(v.dtype), v
+    # dispatch_attention_fn takes the packed [B, S, H, hd] layout (as the diffusers processors
+    # pass it) and handles the flash/flex/sdpa layout conversion and kernel selection internally.
+    out = dispatch_attention_fn(q, k, v, backend=backend)
+    return out.flatten(2)
 
 
 class _TextBlock(nn.Module):
     def __init__(self, dim, ffn_dim, heads):
         super().__init__()
         self.heads = heads
+        self.attention_backend = None
         self.norm1, self.norm2 = _RMSNorm(dim), _RMSNorm(dim)
         self.q_norm, self.k_norm = _RMSNorm(dim // heads), _RMSNorm(dim // heads)
         self.qkv = nn.Linear(dim, 3 * dim)
@@ -108,7 +118,7 @@ class _TextBlock(nn.Module):
         q, k, v = self.qkv(self.norm1(x)).to(dtype).chunk(3, -1)
         q = self.q_norm(q.unflatten(-1, (self.heads, -1))).flatten(2)
         k = self.k_norm(k.unflatten(-1, (self.heads, -1))).flatten(2)
-        x = x + self.proj(_attention(q, k, v, rope, self.heads)).to(dtype)
+        x = x + self.proj(_attention(q, k, v, rope, self.heads, self.attention_backend)).to(dtype)
         y = self.norm2(x)
         return x + self.ffn_down(_situ(self.ffn_up(y), self.ffn_gate(y))).to(dtype)
 
@@ -130,6 +140,7 @@ class _Block(nn.Module):
     def __init__(self, dim, ffn_dim, heads):
         super().__init__()
         self.heads = heads
+        self.attention_backend = None
         self.norm1, self.norm2 = _RMSNorm(dim), _RMSNorm(dim)
         self.q_norm, self.k_norm = _RMSNorm(dim // heads), _RMSNorm(dim // heads)
         self.proj = nn.ModuleDict({
@@ -146,7 +157,7 @@ class _Block(nn.Module):
         q = self.q_norm(self.proj['q'](y).to(dtype).unflatten(-1, (self.heads, -1))).flatten(2)
         k = self.k_norm(self.proj['k'](y).to(dtype).unflatten(-1, (self.heads, -1))).flatten(2)
         v = self.proj['v'](y).to(dtype)
-        x = x + self.proj['o'](_attention(q, k, v, rope, self.heads)).to(dtype) * gate_a[:, None]
+        x = x + self.proj['o'](_attention(q, k, v, rope, self.heads, self.attention_backend)).to(dtype) * gate_a[:, None]
         y = self.norm2(x) * (1 + scale_f[:, None]) + shift_f[:, None]
         hidden, gate = self.proj['ffn_up_gate'](y.to(dtype)).to(dtype).chunk(2, -1)
         return x + self.proj['ffn_down'](_situ(hidden, gate)).to(dtype) * gate_f[:, None]
@@ -219,6 +230,14 @@ class MOSSImageTransformer(ModelMixin, ConfigMixin):
                 raise ValueError('All keys must start with the explicit prefix.')
             state_dict = {key[len(prefix):]: value for key, value in state_dict.items()}
         return self.load_state_dict(state_dict, strict=True)
+
+    def set_attention_backend(self, backend: str):
+        """Select the attention kernel for every DiT block."""
+        if backend not in _ATTENTION_BACKENDS:
+            raise ValueError(f'backend={backend!r} must be one of: {", ".join(_ATTENTION_BACKENDS)}')
+        for module in self.modules():
+            if isinstance(module, (_TextBlock, _Block)):
+                module.attention_backend = backend
 
     def forward(self, hidden_states, timestep, encoder_hidden_states,
                 encoder_attention_mask=None, return_dict=True, skip_layers=None):

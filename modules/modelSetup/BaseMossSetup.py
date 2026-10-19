@@ -46,6 +46,8 @@ class BaseMossSetup(
         self._setup_model_part(model, config, "text_encoder", config.text_encoder, enable_checkpointing_for_moss_encoder_layers, disable_fp16_autocast=True)
         self._setup_model_part(model, config, "vae", config.vae)
 
+        self._set_attention_backend(model.transformer, config.attention_mechanism, mask=False)
+
     def predict(
             self,
             model: MossModel,
