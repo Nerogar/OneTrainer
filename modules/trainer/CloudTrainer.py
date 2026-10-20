@@ -162,7 +162,7 @@ class CloudTrainer(BaseTrainer):
         adjust(remote,"base_model_name", if_exists=True)
         adjust(remote.prior,"model_name", if_exists=True)
         adjust(remote.transformer,"model_name", if_exists=True)
-        adjust(remote,"output_model_destination")
+        adjust(remote,"final_output_dir")
         adjust(remote,"lora_model_name")
 
         adjust(remote.embedding,"model_name")

@@ -46,6 +46,8 @@ adv_optm==2.5.16 # advanced optimizers
 # Profiling
 scalene==1.5.51
 
+friendlywords==1.1.3
+
 # ui
 customtkinter==5.2.2
 PySide6==6.11.1

@@ -8,10 +8,10 @@ from collections import deque
 from collections.abc import Callable
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import TYPE_CHECKING
-from urllib.parse import urlparse
 
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.PathIOType import PathIOType
+from modules.util.ui.autocorrect import INVALID_PATH_CHARS, is_huggingface_repo_or_file
 
 if TYPE_CHECKING:
     from modules.util.ui.UIState import BaseUIState
@@ -20,47 +20,36 @@ if TYPE_CHECKING:
 DEBOUNCE_TYPING_MS = 250
 UNDO_DEBOUNCE_MS = 500
 ERROR_BORDER_COLOR = "#dc3545"
+_MAX_DISPLAY_CHARS = 5
 
 TRAILING_SLASH_RE = re.compile(r"[\\/]$")
 ENDS_WITH_EXT = re.compile(r"\.[A-Za-z0-9]+$")
-HUGGINGFACE_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
-
-_INVALID_CHARS = {chr(c) for c in range(32)}
 _IS_WINDOWS = sys.platform == "win32"
-if _IS_WINDOWS:
-    _INVALID_CHARS |= set('<>"|?*')
 
 
-def _is_huggingface_repo_or_file(value: str) -> bool:
-    trimmed = value.strip()
+def _format_char(c: str) -> str:
+    """Return a human-readable representation of a single character."""
+    cp = ord(c)
+    if cp < 32:
+        return f"U+{cp:04X}" # control chars
+    # Printable but forbidden (e.g. Windows-reserved)
+    return repr(c)
 
-    if trimmed.startswith("https://"):
-        parsed = urlparse(trimmed)
-        if parsed.netloc not in {"huggingface.co", "huggingface.com"}:
-            return False
-        parts = parsed.path.strip("/").split("/")
-        if len(parts) >= 5 and parts[2] in {"resolve", "blob"}:
-            return bool(ENDS_WITH_EXT.search(parts[-1]))
-        return False
 
-    if len(trimmed) > 96:
-        return False
-    if " " in trimmed or "\t" in trimmed:
-        return False
-    if "—" in trimmed or ".." in trimmed:
-        return False
-    if trimmed.startswith(("\\\\", "//", "/")):
-        return False
-    if len(trimmed) >= 2 and trimmed[1] == ":" and trimmed[0].isalpha():
-        return False
-    if trimmed.count("/") != 1:
-        return False
+def _describe_invalid_chars(value: str) -> str:
+    """Return a suffix like ``': '?', '*'`` listing the offending characters."""
+    bad = sorted(set(value) & INVALID_PATH_CHARS)
+    if not bad:
+        return ""
 
-    return bool(HUGGINGFACE_REPO_RE.match(trimmed))
+    shown = ", ".join(_format_char(c) for c in bad[:_MAX_DISPLAY_CHARS])
+    if len(bad) > _MAX_DISPLAY_CHARS:
+        shown += f" and {len(bad) - _MAX_DISPLAY_CHARS} more"
+    return f": {shown}"
 
 
 def _has_invalid_chars(value: str) -> bool:
-    return bool(_INVALID_CHARS.intersection(value))
+    return bool(INVALID_PATH_CHARS.intersection(value))
 
 
 def _check_overwrite(path: str, *, is_dir: bool, prevent: bool) -> str | None:
@@ -79,20 +68,19 @@ def validate_path(
     io_type: PathIOType = PathIOType.INPUT,
     *,
     prevent_overwrites: bool = False,
+    output_is_dir: bool = False,
     output_format: str | None = None,
 ) -> str | None:
     """Return an error string if *value* is an invalid path, else ``None``."""
-    trimmed = value.strip()
-
-    if not trimmed:
+    if not value:
         return "Path is empty"
-    if TRAILING_SLASH_RE.search(trimmed):
-        return "Path must not end with a slash"
-    if _has_invalid_chars(trimmed):
-        return "Path contains invalid characters"
+    # The '?' in the Windows extended-path prefix is not a filename character.
+    path_chars = value[4:] if _IS_WINDOWS and value.startswith("\\\\?\\") else value
+    if _has_invalid_chars(path_chars):
+        return "Path contains invalid characters" + _describe_invalid_chars(path_chars)
 
-    if trimmed.startswith("cloud:"):
-        cloud_path = trimmed[6:]
+    if value.startswith("cloud:"):
+        cloud_path = value[6:]
         if not cloud_path:
             return "Cloud path is empty"
         if cloud_path.startswith(("http://", "https://")):
@@ -101,38 +89,42 @@ def validate_path(
             return "Cloud path must use forward slashes (/)"
         return None
 
-    if io_type == PathIOType.INPUT and _is_huggingface_repo_or_file(trimmed):
+    if io_type == PathIOType.INPUT and is_huggingface_repo_or_file(value):
         return None
 
     if io_type == PathIOType.INPUT:
-        if not os.path.exists(os.path.abspath(trimmed)):
+        if not os.path.exists(os.path.abspath(value)):
             return "Input path does not exist"
 
-    if io_type in (PathIOType.OUTPUT, PathIOType.MODEL):
-        if not os.path.isdir(os.path.dirname(os.path.abspath(trimmed))):
-            return "Parent folder does not exist"
-
-    if io_type == PathIOType.MODEL and output_format is not None:
-        if output_format == "DIFFUSERS":
-            if ENDS_WITH_EXT.search(trimmed):
-                return "Diffusers output must be a directory path, not a file"
-            return _check_overwrite(trimmed, is_dir=True, prevent=prevent_overwrites)
-
-        try:
-            expected_ext = ModelFormat[output_format].file_extension()
-        except KeyError:
-            expected_ext = ""
-
-        if expected_ext:
-            suffix = (PureWindowsPath(trimmed) if _IS_WINDOWS else PurePosixPath(trimmed)).suffix.lower()
-            if suffix != expected_ext:
-                return f"Extension must be '{expected_ext}' for {output_format} format"
-        return _check_overwrite(trimmed, is_dir=False, prevent=prevent_overwrites)
+    if io_type == PathIOType.MODEL:
+        fmt = ModelFormat.__members__.get(output_format)
+        is_dir = fmt is not None and not fmt.is_single_file()
+        if is_dir and ENDS_WITH_EXT.search(value):
+            return "Diffusers output must be a directory path, not a file"
+        if not is_dir and fmt is not None:
+            expected = fmt.file_extension()
+            suffix = (PureWindowsPath(value) if _IS_WINDOWS else PurePosixPath(value)).suffix.lower()
+            if expected and suffix != expected:
+                return f"Extension must be '{expected}' for {output_format} format"
+        # A directory model is the artifact itself: create only its parent.
+        error = validate_path(os.path.dirname(os.path.abspath(value)), PathIOType.OUTPUT, output_is_dir=True) \
+            if is_dir else validate_path(value, PathIOType.OUTPUT)
+        return error or _check_overwrite(value, is_dir=is_dir, prevent=prevent_overwrites)
 
     if io_type == PathIOType.OUTPUT:
-        return _check_overwrite(trimmed, is_dir=False, prevent=prevent_overwrites)
+        if not output_is_dir and TRAILING_SLASH_RE.search(value):
+            return "Output file path must not end with a slash"
+        abs_path = os.path.abspath(value)
+        output_dir = abs_path if output_is_dir else os.path.dirname(abs_path)
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+        except OSError as e:
+            return f"Could not create output folder: {e}"
+        if not output_is_dir:
+            return _check_overwrite(value, is_dir=False, prevent=prevent_overwrites)
 
     return None
+
 
 DEFAULT_MAX_UNDO = 20
 
@@ -221,14 +213,20 @@ class BaseFieldValidator(ABC):
         try:
             if declared_type is int:
                 v = int(value)
+                if v < 0 and self._extra_validate is None:
+                    return "Value must be non-negative"
             elif declared_type is float:
                 v = float(value)
-                if v < 0:
+                if v < 0 and self._extra_validate is None:
                     return "Value must be non-negative"
             elif declared_type is bool:
                 if value.lower() not in ("true", "false", "0", "1"):
                     return "Invalid bool"
         except ValueError:
+            if declared_type is int:
+                return "Enter a whole number (for example, 2)"
+            if declared_type is float:
+                return "Enter a number using a decimal point (for example, 0.5 or 1e-4)"
             return "Invalid value"
 
         if self._extra_validate is not None:
@@ -251,7 +249,7 @@ _active_validators: set[BaseFieldValidator] = set()
 
 def flush_and_validate_all() -> list[str]:
     invalid: list[str] = []
-    for v in list(_active_validators):
+    for v in sorted(_active_validators, key=lambda v: v.var_name == "run_name"):
         error = v.flush()
         if error is not None:
             invalid.append(f"{v.var_name}: {error}")

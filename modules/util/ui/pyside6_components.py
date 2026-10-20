@@ -7,7 +7,7 @@ from typing import Any, Literal
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions, supported_video_extensions
-from modules.util.ui.pyside6_validation import PySide6FieldValidator, PySide6PathValidator
+from modules.util.ui.pyside6_validation import PySide6FieldValidator, PySide6PathValidator, PySide6RunNameValidator
 from modules.util.ui.UIState import BaseUIState
 
 from PySide6.QtCore import Qt, QTimer
@@ -220,6 +220,9 @@ def entry(
     if tooltip:
         _set_tooltip(component, tooltip, wide_tooltip)
 
+    if validator_factory is None and var_name == "run_name":
+        validator_factory = PySide6RunNameValidator
+
     if validator_factory is not None:
         validator = validator_factory(
             component, var, ui_state, var_name,
@@ -265,7 +268,7 @@ def path_entry(
     _add(_layout(master), frame, row, column, sticky="new", padx=0, pady=0, colspan=columnspan)
 
     def _path_validator_factory(comp, var, state, name, **kw):
-        return PySide6PathValidator(comp, var, state, name, io_type=io_type, **kw)
+        return PySide6PathValidator(comp, var, state, name, io_type=io_type, output_is_dir=mode == "dir", **kw)
 
     entry_component = entry(
         frame, 0, 0, ui_state, var_name,

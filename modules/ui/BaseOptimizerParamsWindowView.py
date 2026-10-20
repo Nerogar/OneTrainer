@@ -176,7 +176,7 @@ class BaseOptimizerParamsWindowView:
                                    command=update_user_pref_cb)
             elif type != 'bool':
                 self.components.entry(master, row, col + 1, optimizer_ui_state, key,
-                                      command=update_user_pref_cb)
+                                      command=update_user_pref_cb, extra_validate=lambda _: None)
             else:
                 self.components.switch(master, row, col + 1, optimizer_ui_state, key,
                                        command=update_user_pref_cb)
