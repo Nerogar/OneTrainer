@@ -6,22 +6,23 @@ def script_imports(allow_zluda: bool = True):
     import warnings
     from pathlib import Path
 
+    if sys.platform == 'win32':
+        # PyTorch's Windows allocator can retain freed loading/quantization buffers in mimalloc arenas.
+        # Return unused pages promptly, including while the UI is idle. Set this before importing torch;
+        # explicit user allocator settings take precedence. This does not change the CUDA allocator.
+        os.environ.setdefault('MIMALLOC_PURGE_DELAY', '0')
+
+    # Suppress the Triton startup warning and leftover xformers installations warnings.
     # Filter out the Triton warning on startup.
     # xformers is not installed anymore, but might still exist for some installations.
     logging \
         .getLogger("xformers") \
         .addFilter(lambda record: 'A matching Triton is not available' not in record.getMessage())
 
-    # Silence specific non-actionable startup/compile warnings. A logger filter
-    # targets the exact emitting logger, since a parent logger's filter misses
-    # records from child loggers. Set OT_DEBUG_WARNINGS to see them all.
+    # Silence non-actionable startup/compile warnings unless OT_DEBUG_WARNINGS is set.
+    # Filter emitting loggers directly; parent filters miss child records.
     if not os.environ.get("OT_DEBUG_WARNINGS"):
-        # diffusers/transformers chatty logger.warning() lines at import/load time.
-        logging.getLogger("diffusers.modular_pipelines").addFilter(
-            lambda record: 'Modular Diffusers is currently an experimental feature' not in record.getMessage()
-        )
-        # The subject of these two is interpolated into the message, so match the whole
-        # sentence with .* standing in for the runtime value.
+        # Suppress noisy diffusers/transformers import/load logs; regexes match runtime values.
         logging.getLogger("diffusers.configuration_utils").addFilter(
             lambda record: not re.search(
                 r"The config attributes .* were passed to .*, but are not expected and will be ignored",
@@ -37,21 +38,17 @@ def script_imports(allow_zluda: bool = True):
             )
         )
 
-        # A dependency still calls hf_hub_download with the removed local_dir_use_symlinks
-        # argument; the deprecation warning is not actionable.
+        # A dependency still passes the deprecated local_dir_use_symlinks to hf_hub_download.
         warnings.filterwarnings("ignore", message=r".*local_dir_use_symlinks.*")
 
-        # torch.compile emits performance notes when inductor falls back or can't use a
-        # fast path; harmless and noisy for normal runs. The SMs note is a logger.warning()
-        # on its exact emitting logger; the complex-operators note is a warnings.warn().
+        # Suppress harmless torch.compile fallback notes: complex operators use warnings.warn(),
+        # while insufficient SMs use logger.warning().
         warnings.filterwarnings("ignore", message=r".*does not support code generation for complex operators.*")
         logging.getLogger("torch._inductor.utils").addFilter(
             lambda record: 'Not enough SMs to use max_autotune_gemm mode' not in record.getMessage()
         )
 
-    # Insert ourselves as the highest-priority library path, so our modules are
-    # always found without any risk of being shadowed by another import path.
-    # 3 .parent calls to navigate from /scripts/util/import_util.py to the main directory
+    # Prioritize local modules to prevent shadowing; three parents reach the repo root.
     onetrainer_lib_path = Path(__file__).absolute().parent.parent.parent
     sys.path.insert(0, str(onetrainer_lib_path))
 
