@@ -91,6 +91,8 @@ class SampleWindowController:
             model_names=model_names,
             weight_dtypes=self.initial_train_config.weight_dtypes(),
             quantization=self.initial_train_config.quantization,
+            stream_from_disk=self.initial_train_config.stream_from_disk,
+            cache_in_ram=self.initial_train_config.cache_in_ram(),
         )
         model.train_config = self.initial_train_config
 

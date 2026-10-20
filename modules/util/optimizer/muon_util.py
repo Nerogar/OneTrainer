@@ -57,6 +57,10 @@ def build_muon_adam_key_fn(
                     'text_fusion.layerwise_blocks',
                     'text_fusion.refiner_blocks',
                 ]
+            case ModelType.MOSS:
+                default_patterns = [
+                    'layers',
+                ]
             case _: # Unmatched cases
                 raise NotImplementedError(f"Default hidden layer patterns are not defined for model type: {model.model_type}")
         filters = [ModuleFilter(p, use_regex=False) for p in default_patterns]
@@ -111,8 +115,8 @@ def build_muon_adam_key_fn(
     return param_map
 
 def split_parameters_for_muon(
+    model: BaseModel,
     parameters: list[dict],
-    layer_key_fn: dict[int, str],
     config: TrainConfig,
 ) -> tuple[list[dict], bool]:
     """
@@ -122,6 +126,8 @@ def split_parameters_for_muon(
     optimizer_config = config.optimizer
 
     has_adam_params = False
+    layer_key_fn = build_muon_adam_key_fn(model, config) if optimizer_config.MuonWithAuxAdam else None
+
     if layer_key_fn:
         for group in parameters:
             for p in group['params']:

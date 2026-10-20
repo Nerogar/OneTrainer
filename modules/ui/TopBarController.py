@@ -6,7 +6,7 @@ from contextlib import suppress
 
 from modules.util import path_util
 from modules.util.config.SecretsConfig import SecretsConfig
-from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.TrainConfig import RemovedOptimizerError, TrainConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.path_util import write_json_atomic
@@ -41,6 +41,7 @@ class TopBarController:
             ("QwenImage", ModelType.QWEN),
             ("Anima", ModelType.ANIMA),
             ("Krea 2", ModelType.KREA_2),
+            ("MOSS", ModelType.MOSS),
             ("Z-Image", ModelType.Z_IMAGE),
             ("Ernie Image", ModelType.ERNIE),
             ("Ideogram 4", ModelType.IDEOGRAM_4),
@@ -99,6 +100,8 @@ class TopBarController:
             return loaded_config
         except FileNotFoundError:
             return None
+        except RemovedOptimizerError:
+            raise
         except Exception:
             print(traceback.format_exc())
             return None
