@@ -149,7 +149,8 @@ class LinearW8A8(
 ):
     is_quantized: bool
 
-    def __init__(self, dtype: torch.dtype, *args, compress: bool = False, convrot: bool = False, **kwargs):
+    def __init__(self, dtype: torch.dtype, *args, compress: bool = False, convrot: bool = False,
+                 convrot_bf16: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
 
         assert dtype in [torch.int8, torch.float8_e4m3fn]
@@ -157,6 +158,9 @@ class LinearW8A8(
         if convrot and dtype != torch.int8:
             raise ValueError("CONVROT requires INT8 weights and activations")
         self.rotation_block_size = 128 if convrot else 0
+        if convrot_bf16 and not convrot:
+            raise ValueError("BF16 quantized compute is only supported for CONVROT")
+        self.convrot_bf16 = convrot_bf16
 
         self.is_quantized = False
         self.compute_dtype = None
@@ -227,7 +231,9 @@ class LinearW8A8(
 
         weight = self._decompress(self.weight.detach()) if self._compressed else self.weight
 
-        if x.shape[0] > 16:
+        if self.convrot_bf16:
+            y = self._forward_bf16(x, weight).to(self.compute_dtype or x_orig.dtype)
+        elif x.shape[0] > 16:
             y = LinearW8A8Function.apply(x, weight, self.scale, self.bias, self.compute_dtype, self.rotation_block_size)
         else:
             w = dequantize(weight.detach(), self.scale)
@@ -240,20 +246,30 @@ class LinearW8A8(
 
         return y.reshape(x_orig.shape[:-1] + (y.shape[-1], ))
 
+    def _forward_bf16(self, x: Tensor, weight: Tensor) -> Tensor:
+        # Native autograd also uses BF16 matmuls for backward. Stored INT8 weights
+        # stay frozen; checkpointing controls the lifetime of the BF16 working copy.
+        with torch.autocast(device_type=x.device.type, enabled=False):
+            x = block_hadamard(x.float(), self.rotation_block_size).to(torch.bfloat16)
+            weight = dequantize(weight.detach(), self.scale).to(torch.bfloat16)
+            bias = self.bias.to(torch.bfloat16) if self.bias is not None else None
+            return nn.functional.linear(x, weight, bias)
+
     def forward_with_lora(self, x_orig: torch.Tensor, lora_down: torch.Tensor, lora_up: torch.Tensor, dropout: torch.nn.Dropout, alpha: torch.Tensor) -> torch.Tensor:
         assert self.is_quantized
         lora_rank = lora_down.shape[0]
 
         x = x_orig.reshape(-1, x_orig.shape[-1])
-        if x.shape[0] <= 16:
+        if x.shape[0] <= 16 and not self.convrot_bf16:
             ld = torch.nn.functional.linear(dropout(torch.nn.functional.linear(x_orig, lora_down)), lora_up)
             return LinearW8A8.forward(self, x_orig) + ld * (alpha / lora_rank)
 
         #the cast matches lora_up (kept in its own dtype, e.g. f32) to the down-projection's autocast
         #dtype, which the epilogue dot needs; dropout(ones) yields the scaled 0/(1/(1-p)) mask, drawn
         #here rather than inside LinearW8A8LoRAFunction so the RNG stays inductor-native
-        lora_up_scaled = (lora_up * (alpha / lora_rank)).T.to(self.compute_dtype)
-        dropout_mask = dropout(torch.ones(x.shape[0], lora_rank, device=x.device, dtype=self.compute_dtype)) if (dropout.training and dropout.p > 0) else None
+        lora_compute_dtype = torch.bfloat16 if self.convrot_bf16 else self.compute_dtype
+        lora_up_scaled = (lora_up * (alpha / lora_rank)).T.to(lora_compute_dtype)
+        dropout_mask = dropout(torch.ones(x.shape[0], lora_rank, device=x.device, dtype=lora_compute_dtype)) if (dropout.training and dropout.p > 0) else None
         y = self._fused_lora_forward(x, lora_down, lora_up_scaled, dropout_mask)
 
         return y.reshape(x_orig.shape[:-1] + (y.shape[-1], ))
@@ -262,6 +278,14 @@ class LinearW8A8(
     def _fused_lora_forward(self, x: Tensor, lora_down: Tensor, lora_up: Tensor, dropout_mask: Tensor | None) -> Tensor:
         assert not self.weight.requires_grad
         weight = self._decompress(self.weight.detach()) if self._compressed else self.weight
+        if self.convrot_bf16:
+            with torch.autocast(device_type=x.device.type, enabled=False):
+                # Adapters (including merged SVD updates) remain in the original basis.
+                x_down = nn.functional.linear(x.to(torch.bfloat16), lora_down.to(torch.bfloat16))
+                if dropout_mask is not None:
+                    x_down = x_down * dropout_mask.to(torch.bfloat16)
+                y = self._forward_bf16(x, weight) + x_down @ lora_up.to(torch.bfloat16)
+            return y.to(self.compute_dtype or x.dtype)
         return LinearW8A8LoRAFunction.apply(x, weight, self.scale, self.bias, self.compute_dtype, lora_down, lora_up, dropout_mask, self.rotation_block_size)
 
 def run_benchmark(fn, desc, steps=10000, warmup=500, compile=False):

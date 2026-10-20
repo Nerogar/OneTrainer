@@ -56,6 +56,24 @@ class BaseModelTabView(ABC):
             ui_state,
         )
 
+    def _create_convrot_compute_components(self, label_frame, entry_frame, ui_state, part):
+        label = self.components.label(label_frame, 2, 0, "Quantized Compute Mode",
+            tooltip="Applies only to CONVROT layers in the transformer/UNet, including CONVROT fallback layers. "
+                    "Default keeps INT8 computation. BF16 uses BF16 forward and backward matmuls while retaining "
+                    "INT8 weight storage and optional compression; it can improve fidelity but uses more memory and time.")
+        option = self.components.options_kv(entry_frame, 2, 0, [
+            ("Default", DataType.NONE),
+            ("BF16 forward + backward", DataType.BFLOAT_16),
+        ], ui_state, "quantization.convrot_compute_dtype")
+        variables = [ui_state.get_var(f"{part}.weight_dtype"), ui_state.get_var("quantization.fallback_dtype")]
+
+        def visible():
+            return any(var.get() in (str(DataType.INT_W8A8_CONVROT), str(DataType.INT_W8A8_CONVROT_COMPRESSED))
+                       for var in variables)
+
+        for component in (label, option):
+            self.components.bind_visibility(component, variables, visible)
+
     def __create_dtype_options(self, include_gguf: bool = False, include_a8: bool = False,
                                include_compressed: bool = False) -> list[tuple[str, DataType]]:
         options = [
@@ -230,6 +248,9 @@ class BaseModelTabView(ABC):
                              tooltip="The weight data type used for layers excluded by the quantization layer filter. Can itself be a quantized type.")
             self.components.options_kv(dtype_entry_frame, 1, 0, self.__create_dtype_options(include_a8=True, include_compressed=include_compressed),
                                   ui_state, "quantization.fallback_dtype")
+
+            self._create_convrot_compute_components(dtype_label_frame, dtype_entry_frame, ui_state,
+                                                   "unet" if has_unet else "transformer")
 
         row += 1
 

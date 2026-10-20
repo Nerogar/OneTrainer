@@ -224,7 +224,7 @@ def __replace_linear_layers(
                     visited_modules=visited_modules,
                 )
 
-def __quantized_linear_class_and_kwargs(dtype: DataType):
+def __quantized_linear_class_and_kwargs(dtype: DataType, quantization: QuantizationConfig | None = None):
     # only the W8A8 dtypes have a compressed variant, so this covers every layer that can be built compressed
     if dtype.is_compressed() and not nvcomp_util.available():
         raise RuntimeError("a compressed weight data type is selected but nvCOMP is not available")
@@ -249,8 +249,13 @@ def __quantized_linear_class_and_kwargs(dtype: DataType):
     elif dtype.quantize_fp8():
         return LinearFp8, {}
     elif dtype.quantize_intW8A8():
+        convrot_bf16 = False
+        if dtype.quantize_intW8A8_convrot() and quantization is not None:
+            if quantization.convrot_compute_dtype not in (DataType.NONE, DataType.BFLOAT_16):
+                raise ValueError("CONVROT compute dtype must be NONE (default) or BFLOAT_16")
+            convrot_bf16 = quantization.convrot_compute_dtype == DataType.BFLOAT_16
         return LinearW8A8, {'dtype': torch.int8, 'compress': dtype.is_compressed(),
-                            'convrot': dtype.quantize_intW8A8_convrot()}
+                            'convrot': dtype.quantize_intW8A8_convrot(), 'convrot_bf16': convrot_bf16}
     elif dtype.quantize_fpW8A8():
         return LinearW8A8, {'dtype': torch.float8_e4m3fn, 'compress': dtype.is_compressed()}
     elif dtype == DataType.GGUF_A8_INT:
@@ -278,7 +283,7 @@ def replace_linear_with_quantized_layers(
     if keep_in_fp32_modules is None:
         keep_in_fp32_modules = []
 
-    linear_class, kwargs = __quantized_linear_class_and_kwargs(dtype)
+    linear_class, kwargs = __quantized_linear_class_and_kwargs(dtype, quantization)
     if linear_class is None:
         return
 
@@ -302,7 +307,7 @@ def replace_linear_with_quantized_layers(
         ]
 
         if not dtype.is_gguf() and quantization.fallback_dtype.is_quantized():
-            fallback_linear_class, fallback_kwargs = __quantized_linear_class_and_kwargs(quantization.fallback_dtype)
+            fallback_linear_class, fallback_kwargs = __quantized_linear_class_and_kwargs(quantization.fallback_dtype, quantization)
             if fallback_linear_class is not None:
                 fallback_construct_fn = partial(fallback_linear_class, **fallback_kwargs)
     else:
