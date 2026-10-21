@@ -42,7 +42,7 @@ class RemovedOptimizerError(ValueError):
     pass
 
 
-BACKUP_NAME_TIMESTAMP_RE = re.compile(r"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})$")
+TIMESTAMP_SUFFIX_RE = re.compile(r"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})$")
 
 
 def generate_run_name(training_method, run_name_mode: RunNameMode = RunNameMode.DEFAULT) -> str:
@@ -1112,13 +1112,20 @@ class TrainConfig(BaseConfig):
         else:
             return self.additional_embeddings
 
+    def get_timestamped_run_name(self) -> str:
+        """Name a saved artifact by its save time without duplicating the default run timestamp."""
+        timestamp = get_string_timestamp()
+        if self.run_name_mode == RunNameMode.DEFAULT and TIMESTAMP_SUFFIX_RE.search(self.run_name):
+            return TIMESTAMP_SUFFIX_RE.sub(timestamp, self.run_name)
+        return f"{self.run_name}-{timestamp}"
+
     def _backup_sort_key(self, backup_path: str) -> tuple[str, int, int, int, str]:
         """Sort by the backup name's embedded timestamp/progress (not mtime), so copied backups and prefixes dont change which backup is considered latest."""
         backup_name = os.path.basename(backup_path)
         prefix_and_timestamp, separator, progress_suffix = backup_name.rpartition("-backup-")
 
         if separator:
-            timestamp_match = BACKUP_NAME_TIMESTAMP_RE.search(prefix_and_timestamp)
+            timestamp_match = TIMESTAMP_SUFFIX_RE.search(prefix_and_timestamp)
             progress_parts = progress_suffix.split("-")
 
             if timestamp_match and len(progress_parts) == 3 and all(part.isdigit() for part in progress_parts):
