@@ -173,6 +173,7 @@ class BaseFieldValidator(ABC):
     ):
         self.ui_state = ui_state
         self.var_name = var_name
+        self.display_name = var_name
         self._extra_validate = extra_validate
         self._required = required
         self._bound = False
@@ -229,7 +230,7 @@ class BaseFieldValidator(ABC):
             if declared_type is int:
                 return "Enter a whole number (for example, 2)"
             if declared_type is float:
-                return "Enter a number using a decimal point (for example, 0.5 or 1e-4)"
+                return "Enter a valid number (for example, 200, 0.5 or 1e-4)"
             return "Invalid value"
 
         if self._extra_validate is not None:
@@ -255,7 +256,7 @@ def flush_and_validate_all() -> list[str]:
     for v in sorted(_active_validators, key=lambda v: v.var_name == "run_name"):
         error = v.flush()
         if error is not None:
-            invalid.append(f"{v.var_name}: {error}")
+            invalid.append(f"{v.display_name}: {error}")
     return invalid
 
 

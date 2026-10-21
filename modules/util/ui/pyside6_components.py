@@ -1,5 +1,4 @@
 import contextlib
-import html
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
@@ -7,6 +6,7 @@ from typing import Any, Literal
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions, supported_video_extensions
+from modules.util.ui.pyside6_util import format_tooltip
 from modules.util.ui.pyside6_validation import PySide6FieldValidator, PySide6PathValidator, PySide6RunNameValidator
 from modules.util.ui.UIState import BaseUIState
 
@@ -48,10 +48,7 @@ def _layout(master: QWidget) -> QGridLayout:
 
 
 def _set_tooltip(component: QWidget, text: str, wide: bool = False) -> None:
-    # plain QToolTip text is rendered on a single line; wrap it as rich text
-    # with a max-width so it matches Ctk's wraplength of 180/350px
-    width = 350 if wide else 180
-    component.setToolTip(f'<p style="max-width: {width}px;">{html.escape(text)}</p>')
+    component.setToolTip(format_tooltip(text))
 
 
 def _alignment(sticky: str) -> Qt.AlignmentFlag:
@@ -92,6 +89,9 @@ def _add(
         colspan: int = 1,
 ):
     layout.addWidget(widget, row, col, rowspan, colspan)
+    label_item = layout.itemAtPosition(row, col - 1) if col else None
+    if label_item is not None and isinstance(label_item.widget(), QLabel):
+        widget.setAccessibleName(label_item.widget().text())
     align = _alignment(sticky)
     if align:
         layout.setAlignment(widget, align)
@@ -235,6 +235,7 @@ def entry(
             extra_validate=extra_validate,
             required=required,
         )
+    validator.display_name = component.accessibleName() or master.accessibleName() or var_name
     validator.attach()
     component._validator = validator  # type: ignore[attr-defined]
 

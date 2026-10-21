@@ -1,4 +1,3 @@
-import html
 import re
 from collections.abc import Callable
 from pathlib import PurePosixPath
@@ -8,6 +7,7 @@ from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.path_util import supported_image_extensions, supported_video_extensions
 from modules.util.ui.autocorrect import autocorrect_path
+from modules.util.ui.pyside6_util import format_tooltip
 from modules.util.ui.QtVar import QtVar
 from modules.util.ui.UIState import BaseUIState
 from modules.util.ui.validation import (
@@ -18,10 +18,22 @@ from modules.util.ui.validation import (
     validate_path,
 )
 
-from PySide6.QtCore import QPoint, QTimer
+from PySide6.QtCore import QEvent, QObject, QPoint, QTimer
 from PySide6.QtWidgets import QLineEdit, QToolTip
 
 _RUN_NAME_EXTENSIONS = {".safetensors", ".ckpt", ".pt", ".bin"} | supported_image_extensions() | supported_video_extensions()
+
+
+class _ErrorToolTipFilter(QObject):
+    def __init__(self, validator):
+        super().__init__(validator.component)
+        self.validator = validator
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.ToolTip and watched.toolTip() != self.validator._original_tooltip:
+            self.validator._show_error_tooltip()
+            return True
+        return False
 
 
 class PySide6FieldValidator(BaseFieldValidator):
@@ -39,6 +51,7 @@ class PySide6FieldValidator(BaseFieldValidator):
         self.var = var
         self._original_style = component.styleSheet()
         self._original_tooltip = component.toolTip()
+        self._tooltip_filter = _ErrorToolTipFilter(self)
         self._syncing = False
         self._touched = False
         self._cleaned_value: str | None = None
@@ -59,11 +72,17 @@ class PySide6FieldValidator(BaseFieldValidator):
 
     def _apply_error(self) -> None:
         error = self.validate(self.component.text())
-        self.component.setStyleSheet(f"{self._original_style}\nborder: 1px solid {ERROR_BORDER_COLOR};")
-        self.component.setToolTip(f"<p>{html.escape(error or 'Invalid value')}</p>")
+        self.component.setStyleSheet(
+            f"{self._original_style}\nQLineEdit {{ border: 1px solid {ERROR_BORDER_COLOR}; }}"
+            "QToolTip { background-color: #fceded; color: #681c15; font-weight: 600; border: 1px solid #f3d5d5; }"
+        )
+        self.component.setToolTip(format_tooltip(error or "Invalid value"))
         if self.component.hasFocus():
-            QToolTip.showText(self.component.mapToGlobal(QPoint(0, self.component.height())),
-                              self.component.toolTip(), self.component, msecShowTime=5000)
+            self._show_error_tooltip()
+
+    def _show_error_tooltip(self) -> None:
+        QToolTip.showText(self.component.mapToGlobal(QPoint(0, self.component.height() - 4)),
+                          self.component.toolTip(), self.component, msecShowTime=6000)
 
     def _clear_error(self) -> None:
         if self.component.toolTip() != self._original_tooltip:
@@ -72,6 +91,7 @@ class PySide6FieldValidator(BaseFieldValidator):
         self.component.setToolTip(self._original_tooltip)
 
     def attach(self) -> None:
+        self.component.installEventFilter(self._tooltip_filter)
         self.component.setText(str(self.var.get()))
         self.component.textChanged.connect(self._on_text_changed)
         self.component.editingFinished.connect(self._on_editing_finished)
@@ -93,6 +113,7 @@ class PySide6FieldValidator(BaseFieldValidator):
         self._debounce.stop()
         if self.validate(self.component.text()) is None:
             self._commit()
+        self.component.removeEventFilter(self._tooltip_filter)
         self.component.textChanged.disconnect(self._on_text_changed)
         self.component.editingFinished.disconnect(self._on_editing_finished)
         self._on_destroyed()
