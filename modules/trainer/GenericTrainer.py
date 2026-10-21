@@ -106,22 +106,19 @@ class GenericTrainer(BaseTrainer):
 
         if self.config.continue_last_backup:
             self.callbacks.on_update_status("searching for previous backups")
-            last_backup_path = self.config.get_last_backup_path(
-                require_compatible=True,
-                require_remaining_work=True,
-            )
-            if last_backup_path is None:
-                raise ValueError("Continue from latest backup is enabled, but no compatible backup was found.")
+            last_backup_path = self.config.get_last_backup_path()
 
-            if self.config.training_method == TrainingMethod.LORA:
-                model_names.lora = last_backup_path
-            elif self.config.training_method == TrainingMethod.EMBEDDING:
-                assert model_names.embedding is not None
-                model_names.embedding.model_name = last_backup_path
+            if last_backup_path:
+                if self.config.training_method == TrainingMethod.LORA:
+                    model_names.lora = last_backup_path
+                elif self.config.training_method == TrainingMethod.EMBEDDING:
+                    model_names.embedding.model_name = last_backup_path
+                else:  # fine-tunes
+                    model_names.base_model = last_backup_path
+
+                print(f"Continuing training from backup '{last_backup_path}'...")
             else:
-                model_names.base_model = last_backup_path
-
-            print(f"Continuing training from backup '{last_backup_path}'...")
+                print("No backup found, continuing without backup...")
 
         huggingface_util.configure_hub(
             self.config.secrets.huggingface_token,

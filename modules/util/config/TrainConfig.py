@@ -34,7 +34,6 @@ from modules.util.ModelNames import EmbeddingName, ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import default_device
-from modules.util.TrainProgress import TrainProgress
 
 import friendlywords
 
@@ -1142,94 +1141,9 @@ class TrainConfig(BaseConfig):
 
         return backup_paths
 
-    def _load_backup_train_progress(self, backup_path: str) -> TrainProgress | None:
-        meta_path = os.path.join(backup_path, "meta.json")
-        if not os.path.isfile(meta_path):
-            return None
-
-        try:
-            with open(meta_path, 'r') as f:
-                meta = json.load(f)
-        except (OSError, json.JSONDecodeError):
-            return None
-
-        train_progress = meta.get("train_progress")
-        if not isinstance(train_progress, dict):
-            return None
-
-        try:
-            return TrainProgress(
-                epoch=int(train_progress["epoch"]),
-                epoch_step=int(train_progress["epoch_step"]),
-                epoch_sample=int(train_progress["epoch_sample"]),
-                global_step=int(train_progress["global_step"]),
-            )
-        except (KeyError, TypeError, ValueError):
-            return None
-
-    def _backup_training_method_is_compatible(self, backup_path: str) -> bool:
-        args_path = os.path.join(backup_path, "onetrainer_config", "args.json")
-        if not os.path.isfile(args_path):
-            return False
-
-        try:
-            with open(args_path, 'r') as f:
-                backup_settings = json.load(f)
-        except (OSError, json.JSONDecodeError):
-            return False
-
-        if backup_settings.get("training_method") != str(self.training_method):
-            return False
-
-        if self.training_method == TrainingMethod.LORA:
-            return backup_settings.get("peft_type") == str(self.peft_type)
-
-        return True
-
-    def _last_backup_path_error_message(self, backup_paths: list[str]) -> str:
-        mode = f"training_method={self.training_method}"
-        if self.training_method == TrainingMethod.LORA:
-            mode += f", peft_type={self.peft_type}"
-
-        if not backup_paths:
-            return (
-                "Continue from latest backup is enabled, but no backups were found in "
-                f"'{os.path.join(self.workspace_dir, 'backup')}' for {mode}."
-            )
-
-        return (
-            "Continue from latest backup is enabled, but no compatible backup was found in "
-            f"'{os.path.join(self.workspace_dir, 'backup')}' for {mode}."
-        )
-
-    def _last_backup_complete_error_message(self, backup_path: str, train_progress: TrainProgress) -> str:
-        return (
-            "Continue from latest backup is enabled, but the latest compatible backup "
-            f"'{backup_path}' has already reached epoch {train_progress.epoch}. "
-            "Increase your total epochs to continue."
-        )
-
-    def get_last_backup_path(
-        self,
-        require_compatible: bool = False,
-        require_remaining_work: bool = False,
-    ) -> str | None:
+    def get_last_backup_path(self) -> str | None:
         backup_paths = self.get_backup_paths()
-        for backup_path in backup_paths:
-            if not self._backup_training_method_is_compatible(backup_path):
-                continue
-
-            if require_remaining_work:
-                train_progress = self._load_backup_train_progress(backup_path)
-                if train_progress is not None and train_progress.epoch >= self.epochs:
-                    raise ValueError(self._last_backup_complete_error_message(backup_path, train_progress))
-
-            return backup_path
-
-        if require_compatible:
-            raise ValueError(self._last_backup_path_error_message(backup_paths))
-
-        return None
+        return backup_paths[0] if backup_paths else None
 
     def to_settings_dict(self, secrets: bool) -> dict:
         config = TrainConfig.default_values().from_dict(self.to_dict())

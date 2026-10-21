@@ -106,7 +106,7 @@ def validate_path(
             suffix = (PureWindowsPath(value) if _IS_WINDOWS else PurePosixPath(value)).suffix.lower()
             if expected and suffix != expected:
                 return f"Extension must be '{expected}' for {output_format} format"
-        # A directory model is the artifact itself: create only its parent.
+        # A directory model is the artifact itself: validate only its parent.
         error = validate_path(os.path.dirname(os.path.abspath(value)), PathIOType.OUTPUT, output_is_dir=True) \
             if is_dir else validate_path(value, PathIOType.OUTPUT)
         return error or _check_overwrite(value, is_dir=is_dir, prevent=prevent_overwrites)
@@ -116,10 +116,13 @@ def validate_path(
             return "Output file path must not end with a slash"
         abs_path = os.path.abspath(value)
         output_dir = abs_path if output_is_dir else os.path.dirname(abs_path)
-        try:
-            os.makedirs(output_dir, exist_ok=True)
-        except OSError as e:
-            return f"Could not create output folder: {e}"
+        while not os.path.exists(output_dir):
+            parent = os.path.dirname(output_dir)
+            if parent == output_dir:
+                break
+            output_dir = parent
+        if os.path.exists(output_dir) and not os.path.isdir(output_dir):
+            return f"Output folder is not a directory: {output_dir}"
         if not output_is_dir:
             return _check_overwrite(value, is_dir=False, prevent=prevent_overwrites)
 

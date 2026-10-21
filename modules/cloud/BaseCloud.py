@@ -29,15 +29,14 @@ class BaseCloud(metaclass=ABCMeta):
         if self.config.cloud.tensorboard_tunnel:
             self._make_tensorboard_tunnel()
 
-    def download_output_model(self):
-        local_dir = getattr(self.config, "local_final_output_dir", self.config.final_output_dir)
+    def download_output_model(self, local_output_dir: str):
         remote = Path(get_output_model_destination(
             self.config.final_output_dir,
             self.config.run_name,
             self.config.output_model_format,
         ))
         local = Path(get_output_model_destination(
-            local_dir,
+            local_output_dir,
             self.config.run_name,
             self.config.output_model_format,
         ))

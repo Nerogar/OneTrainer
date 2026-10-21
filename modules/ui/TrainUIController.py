@@ -316,12 +316,6 @@ class TrainUIController:
                 return
 
             self.sync_run_name()
-            if self.train_config.continue_last_backup:
-                try:
-                    self.train_config.get_last_backup_path(require_compatible=True, require_remaining_work=True)
-                except ValueError as error:
-                    self.view.show_validation_errors([str(error)])
-                    return
 
             if self.train_config.clear_cache_before_training and self.train_config.latent_caching \
                     and not self.view.confirm("Clear Cache Before Training", "Clear cache?"):

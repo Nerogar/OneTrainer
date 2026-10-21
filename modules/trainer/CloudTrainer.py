@@ -100,7 +100,8 @@ class CloudTrainer(BaseTrainer):
 
             if self.config.cloud.download_output_model:
                 self.callbacks.on_update_status("downloading output model")
-                self.cloud.download_output_model()
+                local_output_dir = "models" if self.config.final_output_dir.startswith("cloud:") else self.config.final_output_dir
+                self.cloud.download_output_model(local_output_dir)
         except Exception:
             self.error_caught=True
             raise
