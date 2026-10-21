@@ -2,7 +2,6 @@ import datetime as dt
 import json
 import os
 import subprocess
-import sys
 import threading
 import time
 import traceback
@@ -95,13 +94,11 @@ class TrainUIController:
         if self.always_on_tensorboard_subprocess:
             self._stop_always_on_tensorboard()
 
-        tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
         tensorboard_log_dir = os.path.join(self.train_config.workspace_dir, "tensorboard")
 
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
 
         tensorboard_args = [
-            tensorboard_executable,
             "--logdir",
             tensorboard_log_dir,
             "--port",
