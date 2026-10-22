@@ -1,5 +1,7 @@
+import html
 import locale
 import os
+import re
 import signal
 import sys
 from abc import ABCMeta
@@ -38,6 +40,10 @@ def fit_form(frame: QWidget) -> None:
         combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         combo.setFixedWidth(combo.sizeHint().width())
     components._pack_form(frame)
+def format_tooltip(text: str) -> str:
+    # wrap tooltips after 45 characters, supported by studys size
+    wrapped = re.sub(r"(.{65}\S*)[ \t]+", r"\1\n", text)
+    return f'<p style="white-space: pre;">{html.escape(wrapped)}</p>'
 
 
 def get_theme_controller() -> ThemeController:
