@@ -13,7 +13,7 @@ function is estimated from the current model and dataset:
 4. D_entropy = ERROR / sigma^2; entropy = cumsum(D_entropy * d_sigma), rescaled to [0, 1].
 
 The result is cached in <workspace_dir>/entropic/schedule.pt using the same format
-as the precomputed repository schedules, so it can also be selected manually in the
+as the referenced paper, so it can also be selected manually in the
 UI afterwards:
   {'time': ascending sigma grid including 0, 'time_func': entropy 0..1, 'help': str}
 
@@ -26,7 +26,7 @@ inside the loop.
 
 Additionally, latents are downscaled once at collection time so their total
 image-space area is about schedule_resolution x schedule_resolution pixels
-(default 256, aspect ratio preserved, area interpolation). Because the entropy
+(default None, aspect ratio preserved, area interpolation). Because the entropy
 curve is normalized to [0, 1], its shape is well preserved at reduced resolution;
 this is an approximation that trades a little accuracy for a large speedup
 (fewer transformer tokens per sample). Pass schedule_resolution=None to evaluate
@@ -280,8 +280,8 @@ def load_or_compute_entropic_schedule(
         data_loader,
         config,
         num_eval_steps: int = 8,
-        num_samples: int = 128,
-        timestep_chunk_size: int = 16,
+        num_samples: int = 32,
+        timestep_chunk_size: int = 8,
         schedule_resolution: int | None = 256,
 ) -> str | None:
     """Return the path of the entropic schedule file, computing and caching it if needed.
