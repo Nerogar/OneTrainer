@@ -261,6 +261,10 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         pyside6_components._pack_form(frame)
 
     def _configure_tools_frame(self, frame):
+        from modules.ui.PySide6QueueTrainingUIView import PySide6QueueTrainingUIView
+        pyside6_components.label(frame, 5, 0, "Training Queue", tooltip="Export Loop or Sweep training scripts")
+        pyside6_components.button(frame, 5, 1, "Open", lambda: self.wait_window(
+            self.controller.open_queue_tool(self, PySide6QueueTrainingUIView)))
         self.build_tools_tab_content(frame, self.controller, self.ui_state)
         pyside6_components._pack_form(frame)
 

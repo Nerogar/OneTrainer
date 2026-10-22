@@ -5,10 +5,11 @@ import sys
 from abc import ABCMeta
 from typing import TYPE_CHECKING
 
+from modules.util.ui import pyside6_components as components
 from modules.util.ui.theme import ThemeController
 
 from PySide6.QtCore import QSettings
-from PySide6.QtWidgets import QApplication, QStyleFactory, QWidget
+from PySide6.QtWidgets import QApplication, QComboBox, QLineEdit, QStyleFactory, QWidget
 
 if TYPE_CHECKING:
     # pyside6 stubs omit qts runtime metaclass; expose ABCMeta to type checkers.
@@ -22,6 +23,21 @@ else:
 
 class OneTrainerApplication(QApplication):
     theme_controller: ThemeController
+
+
+def limit_input_width(entry: QLineEdit, characters: int = 40) -> None:
+    """Cap the visible width without limiting the length of the entered text."""
+    entry.ensurePolished()
+    entry.setMaximumWidth(entry.fontMetrics().horizontalAdvance("0" * characters) + 12)
+
+
+def fit_form(frame: QWidget) -> None:
+    """Fit dropdowns to their options and put surplus space after the form."""
+    for combo in frame.findChildren(QComboBox):
+        combo.ensurePolished()
+        combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        combo.setFixedWidth(combo.sizeHint().width())
+    components._pack_form(frame)
 
 
 def get_theme_controller() -> ThemeController:
