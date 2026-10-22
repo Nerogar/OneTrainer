@@ -1,5 +1,8 @@
 import math
+import os
 from abc import ABCMeta
+
+import numpy as np
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TimestepDistribution import TimestepDistribution
@@ -245,6 +248,32 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
                         weight = config.noising_weight
 
                         weights = torch.clamp(-weight * ((linspace - bias) ** 2) + 2, min=0.0)
+                        weights *= linspace_derivative
+                        self.__weights = weights.to(device=generator.device)
+                elif config.timestep_distribution == TimestepDistribution.ENTROPIC:
+                    # Entropic Time Scheduler (Stancevic et al., arXiv:2504.13612).
+                    # The schedule file holds a precomputed rescaled entropic time function:
+                    # 'time' is an ascending noise grid (sigma: 0 -> sigma_max) and
+                    # 'time_func' is the entropy (0 -> 1) accumulated up to each sigma.
+                    # Sampling timesteps uniformly in entropy space means the sampling
+                    # density over time is proportional to d(entropy)/d(time). We invert
+                    # the stored mapping onto the (shifted) grid and differentiate it.
+                    if self.__weights is None:
+                        weights = torch.ones_like(linspace)  # Fallback: uniform
+                        schedule_path = getattr(config, "entropic_schedule_path", "")
+                        if schedule_path and os.path.isfile(schedule_path):
+                            checkpoint = torch.load(schedule_path, map_location="cpu")
+                            time = checkpoint["time"].to(torch.float64).flatten()
+                            time_func = checkpoint["time_func"].to(torch.float64).flatten()
+                            time = time / time[-1]  # Normalize the sigma grid to [0, 1]
+                            entropy = torch.tensor(
+                                np.interp(linspace.numpy(), time.numpy(), time_func.numpy()),
+                                dtype=linspace.dtype,
+                            )
+                            de = entropy[1:] - entropy[:-1]
+                            dx = linspace[1:] - linspace[:-1]
+                            weights = torch.cat([de[:1] / dx[:1], de / dx])
+                        weights = torch.clamp(weights, min=0.0)
                         weights *= linspace_derivative
                         self.__weights = weights.to(device=generator.device)
                 samples = torch.multinomial(self.__weights, num_samples=batch_size, replacement=True, generator=generator) + min_timestep

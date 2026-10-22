@@ -37,7 +37,7 @@ class CtkTimestepDistributionWindowView(BaseTimestepDistributionWindowView, ctk.
         frame.grid_columnconfigure(1, weight=0)
         frame.grid_columnconfigure(2, weight=0)
         frame.grid_columnconfigure(3, weight=1)
-        frame.grid_rowconfigure(7, weight=1)
+        frame.grid_rowconfigure(8, weight=1)
 
         self.build_content(frame, controller, ui_state)
 
@@ -51,7 +51,7 @@ class CtkTimestepDistributionWindowView(BaseTimestepDistributionWindowView, ctk.
         fig, ax = plt.subplots()
         self.ax = ax
         self.canvas = FigureCanvasTkAgg(fig, master=frame)
-        self.canvas.get_tk_widget().grid(row=0, column=3, rowspan=8)
+        self.canvas.get_tk_widget().grid(row=0, column=3, rowspan=9)
 
         fig.set_facecolor(background_color)
         ax.set_facecolor(background_color)
@@ -67,7 +67,7 @@ class CtkTimestepDistributionWindowView(BaseTimestepDistributionWindowView, ctk.
         self.__update_preview()
 
         # update button
-        ctk_components.button(frame, 8, 3, "Update Preview", command=self.__update_preview)
+        ctk_components.button(frame, 9, 3, "Update Preview", command=self.__update_preview)
 
         frame.pack(fill="both", expand=1)
         frame.grid(row=0, column=0, sticky='nsew')
