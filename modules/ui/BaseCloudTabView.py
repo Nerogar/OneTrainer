@@ -107,7 +107,7 @@ class BaseCloudTabView(ABC):
                          tooltip="Download samples from the remote workspace directory to your local machine.")
         self.components.switch(frame, 11, 3, ui_state, "cloud.download_samples")
         self.components.label(frame, 12, 2, "Download output model",
-                         tooltip="Download the final model after training. You can disable this if you plan to use an automatically saved checkpoint instead.")
+                         tooltip="Download the final model after training to the local Final Output Directory, or to the local models/ folder for a cloud: destination. You can disable this if you plan to use an automatically saved checkpoint instead.")
         self.components.switch(frame, 12, 3, ui_state, "cloud.download_output_model")
         self.components.label(frame, 13, 2, "Download saved checkpoints",
                          tooltip="Download the automatically saved training checkpoints from the remote workspace directory to your local machine.")
