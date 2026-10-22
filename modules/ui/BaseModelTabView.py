@@ -233,7 +233,7 @@ class BaseModelTabView(ABC):
         self.components.options_kv(svd_entry_frame, 2, 0, [("disabled", DataType.NONE), ("float32", DataType.FLOAT_32), ("bfloat16", DataType.BFLOAT_16)],
                               ui_state, "quantization.quant_rot_dtype")
         self.components.label(svd_label_frame, 3, 0, "Quant-Rot Block",
-                         tooltip="Block size of the orthogonal pre-rotation. When training with OFT, equal to the OFT block size folds the rotation into OFT (one matmul, highly optimized); a different size runs the two rotations as separate ops.")
+                         tooltip="Block size of the orthogonal pre-rotation. When training with OFT, integer-multiple relationship to the OFT block size folds the rotation into OFT (one matmul, highly optimized); otherwise, non-multiple block sizes or LoRA run the two rotations as separate ops.")
         self.components.entry(svd_entry_frame, 3, 0, ui_state, "quantization.quant_rot_block_size")
         row += 1
 

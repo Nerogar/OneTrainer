@@ -679,15 +679,14 @@ class OFTModule(PeftBase):
 
         nn.init.zeros_(self.oft_R.weight)
 
-        # When the base layer is an OFT-quant-rotation linear with the same block size, fold its
-        # O^T input rotation into OFT's R: one block-matmul on the activations instead of two,
-        # and the module is called via forward_rotated_input (no O^T). The reference is captured
-        # here (pre-hook), so it stays the module's own method even after hooking replaces forward.
-        # With a different block size the two rotations stay separate: the module's own forward
-        # applies its O^T to the already-OFT-rotated input (still computes W R^T x).
+        # Fold the base layer's O^T input rotation into OFT's R when the block sizes are in an
+        # integer-multiple relationship (M = R @ O^T stays block-diagonal), so the module is
+        # called via forward_rotated_input (no O^T); the reference is captured pre-hook so it
+        # stays the module's own method. Incompatible sizes keep the rotations separate.
         if (isinstance(self.orig_module, BaseLinearQuantRot)
                 and self.orig_module.is_rotatable
-                and self.orig_module.quant_rot_block_size == self.oft_block_size):
+                and (self.orig_module.quant_rot_block_size % self.oft_block_size == 0
+                     or self.oft_block_size % self.orig_module.quant_rot_block_size == 0)):
             self.oft_R.set_merge_rot_source(self.orig_module)
             self.quant_rot_forward = self.orig_module.forward_rotated_input
 
