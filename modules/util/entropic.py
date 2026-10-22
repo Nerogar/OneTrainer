@@ -210,8 +210,8 @@ def _compute_schedule(
                     t_index = torch.arange(chunk_start, chunk_start + k, device=train_device) \
                         .repeat(batch_size)
 
-                    def fixed_get_timestep(*args, **kwargs):
-                        return t_for_sample
+                    def fixed_get_timestep(*args, t_for_sample=t_for_sample, **kwargs):
+                         return t_for_sample
 
                     def capturing_add_noise(scaled_latent, latent_noise, timestep, timesteps):
                         noisy, sigma = original_add_noise(scaled_latent, latent_noise, timestep, timesteps)

@@ -28,9 +28,9 @@ from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
+from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
-from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.profiling_util import PeakMemoryRecorder, TorchMemoryRecorder, TorchProfiler
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc

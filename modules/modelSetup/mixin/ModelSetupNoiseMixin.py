@@ -2,14 +2,14 @@ import math
 import os
 from abc import ABCMeta
 
-import numpy as np
-
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 
 import torch
 import torch.distributions
 from torch import Generator, Tensor
+
+import numpy as np
 
 
 class ModelSetupNoiseMixin(metaclass=ABCMeta):
