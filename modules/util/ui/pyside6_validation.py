@@ -1,6 +1,6 @@
 import re
 from collections.abc import Callable
-from pathlib import PurePosixPath
+from pathlib import PurePath
 
 from modules.util.config.TrainConfig import get_output_model_destination, is_auto_run_name_mode, prepare_run_name
 from modules.util.enum.ModelFormat import ModelFormat
@@ -258,7 +258,7 @@ class PySide6RunNameValidator(PySide6FieldValidator):
             return "Run name must not contain path separators (/ or \\)"
         if re.search(r"[^\w .\-]", value) or value in (".", ".."):
             return "Run name contains invalid characters"
-        if PurePosixPath(value).suffix.lower() in _RUN_NAME_EXTENSIONS:
+        if PurePath(value).suffix.lower() in _RUN_NAME_EXTENSIONS:
             return "Run name must not end with a file extension"
         output_format = ModelFormat[str(self._get_value("output_model_format", "SAFETENSORS"))]
         destination = get_output_model_destination(self._get_value("final_output_dir", ""), value, output_format)

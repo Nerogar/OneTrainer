@@ -6,7 +6,7 @@ import sys
 from abc import ABC, abstractmethod
 from collections import deque
 from collections.abc import Callable
-from pathlib import PurePosixPath, PureWindowsPath
+from pathlib import PurePath
 from typing import TYPE_CHECKING
 
 from modules.util.enum.ModelFormat import ModelFormat
@@ -103,7 +103,7 @@ def validate_path(
             return "Diffusers output must be a directory path, not a file"
         if not is_dir and fmt is not None:
             expected = fmt.file_extension()
-            suffix = (PureWindowsPath(value) if _IS_WINDOWS else PurePosixPath(value)).suffix.lower()
+            suffix = PurePath(value).suffix.lower()
             if expected and suffix != expected:
                 return f"Extension must be '{expected}' for {output_format} format"
         # A directory model is the artifact itself: validate only its parent.
