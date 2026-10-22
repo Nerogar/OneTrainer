@@ -179,7 +179,11 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("computing the entropic timestep schedule")
         self.config.entropic_schedule_path = load_or_compute_entropic_schedule(
-            self.model, self.model_setup, self.data_loader, self.config
+            self.model, self.model_setup, self.data_loader, self.config,
+            num_eval_steps=self.config.entropic_num_eval_steps,
+            num_samples=self.config.entropic_num_samples,
+            timestep_chunk_size=self.config.entropic_timestep_chunk_size,
+            schedule_resolution=self.config.entropic_schedule_resolution,
         )
 
     def __save_config_to_workspace(self):

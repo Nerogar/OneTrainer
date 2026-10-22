@@ -282,7 +282,7 @@ def load_or_compute_entropic_schedule(
         num_eval_steps: int = 8,
         num_samples: int = 32,
         timestep_chunk_size: int = 8,
-        schedule_resolution: int | None = 256,
+        schedule_resolution: int | None = None,
 ) -> str | None:
     """Return the path of the entropic schedule file, computing and caching it if needed.
 
