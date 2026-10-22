@@ -1003,7 +1003,7 @@ class TrainConfig(BaseConfig):
         destination = migrated.pop("output_model_destination", "")
         prefix = migrated.pop("save_filename_prefix", "").rstrip("-").strip()
         migrated.pop("output_name_as_run_name", None)
-        path = PureWindowsPath(destination) if "\\" in destination else PurePosixPath(destination)
+        path = Path(destination)
         directory_output = migrated.get("output_model_format") in ("DIFFUSERS", "INTERNAL")
         if not directory_output and (destination.endswith(("/", "\\")) or os.path.isdir(destination)):
             name, directory = "", str(path)
