@@ -3,8 +3,7 @@ Entropic Time Scheduler (Stancevic et al., "Entropic Time Schedulers for Generat
 Diffusion Models", arXiv:2504.13612) - automatic schedule estimation for sigma
 (flow-matching) models.
 
-The entropic time
-function is estimated from the current model and dataset:
+The entropic time function is estimated from the current model and dataset:
 
 1. For a grid of timesteps, create x_t = (1 - sigma) * x_0 + sigma * epsilon with
    the linear sigma used by ModelSetupFlowMatchingMixin (sigma = t / T).
@@ -21,8 +20,7 @@ Performance note: instead of pinning one timestep per pass (num_eval_steps x
 num_batches tiny forward passes), timesteps are processed in chunks that are tiled
 into the batch. The pipeline already supports per-sample timesteps, so one forward
 pass evaluates timestep_chunk_size x batch_size samples at once. All error/sigma
-reductions stay on the train device with index_add_; there is no host synchronization
-inside the loop.
+reductions stay on the train device with index_add_.
 
 Additionally, latents are downscaled once at collection time so their total
 image-space area is about schedule_resolution x schedule_resolution pixels
@@ -41,6 +39,19 @@ from modules.util.tqdm_util import tqdm
 
 import torch
 import torch.nn.functional as F
+
+
+def _to_device(data, device):
+    """Recursively move tensors in nested dicts/lists/tuples to the given device."""
+    if torch.is_tensor(data):
+        return data.to(device)
+    if isinstance(data, dict):
+        return {k: _to_device(v, device) for k, v in data.items()}
+    if isinstance(data, list):
+        return [_to_device(v, device) for v in data]
+    if isinstance(data, tuple):
+        return tuple(_to_device(v, device) for v in data)
+    return data
 
 
 def entropic_schedule_path(config) -> str:
@@ -118,14 +129,7 @@ def _downscale_batch(batch: dict, schedule_resolution: float, downscale: int, fi
 
 def _collect_batches(data_loader, num_samples: int, schedule_resolution: float | None = None,
                      downscale: int = 8) -> list[dict]:
-    """Read num_samples latents (plus their conditioning) from the data loader.
-
-    The latents and text encodings are already cached to disk by the data loader,
-    so this only reads from the existing cache. Batches stay on the train device
-    (where the data loader produces them), so the evaluation loop never re-uploads
-    them from CPU. If schedule_resolution is set, spatial tensors are downscaled
-    once here, which also keeps the in-memory batch list small.
-    """
+    """Read num_samples latents (plus their conditioning) from the data loader."""
     data_loader.get_data_set().start_next_epoch()
 
     batches = []
@@ -133,6 +137,8 @@ def _collect_batches(data_loader, num_samples: int, schedule_resolution: float |
     total = 0
     for batch in data_loader.get_data_loader():
         batch = _downscale_batch(batch, schedule_resolution, downscale, first_resize)
+        # Offload batch to CPU memory
+        batch = _to_device(batch, "cpu")
         batches.append(batch)
         total += batch['latent_image'].shape[0]
         if total >= num_samples:
@@ -142,13 +148,7 @@ def _collect_batches(data_loader, num_samples: int, schedule_resolution: float |
 
 
 def _tile_batch(batch: dict, k: int) -> dict:
-    """Repeat every entry of a batch k times along the batch dimension.
-
-    Tensors whose first dimension is the batch dimension are repeated with
-    repeat_interleave, so the sample order becomes (sample0 x k, sample1 x k, ...).
-    Per-sample list entries are repeated the same way; shared scalars and tensors
-    without a batch dimension are kept as-is.
-    """
+    """Repeat every entry of a batch k times along the batch dimension."""
     batch_size = batch['latent_image'].shape[0]
 
     def tile(value):
@@ -180,8 +180,6 @@ def _compute_schedule(
     original_add_noise = model_setup._add_noise_discrete
     captured = {}
 
-    # All reductions stay on the train device; nothing inside the loop synchronizes
-    # with the host, so the GPU pipeline is never drained.
     errors = torch.zeros(num_eval_steps, dtype=torch.float64, device=train_device)
     counts = torch.zeros(num_eval_steps, dtype=torch.float64, device=train_device)
     sigma_sums = torch.zeros(num_eval_steps, dtype=torch.float64, device=train_device)
@@ -194,9 +192,9 @@ def _compute_schedule(
     try:
         with torch.inference_mode(), torch.autocast(device_type=train_device.type, dtype=torch.bfloat16):
             for batch in batches:
-                # x0 only depends on the batch, not on the timestep: compute it once
-                # per batch instead of num_eval_steps times.
-                x0 = model.scale_latents(batch['latent_image'])
+                # Move only the current batch to the GPU
+                gpu_batch = _to_device(batch, train_device)
+                x0 = model.scale_latents(gpu_batch['latent_image'])
                 batch_size = x0.shape[0]
 
                 for chunk_start in range(0, num_eval_steps, timestep_chunk_size):
@@ -222,8 +220,10 @@ def _compute_schedule(
                     model_setup._get_timestep_discrete = fixed_get_timestep
                     model_setup._add_noise_discrete = capturing_add_noise
 
+                    tiled_batch = _tile_batch(gpu_batch, k)
                     model_output_data = model_setup.predict(
-                        model, _tile_batch(batch, k), config, model.train_progress, deterministic=True)
+                        model, tiled_batch, config, model.train_progress, deterministic=True)
+                    del tiled_batch
 
                     x0_hat = captured['noisy'] \
                         - captured['sigma'].reshape(-1, 1, 1, 1) * model_output_data['predicted']
@@ -234,8 +234,14 @@ def _compute_schedule(
                     counts.index_add_(0, t_index, torch.ones_like(per_sample_error))
                     sigma_sums.index_add_(0, t_index, captured['sigma'].double())
                     progress.update(1)
+
                     del model_output_data
+
+                # Release the GPU memory for this batch before loading the next
+                del gpu_batch, x0
+                captured.clear()
     finally:
+        captured.clear()
         model_setup._get_timestep_discrete = original_get_timestep
         model_setup._add_noise_discrete = original_add_noise
         # The pinned-timestep stub skipped the real sampler; clear any cached sampling
