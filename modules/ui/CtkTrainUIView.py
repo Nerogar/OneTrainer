@@ -371,6 +371,12 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
         if self.lora_tab:
             self.lora_tab.refresh_ui()
 
+        # embedding tab is built once; rebuild it so model-specific controls
+        # (e.g. hiding the output embedding toggle for Moss) reflect the new model type
+        if self.tabview and "embedding" in self.tabview._tab_dict:
+            self.tabview.delete("embedding")
+            self.embedding_tab(self.tabview.add("embedding"))
+
         self._update_additional_embeddings_tab(model_type)
 
     def _update_additional_embeddings_tab(self, model_type: ModelType):
