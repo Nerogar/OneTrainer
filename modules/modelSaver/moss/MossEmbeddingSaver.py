@@ -24,8 +24,8 @@ class MossEmbeddingSaver(
     ):
         state_dict = copy(embedding_state_dict) if embedding_state_dict is not None else {}
 
-        if embedding is not None and embedding.adjoint_token is not None:
-            state_dict["moss"] = embedding.adjoint_token.to(device="cpu", dtype=dtype)
+        if embedding is not None and embedding.append_token is not None:
+            state_dict["moss"] = embedding.append_token.to(device="cpu", dtype=dtype)
 
         return state_dict
 

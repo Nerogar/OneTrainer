@@ -9,7 +9,7 @@ from torch import Tensor
 from diffusers import AutoencoderKLFlux2, DiffusionPipeline
 from transformers import Qwen2Tokenizer, Qwen3_5Model
 
-from modules.model.BaseModel import BaseModel
+from modules.model.BaseModel import BaseModel, BaseModelEmbedding
 from modules.model.moss.pipeline_moss_image import (
     MOSSImagePipeline,
     MOSSImageScheduler,
@@ -32,17 +32,19 @@ def format_moss_prompt(tokenizer: Qwen2Tokenizer, prompt: str) -> str:
     )
 
 
-class MossModelEmbedding:
+class MossModelEmbedding(BaseModelEmbedding):
     def __init__(
             self,
             uuid: str,
             placeholder: str,
             token_count: int,
     ):
-        self.uuid = uuid
-        self.placeholder = placeholder
+        # appended embedding: the learned vector is appended to the text encoder
+        # output (not written into token positions like an output embedding), so it is
+        # not an output embedding.
+        super().__init__(uuid, placeholder, vector=None, is_output_embedding=False)
         self.token_count = token_count
-        self.adjoint_token: Tensor | None = None
+        self.append_token: Tensor | None = None
 
 
 class MossModel(BaseModel):
@@ -62,7 +64,7 @@ class MossModel(BaseModel):
 
     embedding: MossModelEmbedding | None
     additional_embeddings: list[MossModelEmbedding] | None
-    adjoint_tokens: dict[str, Tensor] | None
+    append_tokens: dict[str, Tensor] | None
 
     def __init__(
             self,
@@ -85,7 +87,7 @@ class MossModel(BaseModel):
 
         self.embedding = None
         self.additional_embeddings = []
-        self.adjoint_tokens = {}
+        self.append_tokens = {}
 
     def fusion_groups(self) -> list | None:
         # MOSS fuses the DiT block q/k/v into one qkv Linear per layer; everything else in the
@@ -123,7 +125,8 @@ class MossModel(BaseModel):
             tokens_mask: Tensor = None,
             text_encoder_dropout_probability: float | None = None,
             text_encoder_output: Tensor = None,
-            apply_adjoint_tokens: bool = True,
+            apply_append_tokens: bool = True,
+            caption_texts: list[str] | None = None,
     ) -> tuple[Tensor, Tensor]:
         if tokens is None and text is not None:
             if isinstance(text, str):
@@ -161,24 +164,33 @@ class MossModel(BaseModel):
             raise NotImplementedError
 
         # real tokens are a contiguous prefix (padding sits at the end), so gather the
-        # unmasked tokens per sample, append adjoint tokens, then re-pad the batch
+        # unmasked tokens per sample, append append tokens, then re-pad the batch
         seq_lengths = tokens_mask.sum(dim=1)
         pruned_hidden_states = [text_encoder_output[i][tokens_mask[i].bool()] for i in range(text_encoder_output.shape[0])]
 
-        if apply_adjoint_tokens and self.adjoint_tokens:
-            active_adjoint_tokens = [
-                self.adjoint_tokens[emb.uuid]
-                for emb in self.all_embeddings()
-                if emb.uuid in self.adjoint_tokens
+        if apply_append_tokens and self.append_tokens:
+            active_embeddings = [
+                emb for emb in self.all_embeddings()
+                if emb.uuid in self.append_tokens
             ]
-            if active_adjoint_tokens:
-                adjoint_concat = torch.cat(active_adjoint_tokens, dim=0).to(
-                    device=train_device, dtype=text_encoder_output.dtype
-                )
-                pruned_hidden_states = [
-                    torch.cat([h, adjoint_concat], dim=0) for h in pruned_hidden_states
-                ]
-                seq_lengths = seq_lengths + adjoint_concat.shape[0]
+            if active_embeddings:
+                # per-sample trigger gating lives on the embedding module itself
+                # (BaseModelEmbedding.append_embed_token): an embedding's append
+                # tokens are appended only when that sample's caption contains its
+                # trigger word (placeholder). caption_texts=None appends everywhere.
+                captions = caption_texts if caption_texts is not None else [None] * len(pruned_hidden_states)
+                new_states = []
+                new_lengths = []
+                for i, h in enumerate(pruned_hidden_states):
+                    caption = captions[i] if i < len(captions) else None
+                    for emb in active_embeddings:
+                        append = emb.append_embed_token(caption, train_device, text_encoder_output.dtype)
+                        if append is not None:
+                            h = torch.cat([h, append], dim=0)
+                    new_states.append(h)
+                    new_lengths.append(h.shape[0])
+                pruned_hidden_states = new_states
+                seq_lengths = torch.tensor(new_lengths, device=train_device, dtype=seq_lengths.dtype)
 
         text_encoder_output = torch.nn.utils.rnn.pad_sequence(pruned_hidden_states, batch_first=True)
         max_seq_length = text_encoder_output.shape[1]
@@ -220,10 +232,6 @@ class MossModel(BaseModel):
     def all_embeddings(self) -> list[MossModelEmbedding]:
         return self.additional_embeddings \
                + ([self.embedding] if self.embedding is not None else [])
-
-    def _apply_adjoint_tokens(self, text_encoder_output: Tensor) -> Tensor:
-        # Adjoint tokens are concatenated directly in encode_text to preserve real token lengths
-        return text_encoder_output
 
     def calculate_timestep_shift(self, latent_width: int, latent_height: int):
         base_seq_len = self.noise_scheduler.config.base_image_seq_len

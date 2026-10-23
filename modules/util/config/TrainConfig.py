@@ -1003,9 +1003,6 @@ class TrainConfig(BaseConfig):
             or any((embedding.train and not embedding.is_output_embedding) for embedding in self.additional_embeddings)
 
     def train_any_output_embedding(self) -> bool:
-        if self.model_type.is_moss():
-            return (self.training_method == TrainingMethod.EMBEDDING) \
-                or any(embedding.train for embedding in self.additional_embeddings)
         return ((self.training_method == TrainingMethod.EMBEDDING) and self.embedding.is_output_embedding) \
             or any((embedding.train and embedding.is_output_embedding) for embedding in self.additional_embeddings)
 

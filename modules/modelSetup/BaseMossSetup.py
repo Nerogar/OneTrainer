@@ -71,6 +71,7 @@ class BaseMossSetup(
                 tokens_mask=batch.get("tokens_mask"),
                 text_encoder_output=batch.get('text_encoder_hidden_state'),
                 text_encoder_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
+                caption_texts=batch.get('prompt'),
             )
 
             latent_image = batch['latent_image']
@@ -159,7 +160,7 @@ class BaseMossSetup(
             token_count = embedding_config.token_count or 1
 
             if embedding_state is None:
-                adjoint_token = torch.randn(
+                append_token = torch.randn(
                     token_count, hidden_dim,
                     dtype=train_dtype,
                     device=self.train_device,
@@ -169,12 +170,12 @@ class BaseMossSetup(
                 embedding_state = embedding_state.get("moss", None)
 
                 if embedding_state is not None:
-                    adjoint_token = embedding_state.to(
+                    append_token = embedding_state.to(
                         dtype=train_dtype,
                         device=self.train_device,
                     ).detach().requires_grad_(True)
                 else:
-                    adjoint_token = torch.randn(
+                    append_token = torch.randn(
                         token_count, hidden_dim,
                         dtype=train_dtype,
                         device=self.train_device,
@@ -186,8 +187,9 @@ class BaseMossSetup(
                 embedding_config.placeholder,
                 token_count,
             )
-            embedding.adjoint_token = adjoint_token
-            model.adjoint_tokens[embedding_config.uuid] = adjoint_token
+            embedding.append_token = append_token
+            embedding.vector = append_token  # alias so BaseModelEmbedding.append_embed_token can gate on the trigger word
+            model.append_tokens[embedding_config.uuid] = append_token
 
             if embedding_config.uuid == config.embedding.uuid:
                 model.embedding = embedding
@@ -207,7 +209,7 @@ class BaseMossSetup(
                 embedding_config.train \
                 and config.text_encoder.train_embedding \
                 and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
-            model.adjoint_tokens[embedding.uuid].requires_grad_(train_embedding)
+            model.append_tokens[embedding.uuid].requires_grad_(train_embedding)
 
     def prepare_text_caching(self, model: MossModel, config: TrainConfig):
         if not config.train_text_encoder_or_embedding():

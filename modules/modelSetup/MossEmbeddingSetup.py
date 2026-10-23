@@ -35,7 +35,7 @@ class MossEmbeddingSetup(
                 embedding_config.train \
                 and config.text_encoder.train_embedding \
                 and not self.stop_embedding_training_elapsed(embedding_config, model.train_progress)
-            model.adjoint_tokens[embedding.uuid].requires_grad_(train_embedding)
+            model.append_tokens[embedding.uuid].requires_grad_(train_embedding)
 
     def create_parameters(
             self,
@@ -44,12 +44,15 @@ class MossEmbeddingSetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.train_text_encoder_or_embedding() or config.train_any_output_embedding():
-            for embedding in model.all_embeddings():
+        if config.text_encoder.train_embedding:
+            for embedding, embedding_config in zip(model.all_embeddings(),
+                                                    config.all_embedding_configs(), strict=True):
+                if not embedding_config.train:
+                    continue
                 parameter_group_collection.add_group(NamedParameterGroup(
                     unique_name=f"embeddings/{embedding.uuid}",
                     display_name=f"embeddings/{embedding.placeholder}",
-                    parameters=[model.adjoint_tokens[embedding.uuid]],
+                    parameters=[model.append_tokens[embedding.uuid]],
                     learning_rate=config.embedding_learning_rate,
                 ))
 
@@ -107,16 +110,16 @@ class MossEmbeddingSetup(
             train_progress: TrainProgress
     ):
         if config.preserve_embedding_norm:
-            self._normalize_adjoint_tokens(model)
+            self._normalize_append_tokens(model)
         self.__setup_requires_grad(model, config)
 
-    def _normalize_adjoint_tokens(self, model: MossModel):
+    def _normalize_append_tokens(self, model: MossModel):
         with torch.no_grad():
             target_std = self._get_conditioner_output_std(model)
             if target_std <= 0:
                 return
             for embedding in model.all_embeddings():
-                token_tensor = model.adjoint_tokens.get(embedding.uuid)
+                token_tensor = model.append_tokens.get(embedding.uuid)
                 if token_tensor is not None and token_tensor.requires_grad:
                     std = token_tensor.std(dim=1).mean()
                     if std > 0:
@@ -132,7 +135,7 @@ class MossEmbeddingSetup(
                         dummy_output, _ = model.encode_text(
                             text="*",
                             train_device=self.train_device,
-                            apply_adjoint_tokens=False,
+                            apply_append_tokens=False,
                         )
                         self._conditioner_output_std = dummy_output.std(dim=(1, 2)).mean().item()
                 else:

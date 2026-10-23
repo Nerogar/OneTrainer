@@ -35,7 +35,7 @@ class MossFineTuneSetup(
                 parameter_group_collection.add_group(NamedParameterGroup(
                     unique_name=f"embeddings/{embedding.uuid}",
                     display_name=f"embeddings/{embedding.placeholder}",
-                    parameters=[model.adjoint_tokens[embedding.uuid]],
+                    parameters=[model.append_tokens[embedding.uuid]],
                     learning_rate=config.embedding_learning_rate,
                 ))
 

@@ -90,6 +90,13 @@ class BaseModelEmbedding:
         else:
             self.vector.requires_grad_(requires_grad)
 
+    def append_embed_token(self, caption: str | None, device, dtype) -> torch.Tensor | None:
+        if self.vector is None:
+            return None
+        if caption is not None and self.placeholder not in caption:
+            return None
+        return self.vector.to(device=device, dtype=dtype)
+
 
 class BaseModel(metaclass=ABCMeta):
     model_type: ModelType
