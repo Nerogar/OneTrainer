@@ -380,6 +380,7 @@ class TrainConfig(BaseConfig):
     tensorboard_always_on: bool
     tensorboard_port: str
     validation: bool
+    validation_timesteps: str
     validate_after: float
     validate_after_unit: TimeUnit
     continue_last_backup: bool
@@ -950,6 +951,9 @@ class TrainConfig(BaseConfig):
         else:
             return self.additional_embeddings
 
+    def parse_validation_timesteps(self) -> list[int]:
+        return [int(x) for x in self.validation_timesteps.split(',') if x.strip()]
+
     def get_last_backup_path(self) -> str | None:
         backups_path = os.path.join(self.workspace_dir, "backup")
         if os.path.exists(backups_path):
@@ -1024,6 +1028,7 @@ class TrainConfig(BaseConfig):
         data.append(("tensorboard_always_on", False, bool, False))
         data.append(("tensorboard_port", 6006, int, False))
         data.append(("validation", False, bool, False))
+        data.append(("validation_timesteps", "500", str, False))
         data.append(("validate_after", 1, int, False))
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
         data.append(("continue_last_backup", False, bool, False))

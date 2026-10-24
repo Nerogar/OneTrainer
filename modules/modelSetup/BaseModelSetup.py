@@ -2,6 +2,7 @@ from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 
 from modules.model.BaseModel import BaseModel
+from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig, TrainModelPartConfig
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
@@ -90,6 +91,37 @@ class BaseModelSetup(
             config: TrainConfig,
     ) -> Tensor:
         pass
+
+    @torch.no_grad()
+    def calculate_validation_losses(
+            self,
+            model: BaseModel,
+            batch: dict,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+    ) -> dict[str, float]:
+        # returns the validation losses of a batch, keyed by a label suffix
+        if not isinstance(self, ModelSetupNoiseMixin):
+            return {"": self.__calculate_validation_loss(model, batch, config, train_progress)}
+
+        timesteps = config.parse_validation_timesteps()
+        losses = {}
+        for timestep in timesteps:
+            # timesteps are configured as 0-based indices into 1000 discrete timesteps
+            with self.deterministic_timestep((timestep + 1) / 1000):
+                loss = self.__calculate_validation_loss(model, batch, config, train_progress)
+            losses[f"-{timestep}" if len(timesteps) > 1 else ""] = loss
+        return losses
+
+    def __calculate_validation_loss(
+            self,
+            model: BaseModel,
+            batch: dict,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+    ) -> float:
+        model_output_data = self.predict(model, batch, config, train_progress, deterministic=True)
+        return self.calculate_loss(model, batch, model_output_data, config).item()
 
     @abstractmethod
     def after_optimizer_step(

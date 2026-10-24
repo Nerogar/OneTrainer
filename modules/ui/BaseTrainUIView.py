@@ -184,6 +184,10 @@ class BaseTrainUIView(ABC):
                          tooltip="The interval used when validate training")
         self.components.time_entry(frame, 8, 3, ui_state, "validate_after", "validate_after_unit")
 
+        self.components.label(frame, 9, 0, "Validation Timesteps",
+                         tooltip="Comma-separated list of timesteps that are used for validation, between 0 and 999. High values determine the image composition, low values the details. If multiple timesteps are given, a separate graph is shown for each.")
+        self.components.entry(frame, 9, 1, ui_state, "validation_timesteps")
+
         # device
         self.components.label(frame, 10, 0, "Dataloader Threads",
                          tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
