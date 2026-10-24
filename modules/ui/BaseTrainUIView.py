@@ -272,6 +272,10 @@ class BaseTrainUIView(ABC):
                          tooltip="Whether to include sample images in the Tensorboard output.")
         self.components.switch(sub_frame, 0, 3, ui_state, "samples_to_tensorboard")
 
+        self.components.label(sub_frame, 0, 4, "Cache Sample Text Encodings",
+                         tooltip="Precomputes and caches the text encodings of all enabled samples once, so sampling during training never has to load the text encoder again.")
+        self.components.switch(sub_frame, 0, 5, ui_state, "sample_cache_text_encodings")
+
     def build_backup_tab_content(self, frame, controller, ui_state):
         # backup after
         self.components.label(frame, 0, 0, "Backup After",

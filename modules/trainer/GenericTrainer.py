@@ -157,6 +157,7 @@ class GenericTrainer(BaseTrainer):
         self.model_sampler = self.create_model_sampler(self.model)
         self.previous_sample_time = -1
         self.sample_queue = []
+        self.sample_text_encodings_prepared = False
 
         self.parameters = self.model.parameters.parameters()
 
@@ -315,6 +316,16 @@ class GenericTrainer(BaseTrainer):
             #non-EMA sampling is done on all GPUs
             assert multi.is_master() and self.config.ema != EMAMode.OFF
             self.model.ema.copy_ema_to(self.parameters, store_temp=True)
+
+        # Precompute the text encodings of all enabled samples once, so sampling never has to load the
+        # text encoder again. Each process prepares its own cache.
+        if self.config.sample_cache_text_encodings and not self.sample_text_encodings_prepared:
+            for sample_config in sample_params_list:
+                if sample_config.enabled:
+                    prepared_config = copy.copy(sample_config)
+                    prepared_config.from_train_config(self.config)
+                    self.model_sampler.prepare_text_encoding(prepared_config)
+            self.sample_text_encodings_prepared = True
 
         self.__sample_loop(
             train_progress=train_progress,
