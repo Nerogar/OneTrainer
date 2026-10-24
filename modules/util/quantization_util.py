@@ -9,6 +9,7 @@ from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearM
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.config.TrainConfig import QuantizationConfig, TrainConfig
 from modules.util.enum.DataType import DataType
+from modules.util.hadamard_util import block_hadamard
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.tqdm_util import tqdm
 
@@ -53,6 +54,22 @@ def quantize_int8_tensorwise_chunked(x: Tensor) -> tuple[Tensor, Tensor]:
     rows = max(1, _QUANTIZE_CHUNK_ELEMENTS // x[0].numel())
     for i in range(0, x.shape[0], rows):
         q[i:i + rows] = quantize_int8(x[i:i + rows], scale)
+    return q, scale
+
+
+def quantize_int8_hadamard_chunked(x: Tensor, block_size: int) -> tuple[Tensor, Tensor]:
+    # Two passes retain a single tensorwise scale without a full fp32 rotated weight.
+    rows = max(1, _QUANTIZE_CHUNK_ELEMENTS // x.shape[-1])
+    abs_max = torch.zeros((), device=x.device, dtype=torch.float32)
+    for i in range(0, x.shape[0], rows):
+        rotated = block_hadamard(x[i:i + rows].float(), block_size)
+        min_val, max_val = torch.aminmax(rotated)
+        abs_max = torch.maximum(abs_max, torch.maximum(max_val, -min_val))
+    scale = (abs_max / 127.0).clamp(min=1e-30)
+    q = torch.empty_like(x, dtype=torch.int8)
+    for i in range(0, x.shape[0], rows):
+        rotated = block_hadamard(x[i:i + rows].float(), block_size)
+        q[i:i + rows] = quantize_int8(rotated, scale)
     return q, scale
 
 def quantize_int8_axiswise_get_scale(x: Tensor, dim: int) -> Tensor:
@@ -154,7 +171,8 @@ def __replace_linear_layers(
     if isinstance(parent_module, nn.ModuleList | nn.Sequential | nn.ModuleDict):
         for key, module in (parent_module.items() if isinstance(parent_module, nn.ModuleDict) else enumerate(parent_module)):
             if isinstance(module, convert_type):
-                matches = filters is None or len(filters) == 0 or any(f.matches(name_prefix) for f in filters)
+                key_name = str(key) if name_prefix == "" else f"{name_prefix}.{key}"
+                matches = filters is None or len(filters) == 0 or any(f.matches(key_name) for f in filters)
                 fn = construct_fn if matches else fallback_construct_fn
                 if fn is None:
                     continue
@@ -206,7 +224,7 @@ def __replace_linear_layers(
                     visited_modules=visited_modules,
                 )
 
-def __quantized_linear_class_and_kwargs(dtype: DataType):
+def __quantized_linear_class_and_kwargs(dtype: DataType, quantization: QuantizationConfig | None = None):
     # only the W8A8 dtypes have a compressed variant, so this covers every layer that can be built compressed
     if dtype.is_compressed() and not nvcomp_util.available():
         raise RuntimeError("a compressed weight data type is selected but nvCOMP is not available")
@@ -231,7 +249,13 @@ def __quantized_linear_class_and_kwargs(dtype: DataType):
     elif dtype.quantize_fp8():
         return LinearFp8, {}
     elif dtype.quantize_intW8A8():
-        return LinearW8A8, {'dtype': torch.int8, 'compress': dtype.is_compressed()}
+        convrot_bf16 = False
+        if dtype.quantize_intW8A8_convrot() and quantization is not None:
+            if quantization.convrot_compute_dtype not in (DataType.NONE, DataType.BFLOAT_16):
+                raise ValueError("CONVROT compute dtype must be NONE (default) or BFLOAT_16")
+            convrot_bf16 = quantization.convrot_compute_dtype == DataType.BFLOAT_16
+        return LinearW8A8, {'dtype': torch.int8, 'compress': dtype.is_compressed(),
+                            'convrot': dtype.quantize_intW8A8_convrot(), 'convrot_bf16': convrot_bf16}
     elif dtype.quantize_fpW8A8():
         return LinearW8A8, {'dtype': torch.float8_e4m3fn, 'compress': dtype.is_compressed()}
     elif dtype == DataType.GGUF_A8_INT:
@@ -259,7 +283,7 @@ def replace_linear_with_quantized_layers(
     if keep_in_fp32_modules is None:
         keep_in_fp32_modules = []
 
-    linear_class, kwargs = __quantized_linear_class_and_kwargs(dtype)
+    linear_class, kwargs = __quantized_linear_class_and_kwargs(dtype, quantization)
     if linear_class is None:
         return
 
@@ -283,7 +307,7 @@ def replace_linear_with_quantized_layers(
         ]
 
         if not dtype.is_gguf() and quantization.fallback_dtype.is_quantized():
-            fallback_linear_class, fallback_kwargs = __quantized_linear_class_and_kwargs(quantization.fallback_dtype)
+            fallback_linear_class, fallback_kwargs = __quantized_linear_class_and_kwargs(quantization.fallback_dtype, quantization)
             if fallback_linear_class is not None:
                 fallback_construct_fn = partial(fallback_linear_class, **fallback_kwargs)
     else:
