@@ -1,6 +1,10 @@
 from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
@@ -8,21 +12,17 @@ from modules.util.TrainProgress import TrainProgress
 import torch
 
 
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_21, TrainingMethod.FINE_TUNE_VAE)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.FINE_TUNE_VAE)
 class StableDiffusionFineTuneVaeSetup(
     BaseStableDiffusionSetup,
 ):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
-    ):
-        super().__init__(
-            train_device=train_device,
-            temp_device=temp_device,
-            debug_mode=debug_mode,
-        )
-
     def create_parameters(
             self,
             model: StableDiffusionModel,
@@ -43,21 +43,19 @@ class StableDiffusionFineTuneVaeSetup(
             model: StableDiffusionModel,
             config: TrainConfig,
     ):
+        params = self.create_parameters(model, config)
         model.text_encoder.requires_grad_(False)
         model.vae.requires_grad_(False)
         model.vae.decoder.requires_grad_(True)
         model.unet.requires_grad_(False)
-
-        init_model_parameters(model, self.create_parameters(model, config), self.train_device)
+        init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
             self,
             model: StableDiffusionModel,
             config: TrainConfig,
     ):
-        model.text_encoder.to(self.temp_device)
-        model.vae.to(self.train_device)
-        model.unet.to(self.temp_device)
+        model.materialize_only("vae")
         if model.depth_estimator is not None:
             model.depth_estimator.to(self.temp_device)
 

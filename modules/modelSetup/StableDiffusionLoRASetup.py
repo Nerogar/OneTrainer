@@ -1,36 +1,28 @@
 from modules.model.StableDiffusionModel import StableDiffusionModel
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseStableDiffusionSetup import BaseStableDiffusionSetup
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
 from modules.util.TrainProgress import TrainProgress
 
-import torch
 
-PRESETS = {
-    "attn-mlp": ["attentions"],
-    "attn-only": ["attn"],
-    "full": [],
-}
-
-
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_15_INPAINTING, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_BASE, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_INPAINTING, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_20_DEPTH, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_21, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_21_BASE, TrainingMethod.LORA)
 class StableDiffusionLoRASetup(
     BaseStableDiffusionSetup,
 ):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
-    ):
-        super().__init__(
-            train_device=train_device,
-            temp_device=temp_device,
-            debug_mode=debug_mode,
-        )
-
     def create_parameters(
             self,
             model: StableDiffusionModel,
@@ -38,12 +30,7 @@ class StableDiffusionLoRASetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.text_encoder.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="text_encoder_lora",
-                parameters=model.text_encoder_lora.parameters(),
-                learning_rate=config.text_encoder.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder_lora", model.text_encoder_lora, config.text_encoder)
 
         if config.train_any_embedding() or config.train_any_output_embedding():
             self._add_embedding_param_groups(
@@ -51,12 +38,7 @@ class StableDiffusionLoRASetup(
                 "embeddings"
             )
 
-        if config.unet.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="unet_lora",
-                parameters=model.unet_lora.parameters(),
-                learning_rate=config.unet.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "unet_lora", model.unet_lora, config.unet)
 
         return parameter_group_collection
 
@@ -70,15 +52,8 @@ class StableDiffusionLoRASetup(
         model.unet.requires_grad_(False)
         model.vae.requires_grad_(False)
 
-        if model.text_encoder_lora is not None:
-            train_text_encoder = config.text_encoder.train and \
-                                 not self.stop_text_encoder_training_elapsed(config, model.train_progress)
-            model.text_encoder_lora.requires_grad_(train_text_encoder)
-
-        if model.unet_lora is not None:
-            train_unet = config.unet.train and \
-                         not self.stop_unet_training_elapsed(config, model.train_progress)
-            model.unet_lora.requires_grad_(train_unet)
+        self._setup_model_part_requires_grad("text_encoder_lora", model.text_encoder_lora, config.text_encoder, model.train_progress)
+        self._setup_model_part_requires_grad("unet_lora", model.unet_lora, config.unet, model.train_progress)
 
     def setup_model(
             self,
@@ -88,13 +63,13 @@ class StableDiffusionLoRASetup(
         if config.train_any_embedding():
             model.text_encoder.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te")
+        create_te = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
         model.text_encoder_lora = LoRAModuleWrapper(
-            model.text_encoder, "lora_te", config
+            model.text_encoder, "text_encoder", config
         ) if create_te else None
 
         model.unet_lora = LoRAModuleWrapper(
-            model.unet, "lora_unet", config, config.lora_layers.split(",")
+            model.unet, "unet", config, config.layer_filter.split(",")
         )
 
         if model.lora_state_dict:
@@ -118,12 +93,12 @@ class StableDiffusionLoRASetup(
             model.rescale_noise_scheduler_to_zero_terminal_snr()
             model.force_v_prediction()
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
-        self.__setup_requires_grad(model, config)
 
-        init_model_parameters(model, self.create_parameters(model, config), self.train_device)
+        params = self.create_parameters(model, config)
+        self.__setup_requires_grad(model, config)
+        init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
             self,
@@ -136,10 +111,14 @@ class StableDiffusionLoRASetup(
             or config.train_any_embedding() \
             or not config.latent_caching
 
-        model.text_encoder_to(self.train_device if text_encoder_on_train_device else self.temp_device)
-        model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
-        model.unet_to(self.train_device)
-        model.depth_estimator_to(self.temp_device)
+        parts = ["unet"]
+        if text_encoder_on_train_device:
+            parts.append("text_encoder")
+        if vae_on_train_device:
+            parts.append("vae")
+        model.materialize_only(*parts)
+        if model.depth_estimator is not None:
+            model.depth_estimator.to(self.temp_device)
 
         if config.text_encoder.train:
             model.text_encoder.train()

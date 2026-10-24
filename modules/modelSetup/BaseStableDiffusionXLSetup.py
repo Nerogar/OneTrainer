@@ -1,6 +1,7 @@
 from abc import ABCMeta
 from random import Random
 
+import modules.util.multi_gpu_util as multi
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel, StableDiffusionXLModelEmbedding
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
@@ -8,6 +9,7 @@ from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiff
 from modules.modelSetup.mixin.ModelSetupDiffusionMixin import ModelSetupDiffusionMixin
 from modules.modelSetup.mixin.ModelSetupEmbeddingMixin import ModelSetupEmbeddingMixin
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
+from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.util.checkpointing_util import (
     enable_checkpointing_for_basic_transformer_blocks,
@@ -15,8 +17,7 @@ from modules.util.checkpointing_util import (
 )
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.conv_util import apply_circular_padding_to_conv2d
-from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
-from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.dtype_util import disable_fp16_autocast_context
 from modules.util.quantization_util import quantize_layers
 from modules.util.TrainProgress import TrainProgress
 
@@ -31,19 +32,27 @@ class BaseStableDiffusionXLSetup(
     ModelSetupNoiseMixin,
     ModelSetupDiffusionMixin,
     ModelSetupEmbeddingMixin,
+    ModelSetupText2ImageMixin,
     metaclass=ABCMeta
 ):
+    LAYER_PRESETS = {
+        "attn-mlp": ["attentions"],
+        "attn-only": ["attn"],
+        "full": [],
+    }
 
     def setup_optimizations(
             self,
             model: StableDiffusionXLModel,
             config: TrainConfig,
     ):
-        if config.gradient_checkpointing.enabled():
+        super().setup_optimizations(model, config)
+
+        if config.unet.checkpointing_enabled():
             model.unet.enable_gradient_checkpointing()
-            enable_checkpointing_for_basic_transformer_blocks(model.unet, config, offload_enabled=False)
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config)
-            enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config)
+            enable_checkpointing_for_basic_transformer_blocks(model.unet, config, config.unet, supports_offloading=False)
+        enable_checkpointing_for_clip_encoder_layers(model.text_encoder_1, config, config.text_encoder)
+        enable_checkpointing_for_clip_encoder_layers(model.text_encoder_2, config, config.text_encoder_2)
 
         if config.force_circular_padding:
             apply_circular_padding_to_conv2d(model.vae)
@@ -51,29 +60,18 @@ class BaseStableDiffusionXLSetup(
             if model.unet_lora is not None:
                 apply_circular_padding_to_conv2d(model.unet_lora)
 
-        model.autocast_context, model.train_dtype = create_autocast_context(self.train_device, config.train_dtype, [
-            config.weight_dtypes().unet,
-            config.weight_dtypes().text_encoder,
-            config.weight_dtypes().text_encoder_2,
-            config.weight_dtypes().vae,
-            config.weight_dtypes().lora if config.training_method == TrainingMethod.LORA else None,
-            config.weight_dtypes().embedding if config.train_any_embedding() else None,
-        ], config.enable_autocast_cache)
-
         model.vae_autocast_context, model.vae_train_dtype = disable_fp16_autocast_context(
             self.train_device,
             config.train_dtype,
             config.fallback_train_dtype,
-            [
-                config.weight_dtypes().vae,
-            ],
             config.enable_autocast_cache,
         )
 
-        quantize_layers(model.text_encoder_1, self.train_device, model.train_dtype)
-        quantize_layers(model.text_encoder_2, self.train_device, model.train_dtype)
-        quantize_layers(model.vae, self.train_device, model.vae_train_dtype)
-        quantize_layers(model.unet, self.train_device, model.train_dtype)
+        quantize_layers(model.text_encoder_1, self.train_device, model.train_dtype, config)
+        quantize_layers(model.text_encoder_2, self.train_device, model.train_dtype, config)
+        quantize_layers(model.vae, self.train_device, model.vae_train_dtype, config)
+        quantize_layers(model.unet, self.train_device, model.train_dtype, config)
+        self._set_attention_backend(model.unet, config.attention_mechanism, mask=False)
 
     def _setup_embeddings(
             self,
@@ -186,7 +184,7 @@ class BaseStableDiffusionXLSetup(
             deterministic: bool = False,
     ) -> dict:
         with model.autocast_context:
-            batch_seed = 0 if deterministic else train_progress.global_step
+            batch_seed = 0 if deterministic else train_progress.global_step * multi.world_size() + multi.rank()
             generator = torch.Generator(device=config.train_device)
             generator.manual_seed(batch_seed)
             rand = Random(batch_seed)
@@ -207,8 +205,8 @@ class BaseStableDiffusionXLSetup(
                     'text_encoder_2_hidden_state'] if not config.train_text_encoder_2_or_embedding() else None,
                 pooled_text_encoder_2_output=batch[
                     'text_encoder_2_pooled_state'] if not config.train_text_encoder_2_or_embedding() else None,
-                text_encoder_1_dropout_probability=config.text_encoder.dropout_probability,
-                text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability,
+                text_encoder_1_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
+                text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability if not deterministic else None,
             ))
 
             latent_image = batch['latent_image']
@@ -218,14 +216,20 @@ class BaseStableDiffusionXLSetup(
             if config.model_type.has_conditioning_image_input():
                 scaled_latent_conditioning_image = batch['latent_conditioning_image'] * vae_scaling_factor
 
-            latent_noise = self._create_noise(scaled_latent_image, config, generator)
-
             timestep = self._get_timestep_discrete(
                 model.noise_scheduler.config['num_train_timesteps'],
                 deterministic,
                 generator,
                 scaled_latent_image.shape[0],
                 config,
+            )
+
+            latent_noise = self._create_noise(
+                scaled_latent_image,
+                config,
+                generator,
+                timestep,
+                model.noise_scheduler.betas,
             )
 
             scaled_noisy_latent_image = self._add_noise_discrete(
@@ -369,5 +373,15 @@ class BaseStableDiffusionXLSetup(
             data=data,
             config=config,
             train_device=self.train_device,
-            betas=model.noise_scheduler.betas.to(device=self.train_device),
+            betas=model.noise_scheduler.betas,
         ).mean()
+
+    def prepare_text_caching(self, model: StableDiffusionXLModel, config: TrainConfig):
+        parts = []
+        if not config.train_text_encoder_or_embedding():
+            parts.append("text_encoder")
+        if not config.train_text_encoder_2_or_embedding():
+            parts.append("text_encoder_2")
+        model.materialize_only(*parts)
+
+        model.eval()

@@ -11,8 +11,8 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.VideoFormat import VideoFormat
 
 import torch
-from torchvision.io import write_video
 
+import av
 from PIL import Image
 
 
@@ -81,16 +81,51 @@ class BaseModelSampler(metaclass=ABCMeta):
     def save_sampler_output(
             sampler_output: ModelSamplerOutput,
             destination: str,
-            image_format: ImageFormat,
-            video_format: VideoFormat,
-            audio_format: AudioFormat,
+            image_format: ImageFormat | None,
+            video_format: VideoFormat | None,
+            audio_format: AudioFormat | None,
+            fps: int = 24,
     ):
         os.makedirs(Path(destination).parent.absolute(), exist_ok=True)
 
         if sampler_output.file_type == FileType.IMAGE:
+            if image_format is None:
+                raise ValueError("Image format required for sampling an image")
             image = sampler_output.data
             image.save(destination + image_format.extension(), format=image_format.pil_format())
         elif sampler_output.file_type == FileType.VIDEO:
-            write_video(destination + video_format.extension(), options={"crf": "17"}, video_array=sampler_output.data, fps=24)
+            if video_format is None:
+                raise ValueError("Video format required for sampling a video")
+
+            if isinstance(sampler_output.data, torch.Tensor):
+                video_tensor = sampler_output.data.detach().cpu()
+
+                if len(video_tensor.shape) == 4:
+                    shape = video_tensor.shape
+                    # (T, H, W, C) if last dim is channels, otherwise assume (C, T, H, W)
+                    frames = video_tensor.numpy() if shape[-1] == 3 else video_tensor.permute(1, 2, 3, 0).numpy()
+
+                    frames = (
+                        (frames * 255).astype('uint8')
+                        if frames.max() <= 1.0
+                        else frames.astype('uint8')
+                    )
+
+                    with av.open(destination + video_format.extension(), 'w') as container:
+                        stream = container.add_stream('libx264', rate=fps)
+                        stream.options = {'crf': '17'}
+                        stream.width = frames.shape[2]
+                        stream.height = frames.shape[1]
+                        stream.pix_fmt = 'yuv420p'  # Required pixel format for H.264
+
+                        for frame_data in frames:
+                            frame = av.VideoFrame.from_ndarray(frame_data, format='rgb24')
+                            for packet in stream.encode(frame):
+                                container.mux(packet)
+
+                        for packet in stream.encode():
+                            container.mux(packet)
+                else:
+                    raise ValueError(f"Expected 4D video tensor (T, H, W, C) or (C, T, H, W), got shape {video_tensor.shape}")
         elif sampler_output.file_type == FileType.AUDIO:
             pass # TODO

@@ -1,3 +1,4 @@
+import copy
 import os
 import traceback
 
@@ -5,6 +6,7 @@ from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.modelLoader.mixin.SDConfigModelLoaderMixin import SDConfigModelLoaderMixin
 from modules.util import create
+from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.ModelNames import ModelNames
@@ -55,9 +57,10 @@ class StableDiffusionModelLoader(
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             vae_model_name: str,
+            quantization: QuantizationConfig,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
-            self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name)
+            self.__load_diffusers(model, model_type, weight_dtypes, base_model_name, vae_model_name, quantization)
         else:
             raise Exception("not an internal model")
 
@@ -68,6 +71,7 @@ class StableDiffusionModelLoader(
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             vae_model_name: str,
+            quantization: QuantizationConfig,
     ):
         tokenizer = CLIPTokenizer.from_pretrained(
             base_model_name,
@@ -113,6 +117,7 @@ class StableDiffusionModelLoader(
             weight_dtypes.train_dtype,
             base_model_name,
             "unet",
+            quantization,
         )
 
         image_depth_processor = DPTImageProcessor.from_pretrained(
@@ -128,6 +133,7 @@ class StableDiffusionModelLoader(
 
         model.model_type = model_type
         model.tokenizer = tokenizer
+        model.orig_tokenizer = copy.deepcopy(tokenizer)
         model.noise_scheduler = noise_scheduler
         model.text_encoder = text_encoder
         model.vae = vae
@@ -158,6 +164,7 @@ class StableDiffusionModelLoader(
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             vae_model_name: str,
+            quantization: QuantizationConfig,
     ):
         state_dict = torch.load(base_model_name, weights_only=True)
         state_dict = self.__fix_nai_model(state_dict)
@@ -196,11 +203,12 @@ class StableDiffusionModelLoader(
             pipeline.text_encoder, weight_dtypes.text_encoder, weight_dtypes.train_dtype
         )
         unet = self._convert_diffusers_sub_module_to_dtype(
-            pipeline.unet, weight_dtypes.unet, weight_dtypes.train_dtype
+            pipeline.unet, weight_dtypes.unet, weight_dtypes.train_dtype, quantization,
         )
 
         model.model_type = model_type
         model.tokenizer = pipeline.tokenizer
+        model.orig_tokenizer = copy.deepcopy(pipeline.tokenizer)
         model.noise_scheduler = noise_scheduler
         model.text_encoder = text_encoder
         model.vae = vae
@@ -215,6 +223,7 @@ class StableDiffusionModelLoader(
             weight_dtypes: ModelWeightDtypes,
             base_model_name: str,
             vae_model_name: str,
+            quantization: QuantizationConfig,
     ):
         num_in_channels = 4
         if model_type.has_mask_input():
@@ -251,11 +260,12 @@ class StableDiffusionModelLoader(
             pipeline.text_encoder, weight_dtypes.text_encoder, weight_dtypes.train_dtype
         )
         unet = self._convert_diffusers_sub_module_to_dtype(
-            pipeline.unet, weight_dtypes.unet, weight_dtypes.train_dtype
+            pipeline.unet, weight_dtypes.unet, weight_dtypes.train_dtype, quantization,
         )
 
         model.model_type = model_type
         model.tokenizer = pipeline.tokenizer
+        model.orig_tokenizer = copy.deepcopy(pipeline.tokenizer)
         model.noise_scheduler = noise_scheduler
         model.text_encoder = text_encoder
         model.vae = vae
@@ -269,6 +279,7 @@ class StableDiffusionModelLoader(
             model_type: ModelType,
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
+            quantization: QuantizationConfig,
     ):
         stacktraces = []
 
@@ -276,28 +287,30 @@ class StableDiffusionModelLoader(
         model.sd_config_filename = self._get_sd_config_name(model_type, model_names.base_model)
 
         try:
-            self.__load_internal(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
+            self.__load_internal(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
-            self.__load_diffusers(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
+            self.__load_diffusers(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
 
         try:
-            self.__load_safetensors(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
+            self.__load_safetensors(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)
             return
         except Exception:
             stacktraces.append(traceback.format_exc())
 
-        try:
-            self.__load_ckpt(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
-            return
-        except Exception:
-            stacktraces.append(traceback.format_exc())
+        if model_names.base_model.endswith(".ckpt"):
+            try:
+                self.__load_ckpt(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
+                print("Warning: Legacy code is used to load ckpt files. Some features may not be supported.")
+                return
+            except Exception:
+                stacktraces.append(traceback.format_exc())
 
         for stacktrace in stacktraces:
             print(stacktrace)

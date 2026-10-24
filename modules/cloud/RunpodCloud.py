@@ -40,7 +40,7 @@ class RunpodCloud(LinuxCloud):
             if secrets.id == "":
                 print("waiting for public IP...")
             else:
-                print(f"waiting for public IP... Status: https://www.runpod.io/console/pods/{secrets.id}")
+                print(f"waiting for public IP... Status: https://www.runpod.io/console/pods?id={secrets.id}")
             time.sleep(5)
 
 
@@ -68,13 +68,13 @@ class RunpodCloud(LinuxCloud):
         secrets=self.config.secrets.cloud
         pod=runpod.create_pod(
             name=config.name,
-            image_name="",
+            image_name="dxqbyd/runpod-onetrainer-cli:latest",
             template_id="1a33vbssq9",
             gpu_type_id=config.gpu_type,
             cloud_type=config.sub_type,
             support_public_ip=True,
             volume_in_gb=config.volume_size,
-            container_disk_in_gb=10,
+            container_disk_in_gb=20,
             volume_mount_path="/workspace",
             min_download=config.min_download,
             env={"JUPYTER_PASSWORD": pysecrets.token_urlsafe(16)},

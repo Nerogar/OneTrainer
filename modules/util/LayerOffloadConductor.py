@@ -2,7 +2,7 @@ import math
 import random
 from typing import Any
 
-from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.TrainConfig import TrainConfig, TrainModelPartConfig
 from modules.util.quantization_util import get_offload_tensor_bytes, offload_quantized
 from modules.util.torch_util import (
     create_stream_context,
@@ -34,12 +34,12 @@ def clone_tensor_allocator(tensor: torch.Tensor) -> torch.Tensor:
     return tensor.clone()
 
 
-def ceil_4(number: int) -> int:
-    return number + (4 - (number % 4)) % 4
+def ceil_16(number: int) -> int:
+    return number + (16 - (number % 16)) % 16
 
 
-def floor_4(number: int) -> int:
-    return number - (number % 4)
+def floor_16(number: int) -> int:
+    return number - (number % 16)
 
 
 class StaticLayerTensorAllocator:
@@ -69,16 +69,20 @@ class StaticLayerTensorAllocator:
         total_cache_bytes = cache_tensor_size * len(self.__layer_allocator.cache_tensors)
         if self.__allocate_forward:
             cache_tensor_index = self.__allocation_end // cache_tensor_size
-            cache_tensor_allocation_end = ceil_4(self.__allocation_end % cache_tensor_size)
+            # never hand out views at storage_offset 0: torch.compile creates a 0/1-specialized
+            # symbol for the storage_offset of any tensor with a dynamic dim (compressed weights),
+            # so an offset-0 view needs its own graph while one "2 <= offset" guard covers all
+            # other placements. keeping every view at byte offset >= 16 avoids those recompiles.
+            cache_tensor_allocation_end = max(ceil_16(self.__allocation_end % cache_tensor_size), 16)
 
             if cache_tensor_allocation_end + num_bytes > cache_tensor_size:
                 # move to the start of the next cache tensor
                 cache_tensor_index += 1
-                cache_tensor_allocation_end = 0
+                cache_tensor_allocation_end = 16
             if cache_tensor_index * cache_tensor_size + cache_tensor_allocation_end + num_bytes > total_cache_bytes:
                 # move to the first cache tensor
                 cache_tensor_index = 0
-                cache_tensor_allocation_end = 0
+                cache_tensor_allocation_end = 16
 
             self.__allocation_end = cache_tensor_index * cache_tensor_size + cache_tensor_allocation_end
             self.__layer_allocator.ensure_allocation(cache_tensor_index)
@@ -91,7 +95,9 @@ class StaticLayerTensorAllocator:
             cache_tensor_index = self.__allocation_start // cache_tensor_size
             cache_tensor_allocation_start = self.__allocation_start % cache_tensor_size
 
-            if cache_tensor_allocation_start - num_bytes < 0:
+            # "< 16" instead of "< 0": the first 16 bytes of every cache tensor are reserved so no
+            # view lands at storage_offset 0 (see the forward-direction comment above)
+            if cache_tensor_allocation_start - num_bytes < 16:
                 # move to the end of the previous cache tensor
                 cache_tensor_index -= 1
                 cache_tensor_allocation_start = cache_tensor_size
@@ -100,7 +106,7 @@ class StaticLayerTensorAllocator:
                 cache_tensor_index = len(self.__layer_allocator.cache_tensors) - 1
                 cache_tensor_allocation_start = cache_tensor_size
 
-            new_allocation_start = floor_4(cache_tensor_allocation_start - num_bytes)
+            new_allocation_start = floor_16(cache_tensor_allocation_start - num_bytes)
             self.__layer_allocator.ensure_allocation(cache_tensor_index)
             cache_tensor = self.__layer_allocator.cache_tensors[cache_tensor_index]
             allocated_tensor = cache_tensor[new_allocation_start:new_allocation_start + num_bytes]
@@ -248,7 +254,7 @@ class StaticActivationAllocator:
 
     def reserve_cache(self, tensors: list[torch.Tensor]):
         num_bytes = sum(tensor.element_size() * tensor.numel() for tensor in tensors) \
-                    + len(tensors) * 4  # add enough padding for alignment
+                    + len(tensors) * 16  # add enough padding for alignment
 
         if num_bytes == 0:
             return
@@ -284,7 +290,7 @@ class StaticActivationAllocator:
         cache_tensor = self.__cache_tensors[self.__current_cache_tensor]
         allocated_tensor = \
             cache_tensor[self.__current_cache_tensor_offset:self.__current_cache_tensor_offset + num_bytes]
-        self.__current_cache_tensor_offset += ceil_4(num_bytes)
+        self.__current_cache_tensor_offset += ceil_16(num_bytes)
 
         return allocated_tensor.view(dtype=source_tensor.dtype).view(size=source_tensor.shape)
 
@@ -558,10 +564,15 @@ class LayerOffloadConductor:
 
     __is_active: bool
 
+    __deferred_layers: list[int]
+
+    __config: TrainConfig
+
     def __init__(
             self,
             module: nn.Module,
             config: TrainConfig,
+            part: TrainModelPartConfig,
     ):
         super().__init__()
 
@@ -569,16 +580,16 @@ class LayerOffloadConductor:
 
         self.__layers = []
         self.__layer_device_map = []
-        self.__layer_offload_fraction = config.layer_offload_fraction
+        self.__layer_offload_fraction = part.offload_fraction
 
         self.__layer_activations_included_offload_param_indices_map = []
 
         self.__train_device = torch.device(config.train_device)
         self.__temp_device = torch.device(config.temp_device)
 
-        self.__offload_activations = config.gradient_checkpointing.offload() and config.enable_activation_offloading
-        self.__offload_layers = config.gradient_checkpointing.offload() and config.layer_offload_fraction > 0
-        self.__async_transfer = self.__train_device.type == "cuda" and config.enable_async_offloading
+        self.__offload_activations = part.activation_offloading
+        self.__offload_layers = part.offload_fraction > 0
+        self.__async_transfer = self.__train_device.type == "cuda" and config.async_offloading
 
         if self.__async_transfer:
             self.__train_stream = torch.cuda.default_stream(self.__train_device)
@@ -606,69 +617,76 @@ class LayerOffloadConductor:
 
         self.__is_active = False
 
+        self.__deferred_layers = []
+
+        self.__config = config
+
     def offload_activated(self) -> bool:
         return self.__offload_activations or self.__offload_layers
 
-    def layer_offload_activated(self) -> bool:
-        return self.__offload_layers
-
-    def to(self, device: torch.device):
+    def evict(self):
         torch_gc()
 
         self.__wait_all_layer_transfers()
         self.__wait_all_activation_transfers()
 
-        if device_equals(device, self.__temp_device):
-            log("to temp device")
+        log("to temp device")
 
-            # deallocate the cache before to take advantage of the gc
-            self.__train_device_layer_allocator.deallocate_cache()
-            self.__temp_device_layer_allocator.deallocate_cache()
-            self.__temp_device_activations_allocator.deallocate_cache()
+        # deallocate the cache before to take advantage of the gc
+        self.__train_device_layer_allocator.deallocate_cache()
+        self.__temp_device_layer_allocator.deallocate_cache()
+        self.__temp_device_activations_allocator.deallocate_cache()
 
-            self.__module_to_device_except_layers(self.__temp_device)
-            for layer_index, layer in enumerate(self.__layers):
-                self.__layers[layer_index].to(self.__temp_device)
-                for module in layer.modules():
-                    offload_quantized(module, self.__temp_device, allocator=clone_tensor_allocator)
-                self.__layer_device_map[layer_index] = None
+        self.__module_to_device_except_layers(self.__temp_device)
+        for layer_index, layer in enumerate(self.__layers):
+            self.__layers[layer_index].to(self.__temp_device)
+            for module in layer.modules():
+                offload_quantized(module, self.__temp_device, allocator=clone_tensor_allocator)
+            self.__layer_device_map[layer_index] = None
 
-            self.__is_active = False
+        self.__is_active = False
 
-        elif device_equals(device, self.__train_device):
-            log("to train device")
+        torch_gc()
 
-            self.__offload_strategy = LayerOffloadStrategy(self.__layers, self.__layer_offload_fraction)
+    def materialize(self):
+        torch_gc()
 
-            self.__train_device_layer_allocator.allocate_cache(
-                self.__layers, self.__offload_strategy.max_loaded_bytes)
-            self.__temp_device_layer_allocator.allocate_cache(
-                self.__layers, self.__offload_strategy.max_offloaded_bytes)
-            self.__module_to_device_except_layers(self.__train_device)
+        self.__wait_all_layer_transfers()
+        self.__wait_all_activation_transfers()
 
-            # move all layers to the train device, then move offloadable tensors back to the temp device
-            for layer_index, layer in enumerate(self.__layers):
-                if self.__layer_device_map[layer_index] is None:
-                    log(f"layer {layer_index} to train device")
-                    layer.to(self.__train_device)
+        log("to train device")
 
-                    if layer_index in self.__offload_strategy.initial_loaded_layers:
-                        allocator = self.__train_device_layer_allocator.get_allocator(
-                            layer_index, allocate_forward=True)
-                        for module in layer.modules():
-                            offload_quantized(module, self.__train_device, allocator=allocator.allocate_like)
-                        self.__layer_device_map[layer_index] = self.__train_device
-                    else:
-                        allocator = self.__temp_device_layer_allocator.get_allocator(layer_index, allocate_forward=True)
-                        for module in layer.modules():
-                            offload_quantized(module, self.__temp_device, allocator=allocator.allocate_like)
-                        self.__layer_device_map[layer_index] = self.__temp_device
+        self.__offload_strategy = LayerOffloadStrategy(self.__layers, self.__layer_offload_fraction)
 
-                    if self.__async_transfer:
-                        event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
-                        self.__layer_train_event_map[layer_index] = event
+        self.__train_device_layer_allocator.allocate_cache(
+            self.__layers, self.__offload_strategy.max_loaded_bytes)
+        self.__temp_device_layer_allocator.allocate_cache(
+            self.__layers, self.__offload_strategy.max_offloaded_bytes)
+        self.__module_to_device_except_layers(self.__train_device)
 
-            self.__is_active = True
+        # move all layers to the train device, then move offloadable tensors back to the temp device
+        for layer_index, layer in enumerate(self.__layers):
+            if self.__layer_device_map[layer_index] is None:
+                log(f"layer {layer_index} to train device")
+                layer.to(self.__train_device)
+
+                if layer_index in self.__offload_strategy.initial_loaded_layers:
+                    allocator = self.__train_device_layer_allocator.get_allocator(
+                        layer_index, allocate_forward=True)
+                    for module in layer.modules():
+                        offload_quantized(module, self.__train_device, allocator=allocator.allocate_like)
+                    self.__layer_device_map[layer_index] = self.__train_device
+                else:
+                    allocator = self.__temp_device_layer_allocator.get_allocator(layer_index, allocate_forward=True)
+                    for module in layer.modules():
+                        offload_quantized(module, self.__temp_device, allocator=allocator.allocate_like)
+                    self.__layer_device_map[layer_index] = self.__temp_device
+
+                if self.__async_transfer:
+                    event = SyncEvent(self.__train_stream.record_event(), f"train on {self.__train_device}")
+                    self.__layer_train_event_map[layer_index] = event
+
+        self.__is_active = True
 
         torch_gc()
 
@@ -740,6 +758,7 @@ class LayerOffloadConductor:
         if self.__offload_layers:
             self.__wait_layer_transfer(layer_index)
 
+            self.__schedule_deferred_layers_to_temp(except_layer=layer_index)
             for i in self.__offload_strategy.get_layers_to_offload(
                     layer_index=layer_index,
                     is_forward=self.__is_forward_pass,
@@ -788,7 +807,7 @@ class LayerOffloadConductor:
         sub_module_parameters = set(sum([list(x.parameters()) for x in self.__layers], []))
 
         def convert(t):
-            if t in sub_module_parameters:
+            if t in sub_module_parameters or t.is_meta:
                 return t
 
             return t.to(device=device)
@@ -853,6 +872,25 @@ class LayerOffloadConductor:
 
         allocator_fn = allocator.allocate_like if allocator is not None else None
 
+        if not is_forward and device_equals(device, self.__temp_device):
+            layer = self.__layers[layer_index]
+            for module in layer.modules():
+                for parameter in module.parameters():
+                    if parameter.grad is not None:
+                        #Layers to be offloaded usually do not have gradients. Model weights only have gradients in full-finetuning,
+                        #and then a fused backpass is required for offloading, which sets all gradients to None before a layer is offloaded.
+                        #There is only once exception:
+                        #In Multi-GPU training, when the gradient reduction has been started during the fused back pass, but
+                        #has not finished yet. The gradients are then set to None during the backward of one of the next layers.
+                        #Record which layers were ready to be offloaded, and offload them later:
+                        if (not self.__config.multi_gpu or not self.__config.optimizer.fused_back_pass
+                            or not self.__config.fused_gradient_reduce or not self.__config.async_gradient_reduce):
+                            raise RuntimeError("Gradients are still active while attempting to offload a layer")
+
+                        #TODO deferring layer offloading appears to work for multi-GPU training, but there might be edge cases because offloading depends on the exact same order of layer execution. It's possible that when communication between GPU lags, more layers are deferred and this fails silently.
+                        self.__deferred_layers.append(layer_index)
+                        return
+
         with create_stream_context(self.__layer_transfer_stream):
             self.__wait_layer_train(layer_index)
             layer = self.__layers[layer_index]
@@ -869,6 +907,18 @@ class LayerOffloadConductor:
                 log(f"schedule layer {layer_index} to {str(device)}")
 
             self.__layer_device_map[layer_index] = device
+
+    def __schedule_deferred_layers_to_temp(
+            self,
+            except_layer: int,
+    ):
+        layers = self.__deferred_layers
+        self.__deferred_layers = []
+        for layer_index in layers:
+            if layer_index == except_layer:
+                #don't offload this layer, because it is needed now #TODO can this even happen?
+                continue
+            self.__schedule_layer_to(layer_index, device=self.__temp_device, is_forward=False)
 
     def __schedule_activations_to_device(
             self,

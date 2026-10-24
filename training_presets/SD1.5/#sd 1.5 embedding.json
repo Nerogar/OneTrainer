@@ -1,0 +1,22 @@
+{
+    "backup_after": 10,
+    "base_model_name": "stable-diffusion-v1-5/stable-diffusion-v1-5",
+    "latent_caching": false,
+    "learning_rate": 0.0003,
+    "learning_rate_warmup_steps": 20,
+    "model_type": "STABLE_DIFFUSION_15",
+    "output_model_destination": "models/embedding.safetensors",
+    "output_model_format": "SAFETENSORS",
+    "resolution": "512",
+    "sample_after": 1,
+    "training_method": "EMBEDDING",
+    "vae": {
+        "weight_dtype": "FLOAT_32"
+    },
+    "unet": {
+        "weight_dtype": "FLOAT_16"
+    },
+    "text_encoder": {
+        "weight_dtype": "FLOAT_16"
+    }
+}

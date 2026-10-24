@@ -63,7 +63,7 @@ def step_adamw_parameter(self, p, group, i):
     beta1, beta2 = group["betas"]
 
     # If compiling, the compiler will handle cudagraph checks, see note [torch.compile x capturable]
-    if not torch._utils.is_compiling() and group["capturable"]:
+    if not torch.compiler.is_compiling() and group["capturable"]:
         assert (
                 (p.is_cuda and step_t.is_cuda) or (p.is_xla and step_t.is_xla)
         ), "If capturable=True, params and state_steps must be CUDA or XLA tensors."

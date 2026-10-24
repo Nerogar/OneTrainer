@@ -2,7 +2,7 @@
 
 To get a general overview of the UI, please read the [Quick Start Guide](QuickStartGuide.md) first.
 
-Training an embedding requires a few different settings than Fine-Tuning or LoRA training. You can enable Embedding
+Training an embedding requires a few different settings than fine-tuning or LoRA training. You can enable Embedding
 training in the dropdown in the top right corner.
 
 ### Concepts

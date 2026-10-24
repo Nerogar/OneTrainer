@@ -3,9 +3,8 @@ from collections.abc import Callable
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.DiffusionScheduleCoefficients import DiffusionScheduleCoefficients
-from modules.util.enum.LossScaler import LossScaler
 from modules.util.enum.LossWeight import LossWeight
-from modules.util.loss.masked_loss import masked_losses
+from modules.util.loss.masked_loss import masked_losses, masked_losses_with_prior
 from modules.util.loss.vb_loss import vb_losses
 
 import torch
@@ -45,41 +44,79 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
 
         # MSE/L2 Loss
         if config.mse_strength != 0:
-            losses += masked_losses(
+            losses += masked_losses_with_prior(
                 losses=F.mse_loss(
                     data['predicted'].to(dtype=torch.float32),
                     data['target'].to(dtype=torch.float32),
                     reduction='none'
                 ),
+                prior_losses=F.mse_loss(
+                    data['predicted'].to(dtype=torch.float32),
+                    data['prior_target'].to(dtype=torch.float32),
+                    reduction='none'
+                ) if 'prior_target' in data else None,
                 mask=batch['latent_mask'].to(dtype=torch.float32),
                 unmasked_weight=config.unmasked_weight,
                 normalize_masked_area_loss=config.normalize_masked_area_loss,
+                masked_prior_preservation_weight=config.masked_prior_preservation_weight,
             ).mean(mean_dim) * config.mse_strength
 
         # MAE/L1 Loss
         if config.mae_strength != 0:
-            losses += masked_losses(
+            losses += masked_losses_with_prior(
                 losses=F.l1_loss(
                     data['predicted'].to(dtype=torch.float32),
                     data['target'].to(dtype=torch.float32),
                     reduction='none'
                 ),
+                prior_losses=F.l1_loss(
+                    data['predicted'].to(dtype=torch.float32),
+                    data['prior_target'].to(dtype=torch.float32),
+                    reduction='none'
+                ) if 'prior_target' in data else None,
                 mask=batch['latent_mask'].to(dtype=torch.float32),
                 unmasked_weight=config.unmasked_weight,
                 normalize_masked_area_loss=config.normalize_masked_area_loss,
+                masked_prior_preservation_weight=config.masked_prior_preservation_weight,
             ).mean(mean_dim) * config.mae_strength
 
         # log-cosh Loss
         if config.log_cosh_strength != 0:
-            losses += masked_losses(
+            losses += masked_losses_with_prior(
                 losses=self.__log_cosh_loss(
                     data['predicted'].to(dtype=torch.float32),
                     data['target'].to(dtype=torch.float32)
                 ),
+                prior_losses=self.__log_cosh_loss(
+                    data['predicted'].to(dtype=torch.float32),
+                    data['prior_target'].to(dtype=torch.float32)
+                ) if 'prior_target' in data else None,
                 mask=batch['latent_mask'].to(dtype=torch.float32),
                 unmasked_weight=config.unmasked_weight,
                 normalize_masked_area_loss=config.normalize_masked_area_loss,
+                masked_prior_preservation_weight=config.masked_prior_preservation_weight,
             ).mean(mean_dim) * config.log_cosh_strength
+
+        # Huber Loss
+        if config.huber_strength != 0:
+            losses += masked_losses_with_prior(
+                losses=F.huber_loss(
+                    data['predicted'].to(dtype=torch.float32),
+                    data['target'].to(dtype=torch.float32),
+                    reduction='none',
+                    delta=config.huber_delta,
+                ),
+                prior_losses=F.huber_loss(
+                    data['predicted'].to(dtype=torch.float32),
+                    data['prior_target'].to(dtype=torch.float32),
+                    reduction='none',
+                    delta=config.huber_delta,
+                ) if 'prior_target' in data else None,
+                mask=batch['latent_mask'].to(dtype=torch.float32),
+                unmasked_weight=config.unmasked_weight,
+                normalize_masked_area_loss=config.normalize_masked_area_loss,
+                masked_prior_preservation_weight=config.masked_prior_preservation_weight,
+            ).mean(mean_dim) * config.huber_strength
 
         # VB loss
         if config.vb_loss_strength != 0 and 'predicted_var_values' in data and self.__coefficients is not None:
@@ -131,6 +168,15 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                     data['predicted'].to(dtype=torch.float32),
                     data['target'].to(dtype=torch.float32)
                 ).mean(mean_dim) * config.log_cosh_strength
+
+        # Huber Loss
+        if config.huber_strength != 0:
+            losses += F.huber_loss(
+                data['predicted'].to(dtype=torch.float32),
+                data['target'].to(dtype=torch.float32),
+                reduction='none',
+                delta=config.huber_delta,
+            ).mean(mean_dim) * config.huber_strength
 
         # VB loss
         if config.vb_loss_strength != 0 and 'predicted_var_values' in data:
@@ -223,15 +269,8 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             alphas_cumprod_fun: Callable[[Tensor, int], Tensor] | None = None,
     ) -> Tensor:
         loss_weight = batch['loss_weight']
-        batch_size_scale = \
-            1 if config.loss_scaler in [LossScaler.NONE, LossScaler.GRADIENT_ACCUMULATION] \
-                else config.batch_size
-        gradient_accumulation_steps_scale = \
-            1 if config.loss_scaler in [LossScaler.NONE, LossScaler.BATCH] \
-                else config.gradient_accumulation_steps
-
         if self.__coefficients is None and betas is not None:
-            self.__coefficients = DiffusionScheduleCoefficients.from_betas(betas)
+            self.__coefficients = DiffusionScheduleCoefficients.from_betas(betas.to(train_device))
 
         self.__alphas_cumprod_fun = alphas_cumprod_fun
 
@@ -244,20 +283,24 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 losses = self.__unmasked_losses(batch, data, config)
 
         # Scale Losses by Batch and/or GA (if enabled)
-        losses = losses * batch_size_scale * gradient_accumulation_steps_scale
+        losses = losses * config.loss_scaler.get_scale(batch_size=config.batch_size, accumulation_steps=config.gradient_accumulation_steps)
 
-        losses *= loss_weight.to(device=losses.device, dtype=losses.dtype)
+        losses *= loss_weight
 
         # Apply timestep based loss weighting.
         if 'timestep' in data:
             v_pred = data.get('prediction_type', '') == 'v_prediction'
             match config.loss_weight_fn:
+                case LossWeight.CONSTANT:
+                    pass
                 case LossWeight.MIN_SNR_GAMMA:
                     losses *= self.__min_snr_weight(data['timestep'], config.loss_weight_strength, v_pred, losses.device)
                 case LossWeight.DEBIASED_ESTIMATION:
                     losses *= self.__debiased_estimation_weight(data['timestep'], v_pred, losses.device)
                 case LossWeight.P2:
                     losses *= self.__p2_loss_weight(data['timestep'], config.loss_weight_strength, v_pred, losses.device)
+                case _:
+                    raise NotImplementedError(f"Loss weight function {config.loss_weight_fn} not implemented for diffusion models")
 
         return losses
 
@@ -270,16 +313,9 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
             sigmas: Tensor | None = None,
     ) -> Tensor:
         loss_weight = batch['loss_weight']
-        batch_size_scale = \
-            1 if config.loss_scaler in [LossScaler.NONE, LossScaler.GRADIENT_ACCUMULATION] \
-                else config.batch_size
-        gradient_accumulation_steps_scale = \
-            1 if config.loss_scaler in [LossScaler.NONE, LossScaler.BATCH] \
-                else config.gradient_accumulation_steps
-
         if self.__sigmas is None and sigmas is not None:
             num_timesteps = sigmas.shape[0]
-            all_timesteps = torch.arange(start=1, end=num_timesteps + 1, step=1, dtype=torch.int32, device=sigmas.device)
+            all_timesteps = torch.arange(start=1, end=num_timesteps + 1, step=1, dtype=torch.int32, device=train_device)
             self.__sigmas = all_timesteps / num_timesteps
 
         if data['loss_type'] == 'target':
@@ -291,14 +327,17 @@ class ModelSetupDiffusionLossMixin(metaclass=ABCMeta):
                 losses = self.__unmasked_losses(batch, data, config)
 
         # Scale Losses by Batch and/or GA (if enabled)
-        losses = losses * batch_size_scale * gradient_accumulation_steps_scale
-
-        losses *= loss_weight.to(device=losses.device, dtype=losses.dtype)
+        losses = losses * config.loss_scaler.get_scale(config.batch_size, config.gradient_accumulation_steps)
+        losses *= loss_weight
 
         # Apply timestep based loss weighting.
         if 'timestep' in data:
             match config.loss_weight_fn:
+                case LossWeight.CONSTANT:
+                    pass
                 case LossWeight.SIGMA:
                     losses *= self.__sigma_loss_weight(data['timestep'], losses.device)
+                case _:
+                    raise NotImplementedError(f"Loss weight function {config.loss_weight_fn} not implemented for flow matching models")
 
         return losses

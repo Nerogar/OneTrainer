@@ -9,11 +9,12 @@ from modules.util.config.CloudConfig import CloudConfig
 from modules.util.config.ConceptConfig import ConceptConfig
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.SecretsConfig import SecretsConfig
+from modules.util.enum.AttentionMechanism import AttentionMechanism
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.EMAMode import EMAMode
-from modules.util.enum.GradientCheckpointingMethod import GradientCheckpointingMethod
+from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.LearningRateScaler import LearningRateScaler
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
@@ -65,6 +66,7 @@ class TrainOptimizerConfig(BaseConfig):
     max_unorm: float
     maximize: bool
     min_8bit_size: int
+    quant_block_size: int
     momentum: float
     nesterov: bool
     no_prox: bool
@@ -89,7 +91,6 @@ class TrainOptimizerConfig(BaseConfig):
     xi: float
     n_sma_threshold: int
     ams_bound: bool
-    r: float
     adanorm: bool
     adam_debias: bool
     slice_p: int
@@ -102,11 +103,41 @@ class TrainOptimizerConfig(BaseConfig):
     factored: True
     factored_fp32: True
     use_stableadamw: True
-    use_muon_pp: False
     use_cautious: False
     use_grams: False
     use_adopt: False
-    use_focus: False
+    d_limiter: True
+    use_schedulefree: True
+    use_orthograd: False
+    nnmf_factor: False
+    orthogonal_gradient: False
+    use_atan2: False
+    use_AdEMAMix: False
+    beta3_ema: float
+    alpha_grad: float
+    beta1_warmup: int
+    min_beta1: float
+    Simplified_AdEMAMix: False
+    kourkoutas_beta: False
+    schedulefree_c: float
+    ns_steps: int
+    MuonWithAuxAdam: False
+    muon_hidden_layers: str
+    muon_adam_regex: False
+    muon_adam_lr: float
+    muon_te1_adam_lr: float
+    muon_te2_adam_lr: float
+    muon_adam_config: dict
+    rms_rescaling: True
+    normuon_variant: False
+    beta2_normuon: float
+    low_rank_ortho: False
+    ortho_rank: int
+    accelerated_ns: False
+    cautious_wd: False
+    approx_mars: False
+    auto_kappa_p: False
+    compile: False
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -149,6 +180,7 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("max_unorm", None, float, True))
         data.append(("maximize", False, bool, False))
         data.append(("min_8bit_size", None, int, True))
+        data.append(("quant_block_size", None, int, True))
         data.append(("momentum", None, float, True))
         data.append(("nesterov", False, bool, False))
         data.append(("no_prox", False, bool, False))
@@ -172,7 +204,6 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("xi", None, float, True))
         data.append(("n_sma_threshold", None, int, True))
         data.append(("ams_bound", False, bool, False))
-        data.append(("r", None, float, True))
         data.append(("adanorm", False, bool, False))
         data.append(("adam_debias", False, bool, False))
         data.append(("slice_p", None, int, True))
@@ -185,11 +216,41 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("factored", True, bool, False))
         data.append(("factored_fp32", True, bool, False))
         data.append(("use_stableadamw", True, bool, False))
-        data.append(("use_muon_pp", False, bool, False))
         data.append(("use_cautious", False, bool, False))
         data.append(("use_grams", False, bool, False))
         data.append(("use_adopt", False, bool, False))
-        data.append(("use_focus", False, bool, False))
+        data.append(("d_limiter", True, bool, True))
+        data.append(("use_schedulefree", True, bool, True))
+        data.append(("use_orthograd", False, bool, False))
+        data.append(("nnmf_factor", False, bool, False))
+        data.append(("orthogonal_gradient", False, bool, False))
+        data.append(("use_atan2", False, bool, False))
+        data.append(("use_AdEMAMix", False, bool, False))
+        data.append(("beta3_ema", None, float, True))
+        data.append(("alpha_grad", None, float, True))
+        data.append(("beta1_warmup", None, int, True))
+        data.append(("min_beta1", None, float, True))
+        data.append(("Simplified_AdEMAMix", False, bool, False))
+        data.append(("kourkoutas_beta", False, bool, False))
+        data.append(("schedulefree_c", None, float, True))
+        data.append(("ns_steps", None, int, True))
+        data.append(("MuonWithAuxAdam", False, bool, False))
+        data.append(("muon_hidden_layers", None, str, True))
+        data.append(("muon_adam_regex", False, bool, False))
+        data.append(("muon_adam_lr", None, float, True))
+        data.append(("muon_te1_adam_lr", None, float, True))
+        data.append(("muon_te2_adam_lr", None, float, True))
+        data.append(("muon_adam_config", {}, dict, True))
+        data.append(("rms_rescaling", True, bool, True))
+        data.append(("normuon_variant", False, bool, False))
+        data.append(("beta2_normuon", None, float, True))
+        data.append(("low_rank_ortho", False, bool, False))
+        data.append(("ortho_rank", None, int, True))
+        data.append(("accelerated_ns", False, bool, False))
+        data.append(("cautious_wd", False, bool, False))
+        data.append(("approx_mars", False, bool, False))
+        data.append(("auto_kappa_p", False, bool, False))
+        data.append(("compile", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
@@ -202,13 +263,33 @@ class TrainModelPartConfig(BaseConfig):
     stop_training_after_unit: TimeUnit
     learning_rate: float
     weight_dtype: DataType
-    dropout_probability: float
+    dropout_probability: float #this is text encoder caption dropout!
     train_embedding: bool
     attention_mask: bool
     guidance_scale: float
+    gradient_checkpointing: bool
+    offload_fraction: float
+    activation_offloading: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
+
+    def offloading_enabled(self) -> bool:
+        # a conductor should exist iff this is True. Not gated on train: activations are built and cost
+        # VRAM whenever grad flows through a part, not only when it is trained (e.g. embedding training
+        # runs grad through the frozen denoiser and TE), so both layer and activation offloading apply to
+        # frozen grad-carrying parts too.
+        return self.offload_fraction > 0 or self.activation_offloading
+
+    def checkpointing_enabled(self) -> bool:
+        # the inner torch checkpoint() should run iff this is True. Not gated on train: grad can flow
+        # through a frozen part (e.g. embedding training runs grad through the frozen denoiser and TE),
+        # and checkpointing then still saves VRAM. On a part with no grad flow the wrapper is a no-op.
+        return self.gradient_checkpointing
+
+    def checkpointing_or_offloading_enabled(self) -> bool:
+        # whether the checkpoint layer wrapper needs to be installed for this part at all
+        return self.checkpointing_enabled() or self.offloading_enabled()
 
     @staticmethod
     def default_values():
@@ -221,11 +302,14 @@ class TrainModelPartConfig(BaseConfig):
         data.append(("stop_training_after", None, int, True))
         data.append(("stop_training_after_unit", TimeUnit.NEVER, TimeUnit, False))
         data.append(("learning_rate", None, float, True))
-        data.append(("weight_dtype", DataType.NONE, DataType, False))
+        data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("dropout_probability", 0.0, float, False))
         data.append(("train_embedding", True, bool, False))
         data.append(("attention_mask", False, bool, False))
         data.append(("guidance_scale", 1.0, float, False))
+        data.append(("gradient_checkpointing", True, bool, False))
+        data.append(("offload_fraction", 0.0, float, False))
+        data.append(("activation_offloading", False, bool, False))
 
         return TrainModelPartConfig(data)
 
@@ -261,6 +345,26 @@ class TrainEmbeddingConfig(BaseConfig):
 
         return TrainEmbeddingConfig(data)
 
+class QuantizationConfig(BaseConfig):
+    layer_filter: str
+    layer_filter_preset: str
+    layer_filter_regex: bool
+    svd_dtype: DataType
+    svd_rank: int
+    cache_dir: str
+
+    @staticmethod
+    def default_values():
+        data = []
+
+        # name, default value, data type, nullable
+        data.append(("layer_filter", "", str, False))
+        data.append(("layer_filter_preset", "full", str, False))
+        data.append(("layer_filter_regex", False, bool, False))
+        data.append(("svd_dtype", DataType.NONE, DataType, False))
+        data.append(("svd_rank", 16, int, False))
+        data.append(("cache_dir", None, str, True))
+        return QuantizationConfig(data)
 
 class TrainConfig(BaseConfig):
     training_method: TrainingMethod
@@ -269,27 +373,36 @@ class TrainConfig(BaseConfig):
     debug_dir: str
     workspace_dir: str
     cache_dir: str
+    huggingface_cache_dir: str
+    offline_mode: bool
     tensorboard: bool
     tensorboard_expose: bool
+    tensorboard_always_on: bool
     tensorboard_port: str
     validation: bool
     validation_timesteps: str
     validate_after: float
     validate_after_unit: TimeUnit
     continue_last_backup: bool
+    prevent_overwrites: bool
     include_train_config: ConfigPart
+
+    # multi-GPU
+    multi_gpu: bool
+    device_indexes: str
+    gradient_reduce_prevision: GradientReducePrecision
+    fused_gradient_reduce: bool
+    async_gradient_reduce: bool
+    async_gradient_reduce_buffer: int
 
     # model settings
     base_model_name: str
-    weight_dtype: DataType
     output_dtype: DataType
     output_model_format: ModelFormat
     output_model_destination: str
-    gradient_checkpointing: GradientCheckpointingMethod
-    enable_async_offloading: bool
-    enable_activation_offloading: bool
-    layer_offload_fraction: float
+    async_offloading: bool
     force_circular_padding: bool
+    compile: bool
 
     # data settings
     concept_file_name: str
@@ -323,19 +436,28 @@ class TrainConfig(BaseConfig):
     only_cache: bool
     resolution: str
     frames: str
+    attention_mechanism: AttentionMechanism
     mse_strength: float
     mae_strength: float
     log_cosh_strength: float
+    huber_strength: float
+    huber_delta: float
     vb_loss_strength: float
     loss_weight_fn: LossWeight
     loss_weight_strength: float
-    dropout_probability: float
+    dropout_probability: float #this is LoRA dropout!
     loss_scaler: LossScaler
     learning_rate_scaler: LearningRateScaler
     clip_grad_norm: float
 
+    #layer filter
+    layer_filter: str  # comma-separated
+    layer_filter_preset: str
+    layer_filter_regex: bool
+
     # noise
     offset_noise_weight: float
+    generalized_offset_noise: bool
     perturbation_noise_weight: float
     rescale_noise_scheduler_to_zero_terminal_snr: bool
     force_v_prediction: bool
@@ -356,6 +478,11 @@ class TrainConfig(BaseConfig):
     # prior
     prior: TrainModelPartConfig
 
+    # transformer
+    transformer: TrainModelPartConfig
+    unconditional_transformer: TrainModelPartConfig
+    quantization: QuantizationConfig
+
     # text encoder
     text_encoder: TrainModelPartConfig
     text_encoder_layer_skip: int
@@ -363,10 +490,15 @@ class TrainConfig(BaseConfig):
     # text encoder 2
     text_encoder_2: TrainModelPartConfig
     text_encoder_2_layer_skip: int
+    text_encoder_2_sequence_length: int
 
     # text encoder 3
     text_encoder_3: TrainModelPartConfig
     text_encoder_3_layer_skip: int
+
+    # text encoder 4
+    text_encoder_4: TrainModelPartConfig
+    text_encoder_4_layer_skip: int
 
     # vae
     vae: TrainModelPartConfig
@@ -388,6 +520,10 @@ class TrainConfig(BaseConfig):
     unmasked_probability: float
     unmasked_weight: float
     normalize_masked_area_loss: bool
+    masked_prior_preservation_weight: float
+
+    # custom conditioning image
+    custom_conditioning_image: bool
 
     # embedding
     embedding_learning_rate: float
@@ -405,9 +541,22 @@ class TrainConfig(BaseConfig):
     lora_decompose_norm_epsilon: bool
     lora_decompose_output_axis: bool
     lora_weight_dtype: DataType
-    lora_layers: str  # comma-separated
-    lora_layer_preset: str
     bundle_additional_embeddings: bool
+
+    # oft
+    oft_block_size: int
+    oft_block_share: bool
+    oft_scaled: bool
+
+    # lokr
+    lokr_dim: int
+    lokr_decompose_both: bool
+    lokr_decompose_factor: int
+    lokr_use_tucker: bool
+    lokr_weight_decompose: bool
+    lokr_dora_on_output: bool
+    lokr_full_matrix: bool
+    lokr_vec_trick: bool
 
     # optimizer
     optimizer: TrainOptimizerConfig
@@ -445,7 +594,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=6,
+            config_version=11,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -453,6 +602,11 @@ class TrainConfig(BaseConfig):
                 3: self.__migration_3,
                 4: self.__migration_4,
                 5: self.__migration_5,
+                6: self.__migration_6,
+                7: self.__migration_7,
+                8: self.__migration_8,
+                9: self.__migration_9,
+                10: self.__migration_10,
             }
         )
 
@@ -599,12 +753,14 @@ class TrainConfig(BaseConfig):
     def __migration_4(self, data: dict) -> dict:
         migrated_data = data.copy()
 
+        # Translate the old bool form of gradient_checkpointing into the v5..v10
+        # string/enum form. __migration_10 later fans this out per-component.
         gradient_checkpointing = migrated_data.pop("gradient_checkpointing", True)
 
         if gradient_checkpointing:
-            migrated_data["gradient_checkpointing"] = GradientCheckpointingMethod.ON
+            migrated_data["gradient_checkpointing"] = "ON"
         else:
-            migrated_data["gradient_checkpointing"] = GradientCheckpointingMethod.OFF
+            migrated_data["gradient_checkpointing"] = "OFF"
 
         return migrated_data
 
@@ -618,30 +774,132 @@ class TrainConfig(BaseConfig):
 
         return migrated_data
 
+    def __migration_6(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        # None is not a valid value, but there was a bug that allowed it, so old config files can have it set to None:
+        if (
+            "lora_layer_preset" in migrated_data
+            and migrated_data["lora_layer_preset"] is None
+        ):
+            migrated_data["lora_layer_preset"] = "full"
+
+        return migrated_data
+
+    def __migration_7(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        if "lora_layers" in migrated_data:
+            migrated_data["layer_filter"] = migrated_data.pop("lora_layers")
+        if "lora_layer_preset" in migrated_data:
+            migrated_data["layer_filter_preset"] = migrated_data.pop("lora_layer_preset")
+        if "lora_layers_regex" in migrated_data:
+            migrated_data["layer_filter_regex"] = migrated_data.pop("lora_layers_regex")
+
+        return migrated_data
+
+    def __migration_8(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        if migrated_data["model_type"] != "STABLE_CASCADE_1" and migrated_data["model_type"] != "WUERSTCHEN_2":
+            migrated_data["transformer"] = migrated_data["prior"]
+
+        return migrated_data
+
+    def __migration_9(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        def replace_dtype(part: str):
+            if part in migrated_data and migrated_data[part]["weight_dtype"] == "NONE":
+                migrated_data[part]["weight_dtype"] = migrated_data["weight_dtype"]
+        replace_dtype("unet")
+        replace_dtype("prior")
+        replace_dtype("transformer")
+        replace_dtype("text_encoder")
+        replace_dtype("text_encoder_2")
+        replace_dtype("text_encoder_3")
+        replace_dtype("text_encoder_4")
+        replace_dtype("vae")
+        replace_dtype("effnet_encoder")
+        replace_dtype("decoder")
+        replace_dtype("decoder_text_encoder")
+        replace_dtype("decoder_vqgan")
+        migrated_data.pop("weight_dtype")
+
+        return migrated_data
+
+    def __migration_10(self, data: dict) -> dict:
+        migrated_data = data.copy()
+
+        # Fan the four old global offload/checkpointing settings out per-component.
+        # After __migration_4 gradient_checkpointing is a string "OFF"/"ON"/"CPU_OFFLOADED".
+        gc = migrated_data.pop("gradient_checkpointing", "ON")
+        act = migrated_data.pop("enable_activation_offloading", True)
+        frac = migrated_data.pop("layer_offload_fraction", 0.0)
+        migrated_data["async_offloading"] = migrated_data.pop("enable_async_offloading", True)
+
+        def fan_out(part: str):
+            if part in migrated_data:
+                migrated_data[part]["gradient_checkpointing"] = gc != "OFF"
+                migrated_data[part]["activation_offloading"] = (gc == "CPU_OFFLOADED") and act
+                migrated_data[part]["offload_fraction"] = frac if gc == "CPU_OFFLOADED" else 0.0
+
+        fan_out("unet")
+        fan_out("prior")
+        fan_out("transformer")
+        fan_out("text_encoder")
+        fan_out("text_encoder_2")
+        fan_out("text_encoder_3")
+        fan_out("text_encoder_4")
+        fan_out("vae")
+        fan_out("effnet_encoder")
+        fan_out("decoder")
+        fan_out("decoder_text_encoder")
+        fan_out("decoder_vqgan")
+
+        if migrated_data.get("output_model_format") == "SAFETENSORS":
+            training_method = migrated_data.get("training_method")
+            if training_method == "LORA":
+                migrated_data["output_model_format"] = "LEGACY_LORA"
+            elif training_method != "EMBEDDING":
+                migrated_data["output_model_format"] = "LEGACY_SAFETENSORS"
+
+        return migrated_data
+
+    def model_part_configs(self) -> list[TrainModelPartConfig]:
+        # the per-part configs for the components this model_type actually has. Avoids "phantom" parts whose
+        # fields keep their defaults (train=True) or migrated offload values but don't exist in the model.
+        return [getattr(self, name) for name in self.model_type.model_parts()]
+
     def weight_dtypes(self) -> ModelWeightDtypes:
         return ModelWeightDtypes(
             self.train_dtype,
             self.fallback_train_dtype,
-            self.weight_dtype if self.unet.weight_dtype == DataType.NONE else self.unet.weight_dtype,
-            self.weight_dtype if self.prior.weight_dtype == DataType.NONE else self.prior.weight_dtype,
-            self.weight_dtype if self.text_encoder.weight_dtype == DataType.NONE else self.text_encoder.weight_dtype,
-            self.weight_dtype if self.text_encoder_2.weight_dtype == DataType.NONE else self.text_encoder_2.weight_dtype,
-            self.weight_dtype if self.text_encoder_3.weight_dtype == DataType.NONE else self.text_encoder_3.weight_dtype,
-            self.weight_dtype if self.vae.weight_dtype == DataType.NONE else self.vae.weight_dtype,
-            self.weight_dtype if self.effnet_encoder.weight_dtype == DataType.NONE else self.effnet_encoder.weight_dtype,
-            self.weight_dtype if self.decoder.weight_dtype == DataType.NONE else self.decoder.weight_dtype,
-            self.weight_dtype if self.decoder_text_encoder.weight_dtype == DataType.NONE else self.decoder_text_encoder.weight_dtype,
-            self.weight_dtype if self.decoder_vqgan.weight_dtype == DataType.NONE else self.decoder_vqgan.weight_dtype,
-            self.weight_dtype if self.lora_weight_dtype == DataType.NONE else self.lora_weight_dtype,
-            self.weight_dtype if self.embedding_weight_dtype == DataType.NONE else self.embedding_weight_dtype,
+            self.unet.weight_dtype,
+            self.prior.weight_dtype,
+            self.transformer.weight_dtype,
+            self.unconditional_transformer.weight_dtype,
+            self.text_encoder.weight_dtype,
+            self.text_encoder_2.weight_dtype,
+            self.text_encoder_3.weight_dtype,
+            self.text_encoder_4.weight_dtype,
+            self.vae.weight_dtype,
+            self.effnet_encoder.weight_dtype,
+            self.decoder.weight_dtype,
+            self.decoder_text_encoder.weight_dtype,
+            self.decoder_vqgan.weight_dtype,
+            self.lora_weight_dtype,
+            self.embedding_weight_dtype,
         )
 
     def model_names(self) -> ModelNames:
         return ModelNames(
             base_model=self.base_model_name,
             prior_model=self.prior.model_name,
+            transformer_model=self.transformer.model_name,
             effnet_encoder_model=self.effnet_encoder.model_name,
             decoder_model=self.decoder.model_name,
+            text_encoder_4=self.text_encoder_4.model_name,
             vae_model=self.vae.model_name,
             lora=self.lora_model_name,
             embedding=EmbeddingName(self.embedding.uuid, self.embedding.model_name) \
@@ -651,6 +909,8 @@ class TrainConfig(BaseConfig):
             include_text_encoder=self.text_encoder.include,
             include_text_encoder_2=self.text_encoder_2.include,
             include_text_encoder_3=self.text_encoder_3.include,
+            include_text_encoder_4=self.text_encoder_4.include,
+            include_unconditional_transformer=self.unconditional_transformer.include,
         )
 
     def train_any_embedding(self) -> bool:
@@ -679,11 +939,20 @@ class TrainConfig(BaseConfig):
             or ((self.text_encoder_3.train_embedding or not self.model_type.has_multiple_text_encoders())
                 and self.train_any_embedding())
 
+    def train_text_encoder_4_or_embedding(self) -> bool:
+        return (self.text_encoder_4.train and self.training_method != TrainingMethod.EMBEDDING
+                and not self.embedding.is_output_embedding) \
+            or ((self.text_encoder_4.train_embedding or not self.model_type.has_multiple_text_encoders())
+                and self.train_any_embedding())
+
     def all_embedding_configs(self):
         if self.training_method == TrainingMethod.EMBEDDING:
             return self.additional_embeddings + [self.embedding]
         else:
             return self.additional_embeddings
+
+    def parse_validation_timesteps(self) -> list[int]:
+        return [int(x) for x in self.validation_timesteps.split(',') if x.strip()]
 
     def get_last_backup_path(self) -> str | None:
         backups_path = os.path.join(self.workspace_dir, "backup")
@@ -725,7 +994,7 @@ class TrainConfig(BaseConfig):
             with open(config.sample_definition_file_name, 'r') as f:
                 samples = json.load(f)
                 for i in range(len(samples)):
-                    samples[i] = SampleConfig.default_values().from_dict(samples[i])
+                    samples[i] = SampleConfig.default_values(config.model_type).from_dict(samples[i])
                 config.samples = samples
 
         config_dict = config.to_dict()
@@ -752,27 +1021,36 @@ class TrainConfig(BaseConfig):
         data.append(("debug_dir", "debug", str, False))
         data.append(("workspace_dir", "workspace/run", str, False))
         data.append(("cache_dir", "workspace-cache/run", str, False))
+        data.append(("huggingface_cache_dir", "", str, False))
+        data.append(("offline_mode", False, bool, False))
         data.append(("tensorboard", True, bool, False))
         data.append(("tensorboard_expose", False, bool, False))
+        data.append(("tensorboard_always_on", False, bool, False))
         data.append(("tensorboard_port", 6006, int, False))
         data.append(("validation", False, bool, False))
         data.append(("validation_timesteps", "500", str, False))
         data.append(("validate_after", 1, int, False))
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
         data.append(("continue_last_backup", False, bool, False))
+        data.append(("prevent_overwrites", False, bool, False))
         data.append(("include_train_config", ConfigPart.NONE, ConfigPart, False))
+
+        #multi-GPU
+        data.append(("multi_gpu", False, bool, False))
+        data.append(("device_indexes", "", str, False))
+        data.append(("gradient_reduce_precision", GradientReducePrecision.FLOAT_32_STOCHASTIC, GradientReducePrecision, False))
+        data.append(("fused_gradient_reduce", True, bool, False))
+        data.append(("async_gradient_reduce", True, bool, False))
+        data.append(("async_gradient_reduce_buffer", 100, int, False))
 
         # model settings
         data.append(("base_model_name", "stable-diffusion-v1-5/stable-diffusion-v1-5", str, False))
-        data.append(("weight_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("output_dtype", DataType.FLOAT_32, DataType, False))
         data.append(("output_model_format", ModelFormat.SAFETENSORS, ModelFormat, False))
         data.append(("output_model_destination", "models/model.safetensors", str, False))
-        data.append(("gradient_checkpointing", GradientCheckpointingMethod.ON, GradientCheckpointingMethod, False))
-        data.append(("enable_async_offloading", True, bool, False))
-        data.append(("enable_activation_offloading", True, bool, False))
-        data.append(("layer_offload_fraction", 0.0, float, False))
+        data.append(("async_offloading", True, bool, False))
         data.append(("force_circular_padding", False, bool, False))
+        data.append(("compile", False, bool, False))
 
         # data settings
         data.append(("concept_file_name", "training_concepts/concepts.json", str, False))
@@ -804,9 +1082,12 @@ class TrainConfig(BaseConfig):
         data.append(("only_cache", False, bool, False))
         data.append(("resolution", "512", str, False))
         data.append(("frames", "25", str, False))
+        data.append(("attention_mechanism", AttentionMechanism.SDP, AttentionMechanism, False))
         data.append(("mse_strength", 1.0, float, False))
         data.append(("mae_strength", 0.0, float, False))
         data.append(("log_cosh_strength", 0.0, float, False))
+        data.append(("huber_strength", 0.0, float, False))
+        data.append(("huber_delta", 1.0, float, False))
         data.append(("vb_loss_strength", 1.0, float, False))
         data.append(("loss_weight_fn", LossWeight.CONSTANT, LossWeight, False))
         data.append(("loss_weight_strength", 5.0, float, False))
@@ -817,6 +1098,7 @@ class TrainConfig(BaseConfig):
 
         # noise
         data.append(("offset_noise_weight", 0.0, float, False))
+        data.append(("generalized_offset_noise", False, bool, False))
         data.append(("perturbation_noise_weight", 0.0, float, False))
         data.append(("rescale_noise_scheduler_to_zero_terminal_snr", False, bool, False))
         data.append(("force_v_prediction", False, bool, False))
@@ -835,7 +1117,6 @@ class TrainConfig(BaseConfig):
         unet.train = True
         unet.stop_training_after = 0
         unet.learning_rate = None
-        unet.weight_dtype = DataType.NONE
         data.append(("unet", unet, TrainModelPartConfig, False))
 
         # prior
@@ -844,8 +1125,26 @@ class TrainConfig(BaseConfig):
         prior.train = True
         prior.stop_training_after = 0
         prior.learning_rate = None
-        prior.weight_dtype = DataType.NONE
         data.append(("prior", prior, TrainModelPartConfig, False))
+
+        # transformer
+        transformer = TrainModelPartConfig.default_values()
+        transformer.model_name = ""
+        transformer.train = True
+        transformer.stop_training_after = 0
+        transformer.learning_rate = None
+        data.append(("transformer", transformer, TrainModelPartConfig, False))
+
+        unconditional_transformer = TrainModelPartConfig.default_values()
+        unconditional_transformer.model_name = ""
+        unconditional_transformer.train = False
+        unconditional_transformer.gradient_checkpointing = False
+        unconditional_transformer.activation_offloading = False
+        data.append(("unconditional_transformer", unconditional_transformer, TrainModelPartConfig, False))
+
+        #quantization layer filter
+        quantization = QuantizationConfig.default_values()
+        data.append(("quantization", quantization, QuantizationConfig, False))
 
         # text encoder
         text_encoder = TrainModelPartConfig.default_values()
@@ -853,9 +1152,9 @@ class TrainConfig(BaseConfig):
         text_encoder.stop_training_after = 30
         text_encoder.stop_training_after_unit = TimeUnit.EPOCH
         text_encoder.learning_rate = None
-        text_encoder.weight_dtype = DataType.NONE
         data.append(("text_encoder", text_encoder, TrainModelPartConfig, False))
         data.append(("text_encoder_layer_skip", 0, int, False))
+        data.append(("text_encoder_sequence_length", 512, int, True))
 
         # text encoder 2
         text_encoder_2 = TrainModelPartConfig.default_values()
@@ -863,9 +1162,9 @@ class TrainConfig(BaseConfig):
         text_encoder_2.stop_training_after = 30
         text_encoder_2.stop_training_after_unit = TimeUnit.EPOCH
         text_encoder_2.learning_rate = None
-        text_encoder_2.weight_dtype = DataType.NONE
         data.append(("text_encoder_2", text_encoder_2, TrainModelPartConfig, False))
         data.append(("text_encoder_2_layer_skip", 0, int, False))
+        data.append(("text_encoder_2_sequence_length", 77, int, True))
 
         # text encoder 3
         text_encoder_3 = TrainModelPartConfig.default_values()
@@ -873,36 +1172,39 @@ class TrainConfig(BaseConfig):
         text_encoder_3.stop_training_after = 30
         text_encoder_3.stop_training_after_unit = TimeUnit.EPOCH
         text_encoder_3.learning_rate = None
-        text_encoder_3.weight_dtype = DataType.NONE
         data.append(("text_encoder_3", text_encoder_3, TrainModelPartConfig, False))
         data.append(("text_encoder_3_layer_skip", 0, int, False))
+
+        # text encoder 4
+        text_encoder_4 = TrainModelPartConfig.default_values()
+        text_encoder_4.train = True
+        text_encoder_4.stop_training_after = 30
+        text_encoder_4.stop_training_after_unit = TimeUnit.EPOCH
+        text_encoder_4.learning_rate = None
+        data.append(("text_encoder_4", text_encoder_4, TrainModelPartConfig, False))
+        data.append(("text_encoder_4_layer_skip", 0, int, False))
 
         # vae
         vae = TrainModelPartConfig.default_values()
         vae.model_name = ""
-        vae.weight_dtype = DataType.FLOAT_32
         data.append(("vae", vae, TrainModelPartConfig, False))
 
         # effnet encoder
         effnet_encoder = TrainModelPartConfig.default_values()
         effnet_encoder.model_name = ""
-        effnet_encoder.weight_dtype = DataType.NONE
         data.append(("effnet_encoder", effnet_encoder, TrainModelPartConfig, False))
 
         # decoder
         decoder = TrainModelPartConfig.default_values()
         decoder.model_name = ""
-        decoder.weight_dtype = DataType.NONE
         data.append(("decoder", decoder, TrainModelPartConfig, False))
 
         # decoder text encoder
         decoder_text_encoder = TrainModelPartConfig.default_values()
-        decoder_text_encoder.weight_dtype = DataType.NONE
         data.append(("decoder_text_encoder", decoder_text_encoder, TrainModelPartConfig, False))
 
         # decoder vqgan
         decoder_vqgan = TrainModelPartConfig.default_values()
-        decoder_vqgan.weight_dtype = DataType.NONE
         data.append(("decoder_vqgan", decoder_vqgan, TrainModelPartConfig, False))
 
         # masked training
@@ -910,6 +1212,13 @@ class TrainConfig(BaseConfig):
         data.append(("unmasked_probability", 0.1, float, False))
         data.append(("unmasked_weight", 0.1, float, False))
         data.append(("normalize_masked_area_loss", False, bool, False))
+        data.append(("masked_prior_preservation_weight", 0.0, float, False))
+        data.append(("custom_conditioning_image", False, bool, False))
+
+        #layer filter
+        data.append(("layer_filter", "", str, False))
+        data.append(("layer_filter_preset", "full", str, False))
+        data.append(("layer_filter_regex", False, bool, False))
 
         # embedding
         data.append(("embedding_learning_rate", None, float, True))
@@ -930,9 +1239,22 @@ class TrainConfig(BaseConfig):
         data.append(("lora_decompose_norm_epsilon", True, bool, False))
         data.append(("lora_decompose_output_axis", False, bool, False))
         data.append(("lora_weight_dtype", DataType.FLOAT_32, DataType, False))
-        data.append(("lora_layers", "", str, False))
-        data.append(("lora_layer_preset", None, str, True))
         data.append(("bundle_additional_embeddings", True, bool, False))
+
+        # oft
+        data.append(("oft_block_size", 32, int, False))
+        data.append(("oft_block_share", False, bool, False))
+        data.append(("oft_scaled", False, bool, False))
+
+        # lokr
+        data.append(("lokr_dim", 16, int, False))
+        data.append(("lokr_decompose_both", False, bool, False))
+        data.append(("lokr_decompose_factor", -1, int, False))
+        data.append(("lokr_use_tucker", False, bool, False))
+        data.append(("lokr_weight_decompose", False, bool, False))
+        data.append(("lokr_dora_on_output", True, bool, False))
+        data.append(("lokr_full_matrix", False, bool, False))
+        data.append(("lokr_vec_trick", True, bool, False))
 
         # optimizer
         data.append(("optimizer", TrainOptimizerConfig.default_values(), TrainOptimizerConfig, False))

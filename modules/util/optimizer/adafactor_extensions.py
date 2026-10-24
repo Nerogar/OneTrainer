@@ -91,8 +91,10 @@ def step_adafactor_parameter(self, p, group, i):
 
     if p.dtype == torch.bfloat16 and self.stochastic_rounding:
         copy_stochastic_(p, p_data_fp32)
-    if p.dtype in {torch.float16, torch.bfloat16}:
+    elif p.dtype in {torch.float16, torch.bfloat16}:
         p.copy_(p_data_fp32)
+    else:
+        assert p_data_fp32 is p
 
 
 @torch.no_grad()

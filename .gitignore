@@ -10,7 +10,7 @@ debug*.py
 
 # user data
 /workspace*
-/models*
+/models/*
 /training_concepts
 /training_samples
 /training_user_settings
@@ -18,6 +18,10 @@ debug*.py
 /update.var
 config.json
 secrets.json
+*.zip
+# excludes all but then whitelists default json presets
+/training_presets/**/*.json
+!/training_presets/**/#*.json
 
 # environments
 /.venv*
@@ -35,3 +39,5 @@ pixi.toml
 /src
 train.bat
 debug_report.log
+config_diff.txt
+CLAUDE.md

@@ -3,7 +3,7 @@ from collections.abc import Callable
 
 from modules.model.StableDiffusionModel import StableDiffusionModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
-from modules.util import create
+from modules.util import create, factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
@@ -12,7 +12,6 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
 from modules.util.image_util import load_image
-from modules.util.torch_util import torch_gc
 
 import torch
 from torch import nn
@@ -21,6 +20,14 @@ from torchvision.transforms import transforms
 from tqdm import tqdm
 
 
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_15)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_15_INPAINTING)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_20)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_20_BASE)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_20_INPAINTING)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_20_DEPTH)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_21)
+@factory.register(BaseModelSampler, ModelType.STABLE_DIFFUSION_21_BASE)
 class StableDiffusionSampler(BaseModelSampler):
     def __init__(
             self,
@@ -66,7 +73,7 @@ class StableDiffusionSampler(BaseModelSampler):
             vae_scale_factor = self.pipeline.vae_scale_factor
 
             # prepare prompt
-            self.model.text_encoder_to(self.train_device)
+            self.model.materialize_only("text_encoder")
 
             prompt_embedding = self.model.encode_text(
                 text=prompt,
@@ -82,9 +89,6 @@ class StableDiffusionSampler(BaseModelSampler):
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
                 .to(dtype=self.model.train_dtype.torch_dtype())
 
-            self.model.text_encoder_to(self.temp_device)
-            torch_gc()
-
             # prepare timesteps
             noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
             timesteps = noise_scheduler.timesteps
@@ -93,8 +97,10 @@ class StableDiffusionSampler(BaseModelSampler):
                 last_timestep = torch.ones(1, device=self.train_device, dtype=torch.int64) \
                                 * (noise_scheduler.config.num_train_timesteps - 1)
 
-                # add the final timestep to force predicting with zero snr
-                timesteps = torch.cat([last_timestep, timesteps])
+                # add the final timestep to force predicting with zero snr if it's not already here
+                if timesteps[0] != last_timestep:
+                    noise_scheduler.set_timesteps(diffusion_steps + 1, device=self.train_device)
+                    timesteps = torch.cat([last_timestep, timesteps])
 
             # prepare latent image
             num_channels_latents = unet.config.in_channels
@@ -111,7 +117,7 @@ class StableDiffusionSampler(BaseModelSampler):
                 extra_step_kwargs["generator"] = generator
 
             # denoising loop
-            self.model.unet_to(self.train_device)
+            self.model.materialize_only("unet")
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 latent_model_input = torch.cat([latent_image] * 2)
                 latent_model_input = noise_scheduler.scale_model_input(latent_model_input, timestep)
@@ -145,20 +151,14 @@ class StableDiffusionSampler(BaseModelSampler):
 
                 on_update_progress(i + 1, len(timesteps))
 
-            self.model.unet_to(self.temp_device)
-            torch_gc()
-
             # decode
-            self.model.vae_to(self.train_device)
+            self.model.materialize_only("vae")
 
             latent_image = latent_image.to(dtype=vae.dtype)
             image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
             do_denormalize = [True] * image.shape[0]
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
-
-            self.model.vae_to(self.temp_device)
-            torch_gc()
 
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,
@@ -213,7 +213,7 @@ class StableDiffusionSampler(BaseModelSampler):
             vae_scale_factor = self.pipeline.vae_scale_factor
 
             # prepare conditioning image
-            self.model.vae_to(self.train_device)
+            self.model.materialize_only("vae")
 
             if sample_inpainting:
                 t = transforms.Compose([
@@ -267,11 +267,8 @@ class StableDiffusionSampler(BaseModelSampler):
                     device=self.train_device
                 )
 
-            self.model.vae_to(self.temp_device)
-            torch_gc()
-
             # prepare prompt
-            self.model.text_encoder_to(self.train_device)
+            self.model.materialize_only("text_encoder")
 
             prompt_embedding = self.model.encode_text(
                 text=prompt,
@@ -287,9 +284,6 @@ class StableDiffusionSampler(BaseModelSampler):
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
                 .to(dtype=self.model.train_dtype.torch_dtype())
 
-            self.model.text_encoder_to(self.temp_device)
-            torch_gc()
-
             # prepare timesteps
             noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
             timesteps = noise_scheduler.timesteps
@@ -298,8 +292,10 @@ class StableDiffusionSampler(BaseModelSampler):
                 last_timestep = torch.ones(1, device=self.train_device, dtype=torch.int64) \
                                 * (noise_scheduler.config.num_train_timesteps - 1)
 
-                # add the final timestep to force predicting with zero snr
-                timesteps = torch.cat([last_timestep, timesteps])
+                # add the final timestep to force predicting with zero snr if it's not already here
+                if timesteps[0] != last_timestep:
+                    noise_scheduler.set_timesteps(diffusion_steps + 1, device=self.train_device)
+                    timesteps = torch.cat([last_timestep, timesteps])
 
             # prepare latent image
             num_channels_latents = latent_conditioning_image.shape[1]
@@ -316,7 +312,7 @@ class StableDiffusionSampler(BaseModelSampler):
                 extra_step_kwargs["generator"] = generator
 
             # denoising loop
-            self.model.unet_to(self.train_device)
+            self.model.materialize_only("unet")
             for i, timestep in enumerate(tqdm(timesteps, desc="sampling")):
                 latent_model_input = noise_scheduler.scale_model_input(latent_image, timestep)
                 latent_model_input = torch.concat(
@@ -353,20 +349,14 @@ class StableDiffusionSampler(BaseModelSampler):
 
                 on_update_progress(i + 1, len(timesteps))
 
-            self.model.unet_to(self.temp_device)
-            torch_gc()
-
             #decode
-            self.model.vae_to(self.train_device)
+            self.model.materialize_only("vae")
 
             latent_image = latent_image.to(dtype=vae.dtype)
             image = vae.decode(latent_image / vae.config.scaling_factor, return_dict=False)[0]
 
             do_denormalize = [True] * image.shape[0]
             image = image_processor.postprocess(image, output_type='pil', do_denormalize=do_denormalize)
-
-            self.model.vae_to(self.temp_device)
-            torch_gc()
 
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,
@@ -377,9 +367,9 @@ class StableDiffusionSampler(BaseModelSampler):
             self,
             sample_config: SampleConfig,
             destination: str,
-            image_format: ImageFormat,
-            video_format: VideoFormat,
-            audio_format: AudioFormat,
+            image_format: ImageFormat | None = None,
+            video_format: VideoFormat | None = None,
+            audio_format: AudioFormat | None = None,
             on_sample: Callable[[ModelSamplerOutput], None] = lambda _: None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ):

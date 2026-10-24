@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 from modules.util.config.BaseConfig import BaseConfig
@@ -12,6 +13,8 @@ class CloudSecretsConfig(BaseConfig):
     port: int
     user: str
     id: str
+    key_file: str
+    password: str
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
@@ -25,7 +28,27 @@ class CloudSecretsConfig(BaseConfig):
         data.append(("host", "", str, False))
         data.append(("port", 0, str, False))
         data.append(("user", "root", str, False))
+        data.append(("key_file", "", str, False)) # whilst not a secret, makes more semantic sense here
+        data.append(("password", "", str, False))
         return CloudSecretsConfig(data)
+
+    def expanded_key_file(self) -> str:
+        key_file = getattr(self, "key_file", "").strip()
+        if key_file == "":
+            return ""
+        return str(Path(key_file).expanduser())
+
+    def connect_kwargs(self) -> dict:
+        kwargs = {}
+        key_file = self.expanded_key_file()
+        if key_file:
+            kwargs["key_filename"] = key_file
+        password = getattr(self, "password", "").strip()
+        if password:
+            kwargs["password"] = password
+        # Never query the ssh-agent: a broken agent can make paramiko's Agent() raise and abort the connect.
+        kwargs["allow_agent"] = False
+        return kwargs
 
 
 class CloudConfig(BaseConfig):
@@ -68,7 +91,7 @@ class CloudConfig(BaseConfig):
         data.append(("enabled", False, bool, False))
         data.append(("type", CloudType.RUNPOD, CloudType, False))
         data.append(("file_sync", CloudFileSync.NATIVE_SCP, CloudFileSync, False))
-        data.append(("create", True, bool, False))
+        data.append(("create", False, bool, False))
         data.append(("name", "OneTrainer", str, False))
         data.append(("tensorboard_tunnel", True, bool, False))
         data.append(("sub_type", "", str, False))

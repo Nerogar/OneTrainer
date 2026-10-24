@@ -18,6 +18,9 @@ torch_version = packaging.version.parse(torch.__version__)
 def state_dict_has_prefix(state_dict: dict | None, prefix: str):
     if not state_dict:
         return False
+    # Match on a dot-delimited segment boundary so "text_encoder" does not also match
+    # "text_encoder_2". Callers pass the bare prefix; the trailing dot is added here.
+    prefix = prefix + '.'
     return any(k.startswith(prefix) for k in state_dict)
 
 def get_tensor_data(
@@ -148,7 +151,7 @@ def replace_tensors_(
         target_data.data = source_data.data
     elif isinstance(target_data, list | tuple):
         for i, elem in enumerate(target_data):
-            if i in include_parameter_indices or include_parameter_indices is None:
+            if include_parameter_indices is None or i in include_parameter_indices:
                 replace_tensors_(elem, source_data[i])
     elif isinstance(target_data, dict) and include_parameter_indices is None:
         for key, elem in target_data.items():
@@ -187,6 +190,7 @@ def tensors_record_stream(
     elif isinstance(data, list | tuple):
         for i, elem in enumerate(data):
             if include_parameter_indices is None or i in include_parameter_indices:
+                # [] intentional - process all tensors inside the selected parameter(s)
                 tensors_record_stream(stream, elem, [])
     elif isinstance(data, dict):
         for elem in data.values():

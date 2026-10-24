@@ -4,8 +4,8 @@ REM Avoid footgun by explictly navigating to the directory containing the batch 
 cd /d "%~dp0"
 
 REM Verify that OneTrainer is our current working directory
-if not exist "scripts\train_ui.py" (
-    echo Error: train_ui.py does not exist, you have done something very wrong. Reclone the repository.
+if not exist "scripts\train_ui_qt.py" (
+    echo Error: train_ui_qt.py does not exist, you have done something very wrong. Reclone the repository.
     goto :end
 )
 
@@ -20,7 +20,7 @@ goto :end
 
 :activate_venv
 echo activating venv %VENV_DIR%
-set PYTHON="%VENV_DIR%\Scripts\python.exe"
+set PYTHON="%VENV_DIR%\Scripts\python.exe" -X utf8
 echo Using Python %PYTHON%
 
 :launch

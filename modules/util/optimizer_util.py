@@ -1,8 +1,9 @@
+import modules.util.multi_gpu_util as multi
 from modules.model.BaseModel import BaseModel
-from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig, TrainOptimizerConfig
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.NamedParameterGroup import NamedParameterGroupCollection
+from modules.util.optimizer.muon_util import build_muon_adam_key_fn
 from modules.util.torch_util import optimizer_to_device_
 
 import torch
@@ -53,16 +54,42 @@ def init_model_parameters(
         train_device: torch.device,
 ):
     model.parameters = parameters
+    #random (LoRA) initialisation can differ, broadcast from GPU #0 to all others
+    #to be safe, do that before the optimizer is created because the optimizer could take copies
+    multi.broadcast_parameters(parameters.parameters(), train_device)
 
-    model.optimizer = create.create_optimizer(parameters, model.optimizer_state_dict, model.train_config)
+    layer_key_fn = None
+    if model.train_config.optimizer.MuonWithAuxAdam:
+        print("INFO: Creating layer keys for MuonWithAuxAdam.")
+        layer_key_fn = build_muon_adam_key_fn(model, model.train_config)
+
+    from modules.util import create
+
+    model.optimizer = create.create_optimizer(
+        parameters, model.optimizer_state_dict, model.train_config, layer_key_fn
+    )
+
     if model.optimizer is not None:
         optimizer_to_device_(model.optimizer, train_device)
     model.optimizer_state_dict = None
 
-    model.ema = create.create_ema(parameters.parameters(), model.ema_state_dict, model.train_config)
+    if multi.is_master():
+        model.ema = create.create_ema(parameters.parameters(), model.ema_state_dict, model.train_config)
+    else:
+        model.ema = None
     model.ema_state_dict = None
 
-    model.param_group_mapping = parameters.unique_name_mapping
+    if model.optimizer is not None and any('optim_type' in g for g in model.optimizer.param_groups):
+        new_param_group_mapping = []
+        for group in model.optimizer.param_groups:
+            original_name = group.get('name')
+
+            optim_type = group.get('optim_type', 'unknown')
+            unique_name = f"{original_name}_{optim_type}"
+            new_param_group_mapping.append(unique_name)
+        model.param_group_mapping = new_param_group_mapping
+    else:
+        model.param_group_mapping = parameters.unique_name_mapping
 
 
 # Optimizer Key map with defaults
@@ -124,6 +151,17 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "percentile_clipping": 100,
         "block_wise": True,
         "is_paged": False,
+    },
+    Optimizer.MUON: {
+        "momentum": 0.95,
+        "weight_decay": 0.0,
+        "MuonWithAuxAdam": True,
+        "muon_hidden_layers": None,
+        "muon_adam_regex": False,
+        "muon_adam_lr": 3e-4,
+        "muon_te1_adam_lr": None,
+        "muon_te2_adam_lr": None,
+        "muon_adam_config": {},
     },
     Optimizer.AdEMAMix_8BIT: {
         "beta1": 0.9,
@@ -284,17 +322,19 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "use_speed": False,
         "eps": 1e-8,
         "split_groups": True,
-        "split_groups_mean": True,
+        "split_groups_mean": False,
         "factored": True,
         "factored_fp32": True,
         "fused_back_pass": False,
         "use_stableadamw": True,
-        "use_muon_pp": False,
         "use_cautious": False,
         "use_grams": False,
         "use_adopt": False,
-        "use_focus": False,
+        "d_limiter": True,
         "stochastic_rounding": True,
+        "use_schedulefree": True,
+        "schedulefree_c": 0.0,
+        "use_orthograd": False,
     },
     Optimizer.DADAPT_ADA_GRAD: {
         "momentum": 0,
@@ -394,7 +434,165 @@ OPTIMIZER_DEFAULT_PARAMETERS = {
         "eps2": 1e-16,
         "weight_decay": 1e-2,
         "stochastic_rounding": False,
+        "use_cautious": False,
         "fused_back_pass": False,
+    },
+    Optimizer.CAME_8BIT: {
+        "beta1": 0.9,
+        "beta2": 0.999,
+        "beta3": 0.9999,
+        "eps": 1e-30,
+        "eps2": 1e-16,
+        "weight_decay": 1e-2,
+        "stochastic_rounding": False,
+        "fused_back_pass": False,
+        "min_8bit_size": 16384,
+        "quant_block_size": 2048
+    },
+    Optimizer.ADAMW_ADV: {
+        "beta1": 0.9,
+        "beta2": 0.99,
+        "eps": 1e-8,
+        "cautious_wd": False,
+        "weight_decay": 0.0,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "compile": False,
+        "fused_back_pass": False,
+        "use_atan2": False,
+        "orthogonal_gradient": False,
+        "use_AdEMAMix": False,
+        "beta3_ema": 0.9999,
+        "alpha": 5,
+        "kourkoutas_beta": False,
+    },
+    Optimizer.ADOPT_ADV: {
+        "beta1": 0.9,
+        "beta2": 0.9999,
+        "eps": 1e-6,
+        "cautious_wd": False,
+        "weight_decay": 0.0,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "compile": False,
+        "fused_back_pass": False,
+        "use_atan2": True,
+        "orthogonal_gradient": False,
+        "use_AdEMAMix": False,
+        "beta3_ema": 0.9999,
+        "alpha": 5,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
+        "kourkoutas_beta": False,
+    },
+    Optimizer.PRODIGY_ADV: {
+        "beta1": 0.9,
+        "beta2": 0.99,
+        "beta3": None,
+        "eps": 1e-8,
+        "cautious_wd": False,
+        "weight_decay": 0.0,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "compile": False,
+        "fused_back_pass": False,
+        "d0": 1e-6,
+        "d_coef": 1.0,
+        "growth_rate": float('inf'),
+        "slice_p": 11,
+        "prodigy_steps": 0,
+        "d_limiter": False,
+        "use_atan2": False,
+        "orthogonal_gradient": False,
+        "use_AdEMAMix": False,
+        "beta3_ema": 0.9999,
+        "alpha": 5,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
+        "kourkoutas_beta": False,
+    },
+    Optimizer.SIGNSGD_ADV: {
+        "momentum": 0.95,
+        "cautious_wd": False,
+        "weight_decay": 0.0,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "compile": False,
+        "fused_back_pass": False,
+        "orthogonal_gradient": False,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
+    },
+    Optimizer.LION_ADV: {
+        "beta1": 0.9,
+        "beta2": 0.99,
+        "cautious_wd": False,
+        "weight_decay": 0.0,
+        "clip_threshold": None,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "compile": False,
+        "fused_back_pass": False,
+        "orthogonal_gradient": False,
+        "auto_kappa_p": True,
+    },
+    Optimizer.MUON_ADV: {
+        "beta1": 0.9,
+        "cautious_wd": False,
+        "weight_decay": 0.0,
+        "accelerated_ns": False,
+        "ns_steps": 5,
+        "low_rank_ortho": False,
+        "ortho_rank": 128,
+        "rms_rescaling": True,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "compile": False,
+        "fused_back_pass": False,
+        "MuonWithAuxAdam": True,
+        "muon_hidden_layers": None,
+        "muon_adam_regex": False,
+        "muon_adam_lr": 1e-6,
+        "muon_te1_adam_lr": None,
+        "muon_te2_adam_lr": None,
+        "nesterov": True,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
+        "normuon_variant": True,
+        "beta2_normuon": 0.95,
+        "orthogonal_gradient": False,
+        "approx_mars": False,
+        "muon_adam_config": {},
+    },
+    Optimizer.ADAMUON_ADV: {
+        "beta1": 0.95,
+        "beta2": 0.95,
+        "eps": 1e-8,
+        "cautious_wd": False,
+        "weight_decay": 0.0,
+        "accelerated_ns": False,
+        "ns_steps": 5,
+        "low_rank_ortho": False,
+        "ortho_rank": 128,
+        "rms_rescaling": True,
+        "nnmf_factor": False,
+        "stochastic_rounding": True,
+        "compile": False,
+        "fused_back_pass": False,
+        "MuonWithAuxAdam": True,
+        "muon_hidden_layers": None,
+        "muon_adam_regex": False,
+        "muon_adam_lr": 1e-6,
+        "muon_te1_adam_lr": None,
+        "muon_te2_adam_lr": None,
+        "nesterov": False,
+        "use_atan2": False,
+        "Simplified_AdEMAMix": False,
+        "alpha_grad": 100.0,
+        "normuon_variant": True,
+        "orthogonal_gradient": False,
+        "approx_mars": False,
+        "muon_adam_config": {},
     },
     Optimizer.ADABELIEF: {
         "beta1": 0.9,

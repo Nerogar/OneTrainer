@@ -1,35 +1,22 @@
 from modules.model.StableDiffusion3Model import StableDiffusion3Model
+from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseStableDiffusion3Setup import BaseStableDiffusion3Setup
 from modules.module.LoRAModule import LoRAModuleWrapper
+from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
-from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
+from modules.util.enum.ModelType import ModelType
+from modules.util.enum.TrainingMethod import TrainingMethod
+from modules.util.NamedParameterGroup import NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.torch_util import state_dict_has_prefix
 from modules.util.TrainProgress import TrainProgress
 
-import torch
 
-PRESETS = {
-    "attn-only": ["attn"],
-    "full": [],
-}
-
-
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_3, TrainingMethod.LORA)
+@factory.register(BaseModelSetup, ModelType.STABLE_DIFFUSION_35, TrainingMethod.LORA)
 class StableDiffusion3LoRASetup(
     BaseStableDiffusion3Setup,
 ):
-    def __init__(
-            self,
-            train_device: torch.device,
-            temp_device: torch.device,
-            debug_mode: bool,
-    ):
-        super().__init__(
-            train_device=train_device,
-            temp_device=temp_device,
-            debug_mode=debug_mode,
-        )
-
     def create_parameters(
             self,
             model: StableDiffusion3Model,
@@ -37,26 +24,9 @@ class StableDiffusion3LoRASetup(
     ) -> NamedParameterGroupCollection:
         parameter_group_collection = NamedParameterGroupCollection()
 
-        if config.text_encoder.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="text_encoder_1",
-                parameters=model.text_encoder_1_lora.parameters(),
-                learning_rate=config.text_encoder.learning_rate,
-            ))
-
-        if config.text_encoder_2.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="text_encoder_2",
-                parameters=model.text_encoder_2_lora.parameters(),
-                learning_rate=config.text_encoder_2.learning_rate,
-            ))
-
-        if config.text_encoder_3.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="text_encoder_3",
-                parameters=model.text_encoder_3_lora.parameters(),
-                learning_rate=config.text_encoder_3.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder_1_lora", model.text_encoder_1_lora, config.text_encoder)
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder_2_lora", model.text_encoder_2_lora, config.text_encoder_2)
+        self._create_model_part_parameters(parameter_group_collection, "text_encoder_3_lora", model.text_encoder_3_lora, config.text_encoder_3)
 
         if config.train_any_embedding() or config.train_any_output_embedding():
             if config.text_encoder.train_embedding and model.text_encoder_1 is not None:
@@ -77,12 +47,7 @@ class StableDiffusion3LoRASetup(
                     "embeddings_3"
                 )
 
-        if config.prior.train:
-            parameter_group_collection.add_group(NamedParameterGroup(
-                unique_name="transformer",
-                parameters=model.transformer_lora.parameters(),
-                learning_rate=config.prior.learning_rate,
-            ))
+        self._create_model_part_parameters(parameter_group_collection, "transformer_lora", model.transformer_lora, config.transformer)
 
         return parameter_group_collection
 
@@ -101,53 +66,38 @@ class StableDiffusion3LoRASetup(
         model.transformer.requires_grad_(False)
         model.vae.requires_grad_(False)
 
-        if model.text_encoder_1_lora is not None:
-            train_text_encoder_1 = config.text_encoder.train and \
-                                   not self.stop_text_encoder_training_elapsed(config, model.train_progress)
-            model.text_encoder_1_lora.requires_grad_(train_text_encoder_1)
-
-        if model.text_encoder_2_lora is not None:
-            train_text_encoder_2 = config.text_encoder_2.train and \
-                                   not self.stop_text_encoder_2_training_elapsed(config, model.train_progress)
-            model.text_encoder_2_lora.requires_grad_(train_text_encoder_2)
-
-        if model.text_encoder_3_lora is not None:
-            train_text_encoder_3 = config.text_encoder_3.train and \
-                                   not self.stop_text_encoder_3_training_elapsed(config, model.train_progress)
-            model.text_encoder_3_lora.requires_grad_(train_text_encoder_3)
-
-        if model.transformer_lora is not None:
-            train_transformer = config.prior.train and \
-                         not self.stop_prior_training_elapsed(config, model.train_progress)
-            model.transformer_lora.requires_grad_(train_transformer)
-
+        self._setup_model_part_requires_grad("text_encoder_1_lora", model.text_encoder_1_lora, config.text_encoder, model.train_progress)
+        self._setup_model_part_requires_grad("text_encoder_2_lora", model.text_encoder_2_lora, config.text_encoder_2, model.train_progress)
+        self._setup_model_part_requires_grad("text_encoder_3_lora", model.text_encoder_3_lora, config.text_encoder_3, model.train_progress)
+        self._setup_model_part_requires_grad("transformer_lora", model.transformer_lora, config.transformer, model.train_progress)
 
     def setup_model(
             self,
             model: StableDiffusion3Model,
             config: TrainConfig,
     ):
-        create_te1 = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "lora_te1")
-        create_te2 = config.text_encoder_2.train or state_dict_has_prefix(model.lora_state_dict, "lora_te2")
-        create_te3 = config.text_encoder_3.train or state_dict_has_prefix(model.lora_state_dict, "lora_te3")
+        create_te1 = config.text_encoder.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder")
+        create_te2 = config.text_encoder_2.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder_2")
+        create_te3 = config.text_encoder_3.train or state_dict_has_prefix(model.lora_state_dict, "text_encoder_3")
 
         if model.text_encoder_1 is not None:
             model.text_encoder_1_lora = LoRAModuleWrapper(
-                model.text_encoder_1, "lora_te1", config
+                model.text_encoder_1, "text_encoder", config
             ) if create_te1 else None
 
         if model.text_encoder_2 is not None:
             model.text_encoder_2_lora = LoRAModuleWrapper(
-                model.text_encoder_2, "lora_te2", config
+                model.text_encoder_2, "text_encoder_2", config
             ) if create_te2 else None
 
         if model.text_encoder_3 is not None:
             model.text_encoder_3_lora = LoRAModuleWrapper(
-                model.text_encoder_3, "lora_te3", config
+                model.text_encoder_3, "text_encoder_3", config
             ) if create_te3 else None
 
         model.transformer_lora = LoRAModuleWrapper(
-            model.transformer, "lora_transformer", config, config.lora_layers.split(",")
+            model.transformer, "transformer", config, config.layer_filter.split(","),
+            fusion_spec=model.fusion_groups(), fuse=config.output_model_format.needs_qkv_fusion(),
         )
 
         if model.lora_state_dict:
@@ -187,14 +137,12 @@ class StableDiffusion3LoRASetup(
             if model.text_encoder_3 is not None:
                 model.text_encoder_3.get_input_embeddings().to(dtype=config.embedding_weight_dtype.torch_dtype())
 
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_1)
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_2)
-        self._remove_added_embeddings_from_tokenizer(model.tokenizer_3)
         self._setup_embeddings(model, config)
         self._setup_embedding_wrapper(model, config)
-        self.__setup_requires_grad(model, config)
 
-        init_model_parameters(model, self.create_parameters(model, config), self.train_device)
+        params = self.create_parameters(model, config)
+        self.__setup_requires_grad(model, config)
+        init_model_parameters(model, params, self.train_device)
 
     def setup_train_device(
             self,
@@ -214,11 +162,16 @@ class StableDiffusion3LoRASetup(
             config.train_text_encoder_3_or_embedding() \
             or not config.latent_caching
 
-        model.text_encoder_1_to(self.train_device if text_encoder_1_on_train_device else self.temp_device)
-        model.text_encoder_2_to(self.train_device if text_encoder_2_on_train_device else self.temp_device)
-        model.text_encoder_3_to(self.train_device if text_encoder_3_on_train_device else self.temp_device)
-        model.vae_to(self.train_device if vae_on_train_device else self.temp_device)
-        model.transformer_to(self.train_device)
+        parts = ["transformer"]
+        if text_encoder_1_on_train_device:
+            parts.append("text_encoder")
+        if text_encoder_2_on_train_device:
+            parts.append("text_encoder_2")
+        if text_encoder_3_on_train_device:
+            parts.append("text_encoder_3")
+        if vae_on_train_device:
+            parts.append("vae")
+        model.materialize_only(*parts)
 
         if model.text_encoder_1:
             if config.text_encoder.train:
@@ -240,7 +193,7 @@ class StableDiffusion3LoRASetup(
 
         model.vae.eval()
 
-        if config.prior.train:
+        if config.transformer.train:
             model.transformer.train()
         else:
             model.transformer.eval()

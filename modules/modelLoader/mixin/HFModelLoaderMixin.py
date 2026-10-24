@@ -1,23 +1,29 @@
 import json
+import logging
 import os
 from abc import ABCMeta
 from itertools import repeat
 
+from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.DataType import DataType
 from modules.util.quantization_util import (
     is_quantized_parameter,
-    replace_linear_with_fp8_layers,
-    replace_linear_with_int8_layers,
-    replace_linear_with_nf4_layers,
+    replace_linear_with_quantized_layers,
 )
 
 import torch
 from torch import nn
 
+from transformers.conversion_mapping import get_checkpoint_conversion_mapping
+from transformers.core_model_loading import rename_source_key
+
 import accelerate
 import huggingface_hub
 from huggingface_hub.utils import EntryNotFoundError
 from safetensors.torch import load_file
+
+# huggingface_hub 1.16+ uses httpx, which logs every HTTP request/response at INFO level.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 class HFModelLoaderMixin(metaclass=ABCMeta):
@@ -30,6 +36,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             dtype: DataType,
             train_dtype: DataType,
             keep_in_fp32_modules: list[str] | None,
+            quantization: QuantizationConfig | None,
             pretrained_model_name_or_path: str,
             subfolder: str | None,
             model_filename: str,
@@ -39,13 +46,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         if keep_in_fp32_modules is None:
             keep_in_fp32_modules = []
 
-        with accelerate.init_empty_weights():
-            if dtype.quantize_nf4():
-                replace_linear_with_nf4_layers(sub_module, keep_in_fp32_modules, copy_parameters=False)
-            elif dtype.quantize_int8():
-                replace_linear_with_int8_layers(sub_module, keep_in_fp32_modules, copy_parameters=False)
-            elif dtype.quantize_fp8():
-                replace_linear_with_fp8_layers(sub_module, keep_in_fp32_modules, copy_parameters=False)
+        replace_linear_with_quantized_layers(sub_module, dtype, keep_in_fp32_modules, quantization, copy_parameters=False)
 
         is_local = os.path.isdir(pretrained_model_name_or_path)
 
@@ -118,6 +119,26 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
         if hasattr(sub_module, '_fix_state_dict_keys_on_load'):
             sub_module._fix_state_dict_keys_on_load(state_dict)
 
+        #some checkpoints (e.g. Ernie's Mistral3 text encoder, Qwen's Qwen2_5_VL text encoder) were saved with an
+        #older module layout than the one transformers builds from the config in this version. transformers' own
+        #from_pretrained applies the same renaming via its checkpoint conversion registry, so we reuse it here.
+        #diffusers sub-modules have no such registry (their config is a plain FrozenDict, no model_type), and
+        #never need this renaming.
+        weight_renamings = get_checkpoint_conversion_mapping(sub_module.config.model_type) \
+            if hasattr(sub_module.config, 'model_type') else None
+        if weight_renamings:
+            meta_state_dict = sub_module.state_dict()
+            new_state_dict = {}
+            for k, v in state_dict.items():
+                new_k, _ = rename_source_key(
+                    k, weight_renamings, [], prefix=sub_module.base_model_prefix, meta_state_dict=meta_state_dict,
+                )
+                new_state_dict[new_k] = v
+            state_dict = new_state_dict
+
+        #tensors that will be quantized are loaded at their original dtype. non-quantized tensors are converted
+        #to their intended dtype here
+        #TODO the following code requires quite a few workarounds by now. Is there a better way?
         for key, value in state_dict.items():
             module = sub_module
             tensor_name = key
@@ -150,6 +171,23 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
 
         del state_dict
 
+        #tied weights (e.g. T5EncoderModel's encoder.embed_tokens.weight <-> shared.weight, or
+        #Qwen3ForCausalLM's lm_head.weight <-> model.embed_tokens.weight) are saved only once in the checkpoint,
+        #so the tied key above is never assigned and stays an empty meta tensor. populate it by cloning the
+        #source weight that was actually loaded, rather than aliasing the same Parameter object: aliasing would
+        #make a later in-place quantization of one side (e.g. quantize_layers() quantizing lm_head) silently
+        #corrupt the other (e.g. the embedding table), since both attribute paths would refer to the same object.
+        tied_weights_keys = getattr(sub_module, '_tied_weights_keys', None)
+        if tied_weights_keys is not None:
+            for target_key, source_key in tied_weights_keys.items():
+                module = sub_module
+                *parents, tensor_name = target_key.split(".")
+                for p in parents:
+                    module = getattr(module, p)
+                if module._parameters[tensor_name].is_meta:
+                    source = sub_module.get_parameter(source_key)
+                    module._parameters[tensor_name] = type(module._parameters[tensor_name])(source)
+
         return sub_module
 
     def _load_transformers_sub_module(
@@ -158,7 +196,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             dtype: DataType,
             train_dtype: DataType,
             pretrained_model_name_or_path: str,
-            subfolder: str | None = None,
+            subfolder: str = "",
     ):
         user_agent = {
             "file_type": "model",
@@ -180,6 +218,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             dtype=dtype,
             train_dtype=train_dtype,
             keep_in_fp32_modules=module_type._keep_in_fp32_modules,
+            quantization=None,
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             subfolder=subfolder,
             model_filename="model.safetensors",
@@ -194,6 +233,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             train_dtype: DataType,
             pretrained_model_name_or_path: str,
             subfolder: str | None = None,
+            quantization: QuantizationConfig | None = None,
     ):
         user_agent = {
             "file_type": "model",
@@ -215,6 +255,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             dtype=dtype,
             train_dtype=train_dtype,
             keep_in_fp32_modules=module_type._keep_in_fp32_modules,
+            quantization=quantization,
             pretrained_model_name_or_path=pretrained_model_name_or_path,
             subfolder=subfolder,
             model_filename="diffusion_pytorch_model.safetensors",
@@ -228,21 +269,16 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             dtype: DataType,
             train_dtype: DataType,
             keep_in_fp32_modules: list[str] | None,
+            quantization: QuantizationConfig | None,
     ):
         if keep_in_fp32_modules is None:
             keep_in_fp32_modules = []
 
-        if dtype.quantize_nf4():
-            replace_linear_with_nf4_layers(sub_module, keep_in_fp32_modules, copy_parameters=True)
-        elif dtype.quantize_int8():
-            replace_linear_with_int8_layers(sub_module, keep_in_fp32_modules, copy_parameters=True)
-        elif dtype.quantize_fp8():
-            replace_linear_with_fp8_layers(sub_module, keep_in_fp32_modules, copy_parameters=True)
+        replace_linear_with_quantized_layers(sub_module, dtype, keep_in_fp32_modules, quantization, copy_parameters=True)
 
         for module_name, module in sub_module.named_modules():
             param_iter = [(x, y[0], y[1]) for x, y in zip(repeat(False), module._parameters.items(), strict=False)]
             buffer_iter = [(x, y[0], y[1]) for x, y in zip(repeat(True), module._buffers.items(), strict=False)]
-
             for is_buffer, tensor_name, value in param_iter + buffer_iter:
                 if value is not None and torch.is_floating_point(value):
                     old_type = type(value)
@@ -266,6 +302,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             sub_module: nn.Module,
             dtype: DataType,
             train_dtype: DataType,
+            quantization: QuantizationConfig | None = None,
     ):
         module_type = type(sub_module)
 
@@ -274,6 +311,7 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             dtype,
             train_dtype,
             module_type._keep_in_fp32_modules,
+            quantization,
         )
 
     def _convert_diffusers_sub_module_to_dtype(
@@ -281,10 +319,12 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             sub_module: nn.Module,
             dtype: DataType,
             train_dtype: DataType,
+            quantization: QuantizationConfig | None = None,
     ):
         return self.__convert_sub_module_to_dtype(
             sub_module,
             dtype,
             train_dtype,
             None,
+            quantization,
         )

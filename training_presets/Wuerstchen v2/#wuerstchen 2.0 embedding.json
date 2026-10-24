@@ -1,0 +1,35 @@
+{
+    "backup_after": 10,
+    "base_model_name": "warp-ai/wuerstchen-prior",
+    "prior": {
+        "weight_dtype": "FLOAT_16"
+    },
+    "text_encoder": {
+        "weight_dtype": "FLOAT_16"
+    },
+    "decoder_text_encoder": {
+        "weight_dtype": "FLOAT_16"
+    },
+    "decoder_vqgan": {
+        "weight_dtype": "FLOAT_16"
+    },
+    "decoder": {
+        "model_name": "warp-ai/wuerstchen",
+        "weight_dtype": "FLOAT_16"
+    },
+    "effnet_encoder": {
+        "model_name": "warp-ai/EfficientNetEncoder",
+        "weight_dtype": "FLOAT_16"
+    },
+    "latent_caching": false,
+    "learning_rate": 0.0003,
+    "learning_rate_warmup_steps": 20,
+    "model_type": "WUERSTCHEN_2",
+    "output_model_destination": "models/embedding.safetensors",
+    "output_model_format": "SAFETENSORS",
+    "resolution": "1024",
+    "sample_after": 1,
+    "training_method": "EMBEDDING",
+    "loss_weight_fn": "P2",
+    "loss_weight_strength": 1.0
+}

@@ -45,10 +45,6 @@ class BaseTrainer(
     def end(self):
         pass
 
-    @abstractmethod
-    def backup(self, train_progress: TrainProgress):
-        pass
-
     def create_model_loader(self) -> BaseModelLoader:
         return create.create_model_loader(self.config.model_type, self.config.training_method)
 
@@ -61,12 +57,13 @@ class BaseTrainer(
             self.config.debug_mode,
         )
 
-    def create_data_loader(self, model: BaseModel, train_progress: TrainProgress, is_validation=False):
+    def create_data_loader(self, model: BaseModel, model_setup: BaseModelSetup, train_progress: TrainProgress, is_validation=False):
         return create.create_data_loader(
             self.train_device,
             self.temp_device,
             model,
             self.config.model_type,
+            model_setup,
             self.config.training_method,
             self.config,
             train_progress,

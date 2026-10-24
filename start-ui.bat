@@ -4,8 +4,8 @@ REM Avoid footgun by explictly navigating to the directory containing the batch 
 cd /d "%~dp0"
 
 REM Verify that OneTrainer is our current working directory
-if not exist "scripts\train_ui.py" (
-    echo Error: train_ui.py does not exist, you have done something very wrong. Reclone the repository.
+if not exist "scripts\train_ui_qt.py" (
+    echo Error: train_ui_qt.py does not exist, you have done something very wrong. Reclone the repository.
     goto :end
 )
 
@@ -31,13 +31,28 @@ if not exist "%VENV_DIR%\Scripts\python.exe" (
     echo Error: Python executable not found in virtual environment
     goto :end
 )
-set PYTHON="%VENV_DIR%\Scripts\python.exe"
+set PYTHON="%VENV_DIR%\Scripts\python.exe" -X utf8
 if defined PROFILE (set PYTHON=%PYTHON% -m scalene --off --cpu --gpu --profile-all --no-browser)
 echo Using Python %PYTHON%
 
+:check_python_version
+echo Checking Python version...
+%PYTHON% --version
+if errorlevel 1 (
+    echo Error: Failed to get Python version
+    goto :end_error
+)
+
+echo.
+%PYTHON% "%~dp0scripts\util\version_check.py" 3.10 3.14 2>&1
+if errorlevel 1 (
+    echo.
+    goto :wrong_python_version
+)
+
 :launch
 echo Starting UI...
-%PYTHON% scripts\train_ui.py
+%PYTHON% scripts\train_ui_qt.py
 if errorlevel 1 (
     echo Error: UI script exited with code %ERRORLEVEL%
 )
