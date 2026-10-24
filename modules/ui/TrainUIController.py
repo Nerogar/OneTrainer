@@ -46,6 +46,7 @@ class TrainUIController:
         # the currently open sample window, or None. Tracked so a second click doesn't spawn a
         # second (non-modal) window - the sample tool isn't designed to run two instances at once.
         self.sample_window = None
+        self.queue_controller = None
 
     def on_update_train_progress(self, train_progress: TrainProgress, max_step: int, max_epoch: int):
         # capture session start on first progress update
@@ -158,6 +159,13 @@ class TrainUIController:
 
     def open_video_tool(self, parent, view_cls):
         return VideoToolUIController().create_window(parent, view_cls)
+
+    def open_queue_tool(self, parent, view_cls):
+        from modules.ui.QueueTrainingUIController import QueueTrainingUIController
+        if self.queue_controller is None:
+            self.queue_controller = QueueTrainingUIController(self.train_config)
+        self.queue_controller.train_config = self.train_config
+        return self.queue_controller.create_window(parent, view_cls)
 
     def open_convert_model_tool(self, parent, view_cls):
         return ConvertModelUIController(

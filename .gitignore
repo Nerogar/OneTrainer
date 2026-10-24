@@ -22,9 +22,17 @@ settings.json
 config.json
 secrets.json
 *.zip
-# excludes all but then whitelists default json presets
-/training_presets/**/*.json
+
+# excludes all but then whitelists default json presets and ignores previous UI state
+/training_presets/**
+!/training_presets/**/
+!/training_presets/**/.gitignore
 !/training_presets/**/#*.json
+
+# Previous UI state is not a bundled default
+/training_presets/**/#.json
+
+/training_queue.*
 
 # environments
 /.venv*
@@ -46,10 +54,3 @@ config_diff.txt
 # macOS
 **/.DS_Store
 CLAUDE.md
-
-training_presets/*
-!training_presets/.gitignore
-!training_presets/\#*
-
-# #.json is an exception (from the exception). This file stores the ui state from a previous run.
-training_presets/\#.json
