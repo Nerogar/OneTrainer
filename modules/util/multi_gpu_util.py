@@ -6,6 +6,8 @@ from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 
 import torch
 
+from tqdm import tqdm
+
 
 def is_enabled() -> bool:
     return torch.distributed.is_available() and torch.distributed.is_initialized()
@@ -40,6 +42,15 @@ def master_first(enabled: bool = True):
                 torch.distributed.barrier()
     else:
         yield()
+
+def distributed(iterable, distribute: bool=True):
+    if distribute:
+        for i, x in enumerate(iterable):
+            if i % world_size() == rank():
+                yield x
+    elif is_master():
+        for x in iterable:
+            yield x
 
 def distributed_enumerate(iterable, distribute: bool=True):
     if distribute:
@@ -140,7 +151,7 @@ def parameter_divergence(params: list[torch.Tensor], train_device: torch.device)
 def warn_parameter_divergence(params: list[torch.Tensor], train_device: torch.device):
     divergence = parameter_divergence(params, train_device)
     if divergence is not None and divergence > 0:
-        print(f"\n\nWARNING: Parameter divergence between GPUs of {divergence}\n\n")
+        tqdm.write(f"WARNING: Parameter divergence between GPUs of {divergence}")
 
 
 @torch.no_grad()

@@ -1,9 +1,6 @@
 from modules.model.SanaModel import SanaModel
 from modules.modelSaver.mixin.LoRASaverMixin import LoRASaverMixin
-from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
-from modules.util.enum.ModelFormat import ModelFormat
 
-import torch
 from torch import Tensor
 
 
@@ -12,9 +9,6 @@ class SanaLoRASaver(
 ):
     def __init__(self):
         super().__init__()
-
-    def _get_convert_key_sets(self, model: SanaModel) -> list[LoraConversionKeySet] | None:
-        return None
 
     def _get_state_dict(
             self,
@@ -38,12 +32,3 @@ class SanaLoRASaver(
                     state_dict[f"bundle_emb.{placeholder}.gemma_out"] = embedding.text_encoder_embedding.output_vector
 
         return state_dict
-
-    def save(
-            self,
-            model: SanaModel,
-            output_model_format: ModelFormat,
-            output_model_destination: str,
-            dtype: torch.dtype | None,
-    ):
-        self._save(model, output_model_format, output_model_destination, dtype)

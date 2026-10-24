@@ -24,6 +24,8 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_XL_10_BASE)
+@factory.register(BaseDataLoader, ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING)
 class StableDiffusionXLBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -136,7 +138,7 @@ class StableDiffusionXLBaseDataLoader(
         debug_dir = os.path.join(config.debug_dir, "dataloader")
 
         def before_save_fun():
-            model.vae_to(self.train_device)
+            model.materialize("vae")
 
         decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae, autocast_contexts=[model.autocast_context, model.vae_autocast_context], dtype=model.vae_train_dtype.torch_dtype())
         decode_conditioning_image = DecodeVAE(in_name='latent_conditioning_image', out_name='decoded_conditioning_image', vae=model.vae, autocast_contexts=[model.autocast_context, model.vae_autocast_context], dtype=model.vae_train_dtype.torch_dtype())
@@ -176,5 +178,3 @@ class StableDiffusionXLBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
         )
-factory.register(BaseDataLoader, StableDiffusionXLBaseDataLoader, ModelType.STABLE_DIFFUSION_XL_10_BASE)
-factory.register(BaseDataLoader, StableDiffusionXLBaseDataLoader, ModelType.STABLE_DIFFUSION_XL_10_BASE_INPAINTING)

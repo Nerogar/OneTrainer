@@ -25,7 +25,8 @@ class BaseFileSync(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def sync_up_dir(self,local : Path,remote: Path,recursive: bool):
+    def sync_up_dir(self,local : Path,remote: Path,recursive: bool,sync_info=None,
+                    skip_hidden: bool=False, allowed_extensions: set[str] | None=None):
         pass
 
     @abstractmethod

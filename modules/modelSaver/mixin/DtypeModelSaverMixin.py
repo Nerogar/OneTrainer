@@ -12,8 +12,6 @@ from modules.util.modelSpec.ModelSpec import ModelSpec
 import torch
 from torch import Tensor
 
-import safetensors.torch as safetensors
-
 
 class DtypeModelSaverMixin:
     def __init__(self):
@@ -44,6 +42,28 @@ class DtypeModelSaverMixin:
             else:
                 state_dict[key] = value.contiguous()
 
+    def _copy_pipeline_to_dtype(
+            self,
+            pipeline,
+            dtype: torch.dtype | None,
+            *tokenizers,
+    ):
+        if dtype is None:
+            return pipeline
+
+        # replace the tokenizers' __deepcopy__ before calling deepcopy, to prevent a copy being made.
+        # the tokenizers try to reload from the file system otherwise
+        for tokenizer in tokenizers:
+            tokenizer.__deepcopy__ = lambda memo, tokenizer=tokenizer: tokenizer
+
+        save_pipeline = copy.deepcopy(pipeline)
+        save_pipeline.to(device="cpu", dtype=dtype, silence_dtype_warnings=True)
+
+        for tokenizer in tokenizers:
+            delattr(tokenizer, '__deepcopy__')
+
+        return save_pipeline
+
     def __calculate_safetensors_hash(
             self,
             state_dict: dict[str, Tensor] | None = None,
@@ -54,8 +74,8 @@ class DtypeModelSaverMixin:
         sha256_hash = hashlib.sha256()
 
         ordered_state_dict = OrderedDict(sorted(state_dict.items()))
-        for key, tensor in ordered_state_dict.items():
-            data = safetensors._tobytes(tensor, key)
+        for tensor in ordered_state_dict.values():
+            data = tensor.contiguous().cpu().flatten().view(torch.uint8).numpy().tobytes()
             sha256_hash.update(data)
 
         return f"0x{sha256_hash.hexdigest()}"

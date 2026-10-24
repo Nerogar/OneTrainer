@@ -5,6 +5,7 @@ from modules.model.BaseModel import BaseModel, BaseModelEmbedding
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.DataType import DataType
+from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
 
 import torch
@@ -14,9 +15,19 @@ from torch import Tensor, nn
 from diffusers import ConfigMixin, DDPMWuerstchenScheduler, DiffusionPipeline, ModelMixin, WuerstchenCombinedPipeline
 from diffusers.configuration_utils import register_to_config
 from diffusers.models import StableCascadeUNet
+from diffusers.pipelines.deprecated.wuerstchen import PaellaVQModel, WuerstchenDiffNeXt, WuerstchenPrior
 from diffusers.pipelines.stable_cascade import StableCascadeCombinedPipeline
-from diffusers.pipelines.wuerstchen import PaellaVQModel, WuerstchenDiffNeXt, WuerstchenPrior
 from transformers import CLIPTextModel, CLIPTokenizer
+
+# Stable Cascade LEGACY prior body: OT's historical attn.to_q/k/v/out_proj names (distinct from both the
+# diffusers to_q and the original in_proj.N), so LEGACY is not derivable from the original body.
+cascade_prior_legacy = [
+    ("{a}.attention.to_q", "{a}.attention.attn.to_q"),
+    ("{a}.attention.to_k", "{a}.attention.attn.to_k"),
+    ("{a}.attention.to_v", "{a}.attention.attn.to_v"),
+    ("{a}.attention.to_out.0", "{a}.attention.attn.out_proj"),
+    ("{k}", "{k}"),
+]
 
 
 class WuerstchenEfficientNetEncoder(ModelMixin, ConfigMixin):
@@ -69,6 +80,7 @@ class WuerstchenModel(BaseModel):
     decoder_vqgan: PaellaVQModel | None
     effnet_encoder: WuerstchenEfficientNetEncoder | None
     prior_tokenizer: CLIPTokenizer | None
+    orig_prior_tokenizer: CLIPTokenizer | None
     prior_text_encoder: CLIPTextModel | None
     prior_noise_scheduler: DDPMWuerstchenScheduler | None
     prior_prior: WuerstchenPrior | StableCascadeUNet | None
@@ -105,6 +117,7 @@ class WuerstchenModel(BaseModel):
         self.decoder_vqgan = None
         self.effnet_encoder = None
         self.prior_tokenizer = None
+        self.orig_prior_tokenizer = None
         self.prior_text_encoder = None
         self.prior_noise_scheduler = None
         self.prior_prior = None
@@ -129,6 +142,30 @@ class WuerstchenModel(BaseModel):
             self.prior_prior_lora,
         ] if a is not None]
 
+    def lora_text_encoders(self) -> list[tuple[torch.nn.Module | None, dict[ModelFormat, str]]]:
+        # Single CLIP TE (model.prior_text_encoder). No COMFY_LORA name -- ComfyUI cannot load
+        # Wuerstchen/Cascade, so the COMFY format refuses to write its TE keys.
+        return [
+            (self.prior_text_encoder, {
+                ModelFormat.DIFFUSERS_LORA: "text_encoder",
+                ModelFormat.KOHYA_LORA: "lora_te",
+            }),
+        ]
+
+    def diffusers_to_original(self) -> list | None:
+        # Stable Cascade prior: diffusers split attention to_q/k/v/to_out.0 -> the native StabilityAI
+        # nn.MultiheadAttention split adapter names. {a} captures the block path; the trailing identity rule
+        # passes every non-attention leaf through. Wuerstchen v2 has no body (identity in every format).
+        if self.model_type.is_stable_cascade():
+            return [
+                ("{a}.attention.to_q", "{a}.attention.attn.in_proj.0"),
+                ("{a}.attention.to_k", "{a}.attention.attn.in_proj.1"),
+                ("{a}.attention.to_v", "{a}.attention.attn.in_proj.2"),
+                ("{a}.attention.to_out.0", "{a}.attention.attn.out_proj"),
+                ("{k}", "{k}"),
+            ]
+        return None
+
     def all_embeddings(self) -> list[WuerstchenModelEmbedding]:
         return self.additional_embeddings \
                + ([self.embedding] if self.embedding is not None else [])
@@ -137,38 +174,27 @@ class WuerstchenModel(BaseModel):
         return [embedding.text_encoder_embedding for embedding in self.additional_embeddings] \
                + ([self.embedding.prior_text_encoder_embedding] if self.embedding is not None else [])
 
-    def decoder_text_encoder_to(self, device: torch.device):
-        self.decoder_text_encoder.to(device=device)
+    def materialize(self, *parts: str):
+        super().materialize(*self._translate_parts(parts))
 
-    def decoder_decoder_to(self, device: torch.device):
-        self.decoder_decoder.to(device=device)
+    def evict(self, *parts: str):
+        # evict() with no parts means "evict all"; translate against the model's own full part list.
+        super().evict(*self._translate_parts(parts or self.model_type.model_parts()))
 
-    def decoder_vqgan_to(self, device: torch.device):
-        self.decoder_vqgan.to(device=device)
-
-    def effnet_encoder_to(self, device: torch.device):
-        self.effnet_encoder.to(device=device)
-
-    def prior_text_encoder_to(self, device: torch.device):
-        self.prior_text_encoder.to(device=device)
-
-        if self.prior_text_encoder_lora is not None:
-            self.prior_text_encoder_lora.to(device)
-
-    def prior_prior_to(self, device: torch.device):
-        self.prior_prior.to(device=device)
-
-        if self.prior_prior_lora is not None:
-            self.prior_prior_lora.to(device)
-
-    def to(self, device: torch.device):
-        if self.model_type.is_wuerstchen_v2():
-            self.decoder_text_encoder_to(device)
-        self.decoder_decoder_to(device)
-        self.decoder_vqgan_to(device)
-        self.effnet_encoder_to(device)
-        self.prior_text_encoder_to(device)
-        self.prior_prior_to(device)
+    def _translate_parts(self, parts: tuple[str, ...]) -> tuple[str, ...]:
+        # The prior stage's own diffusion module and the decoder stage's own diffusion module are each
+        # named after their stage, and the main text encoder belongs to the prior stage.
+        translated = []
+        for part in parts:
+            if part == "prior":
+                translated.append("prior_prior")
+            elif part == "decoder":
+                translated.append("decoder_decoder")
+            elif part == "text_encoder":
+                translated.append("prior_text_encoder")
+            else:
+                translated.append(part)
+        return tuple(translated)
 
     def eval(self):
         if self.model_type.is_wuerstchen_v2():
@@ -179,7 +205,8 @@ class WuerstchenModel(BaseModel):
         self.prior_text_encoder.eval()
         self.prior_prior.eval()
 
-    def create_pipeline(self) -> DiffusionPipeline:
+    def create_pipeline(self, use_original_tokenizers: bool = False) -> DiffusionPipeline:
+        prior_tokenizer = self.orig_prior_tokenizer if use_original_tokenizers else self.prior_tokenizer
         if self.model_type.is_wuerstchen_v2():
             return WuerstchenCombinedPipeline(
                 tokenizer=self.decoder_tokenizer,
@@ -187,19 +214,19 @@ class WuerstchenModel(BaseModel):
                 decoder=self.decoder_decoder,
                 scheduler=self.decoder_noise_scheduler,
                 vqgan=self.decoder_vqgan,
-                prior_tokenizer=self.prior_tokenizer,
+                prior_tokenizer=prior_tokenizer,
                 prior_text_encoder=self.prior_text_encoder,
                 prior_prior=self.prior_prior,
                 prior_scheduler=self.prior_noise_scheduler,
             )
         elif self.model_type.is_stable_cascade():
             return StableCascadeCombinedPipeline(
-                tokenizer=self.prior_tokenizer,
+                tokenizer=prior_tokenizer,
                 text_encoder=self.prior_text_encoder,
                 decoder=self.decoder_decoder,
                 scheduler=self.decoder_noise_scheduler,
                 vqgan=self.decoder_vqgan,
-                prior_tokenizer=self.prior_tokenizer,
+                prior_tokenizer=prior_tokenizer,
                 prior_text_encoder=self.prior_text_encoder,
                 prior_prior=self.prior_prior,
                 prior_scheduler=self.prior_noise_scheduler,
@@ -261,7 +288,7 @@ class WuerstchenModel(BaseModel):
         )
 
         # apply dropout
-        if text_encoder_dropout_probability is not None:
+        if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
             dropout_text_encoder_mask = (torch.tensor(
                 [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)],
                 device=train_device)).float()

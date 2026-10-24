@@ -1,14 +1,12 @@
 import os
 import traceback
 
-from modules.model.BaseModel import BaseModel
 from modules.model.Flux2Model import Flux2Model
 from modules.modelLoader.GenericFineTuneModelLoader import make_fine_tune_model_loader
 from modules.modelLoader.GenericLoRAModelLoader import make_lora_model_loader
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.modelLoader.mixin.LoRALoaderMixin import LoRALoaderMixin
 from modules.util.config.TrainConfig import QuantizationConfig
-from modules.util.convert.lora.convert_lora_util import LoraConversionKeySet
 from modules.util.enum.ModelType import ModelType
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -62,19 +60,6 @@ class Flux2ModelLoader(
             vae_model_name: str,
             quantization: QuantizationConfig,
     ):
-        diffusers_sub = []
-        transformers_sub = ["text_encoder"]
-        if not transformer_model_name:
-            diffusers_sub.append("transformer")
-        if not vae_model_name:
-            diffusers_sub.append("vae")
-
-        self._prepare_sub_modules(
-            base_model_name,
-            diffusers_modules=diffusers_sub,
-            transformers_modules=transformers_sub,
-        )
-
         if transformer_model_name:
             transformer = Flux2Transformer2DModel.from_single_file(
                 transformer_model_name,
@@ -122,10 +107,6 @@ class Flux2ModelLoader(
                 base_model_name,
                 "text_encoder",
             )
-            #TODO this is a tied weight. The dtype conversion code in _load_transformers_sub_module
-            #currently does not support tied weights. Reconstruct but clone, because the quantization code
-            #doesn't support tied weights either:
-            text_encoder.lm_head.weight = type(text_encoder.lm_head.weight)(text_encoder.model.embed_tokens.weight)
 
         noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
             base_model_name,
@@ -214,9 +195,8 @@ class Flux2LoRALoader(
     def __init__(self):
         super().__init__()
 
-    def _get_convert_key_sets(self, model: BaseModel) -> list[LoraConversionKeySet] | None:
-        return None #TODO
-        #return convert_flux_lora_key_sets()
+    def _legacy_conversion(self, model: Flux2Model) -> list | None:
+        return self._mixture_legacy_conversion(model)
 
     def load(
             self,

@@ -38,14 +38,16 @@ class CloudSecretsConfig(BaseConfig):
             return ""
         return str(Path(key_file).expanduser())
 
-    def connect_kwargs(self) -> dict[str, str]:
-        kwargs: dict[str, str] = {}
+    def connect_kwargs(self) -> dict:
+        kwargs = {}
         key_file = self.expanded_key_file()
         if key_file:
             kwargs["key_filename"] = key_file
         password = getattr(self, "password", "").strip()
         if password:
             kwargs["password"] = password
+        # Never query the ssh-agent: a broken agent can make paramiko's Agent() raise and abort the connect.
+        kwargs["allow_agent"] = False
         return kwargs
 
 
@@ -89,7 +91,7 @@ class CloudConfig(BaseConfig):
         data.append(("enabled", False, bool, False))
         data.append(("type", CloudType.RUNPOD, CloudType, False))
         data.append(("file_sync", CloudFileSync.NATIVE_SCP, CloudFileSync, False))
-        data.append(("create", True, bool, False))
+        data.append(("create", False, bool, False))
         data.append(("name", "OneTrainer", str, False))
         data.append(("tensorboard_tunnel", True, bool, False))
         data.append(("sub_type", "", str, False))

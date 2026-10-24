@@ -15,6 +15,8 @@ from mgds.pipelineModules.DecodeTokens import DecodeTokens
 from mgds.pipelineModules.DecodeVAE import DecodeVAE
 from mgds.pipelineModules.EncodeQwenText import EncodeQwenText
 from mgds.pipelineModules.EncodeVAE import EncodeVAE
+from mgds.pipelineModules.PadMaskedTokens import PadMaskedTokens
+from mgds.pipelineModules.PruneMaskedTokens import PruneMaskedTokens
 from mgds.pipelineModules.RescaleImageChannels import RescaleImageChannels
 from mgds.pipelineModules.SampleVAEDistribution import SampleVAEDistribution
 from mgds.pipelineModules.SaveImage import SaveImage
@@ -23,6 +25,7 @@ from mgds.pipelineModules.ScaleImage import ScaleImage
 from mgds.pipelineModules.Tokenize import Tokenize
 
 
+@factory.register(BaseDataLoader, ModelType.Z_IMAGE)
 class ZImageBaseDataLoader(
     BaseDataLoader,
     DataLoaderText2ImageMixin,
@@ -35,10 +38,9 @@ class ZImageBaseDataLoader(
         tokenize_prompt = Tokenize(in_name='prompt', tokens_out_name='tokens', mask_out_name='tokens_mask', tokenizer=model.tokenizer, max_token_length=PROMPT_MAX_LENGTH,
                                     apply_chat_template = lambda caption: format_input(caption), apply_chat_template_kwargs = {'add_generation_prompt': True, 'enable_thinking': True}
                                   )
-        if config.dataloader_threads > 1:
-            raise NotImplementedError("Multiple data loader threads are not supported due to an issue with the transformers library: https://github.com/huggingface/transformers/issues/42673")
         encode_prompt = EncodeQwenText(tokens_name='tokens', tokens_attention_mask_in_name='tokens_mask', hidden_state_out_name='text_encoder_hidden_state', tokens_attention_mask_out_name='tokens_mask',
                                        text_encoder=model.text_encoder, hidden_state_output_index=-2, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        prune_masked_tokens = PruneMaskedTokens(tokens_name='tokens', tokens_mask_name='tokens_mask', hidden_state_name='text_encoder_hidden_state')
 
         modules = [rescale_image, encode_image, image_sample]
 
@@ -46,6 +48,10 @@ class ZImageBaseDataLoader(
             modules.append(downscale_mask)
 
         modules += [tokenize_prompt, encode_prompt]
+
+        if config.latent_caching:
+            modules.append(prune_masked_tokens)
+
         return modules
 
     def _cache_modules(self, config: TrainConfig, model: ZImageModel, model_setup: BaseZImageSetup):
@@ -76,6 +82,8 @@ class ZImageBaseDataLoader(
         )
 
     def _output_modules(self, config: TrainConfig, model: ZImageModel, model_setup: BaseZImageSetup):
+        pad_masked_tokens = PadMaskedTokens(tokens_name='tokens', tokens_mask_name='tokens_mask', hidden_state_name='text_encoder_hidden_state', max_length=PROMPT_MAX_LENGTH)
+
         output_names = [
             'image_path', 'latent_image',
             'prompt',
@@ -89,7 +97,7 @@ class ZImageBaseDataLoader(
 
         output_names.append('text_encoder_hidden_state')
 
-        return self._output_modules_from_out_names(
+        output_module_list = self._output_modules_from_out_names(
             model, model_setup,
             output_names=output_names,
             config=config,
@@ -99,11 +107,16 @@ class ZImageBaseDataLoader(
             train_dtype=model.train_dtype,
         )
 
+        if config.latent_caching:
+            output_module_list = [pad_masked_tokens] + output_module_list
+
+        return output_module_list
+
     def _debug_modules(self, config: TrainConfig, model: ZImageModel):
         debug_dir = os.path.join(config.debug_dir, "dataloader")
 
         def before_save_fun():
-            model.vae_to(self.train_device)
+            model.materialize("vae")
 
         decode_image = DecodeVAE(in_name='latent_image', out_name='decoded_image', vae=model.vae, autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
         upscale_mask = ScaleImage(in_name='latent_mask', out_name='decoded_mask', factor=8)
@@ -138,5 +151,3 @@ class ZImageBaseDataLoader(
             config, model, model_setup, train_progress, is_validation,
             aspect_bucketing_quantization=64,
         )
-
-factory.register(BaseDataLoader, ZImageBaseDataLoader, ModelType.Z_IMAGE)
