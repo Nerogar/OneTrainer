@@ -94,6 +94,7 @@ class BaseModel(metaclass=ABCMeta):
         self.model_spec = None
         self.train_config = None
         self.embedding_state_dicts = {}
+        self.text_encoding_cache = {}
         self.autocast_context = nullcontext()
         self.train_dtype = DataType.FLOAT_32
 
@@ -163,6 +164,20 @@ class BaseModel(metaclass=ABCMeta):
             component = getattr(self, stem)
             if component is not None:
                 component.eval()
+
+    def encode_text_cached(self, parts: str | tuple[str, ...], **kwargs):
+        # materialize_only + encode_text with a result cache: a repeat of the exact same call returns the
+        # stored encoding without materializing the text encoders, so sampling can reuse encodings of
+        # previously sampled prompts. `parts` is the part (or parts) the encoding depends on.
+        parts = (parts,) if isinstance(parts, str) else tuple(parts)
+        key = (parts, tuple(sorted((k, repr(v)) for k, v in kwargs.items())))
+        cached = self.text_encoding_cache.get(key)
+        if cached is not None:
+            return cached
+        self.materialize_only(*parts)
+        encoding = self.encode_text(**kwargs)
+        self.text_encoding_cache[key] = encoding
+        return encoding
 
     def adapters(self) -> list[LoRAModuleWrapper]:
         # Every LoRA adapter present on a model part, in model_parts() order. Parts without a LoRA

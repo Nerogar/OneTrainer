@@ -49,15 +49,15 @@ class WuerstchenSampler(BaseModelSampler):
             on_update_progress,
     ):
         # prepare prompt
-        self.model.materialize_only("text_encoder")
-
-        prompt_embedding, pooled_prompt_embedding = self.model.encode_text(
+        prompt_embedding, pooled_prompt_embedding = self.model.encode_text_cached(
+            "text_encoder",
             text=prompt,
             train_device=self.train_device,
             text_encoder_layer_skip=text_encoder_layer_skip,
         )
 
-        negative_prompt_embedding, pooled_negative_prompt_embedding = self.model.encode_text(
+        negative_prompt_embedding, pooled_negative_prompt_embedding = self.model.encode_text_cached(
+            "text_encoder",
             text=negative_prompt,
             train_device=self.train_device,
             text_encoder_layer_skip=text_encoder_layer_skip,
@@ -152,34 +152,39 @@ class WuerstchenSampler(BaseModelSampler):
             decoder_decoder,
             on_update_progress,
     ):
-        # prepare prompt
-        if self.model_type.is_wuerstchen_v2():
-            self.model.materialize_only("decoder_text_encoder")
-        elif self.model_type.is_stable_cascade():
-            self.model.materialize_only("text_encoder")
-        tokenizer_output = decoder_tokenizer(
-            prompt,
-            padding='max_length',
-            truncation=True,
-            max_length=decoder_tokenizer.model_max_length,
-            return_tensors="pt",
-        )
-        tokens = tokenizer_output.input_ids.to(self.train_device)
-        tokens_attention_mask = tokenizer_output.attention_mask.to(self.train_device)
+        # prepare prompt (cached, so the decoder text encoder is only loaded on the first sample)
+        decoder_encoding_key = ("decoder_text_encoder", prompt, text_encoder_layer_skip, str(self.model_type))
+        prompt_embedding = self.model.text_encoding_cache.get(decoder_encoding_key)
+        if prompt_embedding is None:
+            if self.model_type.is_wuerstchen_v2():
+                self.model.materialize_only("decoder_text_encoder")
+            elif self.model_type.is_stable_cascade():
+                self.model.materialize_only("text_encoder")
+            tokenizer_output = decoder_tokenizer(
+                prompt,
+                padding='max_length',
+                truncation=True,
+                max_length=decoder_tokenizer.model_max_length,
+                return_tensors="pt",
+            )
+            tokens = tokenizer_output.input_ids.to(self.train_device)
+            tokens_attention_mask = tokenizer_output.attention_mask.to(self.train_device)
 
-        text_encoder_output = decoder_text_encoder(
-            tokens,
-            attention_mask=tokens_attention_mask,
-            return_dict=True,
-            output_hidden_states=True,
-        )
-        final_layer_norm = decoder_text_encoder.text_model.final_layer_norm
-        prompt_embedding = final_layer_norm(
-            text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
-        )
+            text_encoder_output = decoder_text_encoder(
+                tokens,
+                attention_mask=tokens_attention_mask,
+                return_dict=True,
+                output_hidden_states=True,
+            )
+            final_layer_norm = decoder_text_encoder.text_model.final_layer_norm
+            prompt_embedding = final_layer_norm(
+                text_encoder_output.hidden_states[-(1 + text_encoder_layer_skip)]
+            )
 
-        if self.model_type.is_stable_cascade():
-            prompt_embedding = text_encoder_output.text_embeds.unsqueeze(1)
+            if self.model_type.is_stable_cascade():
+                prompt_embedding = text_encoder_output.text_embeds.unsqueeze(1)
+
+            self.model.text_encoding_cache[decoder_encoding_key] = prompt_embedding
 
         # prepare timesteps
         decoder_noise_scheduler.set_timesteps(10, device=self.train_device)
@@ -316,6 +321,20 @@ class WuerstchenSampler(BaseModelSampler):
         return ModelSamplerOutput(
             file_type=FileType.IMAGE,
             data=Image.fromarray(image_array),
+        )
+
+    def prepare_text_encoding(self, sample_config: SampleConfig):
+        self.model.encode_text_cached(
+            "text_encoder",
+            text=sample_config.prompt,
+            train_device=self.train_device,
+            text_encoder_layer_skip=sample_config.text_encoder_1_layer_skip,
+        )
+        self.model.encode_text_cached(
+            "text_encoder",
+            text=sample_config.negative_prompt,
+            train_device=self.train_device,
+            text_encoder_layer_skip=sample_config.text_encoder_1_layer_skip,
         )
 
     def sample(
