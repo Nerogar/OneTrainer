@@ -656,6 +656,7 @@ class TrainConfig(BaseConfig):
     oft_block_share: bool
     dora_oft: bool
     oft_scaled: bool
+    oft_clipped_norm: float | None
 
     # lokr
     lokr_dim: int
@@ -702,7 +703,7 @@ class TrainConfig(BaseConfig):
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
             data,
-            config_version=12,
+            config_version=13,
             config_migrations={
                 0: self.__migration_0,
                 1: self.__migration_1,
@@ -716,6 +717,7 @@ class TrainConfig(BaseConfig):
                 9: self.__migration_9,
                 10: self.__migration_10,
                 11: self.__migration_11,
+                12: self.__migration_12,
             }
         )
 
@@ -1014,6 +1016,12 @@ class TrainConfig(BaseConfig):
         migrated.setdefault("final_output_dir", directory)
         migrated.setdefault("run_name_mode", "CUSTOM" if migrated["run_name"] else "DEFAULT")
         return migrated
+
+    def __migration_12(self, data: dict) -> dict:
+        migrated_data = data.copy()
+        # older OFT checkpoints do not contain the persistent clipping buffer
+        migrated_data.setdefault("oft_clipped_norm", None)
+        return migrated_data
 
     def model_part_configs(self) -> list[TrainModelPartConfig]:
         # the per-part configs for the components this model_type actually has. Avoids "phantom" parts whose
@@ -1431,7 +1439,8 @@ class TrainConfig(BaseConfig):
         data.append(("oft_block_size", 32, int, False))
         data.append(("oft_block_share", False, bool, False))
         data.append(("dora_oft", False, bool, False))
-        data.append(("oft_scaled", True, bool, False))
+        data.append(("oft_scaled", False, bool, False))
+        data.append(("oft_clipped_norm", None, float, True))
 
         # lokr
         data.append(("lokr_dim", 16, int, False))

@@ -90,6 +90,11 @@ class BaseLoraTabView:
                                   tooltip="Applies a scaling factor to the learned weights. This ensures that the effective learning rate remains consistent across different block sizes. Without this, different block sizes require significantly different learning rates.")
             self.components.switch(master, 2, 4, ui_state, "oft_scaled")
 
+            # Clip OFT max norm
+            self.components.label(master, 5, 0, "Spectral Norm Clipping",
+                                  tooltip="Limits the spectral norm of the OFT matrix using a power iteration estimate. Start at 0.95 for longer runs. Lower values limit adaptation; keep below 1 for stability. Leave blank to disable (default).")
+            self.components.entry(master, 5, 1, ui_state, "oft_clipped_norm")
+
             # Dropout Percentage
             self.components.label(master, 2, 0, "Dropout Probability",
                                   tooltip="Dropout probability. This percentage of the rotated adapter nodes that will be randomly restored to the base model initial statue. Helps with overfitting. 0 disables, 1 maximum.")
