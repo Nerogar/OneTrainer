@@ -48,7 +48,7 @@ class OFTRotationModule(nn.Module):
         use_cayley_neumann=True,
         num_cayley_neumann_terms=5,
         dropout_probability=0.0,
-        oft_clipped_norm: float | None = 0.95,
+        oft_clipped_norm: float | None = None,
     ):
         super().__init__()
         self.r = r
