@@ -52,7 +52,23 @@ class BaseLinearQuantRot(
     QuantizedModuleMixin,
     QuantizedLinearMixin,
 ):
-    pass
+    @staticmethod
+    def adjust_block_size(in_features: int, block_size: int) -> int:
+        # Snap block size to the nearest divisor of in_features (ties down). 
+        if block_size >= in_features:
+            return in_features
+
+        higher = block_size
+        while higher <= in_features and in_features % higher != 0:
+            higher += 1
+
+        lower = block_size
+        while lower > 1 and in_features % lower != 0:
+            lower -= 1
+
+        if (block_size - lower) <= (higher - block_size):
+            return lower
+        return higher
 
 
 def make_quant_rot_linear(linear_class):
@@ -68,10 +84,15 @@ def make_quant_rot_linear(linear_class):
             if quant_rot_block_size <= 0:
                 raise ValueError(f"quant_rot_block_size must be positive, got {quant_rot_block_size}")
             self.__quant_rot_is_quantized = False
-            self.__quant_rot_block_size = quant_rot_block_size
             self.__quant_rot_dtype = quant_rot_dtype
             in_features = kwargs.get('in_features')
-            self.__rotatable = in_features is None or in_features % quant_rot_block_size == 0
+            # Snap to a divisor of in_features when the requested block size does not divide it,
+            # so the rotation stays applicable.
+            if in_features is not None and (in_features % quant_rot_block_size != 0
+                                            or quant_rot_block_size > in_features):
+                quant_rot_block_size = BaseLinearQuantRot.adjust_block_size(in_features, quant_rot_block_size)
+            self.__quant_rot_block_size = quant_rot_block_size
+            self.__rotatable = in_features is not None
             self.quant_rot = torch.nn.Parameter(torch.empty(0), requires_grad=False)
 
         @property
