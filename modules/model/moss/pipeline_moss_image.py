@@ -43,16 +43,35 @@ from pathlib import Path
 
 import torch
 from torch import nn
+from accelerate import init_empty_weights
 from diffusers import AutoencoderKLFlux2, DiffusionPipeline, FlowMatchEulerDiscreteScheduler
 from diffusers.models.attention_dispatch import dispatch_attention_fn
+from diffusers.loaders.single_file_utils import load_single_file_checkpoint, SingleFileComponentError
+from diffusers.models.model_loading_utils import load_model_dict_into_meta
+from diffusers.quantizers import DiffusersAutoQuantizer
 from diffusers.schedulers.scheduling_utils import SchedulerMixin  # Required by custom-component discovery.
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.models.modeling_utils import ModelMixin
 from diffusers.models.modeling_outputs import Transformer2DModelOutput
 from diffusers.pipelines.pipeline_utils import ImagePipelineOutput
-from diffusers.utils.torch_utils import randn_tensor
+from diffusers.utils.torch_utils import empty_device_cache, randn_tensor
 from transformers import AutoModel, AutoTokenizer
+
+
+def _convert_moss_image_transformer_checkpoint(checkpoint):
+    """Map a single-file MOSSImage transformer checkpoint onto the model's state-dict layout."""
+    converted = {}
+    for key, value in checkpoint.items():
+        if key.startswith('layers.') and key.endswith('.proj.qkv.weight'):
+            q, k, v = value.chunk(3, dim=0)
+            base = key[: -len('.qkv.weight')]
+            converted[base + '.q.weight'] = q
+            converted[base + '.k.weight'] = k
+            converted[base + '.v.weight'] = v
+        else:
+            converted[key] = value
+    return converted
 
 
 class _RMSNorm(nn.Module):
@@ -67,6 +86,11 @@ class _RMSNorm(nn.Module):
 
 def _situ(hidden, gate):
     return (4.0 * torch.tanh(gate / 4.0) * torch.sigmoid(gate)) * (25.0 * torch.tanh(hidden / 25.0))
+
+
+def _input_dtype(module):
+    """Dtype to cast inputs to; GGUF-quantized linears store weights as raw bytes."""
+    return getattr(module, "compute_dtype", None) or module.weight.dtype
 
 
 def _validate_skip_layers(layers, depth, name='skip_layers'):
@@ -233,6 +257,57 @@ class MOSSImageTransformer(ModelMixin, ConfigMixin):
             if isinstance(module, (_TextBlock, _Block)):
                 module.attention_backend = backend
 
+    @classmethod
+    def from_single_file(cls, pretrained_model_link_or_path_or_dict, *, config=None, subfolder=None,
+                        torch_dtype=None, quantization_config=None):
+        """Load a single-file MOSSImage transformer checkpoint (.safetensors/.gguf), mapping its
+        fused qkv projections onto this model's state-dict layout; config comes from the base repo."""
+        if isinstance(pretrained_model_link_or_path_or_dict, dict):
+            checkpoint = pretrained_model_link_or_path_or_dict
+        else:
+            checkpoint = load_single_file_checkpoint(pretrained_model_link_or_path_or_dict)
+
+        hf_quantizer = None
+        if quantization_config is not None:
+            hf_quantizer = DiffusersAutoQuantizer.from_config(quantization_config)
+            hf_quantizer.validate_environment()
+            torch_dtype = hf_quantizer.update_torch_dtype(torch_dtype)
+            checkpoint = hf_quantizer.maybe_update_state_dict(checkpoint)
+
+        if torch_dtype is not None and not isinstance(torch_dtype, torch.dtype):
+            torch_dtype = torch.float32
+
+        if config is not None:
+            model_config = cls.load_config(config, subfolder=subfolder)
+        else:
+            model_config = cls.load_config(pretrained_model_link_or_path_or_dict, subfolder=subfolder)
+
+        with init_empty_weights():
+            model = cls.from_config(model_config)
+
+        checkpoint = _convert_moss_image_transformer_checkpoint(checkpoint)
+        if not checkpoint:
+            raise SingleFileComponentError(
+                f"Failed to load {cls.__name__}: no weights found in the checkpoint.")
+
+        if hf_quantizer is not None:
+            hf_quantizer.preprocess_model(model=model, device_map=None, state_dict=checkpoint, keep_in_fp32_modules=[])
+
+        load_model_dict_into_meta(
+            model, checkpoint, dtype=torch_dtype, device_map={"": torch.device("cpu")},
+            hf_quantizer=hf_quantizer, keep_in_fp32_modules=[])
+        empty_device_cache()
+
+        if hf_quantizer is not None:
+            hf_quantizer.postprocess_model(model)
+            model.hf_quantizer = hf_quantizer
+
+        if torch_dtype is not None and hf_quantizer is None:
+            model.to(torch_dtype)
+
+        model.eval()
+        return model
+
     def forward(self, hidden_states, timestep, encoder_hidden_states,
                 encoder_attention_mask=None, return_dict=True, skip_layers=None):
         skip_layers = _validate_skip_layers(skip_layers, len(self.layers))
@@ -253,16 +328,16 @@ class MOSSImageTransformer(ModelMixin, ConfigMixin):
         freq = 10000 ** (-torch.arange(half, device=times.device, dtype=torch.float64) / half)
         phase = times.double()[:, None] * freq
         embedding = torch.cat((phase.cos(), phase.sin()), -1).float()
-        time = self.time_embedding(embedding.to(self.time_embedding[0].weight.dtype)).float()
-        mod = self.shared_block_modulation(time.to(self.shared_block_modulation.weight.dtype)).view(batch, 6, -1)
-        head = self.video_head_modulation(time.to(self.video_head_modulation.weight.dtype)).view(batch, 2, -1)
+        time = self.time_embedding(embedding.to(_input_dtype(self.time_embedding[0]))).float()
+        mod = self.shared_block_modulation(time.to(_input_dtype(self.shared_block_modulation))).view(batch, 6, -1)
+        head = self.video_head_modulation(time.to(_input_dtype(self.video_head_modulation))).view(batch, 2, -1)
         outputs = []
         for index in range(batch):
             context = encoder_hidden_states[index:index + 1, mask[index].bool()]
             if context.shape[1] == 0:
                 raise ValueError('Each sample needs at least one valid text token.')
             video = hidden_states[index:index + 1].flatten(2).transpose(1, 2)
-            video = self.video_embedder(video.to(self.video_embedder.weight.dtype).contiguous())
+            video = self.video_embedder(video.to(_input_dtype(self.video_embedder)).contiguous())
             # Match the reference activation dtype under fp32 weights + autocast.
             rope = self.rope(height, width, context.shape[1], hidden_states.device).to(video.dtype)
             text = self.text_embedder(context, rope[:, height * width:])
@@ -270,9 +345,9 @@ class MOSSImageTransformer(ModelMixin, ConfigMixin):
             for layer_index, layer in enumerate(self.layers):
                 if layer_index not in skip_layers:
                     x = layer(x, rope, mod[index:index + 1])
-            x = self.final_norm_video(x[:, :height * width].to(self.final_norm_video.weight.dtype))
+            x = self.final_norm_video(x[:, :height * width].to(_input_dtype(self.final_norm_video)))
             x = x * (1 + head[index:index + 1, 1, None]) + head[index:index + 1, 0, None]
-            x = self.final_linear_video(x.to(self.final_linear_video.weight.dtype))
+            x = self.final_linear_video(x.to(_input_dtype(self.final_linear_video)))
             outputs.append(x.transpose(1, 2).reshape(1, -1, height, width))
         sample = torch.cat(outputs)
         return Transformer2DModelOutput(sample=sample) if return_dict else (sample,)

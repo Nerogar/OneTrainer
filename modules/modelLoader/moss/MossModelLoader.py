@@ -84,6 +84,7 @@ class MossModelLoader(
             base_model_name,
             transformer_model_name,
             quantization,
+            config=base_model_name,
             stream_from_disk=stream_from_disk,
         )
 
