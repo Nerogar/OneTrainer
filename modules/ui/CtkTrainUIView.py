@@ -404,6 +404,10 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
         if not self.tabview:
             return
 
+        if self.concepts_tab:
+            self.concepts_tab.reload_from_config()
+        if self.sampling_tab:
+            self.sampling_tab.reload_from_config()
         if self.additional_embeddings_tab:
             self.additional_embeddings_tab.refresh_ui()
 

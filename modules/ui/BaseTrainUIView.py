@@ -127,12 +127,12 @@ class BaseTrainUIView(ABC):
         # workspace dir
         self.components.label(frame, 0, 0, "Workspace Directory",
                          tooltip="The directory where all files of this training run are saved")
-        self.components.path_entry(frame, 0, 1, ui_state, "workspace_dir", mode="dir", command=controller._on_workspace_dir_change)
+        self.components.path_entry(frame, 0, 1, ui_state, "workspace_dir", mode="dir", command=controller._on_workspace_dir_change, io_type=PathIOType.OUTPUT)
 
         # cache dir
         self.components.label(frame, 0, 2, "Cache Directory",
                          tooltip="The directory where cached data is saved")
-        self.components.path_entry(frame, 0, 3, ui_state, "cache_dir", mode="dir")
+        self.components.path_entry(frame, 0, 3, ui_state, "cache_dir", mode="dir", io_type=PathIOType.OUTPUT)
 
         # continue from previous backup
         self.components.label(frame, 2, 0, "Continue from last backup",

@@ -619,12 +619,13 @@ def options_kv(
         var_name: str,
         command: Callable[[Any], None] | None = None,
         sticky: str = "new",
+        reset_to_first_on_mismatch: bool = True,
 ) -> QComboBox:
     var = ui_state.get_var(var_name)
     keys = [key for key, _ in values]
     str_values = [str(v) for _, v in values]
 
-    if var.get() not in str_values and keys:
+    if var.get() not in str_values and keys and reset_to_first_on_mismatch:
         # store the str repr — UIState's enum trace looks up var_type[string]
         var.set(str(values[0][1]))
 
@@ -654,6 +655,14 @@ def options_kv(
                 if command:
                     command(v)
                 break
+        else:
+            # External state (e.g. "Load config") pointed this field outside the
+            # locally scanned config_dir, so it matches none of the known options.
+            # Still reload from it: otherwise this widget's element list stays
+            # stale, and the next save_current_config() overwrites the real file
+            # at `value` with that stale (often empty) list.
+            if command:
+                command(value)
         _updating = False
 
     combo = NoScrollComboBox(master)
