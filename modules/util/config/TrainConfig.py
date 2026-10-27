@@ -488,6 +488,8 @@ class TrainConfig(BaseConfig):
     tensorboard_expose: bool
     tensorboard_always_on: bool
     tensorboard_port: str
+    wandb: bool
+    wandb_project: str
     validation: bool
     validate_after: float
     validate_after_unit: TimeUnit
@@ -1222,6 +1224,8 @@ class TrainConfig(BaseConfig):
         data.append(("tensorboard_expose", False, bool, False))
         data.append(("tensorboard_always_on", False, bool, False))
         data.append(("tensorboard_port", 6006, int, False))
+        data.append(("wandb", False, bool, False))
+        data.append(("wandb_project", "OneTrainer", str, False))
         data.append(("validation", False, bool, False))
         data.append(("validate_after", 1, int, False))
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))

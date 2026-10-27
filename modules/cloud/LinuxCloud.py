@@ -153,6 +153,8 @@ class LinuxCloud(BaseCloud):
 
         if self.config.secrets.huggingface_token != "":
             cmd+=f" && export HF_TOKEN={self.config.secrets.huggingface_token}"
+        if self.config.secrets.wandb_api_key != "":
+            cmd+=f" && export WANDB_API_KEY={self.config.secrets.wandb_api_key}"
         if config.huggingface_cache_dir != "":
             cmd+=f" && export HF_HOME={config.huggingface_cache_dir}"
 
