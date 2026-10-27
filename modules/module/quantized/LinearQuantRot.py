@@ -54,7 +54,7 @@ class BaseLinearQuantRot(
 ):
     @staticmethod
     def adjust_block_size(in_features: int, block_size: int) -> int:
-        # Snap block size to the nearest divisor of in_features (ties down). 
+        # Snap block size to the nearest divisor of in_features (ties down).
         if block_size >= in_features:
             return in_features
 
