@@ -187,7 +187,7 @@ class BaseTrainUIView(ABC):
         self.components.switch(frame, 7, 1, ui_state, "wandb")
 
         self.components.label(frame, 7, 2, "WandB Project",
-                         tooltip="WandB project name. Defaults to \"onetrainer\" if left empty.")
+                         tooltip="WandB project name. Defaults to \"OneTrainer\" if left empty.")
         self.components.entry(frame, 7, 3, ui_state, "wandb_project")
 
         self.components.label(frame, 8, 0, "WandB API Key",
