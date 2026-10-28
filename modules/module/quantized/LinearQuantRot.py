@@ -145,20 +145,19 @@ def make_quant_rot_linear(linear_class):
             assert self.__quant_rot_is_quantized
             return super().forward(x)
 
-        def forward_with_lora(self, x: Tensor, lora_down: nn.Linear, lora_up: nn.Linear, dropout: nn.Dropout, alpha: float) -> Tensor:
+        def forward_with_lora(self, x: Tensor, lora_down: torch.Tensor, lora_up: torch.Tensor, dropout: nn.Dropout, alpha: float) -> Tensor:
             # out = base(x) + lora_up(lora_down(x)) * (alpha / rank), where the LoRA delta acts in
             # the ORIGINAL input space (x, not x @ O^T), so the adapter learns W + lora_up lora_down^T
             # exactly like the unquantized LoRA case. base(x) is reproduced here (instead of
             # self.forward) because self.forward is replaced by the adapter hook once applied.
             assert self.__quant_rot_is_quantized
-            assert lora_down.bias is None and lora_up.bias is None
             x_base = _right_multiply_blocks(x, self.quant_rot, transpose=True) if self._rotatable() else x
             # super() dispatches to the quantized base (LinearW8A8 / LinearSVD / LinearNf4) forward,
             # which applies the stored (rotated, quantized) weight; with SVDQuant it also adds the SVD
             # low-rank part, which acts on the same rotated input x_base (A @ (x @ O^T)).
             base = super().forward(x_base)
-            ld = lora_up(dropout(lora_down(x)))
-            return base + ld * (alpha / lora_down.weight.shape[0])
+            ld = torch.nn.functional.linear(dropout(torch.nn.functional.linear(x, lora_down)), lora_up)
+            return base + ld * (alpha / lora_down.shape[0])
 
         def unquantized_weight(self, dtype: torch.dtype, device: torch.device) -> Tensor:
             if self.__quant_rot_is_quantized and self._rotatable():
