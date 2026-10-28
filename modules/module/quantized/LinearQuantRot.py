@@ -151,13 +151,14 @@ def make_quant_rot_linear(linear_class):
             # exactly like the unquantized LoRA case. base(x) is reproduced here (instead of
             # self.forward) because self.forward is replaced by the adapter hook once applied.
             assert self.__quant_rot_is_quantized
-            x_base = _right_multiply_blocks(x, self.quant_rot, transpose=True) if self._rotatable() else x
-            # super() dispatches to the quantized base (LinearW8A8 / LinearSVD / LinearNf4) forward,
-            # which applies the stored (rotated, quantized) weight; with SVDQuant it also adds the SVD
-            # low-rank part, which acts on the same rotated input x_base (A @ (x @ O^T)).
-            base = super().forward(x_base)
-            ld = torch.nn.functional.linear(dropout(torch.nn.functional.linear(x, lora_down)), lora_up)
-            return base + ld * (alpha / lora_down.shape[0])
+            # Rotate the LoRA down factor so the delta acts on x @ O^T (the base's input space),
+            # enabling fusion with the base quantized matmul while preserving unquantized-LoRA semantics:
+            # lora_down_rot = O^T @ lora_down, so lora_up @ lora_down_rot^T @ (x @ O^T) = lora_up @ lora_down^T @ x.
+            lora_down_rot = _right_multiply_blocks(lora_down, self.quant_rot, transpose=True) if self._rotatable() else lora_down
+            x_rot = _right_multiply_blocks(x, self.quant_rot, transpose=True) if self._rotatable() else x
+            # Route through the base class's forward_with_lora, which fuses the LoRA epilogue into the
+            # quantized matmul (W8A8LoRAFunction / GGUF RequantLoRAFunction / SVD fused path).
+            return super().forward_with_lora(x_rot, lora_down_rot, lora_up, dropout, alpha)
 
         def unquantized_weight(self, dtype: torch.dtype, device: torch.device) -> Tensor:
             if self.__quant_rot_is_quantized and self._rotatable():
