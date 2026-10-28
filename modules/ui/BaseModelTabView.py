@@ -228,6 +228,13 @@ class BaseModelTabView(ABC):
         self.components.label(svd_label_frame, 1, 0, "SVDQuant Rank",
                          tooltip="Rank for SVDQuant weights decomposition")
         self.components.entry(svd_entry_frame, 1, 0, ui_state, "quantization.svd_rank")
+        self.components.label(svd_label_frame, 2, 0, "Quant-Rot",
+                         tooltip="What datatype to use for the SVD-derived orthogonal pre-rotation applied to quantized weights before quantization (spreads outliers evenly across each block). 'disabled' turns it off.")
+        self.components.options_kv(svd_entry_frame, 2, 0, [("disabled", DataType.NONE), ("float32", DataType.FLOAT_32), ("bfloat16", DataType.BFLOAT_16)],
+                              ui_state, "quantization.quant_rot_dtype")
+        self.components.label(svd_label_frame, 3, 0, "Quant-Rot Block",
+                         tooltip="Block size of the orthogonal pre-rotation. When training with OFT, if the OFT block size is divisible by this size, it folds the rotation into OFT (one matmul, highly optimized); otherwise, non-divisible block sizes or LoRA run the Quant-Rot rotation as separate operation.")
+        self.components.entry(svd_entry_frame, 3, 0, ui_state, "quantization.quant_rot_block_size")
         row += 1
 
         if has_text_encoder:
