@@ -50,7 +50,7 @@ dependencies = [
     "schedulefree==1.4.1",
     "pytorch-optimizer==3.6.0",
     "prodigy-plus-schedule-free==2.0.1",
-    "adv-optm==2.2.3",
+    "adv-optm==2.6.0",
     "muon-optimizer @ git+https://github.com/KellerJordan/Muon.git@f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd",
 
     # profiling
@@ -71,6 +71,9 @@ dependencies = [
     "psutil==7.2.2",
     "requests==2.34.2",
     "deepdiff==8.6.2", # output easy to read diff for troublshooting
+
+    # JupyterLab
+    "jupyterlab==4.6.5",
 ]
 
 [project.optional-dependencies]
@@ -200,6 +203,8 @@ platforms = ["linux-generic", "win-generic", "macos-generic"]
 [tool.pixi.feature.cpu.pypi-options]
 extra-index-urls = ["https://download.pytorch.org/whl/cpu"]
 
+[tool.pixi.activation.env]
+no_proxy = "localhost,127.0.0.1,::1"
 [tool.pixi.dependencies]
 python = "3.13.*"
 c-compiler = "*"

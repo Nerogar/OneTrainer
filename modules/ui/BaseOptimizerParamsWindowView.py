@@ -135,6 +135,7 @@ class BaseOptimizerParamsWindowView:
             'normed_momentum': {'title': 'Normalize Before Momentum', 'tooltip': 'Balances gradient sizes before combining them with past gradients. This changes how momentum smooths updates.', 'type': 'bool'},
             'nesterov_coef': {'title': 'Nesterov Momentum Mix', 'tooltip': 'Only used when Nesterov is enabled. Higher values favor momentum over the current gradient. Leave blank to use Beta1 or Momentum.', 'type': 'float'},
             'geometric_wd': {'title': 'Geometric Weight Decay', 'tooltip': 'Regularizes weights based on the geometric structure of the optimizer. Compatible with cautious weight decay.', 'type': 'bool'},
+            'scaled_wd': {'title': 'Scaled Weight Decay', 'tooltip': 'Scale-invariant, dimension-scaled weight decay. Recommended with Spectral Scaling; start weight decay at 0.1. This is decoupled from the LR.', 'type': 'bool'},
         }
         # @formatter:on
 
