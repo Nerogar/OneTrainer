@@ -194,6 +194,8 @@ class TrainOptimizerConfig(BaseConfig):
     normed_momentum: bool
     nesterov_coef: float
     geometric_wd: bool
+    scaled_wd: bool
+    oft_mode: bool
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(
@@ -350,6 +352,8 @@ class TrainOptimizerConfig(BaseConfig):
         data.append(("normed_momentum", False, bool, False))
         data.append(("nesterov_coef", None, float, True))
         data.append(("geometric_wd", False, bool, False))
+        data.append(("scaled_wd", False, bool, False))
+        data.append(("oft_mode", False, bool, False))
 
         return TrainOptimizerConfig(data)
 
