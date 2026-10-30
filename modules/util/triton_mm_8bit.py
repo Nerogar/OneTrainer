@@ -7,6 +7,9 @@
 #dequant scale, a per-column one, a fused low-rank update. Triton specializes a None argument
 #as a constexpr, so each combination compiles to what a separate kernel per epilogue would.
 
+from functools import wraps
+from threading import RLock
+
 from modules.util.tqdm_util import tqdm
 
 import torch
@@ -35,6 +38,21 @@ def announce_autotuning(kernel, name=None):
             bench_fn()
         return orig_check_disk_cache(tuning_key, configs, announced_bench)
     kernel.check_disk_cache = check_disk_cache
+
+    # Text caching can invoke the same quantized encoder from several loader threads.
+    # Triton's Autotuner keeps per-call nargs/best_config on the shared instance, even
+    # for cache hits. Protect the entire launch, not just cache misses, so another
+    # thread cannot overwrite or clear that state during tuning. The custom op keeps
+    # this Python lock outside compiled graphs; GPU launches remain asynchronous.
+    orig_run = kernel.run
+    launch_lock = RLock()
+
+    @wraps(orig_run)
+    def run(*args, **kwargs):
+        with launch_lock:
+            return orig_run(*args, **kwargs)
+
+    kernel.run = run
 
 
 #tiled 8-bit transpose, used to rewrite the backward's B matrix to k-major before the mm.

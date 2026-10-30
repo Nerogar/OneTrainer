@@ -19,6 +19,25 @@ from PIL import Image
 PAD = 10
 
 
+def bind_visibility(component, variables, predicate):
+    def update(*_args):
+        if predicate():
+            component.grid()
+        else:
+            component.grid_remove()
+
+    traces = [(var, var.trace_add("write", update)) for var in variables]
+    original_destroy = component.destroy
+
+    def destroy():
+        for var, trace in traces:
+            var.trace_remove("write", trace)
+        original_destroy()
+
+    component.destroy = destroy
+    update()
+
+
 def app_title(master, row, column):
     frame = ctk.CTkFrame(master)
     frame.grid(row=row, column=column, padx=5, pady=5, sticky="nsew")
