@@ -11,12 +11,12 @@ dependencies = [
     # base requirements
     "numpy==2.2.6",
     "opencv-python==4.11.0.86",
-    "pillow==12.3.0",
+    "pillow==13.0.0",
     "imagesize==1.4.1",
     "tqdm==4.67.1",
     "pyyaml==6.0.2",
     "huggingface-hub==1.22.0",
-    "scipy==1.15.3",
+    "scipy==1.18.1",
     "matplotlib==3.10.3",
     "av==16.1.0",
     "yt-dlp",
@@ -50,7 +50,7 @@ dependencies = [
     "schedulefree==1.4.1",
     "pytorch-optimizer==3.6.0",
     "prodigy-plus-schedule-free==2.0.1",
-    "adv-optm==2.2.3",
+    "adv-optm==2.6.0",
     "muon-optimizer @ git+https://github.com/KellerJordan/Muon.git@f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd",
 
     # profiling
@@ -71,23 +71,27 @@ dependencies = [
     "psutil==7.2.2",
     "requests==2.34.2",
     "deepdiff==8.6.2", # output easy to read diff for troublshooting
+
+    # JupyterLab
+    "jupyterlab==4.6.5",
 ]
 
 [project.optional-dependencies]
 cpu = [
-  "torch==2.12.0",
-  "torchvision==0.27.0",
+  "torch==2.15.0",
+  "torchvision==0.29.2",
   "onnxruntime==1.23.2",
+  "bitsandbytes==0.50.2; sys_platform == 'darwin'",
 ]
 
 cuda = [
-  "torch==2.12.0",
-  "torchvision==0.27.0",
+  "torch==2.15.0",
+  "torchvision==0.29.2",
   "onnxruntime-gpu==1.23.2",
   "triton-windows==3.7.0.post26; sys_platform == 'win32'",
 
   # optimizers
-  "bitsandbytes==0.49.2",
+  "bitsandbytes==0.50.2",
 ]
 
 # CUDA 12 has the same dependencies as CUDA 13.
@@ -101,18 +105,16 @@ cuda12 = [
 
 cuda13 = [
     "onetrainer[cuda]",
-    "nvidia-nccl-cu13==2.29.7; sys_platform == 'linux'",
-    "nvidia-nvcomp-cu13==5.3.0.16",
 ]
 
 rocm = [
   # pytorch
-  "torch==2.12.0",
-  "torchvision==0.27.0",
+  "torch==2.15.0",
+  "torchvision==0.29.2",
   "onnxruntime==1.23.2",
 
   # optimizers
-  "bitsandbytes==0.49.2",
+  "bitsandbytes==0.50.2",
 ]
 
 [tool.setuptools]
@@ -180,7 +182,7 @@ ui = { cmd = "python scripts/train_ui.py", cwd = "." }
 platforms = ["linux-cuda13", "win-cuda13"]
 
 [tool.pixi.feature.cuda13.pypi-options]
-extra-index-urls = ["https://download.pytorch.org/whl/cu130"]
+extra-index-urls = ["https://download.pytorch.org/whl/cu134"]
 
 [tool.pixi.feature.cuda12]
 platforms = ["linux-cuda12", "win-cuda12"]
@@ -192,13 +194,16 @@ extra-index-urls = ["https://download.pytorch.org/whl/cu126"]
 platforms = ["linux-rocm"]
 
 [tool.pixi.feature.rocm.pypi-options]
-extra-index-urls = ["https://download.pytorch.org/whl/rocm7.2"]
+extra-index-urls = ["https://download.pytorch.org/whl/rocm10.0"]
 
 [tool.pixi.feature.cpu]
 platforms = ["linux-generic", "win-generic", "macos-generic"]
 
 [tool.pixi.feature.cpu.pypi-options]
 extra-index-urls = ["https://download.pytorch.org/whl/cpu"]
+
+[tool.pixi.activation.env]
+no_proxy = "localhost,127.0.0.1,::1"
 
 [tool.pixi.dependencies]
 python = "3.13.*"
