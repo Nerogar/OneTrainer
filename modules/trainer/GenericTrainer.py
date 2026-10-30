@@ -34,14 +34,13 @@ from modules.util.profiling_util import PeakMemoryRecorder, TorchMemoryRecorder,
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
 from modules.util.tqdm_util import tqdm
+from modules.util.TrainingLogger import TrainingLogger
 from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor, nn
 from torch.nn import Parameter
 from torch.utils.hooks import RemovableHandle
-from torch.utils.tensorboard import SummaryWriter
-from torchvision.transforms.functional import pil_to_tensor
 
 # OT_DEBUG_PROFILES=1 dumps a CUDA memory snapshot for the first two steps, where the allocator is still
 # growing, and a profiler trace at steps 10 and 40, past compilation and warmup.
@@ -64,7 +63,7 @@ class GenericTrainer(BaseTrainer):
 
     parameters: list[Parameter]
 
-    tensorboard: SummaryWriter
+    logger: TrainingLogger
 
     grad_hook_handles: list[RemovableHandle]
 
@@ -76,8 +75,7 @@ class GenericTrainer(BaseTrainer):
 
         if multi.is_master():
             tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
-            os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
-            self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, config.run_name))
+            self.logger = TrainingLogger(config, tensorboard_log_dir)
             if config.tensorboard and not config.tensorboard_always_on:
                 super()._start_tensorboard()
 
@@ -237,8 +235,8 @@ class GenericTrainer(BaseTrainer):
 
                 def on_sample_default(sampler_output: ModelSamplerOutput):
                     if self.config.samples_to_tensorboard and sampler_output.file_type == FileType.IMAGE:
-                        self.tensorboard.add_image(
-                            f"sample{str(i)} - {safe_prompt}", pil_to_tensor(sampler_output.data),  # noqa: B023
+                        self.logger.add_image(
+                            f"sample{str(i)} - {safe_prompt}", sampler_output.data,  # noqa: B023
                             train_progress.global_step
                         )
                     self.callbacks.on_sample_default(sampler_output)
@@ -395,7 +393,7 @@ class GenericTrainer(BaseTrainer):
             for concept_seed, total_loss in accumulated_loss_per_concept.items():
                 average_loss = total_loss / concept_counts[concept_seed]
 
-                self.tensorboard.add_scalar(f"loss/validation_step/{mapping_seed_to_label[concept_seed]}",
+                self.logger.add_scalar(f"loss/validation_step/{mapping_seed_to_label[concept_seed]}",
                                             average_loss,
                                             train_progress.global_step)
 
@@ -404,7 +402,7 @@ class GenericTrainer(BaseTrainer):
                 total_count = sum(concept_counts[key] for key in concept_counts)
                 total_average_loss = total_loss / total_count
 
-                self.tensorboard.add_scalar("loss/validation_step/total_average",
+                self.logger.add_scalar("loss/validation_step/total_average",
                                             total_average_loss,
                                             train_progress.global_step)
 
@@ -642,7 +640,7 @@ class GenericTrainer(BaseTrainer):
             if math.isnan(loss_value):
                 raise RuntimeError("Training loss became NaN. This may be due to invalid parameters, precision issues, or a bug in the loss computation.")
 
-            self.tensorboard.add_scalar("loss/train_step", loss_value, loss_step)
+            self.logger.add_scalar("loss/train_step", loss_value, loss_step)
             ema_loss = ema_loss or loss_value
             ema_loss_steps += 1
             ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
@@ -652,7 +650,7 @@ class GenericTrainer(BaseTrainer):
                     'loss': loss_value,
                     'smooth loss': ema_loss,
                 })
-            self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, loss_step)
+            self.logger.add_scalar("smooth_loss/train_step", ema_loss, loss_step)
 
         epochs = range(train_progress.epoch, self.config.epochs, 1)
 
@@ -814,8 +812,8 @@ class GenericTrainer(BaseTrainer):
                         has_gradient = False
 
                         if multi.is_master():
-                            self.model_setup.report_to_tensorboard(
-                                self.model, self.config, lr_scheduler, self.tensorboard
+                            self.model_setup.report_to_logger(
+                                self.model, self.config, lr_scheduler, self.logger
                             )
 
                             accum_loss_cpu, accum_loss_step = accum_loss_exchange.exchange(accum_loss, train_progress.global_step)
@@ -828,7 +826,7 @@ class GenericTrainer(BaseTrainer):
                         if self.model.ema:
                             assert multi.is_master()
                             update_step = train_progress.global_step // self.config.gradient_accumulation_steps
-                            self.tensorboard.add_scalar(
+                            self.logger.add_scalar(
                                 "ema_decay",
                                 self.model.ema.get_current_decay(update_step),
                                 train_progress.global_step
@@ -896,7 +894,7 @@ class GenericTrainer(BaseTrainer):
             self.model.evict()
 
         if multi.is_master():
-            self.tensorboard.close()
+            self.logger.close()
 
             if self.config.tensorboard and not self.config.tensorboard_always_on:
                 super()._stop_tensorboard()

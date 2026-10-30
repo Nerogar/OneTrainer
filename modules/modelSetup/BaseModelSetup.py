@@ -10,12 +10,12 @@ from modules.util.ModuleFilter import ModuleFilter
 from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.quantization_util import quantize_layers
 from modules.util.TimedActionMixin import TimedActionMixin
+from modules.util.TrainingLogger import TrainingLogger
 from modules.util.TrainProgress import TrainProgress
 
 import torch
 from torch import Tensor
 from torch.optim.lr_scheduler import LRScheduler
-from torch.utils.tensorboard import SummaryWriter
 
 
 class BaseModelSetup(
@@ -100,12 +100,12 @@ class BaseModelSetup(
     ):
         pass
 
-    def report_to_tensorboard(
+    def report_to_logger(
             self,
             model: BaseModel,
             config: TrainConfig,
             scheduler: LRScheduler,
-            tensorboard: SummaryWriter,
+            logger: TrainingLogger,
     ):
         lrs = scheduler.get_last_lr()
         parameters = model.parameters.display_name_mapping
@@ -135,14 +135,14 @@ class BaseModelSetup(
         reported_learning_rates = config.optimizer.optimizer.maybe_adjust_lrs(reported_learning_rates, model.optimizer)
 
         for name, lr in reported_learning_rates.items():
-            tensorboard.add_scalar(
+            logger.add_scalar(
                 f"lr/{name}", lr, model.train_progress.global_step
             )
 
         if hasattr(model.optimizer, 'kourkoutas_helper') and model.optimizer.kourkoutas_helper is not None:
             stats = model.optimizer.kourkoutas_helper.last_beta2_stats
             if stats:
-                tensorboard.add_scalar("kourkoutas/beta2_mean", stats['mean'], model.train_progress.global_step)
+                logger.add_scalar("kourkoutas/beta2_mean", stats['mean'], model.train_progress.global_step)
 
     def stop_embedding_training_elapsed(
             self,

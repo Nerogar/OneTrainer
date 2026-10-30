@@ -6,6 +6,7 @@ from modules.util.config.CloudConfig import CloudSecretsConfig
 
 class SecretsConfig(BaseConfig):
     huggingface_token: str
+    wandb_api_key: str
     cloud: CloudSecretsConfig
 
     def __init__(self, data: list[(str, Any, type, bool)]):
@@ -17,6 +18,7 @@ class SecretsConfig(BaseConfig):
 
         # name, default value, data type, nullable
         data.append(("huggingface_token", "", str, False))
+        data.append(("wandb_api_key", "", str, False))
 
         # cloud
         cloud = CloudSecretsConfig.default_values()
