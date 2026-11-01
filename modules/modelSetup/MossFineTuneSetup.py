@@ -1,6 +1,6 @@
 from modules.model.MossModel import MossModel
-from modules.modelSetup.BaseMossSetup import BaseMossSetup
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.BaseMossSetup import BaseMossSetup
 from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType

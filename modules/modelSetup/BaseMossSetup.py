@@ -10,8 +10,8 @@ from modules.modelSetup.mixin.ModelSetupFlowMatchingMixin import ModelSetupFlowM
 from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.util.checkpointing_util import (
-    enable_checkpointing_for_moss_transformer,
     enable_checkpointing_for_moss_encoder_layers,
+    enable_checkpointing_for_moss_transformer,
 )
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig
 from modules.util.TrainProgress import TrainProgress

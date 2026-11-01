@@ -43,20 +43,21 @@ from pathlib import Path
 
 import torch
 from torch import nn
-from accelerate import init_empty_weights
+
 from diffusers import AutoencoderKLFlux2, DiffusionPipeline, FlowMatchEulerDiscreteScheduler
-from diffusers.models.attention_dispatch import dispatch_attention_fn
-from diffusers.loaders.single_file_utils import load_single_file_checkpoint, SingleFileComponentError
-from diffusers.models.model_loading_utils import load_model_dict_into_meta
-from diffusers.quantizers import DiffusersAutoQuantizer
-from diffusers.schedulers.scheduling_utils import SchedulerMixin  # Required by custom-component discovery.
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.image_processor import VaeImageProcessor
-from diffusers.models.modeling_utils import ModelMixin
+from diffusers.loaders.single_file_utils import SingleFileComponentError, load_single_file_checkpoint
+from diffusers.models.attention_dispatch import dispatch_attention_fn
+from diffusers.models.model_loading_utils import load_model_dict_into_meta
 from diffusers.models.modeling_outputs import Transformer2DModelOutput
+from diffusers.models.modeling_utils import ModelMixin
 from diffusers.pipelines.pipeline_utils import ImagePipelineOutput
+from diffusers.quantizers import DiffusersAutoQuantizer
 from diffusers.utils.torch_utils import empty_device_cache, randn_tensor
 from transformers import AutoModel, AutoTokenizer
+
+from accelerate import init_empty_weights
 
 
 def _convert_moss_image_transformer_checkpoint(checkpoint):
@@ -394,7 +395,7 @@ class MOSSImagePipeline(DiffusionPipeline):
     def from_components_pretrained(cls, transformer_path, text_encoder_path, vae_path,
                                    torch_dtype=torch.bfloat16, vae_dtype=torch.float32,
                                    local_files_only=False):
-        common = dict(local_files_only=local_files_only)
+        common = {"local_files_only": local_files_only}
         transformer = MOSSImageTransformer.from_pretrained(transformer_path, torch_dtype=torch_dtype, **common)
         tokenizer = AutoTokenizer.from_pretrained(text_encoder_path, **common)
         text_encoder = AutoModel.from_pretrained(text_encoder_path, dtype=torch_dtype, **common).eval()

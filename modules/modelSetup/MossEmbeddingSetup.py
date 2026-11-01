@@ -1,6 +1,6 @@
 from modules.model.MossModel import MossModel
-from modules.modelSetup.BaseMossSetup import BaseMossSetup
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
+from modules.modelSetup.BaseMossSetup import BaseMossSetup
 from modules.util import factory
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.ModelType import ModelType
@@ -8,6 +8,7 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.NamedParameterGroup import NamedParameterGroup, NamedParameterGroupCollection
 from modules.util.optimizer_util import init_model_parameters
 from modules.util.TrainProgress import TrainProgress
+
 import torch
 
 

@@ -1,10 +1,8 @@
 import os
 import traceback
 
-import torch
-
-from modules.model.MossModel import MossModel
 from modules.model.moss.pipeline_moss_image import MOSSImageScheduler, MOSSImageTransformer
+from modules.model.MossModel import MossModel
 from modules.modelLoader.mixin.HFModelLoaderMixin import HFModelLoaderMixin
 from modules.util.config.TrainConfig import QuantizationConfig
 from modules.util.enum.ModelType import ModelType

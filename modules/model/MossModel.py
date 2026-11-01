@@ -2,13 +2,6 @@ import math
 from contextlib import nullcontext
 from random import Random
 
-import torch
-import torch.nn.functional as F
-from torch import Tensor
-
-from diffusers import AutoencoderKLFlux2, DiffusionPipeline
-from transformers import Qwen2Tokenizer, Qwen3_5Model
-
 from modules.model.BaseModel import BaseModel, BaseModelEmbedding
 from modules.model.moss.pipeline_moss_image import (
     MOSSImagePipeline,
@@ -17,6 +10,13 @@ from modules.model.moss.pipeline_moss_image import (
 )
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.ModelType import ModelType
+
+import torch
+import torch.nn.functional as F
+from torch import Tensor
+
+from diffusers import AutoencoderKLFlux2, DiffusionPipeline
+from transformers import Qwen2Tokenizer, Qwen3_5Model
 
 # Maximum number of tokens for a chat-templated prompt (template overhead + user content).
 PROMPT_MAX_LENGTH = 4096
