@@ -1,11 +1,11 @@
 {
  "base_model_name": "OpenMOSS-Team/MOSS-Image-Base",
  "batch_size": 1,
- "learning_rate": 6e-5,
+ "learning_rate": 0.0003,
  "model_type": "MOSS",
  "output_model_format": "DIFFUSERS_LORA",
  "resolution": "512",
- "attention_mechanism": "CUDNN",
+ "attention_mechanism": "SDP",
  "compile": true,
  "transformer": {
   "train": true,
