@@ -127,12 +127,12 @@ class BaseTrainUIView(ABC):
         # workspace dir
         self.components.label(frame, 0, 0, "Workspace Directory",
                          tooltip="The directory where all files of this training run are saved")
-        self.components.path_entry(frame, 0, 1, ui_state, "workspace_dir", mode="dir", command=controller._on_workspace_dir_change)
+        self.components.path_entry(frame, 0, 1, ui_state, "workspace_dir", mode="dir", command=controller._on_workspace_dir_change, io_type=PathIOType.OUTPUT)
 
         # cache dir
         self.components.label(frame, 0, 2, "Cache Directory",
                          tooltip="The directory where cached data is saved")
-        self.components.path_entry(frame, 0, 3, ui_state, "cache_dir", mode="dir")
+        self.components.path_entry(frame, 0, 3, ui_state, "cache_dir", mode="dir", io_type=PathIOType.OUTPUT)
 
         # continue from previous backup
         self.components.label(frame, 2, 0, "Continue from last backup",
@@ -149,6 +149,12 @@ class BaseTrainUIView(ABC):
         self.components.label(frame, 3, 0, "Prevent Overwrites",
                          tooltip="When enabled, output paths that already exist on disk will be flagged as invalid to avoid accidental overwrites")
         self.components.switch(frame, 3, 1, ui_state, "prevent_overwrites")
+
+        self.components.label(frame, 3, 2, "Clean Up Input",
+                              tooltip="On leaving a field, pressing Enter, or starting training: trims surrounding whitespace, "
+                                      "removes matching outer path quotes, expands ~ in local paths, and converts Windows separators. "
+                                      "Invalid input is flagged for you to fix.")
+        self.components.switch(frame, 3, 3, ui_state, "auto_correct_input")
 
         # debug
         self.components.label(frame, 4, 0, "Debug mode",
@@ -308,11 +314,6 @@ class BaseTrainUIView(ABC):
         self.components.label(frame, 5, 0, "Skip First",
                          tooltip="Start saving automatically after this interval has elapsed")
         self.components.entry(frame, 5, 1, ui_state, "save_skip_first", width=50, sticky="nw")
-
-        # save filename prefix
-        self.components.label(frame, 6, 0, "Save Filename Prefix",
-                         tooltip="The prefix for filenames used when saving the model during training")
-        self.components.entry(frame, 6, 1, ui_state, "save_filename_prefix")
 
     def build_embedding_tab_content(self, frame, controller, ui_state):
         # embedding model name

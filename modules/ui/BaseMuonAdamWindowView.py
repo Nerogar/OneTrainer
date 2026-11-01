@@ -59,6 +59,6 @@ class BaseMuonAdamWindowView:
             elif param_type == 'CenteredWDMode':
                 self.components.options(master, row, col + 1, ["full", "float8", "int8", "int4"], ui_state, key)
             elif param_type != 'bool':
-                self.components.entry(master, row, col + 1, ui_state, key)
+                self.components.entry(master, row, col + 1, ui_state, key, extra_validate=lambda _: None)
             else:
                 self.components.switch(master, row, col + 1, ui_state, key)

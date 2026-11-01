@@ -88,6 +88,7 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         self._create_tabs()
         self.change_training_method(self.controller.train_config.training_method)
         self._update_additional_embeddings_tab(self.controller.train_config.model_type)
+        self.controller.sync_run_name(is_new_invocation=True)
 
         self._profiling_controller = ProfilingWindowController()
         self.profiling_window = self._profiling_controller.create_window(self, PySide6ProfilingWindowView)
@@ -124,6 +125,7 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         self._set_training_button_style("running")
 
     def on_training_stopped(self, error_caught: bool):
+        self.controller.sync_run_name(is_new_invocation=True)
         self.eta_label.setText("")
         self._set_training_button_style("idle")
 

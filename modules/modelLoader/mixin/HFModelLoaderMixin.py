@@ -166,6 +166,8 @@ def stream_module_from_checkpoint(
         dest_pool=None,
         fallback_dtype: DataType = DataType.BFLOAT_16,
 ):
+    from modules.module.quantized.LinearA8 import LinearA8
+
     # Fill a meta skeleton by streaming its checkpoint weights one tensor at a time, so the full checkpoint never lands
     # in RAM. key_prefix scopes the lookup to one sub-module; keys stay checkpoint-absolute. dest_pool routes
     # non-quantized weights straight into a MemPool (quantized modules pack in the default pool).
@@ -175,6 +177,10 @@ def stream_module_from_checkpoint(
     # flat work list of every checkpoint-backed skeleton tensor, so the reader threads below can drive the reads.
     work = []  # (key, sub_module, tensor_name, is_buffer, module_name)
     for name, sub_module in module.named_modules():
+        # A8 keeps floating-point weights, so it never enters quantize_if_ready(). Initialize its compute dtype
+        # on every materialization, including streams that defer weight quantization to a later setup pass.
+        if isinstance(sub_module, LinearA8):
+            sub_module.compute_dtype = train_dtype.torch_dtype()
         # gradient checkpointing in compile mode wraps each block in a CheckpointLayer, inserting a "checkpoint"
         # level into the live path; the checkpoint keys have none, so strip it before lookup (as LoRAModule does).
         lookup_name = ".".join(p for p in name.split(".") if p != "checkpoint")
