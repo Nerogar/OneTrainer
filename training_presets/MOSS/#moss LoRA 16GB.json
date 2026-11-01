@@ -24,10 +24,10 @@
  "weight_dtype": "BFLOAT_16",
  "output_dtype": "BFLOAT_16",
  "timestep_distribution": "LOGIT_NORMAL",
- "layer_filter": "q,k,v,o,ffn_up_gate,ffn_down",
+ "layer_filter": "proj.q,proj.k,proj.v,proj.o,proj.ffn_up_gate,proj.ffn_down",
  "layer_filter_preset": "attn-mlp",
  "quantization": {
-  "layer_filter": "q,k,v,o,ffn_up_gate,ffn_down",
+  "layer_filter": "proj.q,proj.k,proj.v,proj.o,proj.ffn_up_gate,proj.ffn_down",
   "layer_filter_preset": "attn-mlp"
  }
 }
