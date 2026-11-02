@@ -9,10 +9,10 @@ from modules.module.FusedModule import FusedModuleGroup, check_fusion_match, dis
 from modules.module.oft_utils import OFTRotationModule
 from modules.module.quantized.mixin.LoRAFusableLinearMixin import LoRAFusableLinearMixin
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.convert_util import convert, oft_qkv_fusion, reverse_conversion
 from modules.util.enum.ModelType import PeftType
 from modules.util.lokr_utils import factorization, make_kron, rebuild_tucker
 from modules.util.ModuleFilter import ModuleFilter
-from modules.util.convert_util import convert, oft_qkv_fusion, reverse_conversion
 from modules.util.quantization_util import get_unquantized_weight, get_weight_shape
 
 import torch
