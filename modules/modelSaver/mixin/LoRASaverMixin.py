@@ -12,7 +12,7 @@ from modules.util.convert_lora_util import (
     lora_kohya_conversion,
     lora_original_conversion,
 )
-from modules.util.convert_util import convert, remove_prefix
+from modules.util.convert_util import convert, oft_qkv_fusion, remove_prefix
 from modules.util.enum.ModelFormat import ModelFormat
 
 import torch
@@ -165,6 +165,12 @@ class LoRASaverMixin(
         # INTERNAL is the raw canonical dict, not a foreign format with a fixed fused/split shape -- exempt.
         if output_model_format != ModelFormat.INTERNAL:
             state_dict = self._get_state_dict(model)
+            # OFT fusion: if the output format needs fused qkv and the state dict is split, fuse the
+            # OFT keys (split -> fused) before check_fusion_match. OFT fusion is lossless (block-diagonal
+            # rotation stacking), unlike LoRA fusion which is lossy (SVD/re-rank).
+            if output_model_format.needs_qkv_fusion() and model.fusion_groups():
+                state_dict = convert(state_dict, oft_qkv_fusion(
+                    model.fusion_groups(), component_prefix=model.model_type.denoising_model_part()), strict=False)
             check_fusion_match(state_dict.keys(), output_model_format.needs_qkv_fusion(), model.fusion_groups())
 
         match output_model_format:
