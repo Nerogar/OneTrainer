@@ -1,2 +1,1 @@
--r requirements-global.txt
 -r requirements-cuda.txt
