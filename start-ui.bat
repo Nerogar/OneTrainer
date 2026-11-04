@@ -32,7 +32,7 @@ if not exist "%VENV_DIR%\Scripts\python.exe" (
     goto :end
 )
 set PYTHON="%VENV_DIR%\Scripts\python.exe" -X utf8
-if defined PROFILE (set PYTHON=%PYTHON% -m scalene --off --cpu --gpu --profile-all --no-browser)
+if defined PROFILE (set PYTHON=%PYTHON% -m scalene run --off --gpu --profile-all)
 echo Using Python %PYTHON%
 
 :check_python_version
@@ -44,7 +44,7 @@ if errorlevel 1 (
 )
 
 echo.
-%PYTHON% "%~dp0scripts\util\version_check.py" 3.10 3.14 2>&1
+%PYTHON% "%~dp0scripts\util\version_check.py" 3.11.1 3.15 2>&1
 if errorlevel 1 (
     echo.
     goto :wrong_python_version
