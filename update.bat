@@ -153,6 +153,9 @@ echo.
 echo Please install a supported Python version from:
 echo https://www.python.org/downloads/windows/
 echo.
+echo If a supported Python version is already installed, your virtual environment
+echo was created with an older one. Delete the "venv" folder and run install.bat.
+echo.
 echo Reminder: Do not rely on installation videos; they are often out of date.
 goto :end_error
 
