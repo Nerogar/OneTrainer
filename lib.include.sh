@@ -22,7 +22,15 @@ cd -- "${SCRIPT_DIR}"
 # since their script shadows "conda" as a shell-function instead of a binary!
 export OT_CONDA_CMD="${OT_CONDA_CMD:-${CONDA_EXE:-conda}}"
 export OT_CONDA_ENV="${OT_CONDA_ENV:-conda_env}"
-export OT_PYTHON_CMD="${OT_PYTHON_CMD:-python}"
+# NOTE: Debian and Ubuntu only ship "python3", without "python" (see PEP 394).
+if [[ -z "${OT_PYTHON_CMD}" ]]; then
+    if command -v python3 &>/dev/null; then
+        OT_PYTHON_CMD="python3"
+    else
+        OT_PYTHON_CMD="python"
+    fi
+fi
+export OT_PYTHON_CMD
 export OT_PYTHON_VENV="${OT_PYTHON_VENV:-venv}"
 export OT_PREFER_VENV="${OT_PREFER_VENV:-true}"
 export OT_LAZY_UPDATES="${OT_LAZY_UPDATES:-false}"
