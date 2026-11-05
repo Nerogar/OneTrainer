@@ -1,0 +1,3 @@
+# Kept for backwards compatibility with external scripts.
+# All dependencies are defined in pyproject.toml.
+-e .
