@@ -292,6 +292,76 @@ def qkv_fusion(fusion_groups: list) -> list:
     return [(group_pattern, group_pattern, rules) for group_pattern, rules in by_group_pattern.items()]
 
 
+def oft_fuse(*tensors):
+    # Fuse N split OFT leaf tensors into one fused tensor. OFT's rotation is a block-diagonal orthogonal
+    # matrix: each leaf's weight [r, n_elements] is one block-row of the fused qkv rotation [r*N, n_elements],
+    # so stacking them (concat dim 0) is the exact fused rotation -- lossless and rank-preserving.
+    # Scalar marker buffers (scaled_oft, matrix_exp_oft, clipped_oft) must agree across leaves; take the first.
+    if all(t.dim() == 0 for t in tensors):
+        for t in tensors[1:]:
+            if not torch.equal(tensors[0], t):
+                raise RuntimeError(
+                    f"OFT scalar buffer mismatch across q/k/v leaves: {tensors[0]} vs {t}")
+        return tensors[0]
+    return torch.cat(tensors, dim=0)
+
+
+def make_oft_defuse(n_leaves: int, leaf_out_features: list[int] | None = None):
+    # Defuse a fused OFT tensor back into N leaf tensors. The reverse of oft_fuse.
+    # For scalar buffers: duplicate the scalar to each leaf.
+    # For weight (2D): split into N equal chunks along dim 0 (all leaves share the same r).
+    # For dora_log_multiplier (1D): split by each leaf's out_features.
+    def oft_defuse(fused):
+        if fused.dim() == 0:
+            return tuple([fused] * n_leaves)
+        if fused.dim() == 2:
+            return tuple(fused.chunk(n_leaves, dim=0))
+        if fused.dim() == 1:
+            if leaf_out_features is None:
+                raise RuntimeError(
+                    f"OFT dora_log_multiplier defusion requires leaf_out_features for {n_leaves} leaves")
+            chunks = []
+            offset = 0
+            for out_f in leaf_out_features:
+                chunks.append(fused[offset:offset + out_f])
+                offset += out_f
+            return tuple(chunks)
+        raise RuntimeError(f"Unexpected OFT tensor dim {fused.dim()} for defusion")
+    return oft_defuse
+
+
+def oft_qkv_fusion(fusion_groups: list, leaf_out_features: dict[str, list[int]] | None = None, component_prefix: str = "") -> list:
+    # LoRA adapter OFT fusion: fuse each group's split q/k/v[/mlp] OFT leaves into its fused name,
+    # and the reverse (defuse). Unlike qkv_fusion (full-model checkpoint, forward-only), this carries a
+    # reverse_convert_fn so the load path can defuse a fused OFT file into a split wrapper. leaf_out_features
+    # maps each group_pattern to the per-leaf out_features list (needed for dora_log_multiplier defusion);
+    # None means the weight-only case (equal chunking) is assumed. component_prefix is the top-level
+    # component name (e.g. "transformer") that prefixes the fusion group pattern in the LoRA state dict.
+    by_group_pattern = {}
+    for group_pattern, leaves, fused, _original in fusion_groups:
+        n = len(leaves)
+        out_features = leaf_out_features.get(group_pattern) if leaf_out_features else None
+        prefix = f"{component_prefix}." if component_prefix else ""
+        full_pattern = f"{prefix}{group_pattern}"
+        oft_suffix = ".oft_R.{post__}"
+        dora_suffix = ".dora_log_multiplier"
+        by_group_pattern.setdefault(full_pattern, []).extend([
+            (
+                [leaf + oft_suffix for leaf in leaves],
+                fused + oft_suffix,
+                oft_fuse,
+                make_oft_defuse(n, out_features),
+            ),
+            (
+                [leaf + dora_suffix for leaf in leaves],
+                fused + dora_suffix,
+                oft_fuse,
+                make_oft_defuse(n, out_features),
+            ),
+        ])
+    return [(pattern, pattern, rules) for pattern, rules in by_group_pattern.items()]
+
+
 def remove_prefix(prefix: str | None = None, separator: str='.'):
     if prefix is None:
         prefix = "{prefix__}"
