@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "onetrainer"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.11,<3.14"
 version = "0.1.0"
 
 dependencies = [
@@ -16,7 +16,7 @@ dependencies = [
     "tqdm==4.67.1",
     "pyyaml==6.0.2",
     "huggingface-hub==1.22.0",
-    "scipy==1.18.1",
+    "scipy==1.17.1",
     "matplotlib==3.10.3",
     "av==16.1.0",
     "yt-dlp",
