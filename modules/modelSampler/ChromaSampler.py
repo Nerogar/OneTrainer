@@ -12,10 +12,9 @@ from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
+from modules.util.tqdm_util import tqdm
 
 import torch
-
-from tqdm import tqdm
 
 
 @factory.register(BaseModelSampler, ModelType.CHROMA_1)
