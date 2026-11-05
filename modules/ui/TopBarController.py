@@ -41,6 +41,7 @@ class TopBarController:
             ("QwenImage", ModelType.QWEN),
             ("Anima", ModelType.ANIMA),
             ("Krea 2", ModelType.KREA_2),
+            ("MOSS", ModelType.MOSS),
             ("Z-Image", ModelType.Z_IMAGE),
             ("Ernie Image", ModelType.ERNIE),
             ("Ideogram 4", ModelType.IDEOGRAM_4),

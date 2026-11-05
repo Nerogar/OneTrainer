@@ -266,6 +266,9 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         self.build_tools_tab_content(frame, self.controller, self.ui_state)
         pyside6_components._pack_form(frame)
 
+    def _should_show_output_embedding_toggle(self) -> bool:
+        return not self.controller.train_config.model_type.is_moss()
+
     def _configure_embedding_frame(self, frame):
         self.build_embedding_tab_content(frame, self.controller, self.ui_state)
         pyside6_components._pack_form(frame)
@@ -356,6 +359,15 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
             self.training_tab.refresh_ui()
         if self.lora_tab:
             self.lora_tab.refresh_ui()
+        # embedding tab is built once; rebuild it so model-specific controls
+        # (e.g. hiding the output embedding toggle for Moss) reflect the new model type
+        page = self._tab_widgets.get("embedding")
+        if page is not None:
+            self.tabview.removeTab(self.tabview.indexOf(page))
+            del self._tab_widgets["embedding"]
+            tab_page = self._create_scrollable_tab(self._configure_embedding_frame)
+            self.tabview.addTab(tab_page, "embedding")
+            self._tab_widgets["embedding"] = tab_page
         self._update_additional_embeddings_tab(model_type)
 
     def _update_additional_embeddings_tab(self, model_type: ModelType):
@@ -364,6 +376,8 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         page = self._tab_widgets.get("additional embeddings")
         if page is not None:
             self.tabview.setTabVisible(self.tabview.indexOf(page), supported)
+            if supported and self.additional_embeddings_tab is not None:
+                self.additional_embeddings_tab.refresh_ui()
 
     def change_training_method(self, training_method: TrainingMethod):
         if not self.tabview:

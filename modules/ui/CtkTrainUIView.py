@@ -330,6 +330,9 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
         frame.pack(fill="both", expand=1)
         return frame
 
+    def _should_show_output_embedding_toggle(self) -> bool:
+        return not self.controller.train_config.model_type.is_moss()
+
     def embedding_tab(self, master):
         frame = ctk.CTkScrollableFrame(master, fg_color="transparent")
         frame.grid_columnconfigure(0, weight=0)
@@ -367,6 +370,12 @@ class CtkTrainUIView(BaseTrainUIView, ctk.CTk):
 
         if self.lora_tab:
             self.lora_tab.refresh_ui()
+
+        # embedding tab is built once; rebuild it so model-specific controls
+        # (e.g. hiding the output embedding toggle for Moss) reflect the new model type
+        if self.tabview and "embedding" in self.tabview._tab_dict:
+            self.tabview.delete("embedding")
+            self.embedding_tab(self.tabview.add("embedding"))
 
         self._update_additional_embeddings_tab(model_type)
 
