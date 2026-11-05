@@ -69,7 +69,14 @@ class OFTRotationModule(nn.Module):
         self.register_buffer("rows", rows, persistent=False)
         self.register_buffer("cols", cols, persistent=False)
         self.dropout = MultiplicativeDropoutLayer(p=dropout_probability)
+        # Set via set_merge_rot_source: the LinearQuantRot module whose O^T input rotation is
+        # folded into this module's R, so its quantized module can skip applying O^T itself.
+        # Held in a list so nn.Module.__setattr__ does not register it as a submodule.
+        self._merge_rot_source = None
 
+
+    def set_merge_rot_source(self, source):
+        self._merge_rot_source = [source] if source is not None else None
 
     def _pytorch_skew_symmetric(self, vec, block_size):
         batch_size = vec.shape[0]
@@ -138,15 +145,41 @@ class OFTRotationModule(nn.Module):
         )
         orth_rotate = self.dropout(orth_rotate)
 
-        rank = self.in_features // self.block_size if self.block_share else self.r
-        batch_dims = x.shape[:-1]
-        x_reshaped = x.reshape(*batch_dims, rank, self.block_size)
-
+        rank = self.in_features // self.block_size
         if self.block_share:
+            # Always ensure full rank before merging or contracting
             orth_rotate = orth_rotate.repeat(rank, 1, 1)
-            x_rotated_reshaped = torch.einsum("...rk,rkc->...rc", x_reshaped, orth_rotate)
+
+        # Ensure rotation matrix matches the input activation dtype
+        orth_rotate = orth_rotate.to(x.dtype)
+
+        if self._merge_rot_source is not None:
+            source = self._merge_rot_source[0]
+            b_o, b_q = self.block_size, source.quant_rot_block_size
+            b_c, b_f = max(b_o, b_q), min(b_o, b_q)
+            k, n = b_c // b_f, self.in_features // b_c
+
+            # Ensure quant_rot matches device and dtype upfront
+            quant_rot = source.quant_rot.to(device=orth_rotate.device, dtype=orth_rotate.dtype)
+
+            if k == 1:
+                M = torch.matmul(orth_rotate, quant_rot.transpose(-1, -2))
+            elif b_o > b_q:
+                M = torch.matmul(
+                    orth_rotate.view(n, b_c, k, b_f).permute(0, 2, 1, 3),
+                    quant_rot.view(n, k, b_f, b_f).transpose(-1, -2)
+                ).permute(0, 2, 1, 3).reshape(n, b_c, b_c)
+            else:
+                M = torch.matmul(
+                    quant_rot.view(n, b_c, k, b_f).permute(0, 2, 1, 3),
+                    orth_rotate.view(n, k, b_f, b_f).transpose(-1, -2)
+                ).permute(0, 2, 1, 3).reshape(n, b_c, b_c).transpose(-1, -2)
+
+            x_reshaped = x.reshape(-1, n, b_c).permute(1, 0, 2)
+            x_rotated_reshaped = torch.bmm(x_reshaped, M).permute(1, 0, 2)
         else:
-            x_rotated_reshaped = torch.einsum("...rk,rkc->...rc", x_reshaped, orth_rotate)
+            x_reshaped = x.reshape(-1, rank, self.block_size).permute(1, 0, 2)
+            x_rotated_reshaped = torch.bmm(x_reshaped, orth_rotate).permute(1, 0, 2)
 
         x_rotated = x_rotated_reshaped.reshape(*orig_shape)
 
