@@ -1,2 +1,2 @@
---extra-index-url https://download.pytorch.org/whl/cu130
+--extra-index-url https://download.pytorch.org/whl/cu134
 -e .[cuda13]
