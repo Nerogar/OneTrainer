@@ -1,8 +1,7 @@
-import datetime
+import datetime as dt
 import json
 import os
 import subprocess
-import sys
 import threading
 import time
 import traceback
@@ -18,13 +17,17 @@ from modules.ui.VideoToolUIController import VideoToolUIController
 from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.TrainConfig import TrainConfig, prepare_run_name
 from modules.util.profiling_util import PeakMemoryRecorder
-from modules.util.torch_util import torch_gc
+from modules.util.tensorboard_util import TensorboardProcess
+from modules.util.torch_util import print_fragmentation, torch_gc
 from modules.util.TrainProgress import TrainProgress
 from modules.util.ui.validation import flush_and_validate_all
 
 import torch
+
+from huggingface_hub import parse_hf_uri
+from huggingface_hub.errors import GatedRepoError
 
 
 class TrainUIController:
@@ -70,7 +73,7 @@ class TrainUIController:
 
         total_eta = spent_total / steps_done_this_session * remaining_steps
 
-        td = datetime.timedelta(seconds=total_eta)
+        td = dt.timedelta(seconds=total_eta)
         days = td.days
         hours, remainder = divmod(td.seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
@@ -91,13 +94,11 @@ class TrainUIController:
         if self.always_on_tensorboard_subprocess:
             self._stop_always_on_tensorboard()
 
-        tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
         tensorboard_log_dir = os.path.join(self.train_config.workspace_dir, "tensorboard")
 
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
 
         tensorboard_args = [
-            tensorboard_executable,
             "--logdir",
             tensorboard_log_dir,
             "--port",
@@ -107,10 +108,13 @@ class TrainUIController:
 
         if self.train_config.tensorboard_expose:
             tensorboard_args.append("--bind_all")
+        else:
+            tensorboard_args.append("--bind=localhost")
 
         try:
-            self.always_on_tensorboard_subprocess = subprocess.Popen(tensorboard_args)
+            self.always_on_tensorboard_subprocess = TensorboardProcess(tensorboard_args)
         except Exception:
+            traceback.print_exc()
             self.always_on_tensorboard_subprocess = None
 
     def _stop_always_on_tensorboard(self):
@@ -230,12 +234,21 @@ class TrainUIController:
             traceback.print_exc()
             self.view.on_update_status(f"Error generating debug package: {e}")
 
+    def __report_gated_repo_error(self) -> str:
+        model_name = self.train_config.base_model_name
+        if not os.path.exists(model_name):
+            model_name = parse_hf_uri(model_name if "://" in model_name else f"hf://{model_name}").id
+        concise_auth_error = f"Cannot access {Path(model_name).name} on HuggingFace.\nAccess is gated and you are not in the authorized list."
+        print(concise_auth_error)
+        return concise_auth_error
+
     def __training_thread_function(self):
         with PeakMemoryRecorder("training run", enabled=False):
             self.__training_thread_function_impl()
 
     def __training_thread_function_impl(self):
         error_caught = False
+        error_message = "Error: check the console for details"
 
         self.training_callbacks = TrainCallbacks(
             on_update_train_progress=self.on_update_train_progress,
@@ -252,11 +265,17 @@ class TrainUIController:
             self.start_total_steps = None
             self.start_time = time.monotonic()
             trainer.train()
-        except Exception:
+        except Exception as e:
             if self.train_config.cloud.enabled:
                 self.view.sync_cloud_secrets()
             error_caught = True
-            traceback.print_exc()
+            if isinstance(e, GatedRepoError):
+                error_message = self.__report_gated_repo_error()
+            else:
+                traceback.print_exc()
+        finally:
+            if self.train_config.debug_mode or os.environ.get("OT_DEBUG_PROFILES") == "1":
+                print_fragmentation("training run, at stop")
 
         trainer.end()
 
@@ -268,8 +287,12 @@ class TrainUIController:
         torch.clear_autocast_cache()
         torch_gc()
 
+        # after trainer.end() + torch_gc: quantifies the reserved-but-unallocated that persists through unload
+        if self.train_config.debug_mode or os.environ.get("OT_DEBUG_PROFILES") == "1":
+            print_fragmentation("training run, after unload")
+
         if error_caught:
-            self.on_update_status("Error: check the console for details")
+            self.on_update_status(error_message)
         else:
             self.on_update_status("Stopped")
 
@@ -279,19 +302,25 @@ class TrainUIController:
         if self.train_config.tensorboard_always_on and not self.always_on_tensorboard_subprocess:
             self.view.schedule_on_main_thread(self._start_always_on_tensorboard)
 
+    def sync_run_name(self, *, is_new_invocation: bool = False):
+        name = prepare_run_name(self.train_config.training_method, self.train_config.run_name_mode,
+                                self.train_config.run_name, is_new_invocation=is_new_invocation)
+        self.view.ui_state.get_var("run_name").set(name)
+
     def start_training(self):
         if self.training_thread is None:
-            self.view.save_default()
-
             errors = flush_and_validate_all()
             if errors:
                 self.view.show_validation_errors(errors)
                 return
 
+            self.sync_run_name()
+
             if self.train_config.clear_cache_before_training and self.train_config.latent_caching \
                     and not self.view.confirm("Clear Cache Before Training", "Clear cache?"):
                 return
 
+            self.view.save_default()
             self.view.on_training_started()
 
             if self.train_config.tensorboard and not self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:

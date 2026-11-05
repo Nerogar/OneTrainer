@@ -22,7 +22,7 @@ def kohya_flatten(
         state_dict: dict[str, Tensor],
 ) -> dict[str, Tensor]:
     # flatten the module path ('.' -> '_'), keeping the value suffix dotted. The suffix is one
-    # of: a bare single-segment param -- .alpha / .dora_scale, or LoHa/LoKr's hada_*/lokr_*
+    # of: a bare single-segment param -- .alpha / .dora_scale / .dora_log_multiplier, or LoHa/LoKr's hada_*/lokr_*
     # factors (.hada_w1_a / .lokr_w1 / .lokr_w2_a, which carry no .weight); or .<param>.weight /
     # .oft_R.scaled_oft (two segments, e.g. .lora_down.weight / .oft_R.weight; Scaled-OFT's marker
     # buffer oft_R.scaled_oft is two-segment but not .weight). Keys without a recognized value

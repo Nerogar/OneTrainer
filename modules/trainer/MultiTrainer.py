@@ -1,4 +1,4 @@
-import datetime
+import datetime as dt
 import os
 import platform
 import subprocess
@@ -44,7 +44,7 @@ class MultiTrainer(BaseTrainer):
 
         #set timeout to 24 hours, because caching is only done on 1 GPU and can take a significant time for large datasets.
         #The other GPU processes have to wait without timing out:
-        timeout = datetime.timedelta(hours=24)
+        timeout = dt.timedelta(hours=24)
 
         torch.distributed.init_process_group(rank=rank, world_size=world_size, device_id=device, timeout=timeout,
             backend='gloo' if platform.system() == 'Windows' else 'nccl',
