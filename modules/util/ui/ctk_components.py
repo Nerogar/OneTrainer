@@ -460,12 +460,12 @@ def options_adv(master, row, column, values, ui_state: CtkUIState, var_name: str
 
 
 def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: CtkUIState, var_name: str,
-               command: Callable[[Any], None] | None = None, sticky=None):
+               command: Callable[[Any], None] | None = None, sticky=None, reset_to_first_on_mismatch: bool = True):
     var = ui_state.get_var(var_name)
     keys = [key for key, value in values]
 
     # if the current value is not valid, select the first option
-    if var.get() not in [str(value) for key, value in values] and len(keys) > 0:
+    if var.get() not in [str(value) for key, value in values] and len(keys) > 0 and reset_to_first_on_mismatch:
         var.set(values[0][1])
 
     deactivate_update_var = False
@@ -493,6 +493,14 @@ def options_kv(master, row, column, values: list[tuple[str, Any]], ui_state: Ctk
                         if command:
                             command(value)
                         break
+            else:
+                # External state (e.g. "Load config") pointed this field outside the
+                # locally scanned config_dir, so it matches none of the known options.
+                # Still reload from it: otherwise this widget's element list stays
+                # stale, and the next save_current_config() overwrites the real file
+                # at `var.get()` with that stale (often empty) list.
+                if command:
+                    command(var.get())
 
     var.trace_add("write", lambda _0, _1, _2: update_var())
     update_var()  # call update_var once to set the initial value

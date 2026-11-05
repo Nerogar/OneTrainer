@@ -368,6 +368,10 @@ class PySide6TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
             self._tab_widgets['embedding'] = tab_page
 
     def load_preset(self):
+        if self.concepts_tab:
+            self.concepts_tab.reload_from_config()
+        if self.sampling_tab:
+            self.sampling_tab.reload_from_config()
         if self.additional_embeddings_tab:
             self.additional_embeddings_tab.refresh_ui()
 
