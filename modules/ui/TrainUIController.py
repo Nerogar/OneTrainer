@@ -108,6 +108,8 @@ class TrainUIController:
 
         if self.train_config.tensorboard_expose:
             tensorboard_args.append("--bind_all")
+        else:
+            tensorboard_args.append("--bind=localhost")
 
         try:
             self.always_on_tensorboard_subprocess = TensorboardProcess(tensorboard_args)
