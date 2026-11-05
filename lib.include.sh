@@ -19,7 +19,7 @@ export OT_SCRIPT_DEBUG="${OT_SCRIPT_DEBUG:-false}"
 
 # Internal environment variables.
 # NOTE: Version check supports "3", "3.1" and "3.1.5" specifier formats.
-export OT_PYTHON_VERSION_MINIMUM="3.10"
+export OT_PYTHON_VERSION_MINIMUM="3.11.1"
 export OT_PYTHON_VERSION_TOO_HIGH="3.14"
 export OT_UPDATE_METADATA_FILE="${SCRIPT_DIR}/update.var"
 export OT_HOST_OS="$(uname -s)"
