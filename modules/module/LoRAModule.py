@@ -671,7 +671,6 @@ class OFTModule(PeftBase):
             block_share=self.block_share,
             oft_scaled=self.oft_scaled,
             use_cayley_neumann=True,
-            num_cayley_neumann_terms=5,
             dropout_probability=self.dropout_probability,
         )
 
@@ -690,7 +689,7 @@ class OFTModule(PeftBase):
 
         # For Conv2d, we must rotate the weights, not the input, to preserve spatial information.
         orth_rotate = self.oft_R._cayley_batch(
-            effective_weight, self.oft_R.block_size, self.oft_R.use_cayley_neumann, self.oft_R.num_cayley_neumann_terms
+            effective_weight, self.oft_R.block_size, self.oft_R.use_cayley_neumann
         )
         orth_rotate = self.oft_R.dropout(orth_rotate)
 
