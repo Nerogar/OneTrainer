@@ -32,7 +32,7 @@ export OT_SCRIPT_DEBUG="${OT_SCRIPT_DEBUG:-false}"
 
 # Internal environment variables.
 # NOTE: Version check supports "3", "3.1" and "3.1.5" specifier formats.
-export OT_PYTHON_VERSION_MINIMUM="3.10"
+export OT_PYTHON_VERSION_MINIMUM="3.11.1"
 export OT_PYTHON_VERSION_TOO_HIGH="3.14"
 export OT_CONDA_USE_PYTHON_VERSION="3.13"
 export OT_MUST_INSTALL_REQUIREMENTS="false"
