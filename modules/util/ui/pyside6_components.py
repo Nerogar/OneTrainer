@@ -188,6 +188,20 @@ def label(
 # Compound widgets
 # ---------------------------------------------------------------------------
 
+def bind_visibility(component, variables, predicate):
+    def update(*_args):
+        component.setVisible(predicate())
+
+    traces = [(var, var.trace_add("write", update)) for var in variables]
+
+    def cleanup():
+        for var, trace in traces:
+            var.trace_remove("write", trace)
+
+    component.destroyed.connect(cleanup)
+    update()
+
+
 def entry(
         master: QWidget,
         row: int,
