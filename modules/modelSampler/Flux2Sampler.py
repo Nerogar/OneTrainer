@@ -1,5 +1,6 @@
 import copy
 import inspect
+import math
 from collections.abc import Callable
 
 from modules.model.Flux2Model import Flux2Model
@@ -48,6 +49,7 @@ class Flux2Sampler(BaseModelSampler):
             diffusion_steps: int,
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
+            override_shift: float | None = None,
             text_encoder_sequence_length: int | None = None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
@@ -90,7 +92,8 @@ class Flux2Sampler(BaseModelSampler):
 
             latent_image = self.model.pack_latents(latent_image)
             image_seq_len = latent_image.shape[1]
-            mu = compute_empirical_mu(image_seq_len, diffusion_steps)
+            # the override is a shift factor, the same quantity the other flow-matching samplers pass as log(shift)
+            mu = math.log(override_shift) if override_shift else compute_empirical_mu(image_seq_len, diffusion_steps)
 
             # prepare timesteps
             #TODO for other models, too? This is different than with sigmas=None
@@ -170,6 +173,7 @@ class Flux2Sampler(BaseModelSampler):
             diffusion_steps=sample_config.diffusion_steps,
             cfg_scale=sample_config.cfg_scale,
             noise_scheduler=sample_config.noise_scheduler,
+            override_shift=sample_config.override_shift,
             text_encoder_sequence_length=sample_config.text_encoder_1_sequence_length,
             on_update_progress=on_update_progress,
         )

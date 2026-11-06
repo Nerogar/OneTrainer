@@ -71,25 +71,32 @@ class BaseSampleFrameView:
             self.components.label(bottom_frame, 4, 0, "steps:")
             self.components.entry(bottom_frame, 4, 1, ui_state, "diffusion_steps")
 
+            if controller.model_type.supports_sample_shift_override():
+                self.components.label(bottom_frame, 5, 0, "override shift:",
+                                      tooltip="Timestep shift for this sample, as the multiplicative factor "
+                                              "(not mu). Empty uses the model's own shift, which is either "
+                                              "derived from the token count or fixed by the scheduler config.")
+                self.components.entry(bottom_frame, 5, 1, ui_state, "override_shift")
+
             # inpainting
             if is_inpainting_model:
-                self.components.label(bottom_frame, 5, 0, "inpainting:",
+                self.components.label(bottom_frame, 6, 0, "inpainting:",
                                       tooltip="Enables inpainting sampling. Only available when sampling from an inpainting model.")
-                self.components.switch(bottom_frame, 5, 1, ui_state, "sample_inpainting")
+                self.components.switch(bottom_frame, 6, 1, ui_state, "sample_inpainting")
 
                 # base image path
-                self.components.label(bottom_frame, 6, 0, "base image path:",
+                self.components.label(bottom_frame, 7, 0, "base image path:",
                                       tooltip="The base image used when inpainting.")
-                self.components.path_entry(bottom_frame, 6, 1, ui_state, "base_image_path",
+                self.components.path_entry(bottom_frame, 7, 1, ui_state, "base_image_path",
                                            mode="file",
                                            allow_model_files=False,
                                            allow_image_files=True,
                                            )
 
                 # mask image path
-                self.components.label(bottom_frame, 6, 2, "mask image path:",
+                self.components.label(bottom_frame, 7, 2, "mask image path:",
                                       tooltip="The mask used when inpainting.")
-                self.components.path_entry(bottom_frame, 6, 3, ui_state, "mask_image_path",
+                self.components.path_entry(bottom_frame, 7, 3, ui_state, "mask_image_path",
                                            mode="file",
                                            allow_model_files=False,
                                            allow_image_files=True,

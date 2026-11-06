@@ -50,6 +50,7 @@ class FluxSampler(BaseModelSampler):
             diffusion_steps: int,
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
+            override_shift: float | None = None,
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
             text_encoder_2_sequence_length: int | None = None,
@@ -97,7 +98,7 @@ class FluxSampler(BaseModelSampler):
                 self.model.train_dtype.torch_dtype()
             )
 
-            shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
+            shift = override_shift or self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
             latent_image = self.model.pack_latents(latent_image)
 
             # prepare timesteps
@@ -189,6 +190,7 @@ class FluxSampler(BaseModelSampler):
             diffusion_steps: int,
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
+            override_shift: float | None = None,
             sample_inpainting: bool = False,
             base_image_path: str = "",
             mask_image_path: str = "",
@@ -313,7 +315,7 @@ class FluxSampler(BaseModelSampler):
                 self.model.train_dtype.torch_dtype()
             )
 
-            shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
+            shift = override_shift or self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
             latent_image = self.model.pack_latents(latent_image)
             noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=math.log(shift))
             timesteps = noise_scheduler.timesteps
@@ -401,6 +403,7 @@ class FluxSampler(BaseModelSampler):
                 diffusion_steps=sample_config.diffusion_steps,
                 cfg_scale=sample_config.cfg_scale,
                 noise_scheduler=sample_config.noise_scheduler,
+                override_shift=sample_config.override_shift,
                 sample_inpainting=sample_config.sample_inpainting,
                 base_image_path=sample_config.base_image_path,
                 mask_image_path=sample_config.mask_image_path,
@@ -421,6 +424,7 @@ class FluxSampler(BaseModelSampler):
                 diffusion_steps=sample_config.diffusion_steps,
                 cfg_scale=sample_config.cfg_scale,
                 noise_scheduler=sample_config.noise_scheduler,
+                override_shift=sample_config.override_shift,
                 text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
                 text_encoder_2_sequence_length=sample_config.text_encoder_2_sequence_length,
