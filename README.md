@@ -65,6 +65,26 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 >
 > Additionally it's been reported Alpine, Arch and Xubuntu Linux may be missing `tkinter`. Install it via `apk add py3-tk` for Alpine and `sudo pacman -S tk` for Arch.
 
+#### AMD (ROCm)
+
+**Linux:** works out of the box, run `install.sh` as normal.
+
+**Windows:** manual install:
+
+1. Find your GPU's GFX architecture from [AMD's table](https://github.com/ROCm/TheRock/blob/main/RELEASES.md#supported-python-device--install-extras) (e.g. `gfx1100`).
+2. Create and activate a venv, then (replace `gfx####`):
+    ```
+    pip install torch[device-gfx####] torchvision[device-gfx####] --index-url https://repo.amd.com/rocm/whl-multi-arch/
+    pip install -r requirements-global.txt onnxruntime triton-windows
+    ```
+3. Set environment variables:
+    - `MIOPEN_FIND_MODE=2`
+    - `FLASH_ATTENTION_TRITON_AMD_ENABLE=TRUE`
+    - `PYTORCH_ALLOC_CONF=max_split_size_mb:512,garbage_collection_threshold:0.8`
+    - `TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1` (RDNA 3 / RX 7000 or newer)
+    - `HIP_VISIBLE_DEVICES=1` (only if you also have an AMD iGPU)
+4. *(Optional)* bitsandbytes (Python 3.12 only): install [this wheel](https://github.com/0xDELUXA/bitsandbytes_win_rocm/releases), then set `ROCM_PATH` and `HIP_PATH` when launching.
+
 ## Updating
 
 #### Automatic update
