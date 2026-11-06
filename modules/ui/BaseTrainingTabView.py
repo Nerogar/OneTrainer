@@ -395,6 +395,12 @@ class BaseTrainingTabView(ABC):
         self.components.entry(frame, row, 1, ui_state, "ema_update_step_interval")
         row += 1
 
+        # ema stochastic rounding
+        self.components.label(frame, row, 0, "EMA Stochastic Rounding",
+                              tooltip="Enables stochastic rounding for BFloat16 EMA.")
+        self.components.switch(frame, row, 1, ui_state, "ema_stochastic_rounding")
+        row += 1
+
         # train dtype
         self.components.label(frame, row, 0, "Train Data Type",
                               tooltip="The mixed precision data type used for training. This can increase training speed, but reduces precision")
