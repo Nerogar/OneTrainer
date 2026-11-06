@@ -44,3 +44,25 @@ class BaseTimestepDistributionWindowView:
         self.components.label(frame, 6, 0, "Dynamic Timestep Shifting",
                          tooltip="Dynamically shift the timestep distribution based on resolution. If enabled, the shifting parameters are taken from the model's scheduler configuration and Timestep Shift is ignored. Dynamic Timestep Shifting is not shown in the preview. For Ideogram, the shifting instead follows the model's own resolution-aware sampling schedule. Note: For Z-Image, the dynamic shifting parameters are likely wrong and unknown. Use with care or set your own, fixed shift.", wide_tooltip=True)
         self.components.switch(frame, 6, 1, ui_state, "dynamic_timestep_shifting")
+
+        # entropic schedule (only used when Timestep Distribution is ENTROPIC)
+        self.components.label(frame, 7, 0, "Entropic Schedule",
+                              tooltip="Path to a precomputed entropic time function (.pt) for the ENTROPIC distribution, e.g. from the 'Entropic Time Schedulers for Generative Diffusion Models' repository. The file must contain 'time' and 'time_func'. If empty or missing, the distribution falls back to uniform.", wide_tooltip=True)
+        self.components.path_entry(frame, 7, 1, ui_state, "entropic_schedule_path", mode="file")
+
+        # entropic schedule computation (only used when the schedule is computed, not loaded from a file)
+        self.components.label(frame, 8, 0, "Entropic Num Samples",
+                              tooltip="Number of dataset samples used to estimate the entropic time function when the schedule is computed. The latents are already cached to disk by the data loader, so this only reads from the existing cache.")
+        self.components.entry(frame, 8, 1, ui_state, "entropic_num_samples")
+
+        self.components.label(frame, 9, 0, "Entropic Num Eval Steps",
+                              tooltip="Number of timesteps at which the entropic time function is evaluated when the schedule is computed.")
+        self.components.entry(frame, 9, 1, ui_state, "entropic_num_eval_steps")
+
+        self.components.label(frame, 10, 0, "Entropic Timestep Chunk Size",
+                              tooltip="Number of timesteps evaluated per forward pass when the entropic schedule is computed. Larger values use more VRAM; smaller values use more passes.")
+        self.components.entry(frame, 10, 1, ui_state, "entropic_timestep_chunk_size")
+
+        self.components.label(frame, 11, 0, "Entropic Schedule Resolution",
+                              tooltip="If set, latents are downscaled so their total image-space area is about this many pixels per side (aspect ratio preserved) before the entropic schedule is estimated. This trades a little accuracy for a large speedup. If empty, the schedule is estimated at the native training resolution.", wide_tooltip=True)
+        self.components.entry(frame, 11, 1, ui_state, "entropic_schedule_resolution")

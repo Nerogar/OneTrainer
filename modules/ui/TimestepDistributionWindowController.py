@@ -17,6 +17,7 @@ class TimestepGenerator(ModelSetupNoiseMixin):
             noising_weight: float,
             noising_bias: float,
             timestep_shift: float,
+            entropic_schedule_path: str = "",
     ):
         super().__init__()
 
@@ -26,6 +27,7 @@ class TimestepGenerator(ModelSetupNoiseMixin):
         self.noising_weight = noising_weight
         self.noising_bias = noising_bias
         self.timestep_shift = timestep_shift
+        self.entropic_schedule_path = entropic_schedule_path
 
     def generate(self) -> Tensor:
         generator = torch.Generator()
@@ -38,6 +40,7 @@ class TimestepGenerator(ModelSetupNoiseMixin):
         config.noising_weight = self.noising_weight
         config.noising_bias = self.noising_bias
         config.timestep_shift = self.timestep_shift
+        config.entropic_schedule_path = self.entropic_schedule_path
 
 
         return self._get_timestep_discrete(
@@ -64,5 +67,6 @@ class TimestepDistributionWindowController:
             noising_weight=self.train_config.noising_weight,
             noising_bias=self.train_config.noising_bias,
             timestep_shift=self.train_config.timestep_shift,
+            entropic_schedule_path=self.train_config.entropic_schedule_path,
         )
         return generator.generate()
