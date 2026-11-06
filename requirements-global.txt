@@ -1,13 +1,13 @@
 # base requirements
-numpy==2.2.6
+numpy==2.4.6
 opencv-python==4.11.0.86
 pillow==13.0.0
 imagesize==1.4.1 #for concept statistics
 tqdm==4.67.1
-PyYAML==6.0.2
+PyYAML==6.0.3
 huggingface-hub==1.22.0
-scipy==1.15.3
-matplotlib==3.10.3
+scipy==1.17.1
+matplotlib==3.11.2
 av==16.1.0
 yt-dlp  #no pinned version, frequently updated for compatibility with sites
 scenedetect==0.7
@@ -45,7 +45,7 @@ adv_optm==2.2.3 # advanced optimizers
 -e git+https://github.com/KellerJordan/Muon.git@f90a42b#egg=muon-optimizer
 
 # Profiling
-scalene==1.5.51
+scalene==2.4.0
 
 # ui
 customtkinter==5.2.2
