@@ -16,7 +16,7 @@ from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.LearningRateScheduler import LearningRateScheduler
-from modules.util.enum.ModelType import ModelType
+from modules.util.enum.ModelType import ModelType, PeftType
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TrainingMethod import TrainingMethod
@@ -498,6 +498,10 @@ def create_optimizer(
         # SINKSGD_ADV Optimizer
         case Optimizer.SINKSGD_ADV:
             from adv_optm import SinkSGD_adv
+            # OFT is always optimized with skew-symmetric Sinkhorn when trained
+            _oft_mode = config.peft_type == PeftType.OFT_2
+            if _oft_mode:
+                print("NOTICE: OFT is being trained. SinkSGD_adv will use skew-symmetric Sinkhorn normalization automatically.")
             optimizer = SinkSGD_adv(
                 params=parameters,
                 lr=config.learning_rate,
@@ -517,6 +521,8 @@ def create_optimizer(
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
                 geometric_wd=optimizer_config.geometric_wd if optimizer_config.geometric_wd is not None else False,
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
+                oft_mode=_oft_mode,
             )
 
         # ADAMW_ADV Optimizer
@@ -544,6 +550,7 @@ def create_optimizer(
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
                 nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
             )
 
         # ADOPT_ADV Optimizer
@@ -571,6 +578,7 @@ def create_optimizer(
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
                 nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
             )
 
         # PRODIGY_ADV Optimizer
@@ -605,6 +613,7 @@ def create_optimizer(
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
                 nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
             )
 
         # SignSGD_ADV Optimizer
@@ -627,6 +636,7 @@ def create_optimizer(
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
                 nesterov_coef=optimizer_config.nesterov_coef if optimizer_config.nesterov_coef is not None else None,
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
                 geometric_wd=optimizer_config.geometric_wd if optimizer_config.geometric_wd is not None else False,
             )
 
@@ -648,6 +658,7 @@ def create_optimizer(
                 spectral_normalization=optimizer_config.spectral_normalization if optimizer_config.spectral_normalization is not None else False,
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
             )
 
         # MUON_ADV Optimizer
@@ -701,6 +712,7 @@ def create_optimizer(
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
                 **adam_kwargs
             )
 
@@ -758,6 +770,7 @@ def create_optimizer(
                 centered_wd=optimizer_config.centered_wd if optimizer_config.centered_wd is not None else 0.0,
                 centered_wd_mode=optimizer_config.centered_wd_mode if optimizer_config.centered_wd_mode is not None else "full",
                 state_precision=optimizer_config.state_precision if optimizer_config.state_precision is not None else "auto",
+                scaled_wd=optimizer_config.scaled_wd if optimizer_config.scaled_wd is not None else False,
                 **adam_kwargs
             )
 

@@ -5,6 +5,7 @@ from modules.util import path_util
 from modules.util.enum.ConfigPart import ConfigPart
 from modules.util.enum.DataType import DataType
 from modules.util.enum.PathIOType import PathIOType
+from modules.util.enum.RunNameMode import RunNameMode
 
 from huggingface_hub.constants import HF_HUB_CACHE
 
@@ -74,12 +75,17 @@ class BaseModelTabView(ABC):
             if include_compressed:
                 options.append(("int W8A8 compressed", DataType.INT_W8A8_COMPRESSED))
 
+            options += [
+                ("bfloat16 A8 int", DataType.BFLOAT_16_A8_INT),
+                ("bfloat16 A8 float", DataType.BFLOAT_16_A8_FLOAT),
+            ]
+
         if include_gguf:
             options.append(("GGUF", DataType.GGUF))
             if include_a8:
                 options += [
-                    ("GGUF A8 float", DataType.GGUF_A8_FLOAT),
                     ("GGUF A8 int", DataType.GGUF_A8_INT),
+                    ("GGUF A8 float", DataType.GGUF_A8_FLOAT),
                 ]
 
         return options
@@ -387,14 +393,14 @@ class BaseModelTabView(ABC):
             controller,
             ui_state,
     ) -> int:
-        # output model destination
-        self.components.label(frame, row, 0, "Model Output Destination",
-                         tooltip="Filename or directory where the output model is saved")
-        self.components.path_entry(
-            frame, row, 1, ui_state, "output_model_destination",
-            mode="file",
-            io_type=PathIOType.MODEL,
-        )
+        self.components.label(frame, row, 0, "Run Name",
+                              tooltip="Filename for the final model and prefix for saves, backups, samples and Tensorboard. "
+                                      "The output format determines the extension.")
+        name_frame = self.components.inline_frame(frame, row, 1)
+        self.components.options_kv(name_frame, 0, 0, [
+            ("Default", RunNameMode.DEFAULT), ("Friendly", RunNameMode.FRIENDLY), ("Custom", RunNameMode.CUSTOM),
+        ], ui_state, "run_name_mode")
+        self.components.entry(name_frame, 0, 1, ui_state, "run_name")
 
         # output data type
         self.components.label(frame, row, 3, "Output Data Type",
@@ -407,6 +413,12 @@ class BaseModelTabView(ABC):
             ("nfloat4", DataType.NFLOAT_4),
         ], ui_state, "output_dtype")
 
+        row += 1
+
+        self.components.label(frame, row, 0, "Final Output Directory",
+                              tooltip="Directory where the final trained model is saved")
+        self.components.path_entry(frame, row, 1, ui_state, "final_output_dir",
+                                   mode="dir", io_type=PathIOType.OUTPUT, required=True)
         row += 1
 
         # output format

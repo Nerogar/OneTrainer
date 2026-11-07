@@ -57,6 +57,9 @@ def main():
     if not canceled or train_config.backup_before_save:
         trainer.end()
 
+    if canceled:
+        raise SystemExit(1)
+
 
 if __name__ == '__main__':
     main()

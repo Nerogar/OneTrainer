@@ -1,2 +1,2 @@
---extra-index-url https://download.pytorch.org/whl/rocm7.2
+--extra-index-url https://download.pytorch.org/whl/rocm10.0
 -e .[rocm]

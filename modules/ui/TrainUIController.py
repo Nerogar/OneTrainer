@@ -2,7 +2,6 @@ import datetime as dt
 import json
 import os
 import subprocess
-import sys
 import threading
 import time
 import traceback
@@ -18,7 +17,7 @@ from modules.ui.VideoToolUIController import VideoToolUIController
 from modules.util import create
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
-from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.TrainConfig import TrainConfig, prepare_run_name
 from modules.util.profiling_util import PeakMemoryRecorder
 from modules.util.tensorboard_util import TensorboardProcess
 from modules.util.torch_util import print_fragmentation, torch_gc
@@ -47,6 +46,7 @@ class TrainUIController:
         # the currently open sample window, or None. Tracked so a second click doesn't spawn a
         # second (non-modal) window - the sample tool isn't designed to run two instances at once.
         self.sample_window = None
+        self.queue_controller = None
 
     def on_update_train_progress(self, train_progress: TrainProgress, max_step: int, max_epoch: int):
         # capture session start on first progress update
@@ -95,13 +95,11 @@ class TrainUIController:
         if self.always_on_tensorboard_subprocess:
             self._stop_always_on_tensorboard()
 
-        tensorboard_executable = os.path.join(os.path.dirname(sys.executable), "tensorboard")
         tensorboard_log_dir = os.path.join(self.train_config.workspace_dir, "tensorboard")
 
         os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
 
         tensorboard_args = [
-            tensorboard_executable,
             "--logdir",
             tensorboard_log_dir,
             "--port",
@@ -111,6 +109,8 @@ class TrainUIController:
 
         if self.train_config.tensorboard_expose:
             tensorboard_args.append("--bind_all")
+        else:
+            tensorboard_args.append("--bind=localhost")
 
         try:
             self.always_on_tensorboard_subprocess = TensorboardProcess(tensorboard_args)
@@ -161,6 +161,13 @@ class TrainUIController:
 
     def open_video_tool(self, parent, view_cls):
         return VideoToolUIController().create_window(parent, view_cls)
+
+    def open_queue_tool(self, parent, view_cls):
+        from modules.ui.QueueTrainingUIController import QueueTrainingUIController
+        if self.queue_controller is None:
+            self.queue_controller = QueueTrainingUIController(self.train_config)
+        self.queue_controller.train_config = self.train_config
+        return self.queue_controller.create_window(parent, view_cls)
 
     def open_convert_model_tool(self, parent, view_cls):
         return ConvertModelUIController(
@@ -303,19 +310,25 @@ class TrainUIController:
         if self.train_config.tensorboard_always_on and not self.always_on_tensorboard_subprocess:
             self.view.schedule_on_main_thread(self._start_always_on_tensorboard)
 
+    def sync_run_name(self, *, is_new_invocation: bool = False):
+        name = prepare_run_name(self.train_config.training_method, self.train_config.run_name_mode,
+                                self.train_config.run_name, is_new_invocation=is_new_invocation)
+        self.view.ui_state.get_var("run_name").set(name)
+
     def start_training(self):
         if self.training_thread is None:
-            self.view.save_default()
-
             errors = flush_and_validate_all()
             if errors:
                 self.view.show_validation_errors(errors)
                 return
 
+            self.sync_run_name()
+
             if self.train_config.clear_cache_before_training and self.train_config.latent_caching \
                     and not self.view.confirm("Clear Cache Before Training", "Clear cache?"):
                 return
 
+            self.view.save_default()
             self.view.on_training_started()
 
             if self.train_config.tensorboard and not self.train_config.tensorboard_always_on and self.always_on_tensorboard_subprocess:
