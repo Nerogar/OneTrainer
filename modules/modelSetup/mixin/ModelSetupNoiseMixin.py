@@ -1,5 +1,7 @@
 import math
 from abc import ABCMeta
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TimestepDistribution import TimestepDistribution
@@ -16,6 +18,17 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
 
         self.__weights = None
         self._offset_noise_psi_schedule: Tensor | None = None
+        # timestep used for deterministic predictions, as a fraction of the timestep range
+        self.__deterministic_timestep = 0.5
+
+    @contextmanager
+    def deterministic_timestep(self, timestep: float) -> Iterator[None]:
+        previous_timestep = self.__deterministic_timestep
+        self.__deterministic_timestep = timestep
+        try:
+            yield
+        finally:
+            self.__deterministic_timestep = previous_timestep
 
     def _compute_and_cache_offset_noise_psi_schedule(self, betas: Tensor) -> Tensor:
         """
@@ -134,7 +147,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
         if deterministic:
             # -1 is for zero-based indexing
             return torch.tensor(
-                int(num_train_timesteps * 0.5) - 1,
+                round(num_train_timesteps * self.__deterministic_timestep) - 1,
                 dtype=torch.long,
                 device=generator.device,
             ).unsqueeze(0)
@@ -262,7 +275,7 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
         if deterministic:
             return torch.full(
                 size=(batch_size,),
-                fill_value=0.5,
+                fill_value=self.__deterministic_timestep,
                 device=generator.device,
             )
         else:
