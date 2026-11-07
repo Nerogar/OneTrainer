@@ -142,6 +142,9 @@ class OFTRotationModule(nn.Module):
         batch_dims = x.shape[:-1]
         x_reshaped = x.reshape(*batch_dims, rank, self.block_size)
 
+        # Ensure rotation matrix matches the input activation dtype
+        orth_rotate = orth_rotate.to(x_reshaped.dtype)
+
         if self.block_share:
             orth_rotate = orth_rotate.repeat(rank, 1, 1)
             x_rotated_reshaped = torch.einsum("...rk,rkc->...rc", x_reshaped, orth_rotate)
