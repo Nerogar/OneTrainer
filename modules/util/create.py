@@ -112,10 +112,10 @@ def create_data_loader(
 ) -> BaseDataLoader | None:
     # Layer offloading uses a non-thread-safe conductor. Only text encoders run inside the caching dataloader's
     # worker threads (to produce the text cache), so only their offload_fraction can conflict with threading.
-    if config.dataloader_threads > 1 and any(
+    if config.caching_threads > 1 and any(
         getattr(config, name).offload_fraction > 0 for name in model_type.text_encoder_parts()
     ):
-        raise RuntimeError('layer offloading can not be activated for a text encoder if "dataloader_threads" > 1')
+        raise RuntimeError('layer offloading can not be activated for a text encoder if "caching_threads" > 1')
 
     if train_progress is None:
         train_progress = TrainProgress()
