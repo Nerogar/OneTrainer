@@ -85,26 +85,32 @@ cpu = [
 ]
 
 cuda = [
-  "torch==2.15.0",
-  "torchvision==0.29.2",
   "onnxruntime-gpu==1.23.2",
-  "triton-windows==3.7.0.post26; sys_platform == 'win32'",
 
   # optimizers
   "bitsandbytes==0.50.2",
 ]
 
-# CUDA 12 has the same dependencies as CUDA 13.
-# However, CUDA 12 requires a different version of torch.
-# This is managed via the `extra-index-urls` options below.
+# Shared CUDA dependencies are in `cuda`; each CUDA version pins its own PyTorch pair.
+# The `extra-index-urls` options below select the corresponding CUDA wheels.
 cuda12 = [
     "onetrainer[cuda]",
-    "nvidia-nccl-cu12==2.29.7; sys_platform == 'linux'",
+    "torch==2.14.1",
+    "torchvision==0.29.1",
+    "nvidia-nccl-cu12==2.29.3; sys_platform == 'linux'",
     "nvidia-nvcomp-cu12==5.3.0.16",
+    # pytorch 2.14 requires 3.8 for win32. Allows minor fixes
+    "triton-windows>=3.8.0.post29,<3.9; sys_platform == 'win32'",
 ]
 
 cuda13 = [
     "onetrainer[cuda]",
+    "torch==2.15.0",
+    "torchvision==0.29.2",
+    "nvidia-nccl-cu13==2.30.7; sys_platform == 'linux'",
+    "nvidia-nvcomp-cu13==5.3.0.16",
+    # pytorch 2.15 requires 3.9 for win32. Allows minor fixes
+    "triton-windows>=3.9.0.post30,<3.10; sys_platform == 'win32'",
 ]
 
 rocm = [
