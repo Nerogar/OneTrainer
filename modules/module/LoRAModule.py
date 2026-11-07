@@ -746,10 +746,19 @@ class DoRAOFTModule(OFTModule):
     ||W_new|| = ||W_orig||.
     """
     dora_log_multiplier: nn.Parameter | None
+    _dropout: nn.Dropout
+
+    @property
+    def dropout(self) -> nn.Dropout:
+        # DoRA-OFT drops out the input x (standard DoRA style) rather than using
+        # OFT's multiplicative block dropout
+        return self._dropout
 
     def __init__(self, *args, **kwargs):
         self.dora_log_multiplier = None
         super().__init__(*args, **kwargs)
+        self._dropout = Dropout(0)
+        self.oft_R.dropout.p = 0.0
 
     def initialize_weights(self):
         super().initialize_weights()
@@ -773,7 +782,7 @@ class DoRAOFTModule(OFTModule):
     def forward(self, x, *args, **kwargs):
         # Get the standard OFT output
         # result = W_orig @ R^T @ x + bias
-        result = super().forward(x, *args, **kwargs)
+        result = super().forward(self.dropout(x), *args, **kwargs)
 
         # Apply Exponential DoRA Scale (exp(0) = Multiplies by 1.0 at step 0)
         multiplier = torch.exp(self.dora_log_multiplier).to(result.dtype)
