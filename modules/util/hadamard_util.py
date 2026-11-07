@@ -35,3 +35,8 @@ def block_hadamard(x: Tensor, block_size: int = 128) -> Tensor:
             offset += length
         size //= 2
     return torch.cat(parts, dim=-1).to(x.dtype)
+
+
+def block_hadamard_2d(x: Tensor, block_size: int = 128) -> Tensor:
+    """Apply the self-inverse block transform along both weight dimensions (N, K)."""
+    return block_hadamard(block_hadamard(x, block_size).T, block_size).T

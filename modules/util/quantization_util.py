@@ -9,7 +9,7 @@ from modules.module.quantized.mixin.QuantizedLinearMixin import QuantizedLinearM
 from modules.module.quantized.mixin.QuantizedModuleMixin import QuantizedModuleMixin
 from modules.util.config.TrainConfig import QuantizationConfig, TrainConfig
 from modules.util.enum.DataType import DataType
-from modules.util.hadamard_util import block_hadamard
+from modules.util.hadamard_util import block_hadamard_2d
 from modules.util.ModuleFilter import ModuleFilter
 from modules.util.tqdm_util import tqdm
 
@@ -59,16 +59,17 @@ def quantize_int8_tensorwise_chunked(x: Tensor) -> tuple[Tensor, Tensor]:
 
 def quantize_int8_hadamard_chunked(x: Tensor, block_size: int) -> tuple[Tensor, Tensor]:
     # Two passes retain a single tensorwise scale without a full fp32 rotated weight.
-    rows = max(1, _QUANTIZE_CHUNK_ELEMENTS // x.shape[-1])
+    # Chunk boundaries must not split N-axis blocks; only the last chunk has a tail.
+    rows = max(1, _QUANTIZE_CHUNK_ELEMENTS // x.shape[-1] // block_size) * block_size
     abs_max = torch.zeros((), device=x.device, dtype=torch.float32)
     for i in range(0, x.shape[0], rows):
-        rotated = block_hadamard(x[i:i + rows].float(), block_size)
+        rotated = block_hadamard_2d(x[i:i + rows].float(), block_size)
         min_val, max_val = torch.aminmax(rotated)
         abs_max = torch.maximum(abs_max, torch.maximum(max_val, -min_val))
     scale = (abs_max / 127.0).clamp(min=1e-30)
     q = torch.empty_like(x, dtype=torch.int8)
     for i in range(0, x.shape[0], rows):
-        rotated = block_hadamard(x[i:i + rows].float(), block_size)
+        rotated = block_hadamard_2d(x[i:i + rows].float(), block_size)
         q[i:i + rows] = quantize_int8(rotated, scale)
     return q, scale
 
