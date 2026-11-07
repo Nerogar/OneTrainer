@@ -99,7 +99,7 @@ class BaseTrainer(
         if self.config.tensorboard_expose:
             tensorboard_args.append("--bind_all")
         else:
-            tensorboard_args.append("--bind=localhost")
+            tensorboard_args.append("--host=localhost")
 
         self.tensorboard_subprocess = TensorboardProcess(tensorboard_args)
 
