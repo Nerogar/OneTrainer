@@ -75,6 +75,7 @@ def create_application() -> OneTrainerApplication:
 
 
 def set_windows_taskbar_icon(window: QWidget) -> None:
+    """Copy Qt's window icons into the Windows class icons used by the taskbar."""
     if sys.platform != "win32":
         return
 
@@ -82,25 +83,35 @@ def set_windows_taskbar_icon(window: QWidget) -> None:
 
     try:
         user32 = ctypes.WinDLL("user32", use_last_error=True)
+        # Tell Python the input and output types of these Windows functions.
+        # Handles are Windows object IDs; the types must preserve all 64 bits on 64-bit Python.
         user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
         user32.SendMessageW.restype = ctypes.c_ssize_t
         user32.CopyIcon.argtypes = [wintypes.HICON]
         user32.CopyIcon.restype = wintypes.HICON
         user32.DestroyIcon.argtypes = [wintypes.HICON]
-        set_class_icon = user32.SetClassLongPtrW if ctypes.sizeof(ctypes.c_void_p) == 8 else user32.SetClassLongW
+        set_class_icon = user32.SetClassLongPtrW
         set_class_icon.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
         set_class_icon.restype = ctypes.c_size_t
-        hwnd = int(window.winId())
-        # Replace Qt's generic class icons with copies that live until process exit.
-        for icon_type, index in ((1, -14), (0, -34)):
-            handle = user32.CopyIcon(user32.SendMessageW(hwnd, 0x7F, icon_type, 0))  # WM_GETICON
-            if not handle:
+        window_handle = int(window.winId())
+        wm_geticon = 0x007F  # Windows message asking a window for its icon.
+
+        # Keep independent copies alive until process exit, even if Qt replaces its icons.
+        # This workaround was AI-driven; no solution was found on the Qt forum and windows ctypes are not my domain but we needed a icon fix
+        for icon_type, class_icon_slot in (
+            (1, -14),  # ICON_BIG -> GCLP_HICON (large class icon)
+            (0, -34),  # ICON_SMALL -> GCLP_HICONSM (small class icon)
+        ):
+            qt_icon = user32.SendMessageW(window_handle, wm_geticon, icon_type, 0)
+            icon_copy = user32.CopyIcon(qt_icon)
+            if not icon_copy:
                 raise ctypes.WinError(ctypes.get_last_error())
+            # A zero return can mean success, so also check Windows' error code.
             ctypes.set_last_error(0)
-            previous = set_class_icon(hwnd, index, handle)
+            previous = set_class_icon(window_handle, class_icon_slot, icon_copy)
             if not previous and ctypes.get_last_error():
                 error = ctypes.WinError(ctypes.get_last_error())
-                user32.DestroyIcon(handle)
+                user32.DestroyIcon(icon_copy)
                 raise error
     except OSError:
         logging.getLogger(__name__).warning("Could not set the Windows taskbar icon", exc_info=True)
