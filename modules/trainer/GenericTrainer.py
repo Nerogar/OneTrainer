@@ -86,6 +86,9 @@ class GenericTrainer(BaseTrainer):
         self.grad_hook_handles = []
 
     def start(self):
+        if self.config.validation:
+            self.config.parse_validation_timesteps()
+
         if multi.is_master():
             self.__save_config_to_workspace()
 
@@ -354,54 +357,36 @@ class GenericTrainer(BaseTrainer):
                 desc="validation_step",
                 total=current_epoch_length_validation)
 
-            accumulated_loss_per_concept = {}
-            concept_counts = {}
-            mapping_seed_to_label = {}
-            mapping_label_to_seed = {}
+            accumulated_loss_per_concept_task = {}
+            concept_task_counts = {}
 
             for validation_batch in step_tqdm_validation:
                 if self.__needs_gc(train_progress):
                     torch_gc()
 
-                with torch.no_grad():
-                    model_output_data = self.model_setup.predict(
-                        self.model, validation_batch, self.config, train_progress, deterministic=True)
-                    loss_validation = self.model_setup.calculate_loss(
-                        self.model, validation_batch, model_output_data, self.config)
+                losses = self.model_setup.calculate_validation_losses(
+                    self.model, validation_batch, self.config, train_progress)
 
                 # since validation batch size = 1
                 concept_name = validation_batch["concept_name"][0]
                 concept_path = validation_batch["concept_path"][0]
-                concept_seed = validation_batch["concept_seed"].item()
-                loss = loss_validation.item()
+                label = concept_name or os.path.basename(concept_path)
 
-                label = concept_name if concept_name else os.path.basename(concept_path)
-                # check and fix collision to display both graphs in tensorboard
-                if label in mapping_label_to_seed and mapping_label_to_seed[label] != concept_seed:
-                    suffix = 1
-                    new_label = f"{label}({suffix})"
-                    while new_label in mapping_label_to_seed and mapping_label_to_seed[new_label] != concept_seed:
-                        suffix += 1
-                        new_label = f"{label}({suffix})"
-                    label = new_label
+                for task, loss in losses.items():
+                    key = (label, task)
+                    accumulated_loss_per_concept_task[key] = accumulated_loss_per_concept_task.get(key, 0) + loss
+                    concept_task_counts[key] = concept_task_counts.get(key, 0) + 1
 
-                if concept_seed not in mapping_seed_to_label:
-                    mapping_seed_to_label[concept_seed] = label
-                    mapping_label_to_seed[label] = concept_seed
+            for (label, task), total_loss in accumulated_loss_per_concept_task.items():
+                average_loss = total_loss / concept_task_counts[(label, task)]
 
-                accumulated_loss_per_concept[concept_seed] = accumulated_loss_per_concept.get(concept_seed, 0) + loss
-                concept_counts[concept_seed] = concept_counts.get(concept_seed, 0) + 1
-
-            for concept_seed, total_loss in accumulated_loss_per_concept.items():
-                average_loss = total_loss / concept_counts[concept_seed]
-
-                self.tensorboard.add_scalar(f"loss/validation_step/{mapping_seed_to_label[concept_seed]}",
+                self.tensorboard.add_scalar(f"loss/validation_step/{label}{task}",
                                             average_loss,
                                             train_progress.global_step)
 
-            if len(concept_counts) > 1:
-                total_loss = sum(accumulated_loss_per_concept[key] for key in concept_counts)
-                total_count = sum(concept_counts[key] for key in concept_counts)
+            if len(concept_task_counts) > 1:
+                total_loss = sum(accumulated_loss_per_concept_task[key] for key in concept_task_counts)
+                total_count = sum(concept_task_counts[key] for key in concept_task_counts)
                 total_average_loss = total_loss / total_count
 
                 self.tensorboard.add_scalar("loss/validation_step/total_average",

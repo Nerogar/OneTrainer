@@ -1,4 +1,5 @@
 import json
+import os
 from abc import ABCMeta
 
 from modules.util.config.ConceptConfig import ConceptConfig
@@ -28,6 +29,23 @@ class DataLoaderMgdsMixin(metaclass=ABCMeta):
 
         # choose all validation concepts, or none of them, depending on is_validation
         concepts = [concept for concept in concepts if (ConceptType(concept.type) == ConceptType.VALIDATION) == is_validation]
+
+        if is_validation:
+            labels = {}
+            for concept in concepts:
+                if not concept.enabled:
+                    continue
+                label = concept.name or os.path.basename(concept.path)
+                description = f"{concept.name!r} ({concept.path!r})"
+                if not label.strip() or label == "total_average":
+                    raise ValueError(
+                        f"Validation concept {description} has an empty or reserved label {label!r}. "
+                        "Assign a distinct name other than 'total_average'.")
+                if label in labels:
+                    raise ValueError(
+                        f"Validation concepts {labels[label]} and {description} share label {label!r}. "
+                        "Assign distinct names.")
+                labels[label] = description
 
         # convert before passing to MGDS
         concepts = [c.to_dict() for c in concepts]

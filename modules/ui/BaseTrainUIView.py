@@ -6,6 +6,7 @@ from modules.util.enum.DataType import DataType
 from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.PathIOType import PathIOType
+from modules.util.ui.validation_helpers import validate_validation_timesteps
 
 
 class BaseTrainUIView(ABC):
@@ -189,6 +190,15 @@ class BaseTrainUIView(ABC):
         self.components.label(frame, 8, 2, "Validate after",
                          tooltip="The interval used when validate training")
         self.components.time_entry(frame, 8, 3, ui_state, "validate_after", "validate_after_unit")
+
+        validation_timesteps_tooltip = (
+            "Comma-separated validation timesteps from 0 to 999 (for example, 100,499,900). "
+            "Higher values test noisier images; lower values test finer details. "
+            "Each distinct timestep gets a separate graph. VAE validation runs once without timesteps."
+        )
+        self.components.label(frame, 9, 0, "Validation Timesteps", tooltip=validation_timesteps_tooltip)
+        self.components.entry(frame, 9, 1, ui_state, "validation_timesteps", required=True,
+                              extra_validate=validate_validation_timesteps, tooltip=validation_timesteps_tooltip)
 
         # device
         self.components.label(frame, 10, 0, "Dataloader Threads",
