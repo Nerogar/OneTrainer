@@ -64,11 +64,11 @@ class HiDreamSampler(BaseModelSampler):
             num_latent_channels = 16
 
             # prepare prompt
-            self.model.materialize_only_text_encoders()
 
             text_encoder_3_prompt_embedding, text_encoder_4_prompt_embedding, pooled_prompt_embedding = \
                 self.model.combine_text_encoder_output(
-                    *self.model.encode_text(
+                    *self.model.encode_text_cached(
+                        self.model_type.text_encoder_parts(),
                         text=prompt,
                         train_device=self.train_device,
                         text_encoder_3_layer_skip=text_encoder_3_layer_skip,
@@ -77,7 +77,8 @@ class HiDreamSampler(BaseModelSampler):
 
             negative_text_encoder_3_prompt_embedding, negative_text_encoder_4_prompt_embedding, negative_pooled_prompt_embedding = \
                 self.model.combine_text_encoder_output(
-                    *self.model.encode_text(
+                    *self.model.encode_text_cached(
+                        self.model_type.text_encoder_parts(),
                         text=negative_prompt,
                         train_device=self.train_device,
                         text_encoder_3_layer_skip=text_encoder_3_layer_skip,
@@ -151,6 +152,15 @@ class HiDreamSampler(BaseModelSampler):
                 file_type=FileType.IMAGE,
                 data=image[0],
             )
+
+    def prepare_text_encoding(self, sample_config: SampleConfig):
+        self.model.encode_text_cached(
+            self.model_type.text_encoder_parts(),
+            text=sample_config.prompt,
+            train_device=self.train_device,
+            text_encoder_3_layer_skip=sample_config.text_encoder_3_layer_skip,
+            apply_attention_mask=sample_config.transformer_attention_mask,
+        )
 
     def sample(
             self,

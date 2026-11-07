@@ -63,9 +63,8 @@ class ChromaSampler(BaseModelSampler):
             num_latent_channels = 16
 
             # prepare prompt
-            self.model.materialize_only("text_encoder")
-
-            combined_prompt_embedding, text_attention_mask = self.model.encode_text(
+            combined_prompt_embedding, text_attention_mask = self.model.encode_text_cached(
+                "text_encoder",
                 text=[prompt, negative_prompt],
                 batch_size = 2,
                 train_device=self.train_device,
@@ -149,6 +148,15 @@ class ChromaSampler(BaseModelSampler):
                 file_type=FileType.IMAGE,
                 data=image[0],
             )
+
+    def prepare_text_encoding(self, sample_config: SampleConfig):
+        self.model.encode_text_cached(
+            "text_encoder",
+            text=[sample_config.prompt, sample_config.negative_prompt],
+            batch_size = 2,
+            train_device=self.train_device,
+            text_encoder_layer_skip=sample_config.text_encoder_1_layer_skip,
+        )
 
     def sample(
             self,

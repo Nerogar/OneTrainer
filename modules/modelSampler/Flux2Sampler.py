@@ -68,10 +68,9 @@ class Flux2Sampler(BaseModelSampler):
             patch_size = 2
 
             # prepare prompt
-            self.model.materialize_only("text_encoder")
-
             batch_size = 2 if cfg_scale > 1.0 and not transformer.config.guidance_embeds else 1
-            prompt_embedding = self.model.encode_text(
+            prompt_embedding = self.model.encode_text_cached(
+                "text_encoder",
                 text=[prompt, negative_prompt] if batch_size == 2 else prompt,
                 train_device=self.train_device,
                 text_encoder_sequence_length=text_encoder_sequence_length,
@@ -149,6 +148,15 @@ class Flux2Sampler(BaseModelSampler):
                 file_type=FileType.IMAGE,
                 data=image[0],
             )
+
+    def prepare_text_encoding(self, sample_config: SampleConfig):
+        batch_size = 2 if sample_config.cfg_scale > 1.0 and not self.pipeline.transformer.config.guidance_embeds else 1
+        self.model.encode_text_cached(
+            "text_encoder",
+            text=[sample_config.prompt, sample_config.negative_prompt] if batch_size == 2 else sample_config.prompt,
+            train_device=self.train_device,
+            text_encoder_sequence_length=sample_config.text_encoder_1_sequence_length,
+        )
 
     def sample(
             self,

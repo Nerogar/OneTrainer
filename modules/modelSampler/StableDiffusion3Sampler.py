@@ -66,10 +66,9 @@ class StableDiffusion3Sampler(BaseModelSampler):
             vae_scale_factor = self.pipeline.vae_scale_factor
 
             # prepare prompt
-            self.model.materialize_only_text_encoders()
-
             prompt_embedding, pooled_prompt_embedding = self.model.combine_text_encoder_output(
-                *self.model.encode_text(
+                *self.model.encode_text_cached(
+                    self.model_type.text_encoder_parts(),
                     text=prompt,
                     train_device=self.train_device,
                     text_encoder_1_layer_skip=text_encoder_1_layer_skip,
@@ -79,7 +78,8 @@ class StableDiffusion3Sampler(BaseModelSampler):
                 ))
 
             negative_prompt_embedding, negative_pooled_prompt_embedding = self.model.combine_text_encoder_output(
-                *self.model.encode_text(
+                *self.model.encode_text_cached(
+                    self.model_type.text_encoder_parts(),
                     text=negative_prompt,
                     train_device=self.train_device,
                     text_encoder_1_layer_skip=text_encoder_1_layer_skip,
@@ -149,6 +149,17 @@ class StableDiffusion3Sampler(BaseModelSampler):
                 file_type=FileType.IMAGE,
                 data=image[0],
             )
+
+    def prepare_text_encoding(self, sample_config: SampleConfig):
+        self.model.encode_text_cached(
+            self.model_type.text_encoder_parts(),
+            text=sample_config.prompt,
+            train_device=self.train_device,
+            text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
+            text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
+            text_encoder_3_layer_skip=sample_config.text_encoder_3_layer_skip,
+            apply_attention_mask=sample_config.transformer_attention_mask,
+        )
 
     def sample(
             self,
