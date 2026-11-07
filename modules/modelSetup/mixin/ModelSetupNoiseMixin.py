@@ -1,5 +1,6 @@
 import math
 from abc import ABCMeta
+from random import Random
 
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.TimestepDistribution import TimestepDistribution
@@ -118,6 +119,46 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
             noise = noise + (config.perturbation_noise_weight * perturbation_noise)
 
         return noise
+
+    def _apply_ciop(
+            self,
+            noisy_latent: Tensor,
+            target_noise: Tensor,
+            config: TrainConfig,
+            generator: Generator,
+            rand: Random
+    ) -> tuple[Tensor, Tensor]:
+        """
+        Applies Coordinated Input-Output Perturbation (CIOP) as per Equation (6) & (7).
+        Paper: "Bidirectional Noise Injection: Enhancing Diffusion Models via Coordinated Input-Output Perturbation"
+
+        With probability p, injects independent Gaussian noise to both the noisy latent
+        and the target noise.
+        """
+        ciop_noise_weight = config.ciop_noise_weight
+        if ciop_noise_weight != 0:
+            prob_threshold = torch.rand(1, generator=generator, device=noisy_latent.device)
+
+            apply_mask = (prob_threshold < config.ciop_p).to(noisy_latent.dtype)
+
+            eps_in = torch.randn(
+                noisy_latent.shape,
+                generator=generator,
+                device=noisy_latent.device,
+                dtype=noisy_latent.dtype
+            ) * (ciop_noise_weight * apply_mask)
+
+            eps_out = torch.randn(
+                target_noise.shape,
+                generator=generator,
+                device=target_noise.device,
+                dtype=target_noise.dtype
+            ) * (ciop_noise_weight * apply_mask)
+
+            noisy_latent = noisy_latent + eps_in
+            target_noise = target_noise + eps_out
+
+        return noisy_latent, target_noise
 
     def _get_timestep_discrete(
             self,
