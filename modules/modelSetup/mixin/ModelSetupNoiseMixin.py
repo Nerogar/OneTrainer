@@ -119,6 +119,50 @@ class ModelSetupNoiseMixin(metaclass=ABCMeta):
 
         return noise
 
+    @staticmethod
+    def _apply_conditional_embedding_perturbation(
+            embedding: Tensor | list,
+            gamma: float,
+            generator: Generator,
+            relative_to_magnitude: bool = True
+    ) -> Tensor | list:
+        """
+        Applies Conditional Embedding Perturbation (CEP) as per Equation (8).
+        Paper: "Slight Corruption in Pre-training Data Makes Better Diffusion Models"
+
+        If relative_to_magnitude=True:
+            Scales noise relative to the actual RMS/std of the embedding tokens,
+            making gamma invariant across different text encoders (CLIP, T5, Qwen).
+        If relative_to_magnitude=False:
+            Uses the raw paper formula: delta ~ U(-(gamma/sqrt(d), gamma/sqrt(d))
+        """
+        def _perturb_cep(tensor: Tensor) -> Tensor:
+            # d denotes the dimension of c_theta(y)
+            d = tensor.shape[-1]
+
+            if relative_to_magnitude:
+                # Compute token-wise RMS (magnitude-aware): ||x||_2 / sqrt(d)
+                token_rms = tensor.pow(2).mean(dim=-1, keepdim=True).sqrt()
+                scale = math.sqrt(3.0) * gamma * token_rms
+            else:
+                # Original paper formulation (assumes unit-variance embeddings)
+                scale = gamma / math.sqrt(d)
+
+            # CEP-U (Uniform) scheme
+            noise = torch.rand(
+                tensor.shape,
+                generator=generator,
+                device=tensor.device,
+                dtype=tensor.dtype
+            )
+            perturbation = (noise * 2.0 - 1.0) * scale
+            return tensor + perturbation
+
+        if isinstance(embedding, list):
+            return [_perturb_cep(emb) for emb in embedding]
+        else:
+            return _perturb_cep(embedding)
+
     def _get_timestep_discrete(
             self,
             num_train_timesteps: int,
