@@ -110,7 +110,7 @@ class BaseModelSetup(
             # timesteps are configured as 0-based indices into 1000 discrete timesteps
             with self.deterministic_timestep((timestep + 1) / 1000):
                 loss = self.__calculate_validation_loss(model, batch, config, train_progress)
-            losses[f"-{timestep}" if len(timesteps) > 1 else ""] = loss
+            losses[f"-{timestep}"] = loss
         return losses
 
     def __calculate_validation_loss(

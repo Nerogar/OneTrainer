@@ -200,6 +200,11 @@ class BaseTrainUIView(ABC):
         self.components.entry(frame, 9, 1, ui_state, "validation_timesteps", required=True,
                               extra_validate=validate_validation_timesteps, tooltip=validation_timesteps_tooltip)
 
+        self.components.label(frame, 9, 2, "Report per val concept",
+                              tooltip="Report validation timesteps in a separate Tensorboard accordion for each concept. "
+                                      "Show the average validation loss and training loss in the loss group.")
+        self.components.switch(frame, 9, 3, ui_state, "validation_report_per_concept")
+
         # device
         self.components.label(frame, 10, 0, "Dataloader Threads",
                          tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
