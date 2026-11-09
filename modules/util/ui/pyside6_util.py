@@ -6,23 +6,12 @@ import os
 import re
 import signal
 import sys
-from abc import ABCMeta
-from typing import TYPE_CHECKING
 
 from modules.util.ui import pyside6_components as components
 from modules.util.ui.theme import ThemeController
 
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication, QComboBox, QLineEdit, QStyleFactory, QWidget
-
-if TYPE_CHECKING:
-    # pyside6 stubs omit qts runtime metaclass; expose ABCMeta to type checkers.
-    QtABCMeta = ABCMeta
-else:
-    # reachable at runtime
-    class QtABCMeta(type(QWidget), ABCMeta):
-        # Combine Qt Shiboken metaclass with ABCMeta at runtime.
-        pass
 
 
 class OneTrainerApplication(QApplication):

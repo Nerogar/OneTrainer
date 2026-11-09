@@ -7,7 +7,7 @@ from util.import_util import script_imports
 script_imports()
 
 from modules.ui.ConvertModelUIController import ConvertModelUIController
-from modules.ui.PySide6ConvertModelUIView import PySide6ConvertModelUIView
+from modules.ui.ConvertModelUIView import ConvertModelUIView
 from modules.util.config.SecretsConfig import SecretsConfig
 from modules.util.ui.pyside6_util import create_application
 
@@ -20,7 +20,7 @@ def main():
         secrets_dict = json.load(f)
         huggingface_token = SecretsConfig.default_values().from_dict(secrets_dict).huggingface_token
 
-    ui = ConvertModelUIController(huggingface_token=huggingface_token).create_window(None, PySide6ConvertModelUIView)
+    ui = ConvertModelUIController(huggingface_token=huggingface_token).create_window(None, ConvertModelUIView)
     ui.exec()
 
 
