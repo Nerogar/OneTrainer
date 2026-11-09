@@ -46,7 +46,7 @@ class OFTRotationModule(nn.Module):
         block_share=False,
         oft_scaled=False,
         use_cayley_neumann=True,
-        num_cayley_neumann_terms=5,
+        use_matrix_exp=False,
         dropout_probability=0.0,
     ):
         super().__init__()
@@ -63,7 +63,10 @@ class OFTRotationModule(nn.Module):
             self.register_buffer("scaled_oft", torch.tensor(True))
         self.oft_scaled = oft_scaled
         self.use_cayley_neumann = use_cayley_neumann
-        self.num_cayley_neumann_terms = num_cayley_neumann_terms
+        if use_matrix_exp:
+            # Register a persistent buffer to indicate this module uses Matrix exp. mode.
+            self.register_buffer("matrix_exp_oft", torch.tensor(True))
+        self.use_matrix_exp = use_matrix_exp
         # Create indices for upper triangle (excluding diagonal)
         rows, cols = torch.triu_indices(block_size, block_size, 1)
         self.register_buffer("rows", rows, persistent=False)
@@ -89,7 +92,7 @@ class OFTRotationModule(nn.Module):
         return vec
 
     def _cayley_batch(
-        self, Q: torch.Tensor, block_size: int, use_cayley_neumann: bool = True, num_neumann_terms: int = 5
+        self, Q: torch.Tensor, block_size: int, use_cayley_neumann: bool = True, use_matrix_exp: bool = False
     ) -> torch.Tensor:
         """
         Perform the Cayley parametrization on a batch of skew-symmetric matrices.
@@ -99,20 +102,20 @@ class OFTRotationModule(nn.Module):
 
         Q_skew = self._pytorch_skew_symmetric(Q, block_size)
 
-        if use_cayley_neumann:
-            R = torch.eye(block_size, device=Q.device, dtype=Q.dtype).repeat(b, 1, 1)
-            if num_neumann_terms > 1:
-                R.add_(Q_skew, alpha=2.0)
-                if num_neumann_terms > 2:
-                    Q_squared = torch.bmm(Q_skew, Q_skew)
-                    R.add_(Q_squared, alpha=2.0)
-
-                    Q_power = Q_squared
-                    for _ in range(3, num_neumann_terms - 1):
-                        Q_power = torch.bmm(Q_power, Q_skew)
-                        R.add_(Q_power, alpha=2.0)
-                    Q_power = torch.bmm(Q_power, Q_skew)
-                    R.add_(Q_power)
+        if use_matrix_exp:
+            eye_matrix = torch.eye(block_size, device=Q.device, dtype=Q.dtype).repeat(b, 1, 1)
+            Q_squared = torch.bmm(Q_skew, Q_skew)
+            c = 4.0 - 2.0 * math.sqrt(2.0)
+            d = 6.0 - 4.0 * math.sqrt(2.0)
+            inner = eye_matrix * 2.0 + Q_skew * c + Q_squared * d
+            R = eye_matrix + Q_skew * 2.0 + torch.bmm(Q_squared, inner)
+        elif use_cayley_neumann:
+            eye_matrix = torch.eye(block_size, device=Q.device, dtype=Q.dtype).repeat(b, 1, 1)
+            Q_squared = torch.bmm(Q_skew, Q_skew)
+            # inner = 2I + 2Q + Q^2
+            inner = eye_matrix * 2.0 + Q_skew * 2.0 + Q_squared
+            # R = I + 2Q + Q^2 * inner
+            R = eye_matrix + Q_skew * 2.0 + torch.bmm(Q_squared, inner)
         else:
             id_mat = (
                 torch.eye(Q_skew.shape[-1], device=Q_skew.device)
@@ -134,7 +137,7 @@ class OFTRotationModule(nn.Module):
         effective_weight = self.weight / scaling_factor
 
         orth_rotate = self._cayley_batch(
-            effective_weight, self.block_size, self.use_cayley_neumann, self.num_cayley_neumann_terms
+            effective_weight, self.block_size, self.use_cayley_neumann, self.use_matrix_exp
         )
         orth_rotate = self.dropout(orth_rotate)
 
