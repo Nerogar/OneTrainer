@@ -55,6 +55,9 @@ class StableDiffusionXLModelEmbedding:
 
 
 class StableDiffusionXLModel(BaseModel):
+    supports_caption_dropout = True
+    force_zeros_for_empty_prompt = True
+
     # base model data
     tokenizer_1: CLIPTokenizer | None
     orig_tokenizer_1: CLIPTokenizer | None
@@ -201,6 +204,7 @@ class StableDiffusionXLModel(BaseModel):
             tokenizer_2=self.orig_tokenizer_2 if use_original_tokenizers else self.tokenizer_2,
             unet=self.unet,
             scheduler=self.noise_scheduler,
+            force_zeros_for_empty_prompt=self.force_zeros_for_empty_prompt,
         )
 
     def force_v_prediction(self):
@@ -258,6 +262,16 @@ class StableDiffusionXLModel(BaseModel):
             )
             tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
 
+        text_encoder_1_dropout_mask, tokens_1 = self._prepare_caption_dropout(
+            "text_encoder_1", text_encoder_1_dropout_probability, rand, text_encoder_1_output,
+            tokens_1,
+        )
+
+        text_encoder_2_dropout_mask, tokens_2 = self._prepare_caption_dropout(
+            "text_encoder_2", text_encoder_2_dropout_probability, rand, text_encoder_2_output,
+            tokens_2,
+        )
+
         text_encoder_1_output, _ = encode_clip(
             text_encoder=self.text_encoder_1,
             tokens=tokens_1,
@@ -295,19 +309,13 @@ class StableDiffusionXLModel(BaseModel):
             text_encoder_2_output,
         )
 
-        # apply dropout
-        if text_encoder_1_dropout_probability is not None and text_encoder_1_dropout_probability > 0.0:
-            dropout_text_encoder_1_mask = (torch.tensor(
-                [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)],
-                device=train_device)).float()
-            text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None, None]
+        text_encoder_1_output, = self._apply_caption_dropout(
+            "text_encoder_1", text_encoder_1_dropout_mask, text_encoder_1_output,
+        )
 
-        if text_encoder_2_dropout_probability is not None and text_encoder_2_dropout_probability > 0.0:
-            dropout_text_encoder_2_mask = (torch.tensor(
-                [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)],
-                device=train_device)).float()
-            pooled_text_encoder_2_output = pooled_text_encoder_2_output * dropout_text_encoder_2_mask[:, None]
-            text_encoder_2_output = text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None]
+        text_encoder_2_output, pooled_text_encoder_2_output = self._apply_caption_dropout(
+            "text_encoder_2", text_encoder_2_dropout_mask, text_encoder_2_output, pooled_text_encoder_2_output,
+        )
 
         return text_encoder_1_output, text_encoder_2_output, pooled_text_encoder_2_output
 

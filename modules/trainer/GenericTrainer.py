@@ -148,6 +148,7 @@ class GenericTrainer(BaseTrainer):
         self.model_setup.setup_train_device(self.model, self.config)
         self.model_setup.setup_model(self.model, self.config)
         self.model.eval()
+        self.model.cache_unconditional(self.config)
 
         self.callbacks.on_update_status("creating the data loader/caching")
 

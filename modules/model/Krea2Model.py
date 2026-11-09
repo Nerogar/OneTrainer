@@ -40,6 +40,8 @@ PROMPT_MAX_LENGTH = 512
 
 
 class Krea2Model(BaseModel):
+    supports_caption_dropout = True
+
     # base model data
     tokenizer: Qwen2Tokenizer | None
     noise_scheduler: FlowMatchEulerDiscreteScheduler | None
@@ -157,6 +159,11 @@ class Krea2Model(BaseModel):
             tokens = torch.cat([prefix_out.input_ids, suffix_out.input_ids], dim=1).to(self.text_encoder.device)
             tokens_mask = torch.cat([prefix_out.attention_mask, suffix_out.attention_mask], dim=1).bool().to(self.text_encoder.device)
 
+        text_encoder_dropout_mask, tokens, tokens_mask = self._prepare_caption_dropout(
+            "text_encoder", text_encoder_dropout_probability, rand, text_encoder_output,
+            tokens, tokens_mask,
+        )
+
         if text_encoder_output is None:
             with self.text_encoder_autocast_context:
                 # cumsum position_ids: suffix tokens get positions right after real prompt tokens,
@@ -180,8 +187,9 @@ class Krea2Model(BaseModel):
                 tokens_mask = tokens_mask[:, PROMPT_TEMPLATE_CROP_START:]
                 text_encoder_output = hidden_states.flatten(2, 3)
 
-        if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
-            raise NotImplementedError
+        text_encoder_output, tokens_mask = self._apply_caption_dropout(
+            "text_encoder", text_encoder_dropout_mask, text_encoder_output, tokens_mask,
+        )
 
         # NOTE: unlike Qwen, Krea2's real tokens are not a contiguous prefix of the sequence -
         # padding sits between the (variable-length) prompt and the fixed suffix
