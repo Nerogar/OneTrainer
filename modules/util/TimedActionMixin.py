@@ -26,7 +26,12 @@ class TimedActionMixin:
                 if int(interval) == 0:
                     return False
                 if start_at_zero:
-                    return train_progress.epoch % int(interval) == 0 and train_progress.epoch_step == 0
+                    last = train_progress.last_action_epoch.get(name, -1)
+                    fire = train_progress.epoch > last \
+                        and train_progress.epoch % int(interval) == 0
+                    if fire:
+                        train_progress.last_action_epoch[name] = train_progress.epoch
+                    return fire
                 else:
                     # should actually be the last step of each epoch, but we don't know how many steps an epoch has
                     return train_progress.epoch % int(interval) == 0 and train_progress.epoch_step == 0 \
