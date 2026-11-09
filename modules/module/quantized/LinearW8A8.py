@@ -47,11 +47,30 @@ def fp8_backward_axiswise(output: Tensor, weight: Tensor, weight_scale: Tensor) 
     mm_res = mm_8bit(output_8.contiguous(), weight)
     return mm_res.float().mul_(weight_scale * output_scale).to(output.dtype)
 
+@torch.no_grad()
+def int8_forward_rowwise(x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
+    x_8, x_scale = quantize_int8_axiswise(x, dim=-1)
+    res = torch._int_mm(x_8, weight.T)
+    #weight_scale is [N, 1], one scale per output channel; the output is [T, N]
+    res_scaled = res.float().mul_(x_scale).mul_(weight_scale.view(1, -1)).to(compute_dtype)
+    if bias is not None:
+        res_scaled.add_(bias)
+    return res_scaled
+
+@torch.no_grad()
+def int8_backward_rowwise(output: Tensor, weight: Tensor, weight_scale: Tensor) -> Tensor:
+    #the weight scale is per output channel, which is the reduction dim of this mm, so it cannot be applied
+    #to the mm result. Fold it into the grad output before quantizing: dY @ (diag(s) Q) == (dY * s) @ Q
+    output_8, output_scale = quantize_int8_axiswise(output.float() * weight_scale.view(1, -1), dim=-1)
+    #see int8_backward_axiswise
+    mm_res = mm_8bit(output_8.contiguous(), weight)
+    return mm_res.float().mul_(output_scale).to(output.dtype)
+
 
 class LinearW8A8Function(torch.autograd.Function):
     #int8 and fp8 differ only in which math runs, and the quantized weight already carries the dtype
     @staticmethod
-    def forward(ctx, x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype) -> Tensor:
+    def forward(ctx, x: Tensor, weight: Tensor, weight_scale: Tensor, bias: Tensor | None, compute_dtype: torch.dtype, rowwise: bool) -> Tensor:
         # `weight` is the decompressed weight, so saving it keeps a full-size copy alive until backward.
         # Under reentrant checkpointing that copy lives only inside the recomputed segment, and not saving
         # it would cost a second decode: there is no partitioner, so recompute would decode once for the
@@ -59,21 +78,26 @@ class LinearW8A8Function(torch.autograd.Function):
         # TODO once offloading uses non-reentrant checkpointing, consider not saving the decompressed
         # weight and decoding in backward() instead.
         ctx.save_for_backward(weight, weight_scale)
-        if weight.dtype == torch.int8:
+        ctx.rowwise = rowwise
+        if rowwise:
+            return int8_forward_rowwise(x, weight, weight_scale, bias, compute_dtype)
+        elif weight.dtype == torch.int8:
             return int8_forward_tokenwise(x, weight, weight_scale, bias, compute_dtype)
         else:
             return fp8_forward_tokenwise(x, weight, weight_scale, bias, compute_dtype)
 
     @staticmethod
     def backward(ctx, output: Tensor):
-        if ctx.needs_input_grad != (True, False, False, False, False):
+        if ctx.needs_input_grad != (True, False, False, False, False, False):
             raise NotImplementedError("Int/Float A8W8 cannot be used for full finetuning")
 
         weight, weight_scale = ctx.saved_tensors
-        if weight.dtype == torch.int8:
-            return int8_backward_axiswise(output, weight, weight_scale), None, None, None, None
+        if ctx.rowwise:
+            return int8_backward_rowwise(output, weight, weight_scale), None, None, None, None, None
+        elif weight.dtype == torch.int8:
+            return int8_backward_axiswise(output, weight, weight_scale), None, None, None, None, None
         else:
-            return fp8_backward_axiswise(output, weight, weight_scale), None, None, None, None
+            return fp8_backward_axiswise(output, weight, weight_scale), None, None, None, None, None
 
 
 class LinearW8A8(
@@ -82,14 +106,18 @@ class LinearW8A8(
     QuantizedLinearMixin,
     CompressedWeightMixin,
 ):
-    def __init__(self, dtype: torch.dtype, *args, **kwargs):
+    def __init__(self, dtype: torch.dtype, *args, rowwise: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
 
         assert dtype in [torch.int8, torch.float8_e4m3fn]
+        #rowwise is int8 only: fp8 already keeps its relative precision across rows through the exponent
+        assert not rowwise or dtype == torch.int8
         self._dtype = dtype
+        self._rowwise = rowwise
 
         self.__is_quantized = False
         self.compute_dtype = None
+        #rowwise: one scale per output channel, shape [out_features, 1]; replaced in quantize()
         self.register_buffer("scale", torch.tensor(1.0, dtype=torch.float32))
 
         self._init_compressed_state()
@@ -114,7 +142,9 @@ class LinearW8A8(
         orig_device = weight.device
         if device is not None:
             weight = weight.to(device=device)
-        if self._dtype == torch.int8:
+        if self._rowwise:
+            weight, scale = quantize_int8_axiswise(weight, dim=-1)
+        elif self._dtype == torch.int8:
             weight, scale = quantize_int8_tensorwise(weight)
         else:
             weight, scale = quantize_fp8_tensorwise(weight)
@@ -125,7 +155,12 @@ class LinearW8A8(
         self.requires_grad_(False)
         self.weight.data = weight
 
-        self.scale.copy_(scale)
+        if self._rowwise:
+            # assign instead of copy_: the shape changes from the scalar placeholder to [out_features, 1]. The model
+            # loader may also have cast the placeholder to the train dtype; keep the scale in float32.
+            self.scale = scale.to(device=self.scale.device, dtype=torch.float32)
+        else:
+            self.scale.copy_(scale)
 
         if self.compress:
             self._compress_weight(device=device)
@@ -138,7 +173,7 @@ class LinearW8A8(
         weight = self._decompress(self.weight.detach()) if self._compressed else self.weight
 
         if x.shape[0] > 16:
-            y = LinearW8A8Function.apply(x, weight, self.scale, self.bias, self.compute_dtype)
+            y = LinearW8A8Function.apply(x, weight, self.scale, self.bias, self.compute_dtype, self._rowwise)
         else:
             w = dequantize(weight.detach(), self.scale)
             y = torch.nn.functional.linear(x, w, self.bias)
