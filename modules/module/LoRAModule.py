@@ -9,6 +9,7 @@ from modules.module.FusedModule import FusedModuleGroup, check_fusion_match, dis
 from modules.module.oft_utils import OFTRotationModule
 from modules.module.quantized.mixin.LoRAFusableLinearMixin import LoRAFusableLinearMixin
 from modules.util.config.TrainConfig import TrainConfig
+from modules.util.convert_util import convert, oft_qkv_fusion, reverse_conversion
 from modules.util.enum.ModelType import PeftType
 from modules.util.lokr_utils import factorization, make_kron, rebuild_tucker
 from modules.util.ModuleFilter import ModuleFilter
@@ -1135,6 +1136,36 @@ class LoRAModuleWrapper:
             if checkpoint_rank != config_rank:
                 raise ValueError(f"Rank/Dim mismatch: checkpoint={checkpoint_rank}, config={config_rank}, please correct in the UI.")
 
+    def _get_oft_leaf_out_features(self) -> dict[str, list[int]] | None:
+        # Extract per-leaf out_features for each fusion group from the live model, for OFT
+        # dora_log_multiplier defusion. Returns a mapping of group_pattern -> [out_features per leaf].
+        if not self.fusion_spec or self.orig_module is None:
+            return None
+        result = {}
+        for group_pattern, leaves, _fused, _orig in self.fusion_spec:
+            out_features = []
+            for leaf in leaves:
+                # Build the leaf module path: strip the prefix, then navigate the group pattern + leaf.
+                # The group pattern may contain a placeholder (e.g. "layers.{i}.proj"); we try each
+                # concrete block index to find the leaf module.
+                leaf_found = False
+                for idx in range(64):  # try up to 64 blocks
+                    concrete_pattern = group_pattern.replace("{i}", str(idx))
+                    module_path = f"{concrete_pattern}.{leaf}"
+                    try:
+                        module = self.orig_module
+                        for part in module_path.split("."):
+                            module = getattr(module, part)
+                        out_features.append(module.out_features)
+                        leaf_found = True
+                        break
+                    except AttributeError:
+                        continue
+                if not leaf_found:
+                    return None  # can't determine out_features; fall back to equal chunking
+            result[group_pattern] = out_features
+        return result if result else None
+
     def load_state_dict(self, state_dict: dict[str, Tensor], strict: bool = True):
         """
         Loads the state dict
@@ -1147,6 +1178,13 @@ class LoRAModuleWrapper:
         # wrapper from also matching the "text_encoder_2" keys
         prefix = self.prefix + "." if self.prefix else ""
         state_dict = {k: v for (k, v) in state_dict.items() if k.startswith(prefix)}
+
+        # OFT defusion: if the wrapper is split (fuse=False) and the state dict is fused, defuse the
+        # OFT keys (fused -> split) before check_fusion_match. OFT defusion is lossless (block-diagonal
+        # rotation splitting), unlike LoRA defusion which is not implemented.
+        if not self.fuse and self.fusion_spec:
+            leaf_out_features = self._get_oft_leaf_out_features()
+            state_dict = convert(state_dict, reverse_conversion(oft_qkv_fusion(self.fusion_spec, leaf_out_features, component_prefix=self.prefix)), strict=False)
 
         check_fusion_match(state_dict.keys(), self.fuse, self.fusion_spec)
         # FIXME: disabled rank check, false positive on Flux2 LoHA loading
