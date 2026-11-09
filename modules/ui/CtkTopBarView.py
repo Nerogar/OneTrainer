@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 
 from modules.ui.BaseTopBarView import BaseTopBarView
 from modules.ui.TopBarController import TopBarController
@@ -29,6 +29,9 @@ class CtkTopBarView(BaseTopBarView):
 
     def _setup_frame_column_weight(self):
         self.frame.grid_columnconfigure(5, weight=1)
+
+    def _show_config_error(self, message: str):
+        messagebox.showerror("Cannot Load Config", message, parent=self.frame)
 
     def _forget_dropdown(self, widget):
         widget.destroy()
