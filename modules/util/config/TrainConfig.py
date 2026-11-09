@@ -42,6 +42,16 @@ class RemovedOptimizerError(ValueError):
     pass
 
 
+def parse_validation_timesteps(value: str) -> list[int]:
+    try:
+        timesteps = [int(part.strip()) for part in value.split(',')]
+    except ValueError as e:
+        raise ValueError("Enter comma-separated whole numbers between 0 and 999 (for example, 100,499,900)") from e
+    if any(timestep < 0 or timestep > 999 for timestep in timesteps):
+        raise ValueError("Validation timesteps must be between 0 and 999")
+    return list(dict.fromkeys(timesteps))
+
+
 TIMESTAMP_SUFFIX_RE = re.compile(r"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})$")
 
 
@@ -489,8 +499,12 @@ class TrainConfig(BaseConfig):
     tensorboard_always_on: bool
     tensorboard_port: str
     validation: bool
+    validation_timesteps: str
+    validation_report_per_concept: bool
     validate_after: float
     validate_after_unit: TimeUnit
+    early_stopping_patience: int
+    early_stopping_min_delta: float | None
     continue_last_backup: bool
     prevent_overwrites: bool
     auto_correct_input: bool
@@ -1124,6 +1138,9 @@ class TrainConfig(BaseConfig):
         else:
             return self.additional_embeddings
 
+    def parse_validation_timesteps(self) -> list[int]:
+        return parse_validation_timesteps(self.validation_timesteps)
+
     def get_timestamped_run_name(self) -> str:
         """Name a saved artifact by its save time without duplicating the default run timestamp."""
         timestamp = get_string_timestamp()
@@ -1223,8 +1240,12 @@ class TrainConfig(BaseConfig):
         data.append(("tensorboard_always_on", False, bool, False))
         data.append(("tensorboard_port", 6006, int, False))
         data.append(("validation", False, bool, False))
+        data.append(("validation_timesteps", "499", str, False))
+        data.append(("validation_report_per_concept", False, bool, False))
         data.append(("validate_after", 1, int, False))
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
+        data.append(("early_stopping_patience", 0, int, False))
+        data.append(("early_stopping_min_delta", None, float, True))
         data.append(("continue_last_backup", False, bool, False))
         data.append(("prevent_overwrites", False, bool, False))
         data.append(("auto_correct_input", True, bool, False))

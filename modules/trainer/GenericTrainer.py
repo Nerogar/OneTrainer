@@ -2,6 +2,7 @@ import copy
 import json
 import math
 import os
+import re
 import shutil
 import traceback
 from collections.abc import Callable
@@ -84,8 +85,13 @@ class GenericTrainer(BaseTrainer):
         self.model = None
         self.one_step_trained = False
         self.grad_hook_handles = []
+        self.__early_stopping_loss: float | None = None
+        self.__early_stopping_epoch = 0
 
     def start(self):
+        if self.config.validation:
+            self.config.parse_validation_timesteps()
+
         if multi.is_master():
             self.__save_config_to_workspace()
 
@@ -336,6 +342,32 @@ class GenericTrainer(BaseTrainer):
 
         torch_gc()
 
+    @staticmethod
+    def __validation_concept_labels(concepts: set[tuple[str, str, int]]) -> dict[tuple[str, str, int], str]:
+        labels = {}
+        for concept in sorted(concepts):
+            name, path, _ = concept
+            label = name.strip()
+            if not label:
+                label = next(folder for folder in reversed(path.split('/')) if folder and not re.fullmatch(
+                    r"(?:val|valid|validation)(?:[-_ ]?(?:set|data|dataset))?(?:[-_ ]?\d+)?",
+                    folder, re.IGNORECASE,
+                ))
+                label = label[:1].upper() + label[1:]
+            labels[concept] = label
+
+        reserved_labels = set(labels.values())
+        used_labels = set()
+        for concept, label in labels.items():
+            unique_label = label
+            suffix = 2
+            while unique_label in used_labels or (unique_label != label and unique_label in reserved_labels):
+                unique_label = f"{label} ({suffix})"
+                suffix += 1
+            labels[concept] = unique_label
+            used_labels.add(unique_label)
+        return labels
+
     def __validate(self, train_progress: TrainProgress):
         if self.__needs_validate(train_progress):
             self.validation_data_loader.get_data_set().start_next_epoch()
@@ -354,59 +386,71 @@ class GenericTrainer(BaseTrainer):
                 desc="validation_step",
                 total=current_epoch_length_validation)
 
-            accumulated_loss_per_concept = {}
-            concept_counts = {}
-            mapping_seed_to_label = {}
-            mapping_label_to_seed = {}
+            accumulated_loss_per_concept_task = {}
+            concept_task_counts = {}
 
             for validation_batch in step_tqdm_validation:
                 if self.__needs_gc(train_progress):
                     torch_gc()
 
-                with torch.no_grad():
-                    model_output_data = self.model_setup.predict(
-                        self.model, validation_batch, self.config, train_progress, deterministic=True)
-                    loss_validation = self.model_setup.calculate_loss(
-                        self.model, validation_batch, model_output_data, self.config)
+                losses = self.model_setup.calculate_validation_losses(
+                    self.model, validation_batch, self.config, train_progress)
 
                 # since validation batch size = 1
                 concept_name = validation_batch["concept_name"][0]
-                concept_path = validation_batch["concept_path"][0]
-                concept_seed = validation_batch["concept_seed"].item()
-                loss = loss_validation.item()
+                concept_path = os.path.normpath(validation_batch["concept_path"][0].replace('\\', '/')).replace('\\', '/')
+                concept_seed = int(validation_batch["concept_seed"][0])
+                concept = (concept_name, concept_path, concept_seed)
 
-                label = concept_name if concept_name else os.path.basename(concept_path)
-                # check and fix collision to display both graphs in tensorboard
-                if label in mapping_label_to_seed and mapping_label_to_seed[label] != concept_seed:
-                    suffix = 1
-                    new_label = f"{label}({suffix})"
-                    while new_label in mapping_label_to_seed and mapping_label_to_seed[new_label] != concept_seed:
-                        suffix += 1
-                        new_label = f"{label}({suffix})"
-                    label = new_label
+                for task, loss in losses.items():
+                    key = (concept, task)
+                    accumulated_loss_per_concept_task[key] = accumulated_loss_per_concept_task.get(key, 0) + loss
+                    concept_task_counts[key] = concept_task_counts.get(key, 0) + 1
 
-                if concept_seed not in mapping_seed_to_label:
-                    mapping_seed_to_label[concept_seed] = label
-                    mapping_label_to_seed[label] = concept_seed
+            report_per_concept = self.config.validation_report_per_concept
+            labels = self.__validation_concept_labels({concept for concept, _ in concept_task_counts}) \
+                if report_per_concept else {}
+            tag_losses = {}
+            tag_counts = {}
+            for (concept, task), total_loss in accumulated_loss_per_concept_task.items():
+                if report_per_concept:
+                    tag = f"{labels[concept]}: val_loss/step{task}" if task else f"{labels[concept]}: val_loss/loss"
+                else:
+                    tag = f"loss/validation_step/{task.removeprefix('-')}" if task else "loss/validation_step"
+                tag_losses[tag] = tag_losses.get(tag, 0) + total_loss
+                tag_counts[tag] = tag_counts.get(tag, 0) + concept_task_counts[(concept, task)]
 
-                accumulated_loss_per_concept[concept_seed] = accumulated_loss_per_concept.get(concept_seed, 0) + loss
-                concept_counts[concept_seed] = concept_counts.get(concept_seed, 0) + 1
-
-            for concept_seed, total_loss in accumulated_loss_per_concept.items():
-                average_loss = total_loss / concept_counts[concept_seed]
-
-                self.tensorboard.add_scalar(f"loss/validation_step/{mapping_seed_to_label[concept_seed]}",
-                                            average_loss,
+            for tag, total_loss in tag_losses.items():
+                self.tensorboard.add_scalar(tag,
+                                            total_loss / tag_counts[tag],
                                             train_progress.global_step)
 
-            if len(concept_counts) > 1:
-                total_loss = sum(accumulated_loss_per_concept[key] for key in concept_counts)
-                total_count = sum(concept_counts[key] for key in concept_counts)
+            if concept_task_counts:
+                total_loss = sum(accumulated_loss_per_concept_task[key] for key in concept_task_counts)
+                total_count = sum(concept_task_counts[key] for key in concept_task_counts)
                 total_average_loss = total_loss / total_count
 
-                self.tensorboard.add_scalar("loss/validation_step/total_average",
-                                            total_average_loss,
-                                            train_progress.global_step)
+                if report_per_concept or len(concept_task_counts) > 1:
+                    self.tensorboard.add_scalar("loss/avg_val_loss" if report_per_concept else "loss/validation_step/total_average",
+                                                total_average_loss,
+                                                train_progress.global_step)
+
+                self.__check_early_stopping(total_average_loss, train_progress)
+
+    def __check_early_stopping(self, loss: float, train_progress: TrainProgress):
+        if not self.config.validation or self.config.early_stopping_patience <= 0 or not math.isfinite(loss):
+            return
+
+        delta = self.config.early_stopping_min_delta or 0.0
+        if self.__early_stopping_loss is None or loss < self.__early_stopping_loss - delta:
+            self.__early_stopping_loss = loss
+            self.__early_stopping_epoch = train_progress.epoch
+        elif train_progress.epoch - self.__early_stopping_epoch >= self.config.early_stopping_patience:
+            tqdm.write(f"Early stopping: validation loss has not improved for {self.config.early_stopping_patience} epochs.")
+            if multi.is_enabled():
+                multi.global_commands.stop()
+            else:
+                self.commands.stop()
 
     def __save_backup_config(self, backup_path):
         config_path = os.path.join(backup_path, "onetrainer_config")
