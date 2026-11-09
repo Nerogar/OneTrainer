@@ -24,6 +24,8 @@ PROMPT_MAX_LENGTH = 512
 
 
 class AnimaModel(BaseModel):
+    supports_caption_dropout = True
+
     # base model data
     tokenizer: Qwen2Tokenizer | None
     t5_tokenizer: T5TokenizerFast | None
@@ -162,6 +164,7 @@ class AnimaModel(BaseModel):
             text_encoder_dropout_probability: float | None = None,
             text_encoder_output: Tensor = None,
     ) -> Tensor:
+        t5_ids = t5_mask = None
         # Two-stage encoding: Qwen3 text encoder → AnimaTextConditioner (with T5 token ids as queries).
         # text_encoder_output, when provided from cache, is already the conditioner output.
         if tokens is None and text is not None:
@@ -188,6 +191,11 @@ class AnimaModel(BaseModel):
             t5_ids = t5_output.input_ids.to(self.text_encoder.device)
             t5_mask = t5_output.attention_mask.to(self.text_encoder.device)
 
+        text_encoder_dropout_mask, tokens, tokens_mask, t5_ids, t5_mask = self._prepare_caption_dropout(
+            "text_encoder", text_encoder_dropout_probability, rand, text_encoder_output,
+            tokens, tokens_mask, t5_ids, t5_mask,
+        )
+
         if text_encoder_output is None:
             with self.text_encoder_autocast_context:
                 qwen_hidden = self.text_encoder(
@@ -204,8 +212,9 @@ class AnimaModel(BaseModel):
                     source_attention_mask=tokens_mask,
                 )
 
-        if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
-            raise NotImplementedError  # https://github.com/Nerogar/OneTrainer/issues/957
+        text_encoder_output, = self._apply_caption_dropout(
+            "text_encoder", text_encoder_dropout_mask, text_encoder_output,
+        )
 
         # conditioner output is always (B, 512, 1024) and fully dense (zeros for padding positions);
         # the Cosmos transformer takes encoder_hidden_states with no separate text attention mask.

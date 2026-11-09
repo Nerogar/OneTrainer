@@ -59,6 +59,8 @@ class HunyuanVideoModelEmbedding:
 
 
 class HunyuanVideoModel(BaseModel):
+    supports_caption_dropout = True
+
     NATIVE_FPS = 24
 
     # base model data
@@ -275,6 +277,16 @@ class HunyuanVideoModel(BaseModel):
             )
             tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
 
+        text_encoder_1_dropout_mask, tokens_1, tokens_mask_1 = self._prepare_caption_dropout(
+            "text_encoder_1", text_encoder_1_dropout_probability, rand, text_encoder_1_output,
+            tokens_1, tokens_mask_1,
+        )
+
+        text_encoder_2_dropout_mask, tokens_2 = self._prepare_caption_dropout(
+            "text_encoder_2", text_encoder_2_dropout_probability, rand, pooled_text_encoder_2_output,
+            tokens_2,
+        )
+
         text_encoder_1_output, tokens_mask_1, tokens_1 = encode_llama(
             text_encoder=self.text_encoder_1,
             tokens=tokens_1,
@@ -321,17 +333,12 @@ class HunyuanVideoModel(BaseModel):
             text_encoder_1_output,
         )
 
-        # apply dropout
-        if text_encoder_1_dropout_probability is not None and text_encoder_1_dropout_probability > 0.0:
-            dropout_text_encoder_1_mask = (torch.tensor(
-                [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)],
-                device=train_device)).float()
-            text_encoder_1_output = text_encoder_1_output * dropout_text_encoder_1_mask[:, None, None]
+        text_encoder_1_output, tokens_mask_1 = self._apply_caption_dropout(
+            "text_encoder_1", text_encoder_1_dropout_mask, text_encoder_1_output, tokens_mask_1,
+        )
 
-        if text_encoder_2_dropout_probability is not None and text_encoder_2_dropout_probability > 0.0:
-            dropout_text_encoder_2_mask = (torch.tensor(
-                [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)],
-                device=train_device)).float()
-            pooled_text_encoder_2_output = pooled_text_encoder_2_output * dropout_text_encoder_2_mask[:, None]
+        pooled_text_encoder_2_output, = self._apply_caption_dropout(
+            "text_encoder_2", text_encoder_2_dropout_mask, pooled_text_encoder_2_output,
+        )
 
         return text_encoder_1_output, pooled_text_encoder_2_output, tokens_mask_1
