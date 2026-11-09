@@ -31,7 +31,8 @@ if len(sys.argv) < 3:
 
 min_ver = str_to_tuple(sys.argv[1])
 too_high_ver = str_to_tuple(sys.argv[2])
-deprecated_ver = (3, 11, 0)
+# Set to a version tuple such as (3, 12) to warn about versions below it.
+deprecated_ver = None
 
 # Specifically exclude Python 3.11.0 as Scalene does NOT support it https://pypi.org/project/scalene/
 if sys.version_info[:3] == (3, 11, 0):
@@ -40,7 +41,7 @@ if sys.version_info[:3] == (3, 11, 0):
 if sys.version_info < min_ver:
     exit_wrong_version("too low", min_ver, too_high_ver)
 
-if sys.version_info < deprecated_ver:
+if deprecated_ver is not None and sys.version_info < deprecated_ver:
     sys.stderr.write("Warning: Deprecated Python version found. Update to %s or newer\n" % (tuple_to_str(deprecated_ver)))
     sys.stderr.flush()
 
