@@ -116,6 +116,11 @@ a mask for every training image. This mask is binary image (black-and-white), wh
 included, and black regions are excluded. The files need the same name as the images, with an added `-masklabel.png`
 extension.
 
+An image can have more than one mask. Alongside `-masklabel.png` you can add `-masklabel1.png` up to
+`-masklabel9.png`. When a concept is set to use several image variations, each variation uses the next mask in
+turn and wraps around, so the model sees the same image under different masks. Images with a single mask, or
+none at all, behave exactly as before.
+
 ### Sampling
 
 Here you can define prompts to regularly sample the model during training. The results will be displayed in tensorboard

@@ -7,7 +7,7 @@ class GenerateMasksWindowController:
         self.view = view_cls(parent_window, self, path, parent_include_subdirectories)
         return self.view
 
-    def create_masks(self, model_name, path, prompt, mode_str, alpha_str, threshold_str, smooth_str, expand_str, include_subdirectories):
+    def create_masks(self, model_name, path, prompt, mode_str, variant_str, alpha_str, threshold_str, smooth_str, expand_str, include_subdirectories):
         self.parent.load_masking_model(model_name)
 
         mode = {
@@ -18,11 +18,15 @@ class GenerateMasksWindowController:
             "Blend with existing": "blend",
         }[mode_str]
 
+        #"Base" is the original -masklabel.png, the numbers are its variants
+        variant = 0 if variant_str == "Base" else int(variant_str)
+
         self.parent.masking_model.mask_folder(
             sample_dir=path,
             prompts=[prompt],
             mode=mode,
             alpha=float(alpha_str),
+            variant=variant,
             threshold=float(threshold_str),
             smooth_pixels=int(smooth_str),
             expand_pixels=int(expand_str),

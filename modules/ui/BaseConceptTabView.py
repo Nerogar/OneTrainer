@@ -79,7 +79,7 @@ class BaseConceptWidgetView:
                 extension = os.path.splitext(path)[1]
                 if (path.is_file()
                         and path_util.is_supported_image_extension(extension)
-                        and not path.name.endswith("-masklabel.png")
+                        and not path_util.is_mask_filename(path.name)
                         and not path.name.endswith("-condlabel.png")):
                     preview_path = path_util.canonical_join(concept_path, path)
                     break

@@ -63,3 +63,31 @@ def supported_caption_extensions() -> set[str]:
 def json_path_modifier(x: str | Path) -> Path:
     x = Path(x).absolute()
     return x.parent if x.suffix == ".json" else x
+
+
+MASK_POSTFIX = '-masklabel'
+MASK_EXTENSION = '.png'
+MAX_MASK_VARIANTS = 9
+
+# Stem postfixes of every mask sidecar: the original '-masklabel' plus the
+# numbered variants '-masklabel1' to '-masklabel9'. Listed explicitly because
+# the dataset enumeration filter matches literal postfixes.
+MASK_POSTFIXES = (MASK_POSTFIX,) + tuple(
+    f'{MASK_POSTFIX}{variant}' for variant in range(1, MAX_MASK_VARIANTS + 1)
+)
+
+
+def mask_postfix(variant: int = 0) -> str:
+    # variant 0 is the original '-masklabel', keeping existing datasets working
+    return MASK_POSTFIX if variant == 0 else f'{MASK_POSTFIX}{variant}'
+
+
+def mask_path_for(image_path: str, variant: int = 0) -> str:
+    return os.path.splitext(image_path)[0] + mask_postfix(variant) + MASK_EXTENSION
+
+
+def is_mask_filename(filename: str) -> bool:
+    # matches '<name>-masklabel.png' and '<name>-masklabel1.png' .. '-masklabel9.png'.
+    # tests the stem, the same rule the dataset enumeration uses to keep mask
+    # sidecars out of the training images
+    return os.path.splitext(filename)[0].endswith(MASK_POSTFIXES)

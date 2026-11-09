@@ -34,6 +34,7 @@ class CaptionUIController:
     Ctrl+M: only show the mask
     Ctrl+D: draw mask editing mode
     Ctrl+F: fill mask editing mode
+    Ctrl+1 to Ctrl+9: edit that mask variant, Ctrl+0 for the base mask
 
     When editing masks:
     Left click: add mask
@@ -52,6 +53,8 @@ class CaptionUIController:
         self.mask_draw_radius = 0.01
         self.display_only_mask = False
         self.mask_editing_mode = 'draw'
+        #which of an image's masks is being edited, 0 for the original '-masklabel.png'
+        self.mask_variant = 0
         self.view = None
 
     def create_window(self, parent, view_cls):
@@ -116,7 +119,7 @@ class CaptionUIController:
     def scan_directory(self, include_subdirectories: bool = False):
         def __is_supported_image_extension(filename):
             name, ext = os.path.splitext(filename)
-            return path_util.is_supported_image_extension(ext) and not name.endswith("-masklabel") and not name.endswith("-condlabel")
+            return path_util.is_supported_image_extension(ext) and not path_util.is_mask_filename(filename) and not name.endswith("-condlabel")
 
         self.image_rel_paths = []
 
@@ -152,7 +155,7 @@ class CaptionUIController:
     def load_mask(self):
         if len(self.image_rel_paths) > 0 and self.current_image_index < len(self.image_rel_paths):
             image_name = self.image_rel_paths[self.current_image_index]
-            mask_name = os.path.splitext(image_name)[0] + "-masklabel.png"
+            mask_name = path_util.mask_path_for(image_name, self.mask_variant)
             mask_name = os.path.join(self.dir, mask_name)
 
             try:
@@ -161,6 +164,11 @@ class CaptionUIController:
                 return None
         else:
             return None
+
+    def set_mask_variant(self, variant: int):
+        #unsaved edits are dropped, the same way moving to another image drops them
+        self.mask_variant = variant
+        self.pil_mask = self.load_mask()
 
     def load_prompt(self):
         if len(self.image_rel_paths) > 0 and self.current_image_index < len(self.image_rel_paths):
@@ -183,7 +191,7 @@ class CaptionUIController:
             prompt_name = os.path.splitext(image_name)[0] + ".txt"
             prompt_name = os.path.join(self.dir, prompt_name)
 
-            mask_name = os.path.splitext(image_name)[0] + "-masklabel.png"
+            mask_name = path_util.mask_path_for(image_name, self.mask_variant)
             mask_name = os.path.join(self.dir, mask_name)
 
             try:

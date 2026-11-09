@@ -27,9 +27,19 @@ Check the `Enable Mask Editing` checkbox at the top. Now you can draw a mask ont
 masked region, right click removes parts from the mask. With the mouse wheel you can increase or decrease the brush
 size. Use `Ctrl + M` to only show the mask. To save the mask, click into the caption input field, then press enter.
 
+The `Mask` dropdown next to the brush settings chooses which of the image's masks you are editing. `Base` is the
+usual `-masklabel.png`, and `1` to `9` are the extra masks used by image variations during training. `Ctrl + 0`
+to `Ctrl + 9` switch between them. The selection stays put as you move through the folder, so you can draw one
+variant across a whole dataset in a single pass. Switching mask discards unsaved changes, the same as moving to
+another image.
+
 ### Automatic masking
 
 Clicking on the `Generate Masks` button opens the batch masking modal. Here you can choose which model to use for
 masking. Some models like ClipSeg support masking based on a prompt. Play around with Threshold, Smooth and Expand values to find what works best for your dataset.
+
+`Variant` picks which mask the batch writes to, and `Mode` still decides how the generated mask combines with
+whatever is already in that slot. Generating into `1` with a different prompt or model is how you build a second
+mask for a whole folder at once.
 
 To generate the masks, press the "Create Masks" button at the bottom. When you use this for the first time, it has to download the model. Depending on the model you chose, this can take a while.

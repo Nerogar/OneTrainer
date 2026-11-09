@@ -4,6 +4,7 @@ from modules.ui.BaseCaptionUIView import BaseCaptionUIView
 from modules.ui.CaptionUIController import CaptionUIController
 from modules.ui.CtkGenerateCaptionsWindowView import CtkGenerateCaptionsWindowView
 from modules.ui.CtkGenerateMasksWindowView import CtkGenerateMasksWindowView
+from modules.util import path_util
 from modules.util.ui import ctk_components
 from modules.util.ui.CtkUIState import CtkUIState
 from modules.util.ui.ui_utils import bind_mousewheel, set_window_icon
@@ -84,7 +85,7 @@ class CtkCaptionUIView(BaseCaptionUIView, ctk.CTkToplevel):
         right_frame = ctk.CTkFrame(master, fg_color="transparent")
         right_frame.grid(row=0, column=1, sticky="nsew")
 
-        right_frame.grid_columnconfigure(4, weight=1)
+        right_frame.grid_columnconfigure(6, weight=1)
         right_frame.grid_rowconfigure(1, weight=1)
 
         self.build_mask_buttons(right_frame)
@@ -105,6 +106,17 @@ class CtkCaptionUIView(BaseCaptionUIView, ctk.CTkToplevel):
         mask_editing_alpha_label = ctk.CTkLabel(right_frame, text="Brush Alpha", width=75)
         mask_editing_alpha_label.grid(row=0, column=4, padx=0, pady=5, sticky="w")
 
+        # which mask of the image is being edited
+        self.mask_variant_var = ctk.StringVar(self, "Base")
+        mask_variant_dropdown = ctk.CTkOptionMenu(
+            right_frame, variable=self.mask_variant_var,
+            values=["Base"] + [str(v) for v in range(1, path_util.MAX_MASK_VARIANTS + 1)],
+            width=80, command=self.select_mask_variant)
+        mask_variant_dropdown.grid(row=0, column=5, padx=5, pady=5, sticky="e")
+
+        mask_variant_label = ctk.CTkLabel(right_frame, text="Mask", width=40)
+        mask_variant_label.grid(row=0, column=6, padx=0, pady=5, sticky="w")
+
         # image
         self.image = ctk.CTkImage(
             light_image=image,
@@ -114,7 +126,7 @@ class CtkCaptionUIView(BaseCaptionUIView, ctk.CTkToplevel):
             master=right_frame, text="", image=self.image,
             height=self.controller.image_size, width=self.controller.image_size
         )
-        self.image_label.grid(row=1, column=0, columnspan=5, sticky="nsew")
+        self.image_label.grid(row=1, column=0, columnspan=7, sticky="nsew")
 
         self.image_label.bind("<Motion>", self.edit_mask)
         self.image_label.bind("<Button-1>", self.edit_mask)
@@ -124,7 +136,7 @@ class CtkCaptionUIView(BaseCaptionUIView, ctk.CTkToplevel):
         # prompt
         self.prompt_var = ctk.StringVar()
         self.prompt_component = ctk.CTkEntry(right_frame, textvariable=self.prompt_var)
-        self.prompt_component.grid(row=2, column=0, columnspan=5, pady=5, sticky="new")
+        self.prompt_component.grid(row=2, column=0, columnspan=7, pady=5, sticky="new")
         self.bind_key_events(self.prompt_component)
         self.prompt_component.focus_set()
 
@@ -135,6 +147,9 @@ class CtkCaptionUIView(BaseCaptionUIView, ctk.CTkToplevel):
         component.bind("<Control-m>", self.toggle_mask)
         component.bind("<Control-d>", self.draw_mask_editing_mode)
         component.bind("<Control-f>", self.fill_mask_editing_mode)
+        for variant in range(path_util.MAX_MASK_VARIANTS + 1):
+            component.bind(f"<Control-Key-{variant}>",
+                           lambda e, v=variant: self.select_mask_variant("Base" if v == 0 else str(v)))
 
     def refresh_file_list(self):
         self.file_list_column(self.bottom_frame)
@@ -153,6 +168,12 @@ class CtkCaptionUIView(BaseCaptionUIView, ctk.CTkToplevel):
     def on_image_cleared(self):
         image = Image.new("RGB", (512, 512), (0, 0, 0))
         self.image.configure(light_image=image)
+
+    def select_mask_variant(self, variant_str):
+        self.mask_variant_var.set(variant_str)
+        self.controller.set_mask_variant(0 if variant_str == "Base" else int(variant_str))
+        self.refresh_image()
+        return "break"
 
     def refresh_image(self):
         pil_image, size = self.controller.get_display_image()
