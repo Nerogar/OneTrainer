@@ -18,7 +18,6 @@ from diffusers import (
     AutoencoderKLQwenImage,
     CosmosTransformer3DModel,
     FlowMatchEulerDiscreteScheduler,
-    GGUFQuantizationConfig,
 )
 from transformers import Qwen2Tokenizer, Qwen3Model, T5TokenizerFast
 
@@ -38,10 +37,12 @@ class AnimaModelLoader(
             transformer_model_name: str,
             vae_model_name: str,
             quantization: QuantizationConfig,
+            stream_from_disk: bool,
     ):
         if os.path.isfile(os.path.join(base_model_name, "meta.json")):
             self.__load_diffusers(
                 model, model_type, weight_dtypes, base_model_name, transformer_model_name, vae_model_name, quantization,
+                stream_from_disk,
             )
         else:
             raise Exception("not an internal model")
@@ -55,83 +56,56 @@ class AnimaModelLoader(
             transformer_model_name: str,
             vae_model_name: str,
             quantization: QuantizationConfig,
+            stream_from_disk: bool,
     ):
-        tokenizer = Qwen2Tokenizer.from_pretrained(
+        model.tokenizer = Qwen2Tokenizer.from_pretrained(
             base_model_name,
             subfolder="tokenizer",
         )
 
-        t5_tokenizer = T5TokenizerFast.from_pretrained(
+        model.t5_tokenizer = T5TokenizerFast.from_pretrained(
             base_model_name,
             subfolder="t5_tokenizer",
         )
 
-        noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
+        model.noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
             base_model_name,
             subfolder="scheduler",
         )
 
-        text_encoder = self._load_transformers_sub_module(
+        model.text_encoder, model.materialize_fn["text_encoder"] = self._load_text_encoder(
             Qwen3Model,
             weight_dtypes.text_encoder,
             weight_dtypes.fallback_train_dtype,
             base_model_name,
             "text_encoder",
+            stream_from_disk=stream_from_disk,
         )
 
         # conditioner is always bfloat16 — small adapter, no user dtype control
-        text_conditioner = AnimaTextConditioner.from_pretrained(
+        model.text_conditioner = AnimaTextConditioner.from_pretrained(
             base_model_name,
             subfolder="text_conditioner",
             torch_dtype=torch.bfloat16,
         )
 
-        if vae_model_name: #TODO simplify
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKLQwenImage,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                vae_model_name,
-            )
-        else:
-            vae = self._load_diffusers_sub_module(
-                AutoencoderKLQwenImage,
-                weight_dtypes.vae,
-                weight_dtypes.train_dtype,
-                base_model_name,
-                "vae",
-            )
+        model.vae = self._load_vae(
+            AutoencoderKLQwenImage,
+            weight_dtypes.vae,
+            weight_dtypes.train_dtype,
+            base_model_name,
+            vae_model_name,
+        )
 
-        if transformer_model_name:
-            transformer = CosmosTransformer3DModel.from_single_file(
-                transformer_model_name,
-                config=base_model_name,
-                subfolder="transformer",
-                #avoid loading the transformer in float32:
-                torch_dtype=torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype(),
-                quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16) if weight_dtypes.transformer.is_gguf() else None,
-            )
-            transformer = self._convert_diffusers_sub_module_to_dtype(
-                transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization,
-            )
-        else:
-            transformer = self._load_diffusers_sub_module(
-                CosmosTransformer3DModel,
-                weight_dtypes.transformer,
-                weight_dtypes.train_dtype,
-                base_model_name,
-                "transformer",
-                quantization,
-            )
-
-        model.model_type = model_type
-        model.tokenizer = tokenizer
-        model.t5_tokenizer = t5_tokenizer
-        model.noise_scheduler = noise_scheduler
-        model.text_encoder = text_encoder
-        model.text_conditioner = text_conditioner
-        model.vae = vae
-        model.transformer = transformer
+        model.transformer, model.materialize_fn["transformer"] = self._load_transformer(
+            CosmosTransformer3DModel,
+            weight_dtypes,
+            base_model_name,
+            transformer_model_name,
+            quantization,
+            config=base_model_name,
+            stream_from_disk=stream_from_disk,
+        )
 
     def load( #TODO share code between models
             self,
@@ -140,12 +114,14 @@ class AnimaModelLoader(
             model_names: ModelNames,
             weight_dtypes: ModelWeightDtypes,
             quantization: QuantizationConfig,
+            stream_from_disk: bool = False,
     ):
         stacktraces = []
 
         try:
             self.__load_internal(
                 model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model, quantization,
+                stream_from_disk,
             )
             return
         except Exception:
@@ -154,6 +130,7 @@ class AnimaModelLoader(
         try:
             self.__load_diffusers(
                 model, model_type, weight_dtypes, model_names.base_model, model_names.transformer_model, model_names.vae_model, quantization,
+                stream_from_disk,
             )
             return
         except Exception:
