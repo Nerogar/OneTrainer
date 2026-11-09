@@ -90,7 +90,8 @@ All functionality is split into different scripts located in the `scripts` direc
 
 -   `train.py` The central training script
 -   `train_ui.py` A UI for training
--   `caption_ui.py` A UI for manual or automatic captioning and mask creation for masked training
+-   `caption_ui.py` The Qt UI for manual or automatic captioning and mask creation for masked training
+-   `caption_ui_ctk.py` The retained CustomTkinter captioning and masking UI
 -   `convert_model_ui.py` A UI for model conversions
 -   `convert_model.py` A utility to convert between different model formats
 -   `sample.py` A utility to sample any model
