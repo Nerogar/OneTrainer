@@ -85,6 +85,8 @@ class GenericTrainer(BaseTrainer):
         self.model = None
         self.one_step_trained = False
         self.grad_hook_handles = []
+        self.__early_stopping_loss: float | None = None
+        self.__early_stopping_epoch = 0
 
     def start(self):
         if self.config.validation:
@@ -423,14 +425,32 @@ class GenericTrainer(BaseTrainer):
                                             total_loss / tag_counts[tag],
                                             train_progress.global_step)
 
-            if concept_task_counts and (report_per_concept or len(concept_task_counts) > 1):
+            if concept_task_counts:
                 total_loss = sum(accumulated_loss_per_concept_task[key] for key in concept_task_counts)
                 total_count = sum(concept_task_counts[key] for key in concept_task_counts)
                 total_average_loss = total_loss / total_count
 
-                self.tensorboard.add_scalar("loss/avg_val_loss" if report_per_concept else "loss/validation_step/total_average",
-                                            total_average_loss,
-                                            train_progress.global_step)
+                if report_per_concept or len(concept_task_counts) > 1:
+                    self.tensorboard.add_scalar("loss/avg_val_loss" if report_per_concept else "loss/validation_step/total_average",
+                                                total_average_loss,
+                                                train_progress.global_step)
+
+                self.__check_early_stopping(total_average_loss, train_progress)
+
+    def __check_early_stopping(self, loss: float, train_progress: TrainProgress):
+        if not self.config.validation or self.config.early_stopping_patience <= 0 or not math.isfinite(loss):
+            return
+
+        delta = self.config.early_stopping_min_delta or 0.0
+        if self.__early_stopping_loss is None or loss < self.__early_stopping_loss - delta:
+            self.__early_stopping_loss = loss
+            self.__early_stopping_epoch = train_progress.epoch
+        elif train_progress.epoch - self.__early_stopping_epoch >= self.config.early_stopping_patience:
+            tqdm.write(f"Early stopping: validation loss has not improved for {self.config.early_stopping_patience} epochs.")
+            if multi.is_enabled():
+                multi.global_commands.stop()
+            else:
+                self.commands.stop()
 
     def __save_backup_config(self, backup_path):
         config_path = os.path.join(backup_path, "onetrainer_config")

@@ -505,6 +505,8 @@ class TrainConfig(BaseConfig):
     validation_report_per_concept: bool
     validate_after: float
     validate_after_unit: TimeUnit
+    early_stopping_patience: int
+    early_stopping_min_delta: float | None
     continue_last_backup: bool
     prevent_overwrites: bool
     auto_correct_input: bool
@@ -1244,6 +1246,8 @@ class TrainConfig(BaseConfig):
         data.append(("validation_report_per_concept", False, bool, False))
         data.append(("validate_after", 1, int, False))
         data.append(("validate_after_unit", TimeUnit.EPOCH, TimeUnit, False))
+        data.append(("early_stopping_patience", 0, int, False))
+        data.append(("early_stopping_min_delta", None, float, True))
         data.append(("continue_last_backup", False, bool, False))
         data.append(("prevent_overwrites", False, bool, False))
         data.append(("auto_correct_input", True, bool, False))
