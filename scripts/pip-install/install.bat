@@ -235,18 +235,6 @@ echo Activating virtual environment...
 call "%VENV_DIR%\Scripts\activate.bat"
 echo Virtual environment activated.
 
-rem  Check for Tkinter
-echo %CYAN%Checking for Tkinter availability...%RESET%
-python -c "import tkinter,sys; sys.exit(0 if hasattr(tkinter,'TkVersion') else 1)" >nul 2>&1
-if not errorlevel 1 goto :tk_ok
-
-echo %RED%Tkinter not found%RESET%
-call :die "Re-run the Python installer and enable 'tcl/tk and IDLE' (its enabled by default on fresh installations, re-enable/dont turn it off)"
-goto :EOF
-
-:tk_ok
-echo %GRN%Tkinter is available, proceeding ... %RESET%
-
 rem 5) Upgrade pip & install
 echo.
 echo %CYAN%Upgrading pip and installing dependencies from requirements.txt...%RESET%

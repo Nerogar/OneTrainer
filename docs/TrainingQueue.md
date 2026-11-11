@@ -1,6 +1,6 @@
 # Training queue generator
 
-You can open this by navigating to the Tools tab then clicking **Training Queue**. This tool is only available in Pyside UI as CTK is effectively defunct.
+You can open this by navigating to the Tools tab then clicking **Training Queue**.
 
 The generator writes a `.bat` or `.sh` containing ordinary
 `python scripts/train.py --config-path ...` commands. Run that script to train.
