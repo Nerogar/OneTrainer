@@ -1,3 +1,6 @@
+
+from abc import ABC, abstractmethod
+
 from modules.ui.ModelTabController import ModelTabController
 from modules.util import path_util
 from modules.util.enum.ConfigPart import ConfigPart
@@ -5,44 +8,20 @@ from modules.util.enum.DataType import DataType
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.RunNameMode import RunNameMode
 from modules.util.ui import pyside6_components
+from modules.util.ui.pyside6_util import QtABCMeta
 
 from huggingface_hub.constants import HF_HUB_CACHE
 from PySide6.QtWidgets import QWidget
 
 
-class ModelTabView(QWidget):
+class BaseModelTabView(ABC):
+    def __init__(self, components):
+        self.components = components
 
-    def __init__(self, master, controller: ModelTabController, ui_state):
-        QWidget.__init__(self, master)
-        self.components = pyside6_components
-
-        self.master = master
-        self.controller = controller
-        self.ui_state = ui_state
-        self.scroll_frame = None
-        self.refresh_ui()
-
+    @abstractmethod
     def _make_svd_frames(self, parent, row: int):
-        svd_label_frame = QWidget(parent)
-        pyside6_components._layout(parent).addWidget(svd_label_frame, row, 3)
-        svd_entry_frame = QWidget(parent)
-        pyside6_components._layout(parent).addWidget(svd_entry_frame, row, 4)
-        return svd_label_frame, svd_entry_frame
-
-    def refresh_ui(self):
-        if self.scroll_frame is not None:
-            self.scroll_frame.hide()
-            self.scroll_frame.deleteLater()
-
-        scroll, frame = pyside6_components.scrollable_frame(self)
-        pyside6_components._layout(self).addWidget(scroll, 0, 0)
-        self.scroll_frame = scroll
-
-        frame_lo = pyside6_components._layout(frame)
-        frame_lo.setColumnStretch(1, 10)
-        frame_lo.setColumnStretch(4, 1)
-
-        self.build_content(frame, self.controller, self.ui_state)
+        # Create and place SVDQuant label+entry subframes; return (label_frame, entry_frame).
+        pass
 
     def build_content(self, frame, controller, ui_state):
         model_type = controller.train_config.model_type
@@ -468,3 +447,38 @@ class ModelTabView(QWidget):
         row += 1
 
         return row
+
+
+class ModelTabView(BaseModelTabView, QWidget, metaclass=QtABCMeta):
+
+    def __init__(self, master, controller: ModelTabController, ui_state):
+        QWidget.__init__(self, master)
+        BaseModelTabView.__init__(self, pyside6_components)
+
+        self.master = master
+        self.controller = controller
+        self.ui_state = ui_state
+        self.scroll_frame = None
+        self.refresh_ui()
+
+    def _make_svd_frames(self, parent, row: int):
+        svd_label_frame = QWidget(parent)
+        pyside6_components._layout(parent).addWidget(svd_label_frame, row, 3)
+        svd_entry_frame = QWidget(parent)
+        pyside6_components._layout(parent).addWidget(svd_entry_frame, row, 4)
+        return svd_label_frame, svd_entry_frame
+
+    def refresh_ui(self):
+        if self.scroll_frame is not None:
+            self.scroll_frame.hide()
+            self.scroll_frame.deleteLater()
+
+        scroll, frame = pyside6_components.scrollable_frame(self)
+        pyside6_components._layout(self).addWidget(scroll, 0, 0)
+        self.scroll_frame = scroll
+
+        frame_lo = pyside6_components._layout(frame)
+        frame_lo.setColumnStretch(1, 10)
+        frame_lo.setColumnStretch(4, 1)
+
+        self.build_content(frame, self.controller, self.ui_state)

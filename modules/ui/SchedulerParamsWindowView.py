@@ -1,4 +1,5 @@
-from modules.ui.ConfigListView import ConfigListView
+
+from modules.ui.ConfigListView import BaseConfigListView, ConfigListView
 from modules.ui.SchedulerParamsWindowController import KvParamsController, SchedulerParamsWindowController
 from modules.util.ui import pyside6_components
 from modules.util.ui.PySide6UIState import PySide6UIState
@@ -6,7 +7,26 @@ from modules.util.ui.PySide6UIState import PySide6UIState
 from PySide6.QtWidgets import QDialog, QGridLayout, QPushButton, QScrollArea, QWidget
 
 
-class KvParamsView(ConfigListView):
+class BaseSchedulerParamsWindowView:
+    def __init__(self, components):
+        self.components = components
+
+    def build_content(self, master, controller, ui_state):
+        if controller.is_custom_scheduler():
+            self.components.label(master, 0, 0, "Class Name",
+                                  tooltip="Python class module and name for the custom scheduler class, in the form of <module>.<class_name>.")
+            self.components.entry(master, 0, 1, ui_state, "custom_learning_rate_scheduler")
+
+
+class BaseKvParamsView(BaseConfigListView):
+    def __init__(self, components):
+        self.components = components
+
+    def open_element_window(self, i, ui_state):
+        pass
+
+
+class KvParamsView(ConfigListView, BaseKvParamsView):
     def __init__(self, master, controller: KvParamsController, ui_state):
         ConfigListView.__init__(
             self, master, controller, ui_state,
@@ -15,16 +35,13 @@ class KvParamsView(ConfigListView):
             add_button_text="add parameter",
             is_full_width=True,
         )
-        self.components = pyside6_components
+        BaseKvParamsView.__init__(self, pyside6_components)
 
     def refresh_ui(self):
         self._create_element_list()
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
         return KvWidget(master, element, i, open_command, remove_command, clone_command, save_command)
-
-    def open_element_window(self, i, ui_state):
-        pass
 
 
 class KvWidget(QWidget):
@@ -61,10 +78,10 @@ class KvWidget(QWidget):
         self.deleteLater()
 
 
-class SchedulerParamsWindowView(QDialog):
+class SchedulerParamsWindowView(BaseSchedulerParamsWindowView, QDialog):
     def __init__(self, parent, controller: SchedulerParamsWindowController, ui_state):
         QDialog.__init__(self, parent)
-        self.components = pyside6_components
+        BaseSchedulerParamsWindowView.__init__(self, pyside6_components)
 
         # delete on close so entry widgets and the field validators they register globally are freed, not leaked
         self.finished.connect(self.deleteLater)
@@ -96,9 +113,3 @@ class SchedulerParamsWindowView(QDialog):
         ok = QPushButton("ok", self)
         ok.clicked.connect(self.accept)
         outer.addWidget(ok, 1, 0)
-
-    def build_content(self, master, controller, ui_state):
-        if controller.is_custom_scheduler():
-            self.components.label(master, 0, 0, "Class Name",
-                                  tooltip="Python class module and name for the custom scheduler class, in the form of <module>.<class_name>.")
-            self.components.entry(master, 0, 1, ui_state, "custom_learning_rate_scheduler")

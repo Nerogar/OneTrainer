@@ -1,3 +1,4 @@
+
 from modules.ui.SampleFrameController import SampleFrameController
 from modules.ui.SampleFrameView import SampleFrameView
 from modules.ui.SampleParamsWindowController import SampleParamsWindowController
@@ -6,10 +7,15 @@ from modules.util.ui import pyside6_components
 from PySide6.QtWidgets import QDialog, QGridLayout, QPushButton, QWidget
 
 
-class SampleParamsWindowView(QDialog):
+class BaseSampleParamsWindowView:
+    def __init__(self, components):
+        self.components = components
+
+
+class SampleParamsWindowView(BaseSampleParamsWindowView, QDialog):
     def __init__(self, parent, controller: SampleParamsWindowController, ui_state):
         QDialog.__init__(self, parent if isinstance(parent, QWidget) else None)
-        self.components = pyside6_components
+        BaseSampleParamsWindowView.__init__(self, pyside6_components)
 
         self.setWindowTitle("Sample")
         self.resize(800, 500)

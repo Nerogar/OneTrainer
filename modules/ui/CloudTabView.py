@@ -1,50 +1,33 @@
+
+from abc import ABC, abstractmethod
+
 from modules.ui.CloudTabController import CloudTabController
 from modules.util.enum.CloudAction import CloudAction
 from modules.util.enum.CloudFileSync import CloudFileSync
 from modules.util.enum.CloudType import CloudType
 from modules.util.ui import pyside6_components
+from modules.util.ui.pyside6_util import QtABCMeta
 
 from PySide6.QtWidgets import QWidget
 
 
-class CloudTabView(QWidget):
-
-    def __init__(self, master, controller: CloudTabController, ui_state):
-        QWidget.__init__(self, master)
-        self.components = pyside6_components
+class BaseCloudTabView(ABC):
+    def __init__(self, components, controller):
+        self.components = components
         self.controller = controller
-
-        self.ui_state = ui_state
-
-        scroll, frame = pyside6_components.scrollable_frame(self)
-        pyside6_components._layout(self).addWidget(scroll, 0, 0)
-        lo = pyside6_components._layout(frame)
-        lo.setColumnStretch(1, 1)
-        lo.setColumnStretch(3, 1)
-        lo.setColumnStretch(5, 1)
-        self.frame = frame
-
-        self.build_content(frame, controller, ui_state)
-
-    def _on_set_gpu_types(self):
-        self.gpu_types_menu.clear()
-        self.gpu_types_menu.addItems(self.controller.get_gpu_types())
-
-    def _make_reattach_frame(self, frame):
-        reattach_frame = QWidget(frame)
-        pyside6_components._layout(frame).addWidget(reattach_frame, 9, 3)
-        pyside6_components._layout(reattach_frame).setColumnStretch(0, 1)
-        return reattach_frame
-
-    def _make_create_frame(self, frame):
-        create_frame = QWidget(frame)
-        pyside6_components._layout(frame).addWidget(create_frame, 1, 5)
-        pyside6_components._layout(create_frame).setColumnStretch(1, 1)
-        return create_frame
 
     @property
     def reattach(self):
         return self.controller.reattach
+
+    @abstractmethod
+    def _make_reattach_frame(self, frame): pass
+
+    @abstractmethod
+    def _make_create_frame(self, frame): pass
+
+    @abstractmethod
+    def _on_set_gpu_types(self): pass
 
     def build_content(self, frame, controller, ui_state):
         self.components.label(frame, 0, 0, "Enabled",
@@ -205,3 +188,38 @@ class CloudTabView(QWidget):
             ("Stop", CloudAction.STOP),
             ("Delete", CloudAction.DELETE),
         ], ui_state, "cloud.on_detached_error")
+
+
+class CloudTabView(BaseCloudTabView, QWidget, metaclass=QtABCMeta):
+
+    def __init__(self, master, controller: CloudTabController, ui_state):
+        QWidget.__init__(self, master)
+        BaseCloudTabView.__init__(self, pyside6_components, controller)
+
+        self.ui_state = ui_state
+
+        scroll, frame = pyside6_components.scrollable_frame(self)
+        pyside6_components._layout(self).addWidget(scroll, 0, 0)
+        lo = pyside6_components._layout(frame)
+        lo.setColumnStretch(1, 1)
+        lo.setColumnStretch(3, 1)
+        lo.setColumnStretch(5, 1)
+        self.frame = frame
+
+        self.build_content(frame, controller, ui_state)
+
+    def _on_set_gpu_types(self):
+        self.gpu_types_menu.clear()
+        self.gpu_types_menu.addItems(self.controller.get_gpu_types())
+
+    def _make_reattach_frame(self, frame):
+        reattach_frame = QWidget(frame)
+        pyside6_components._layout(frame).addWidget(reattach_frame, 9, 3)
+        pyside6_components._layout(reattach_frame).setColumnStretch(0, 1)
+        return reattach_frame
+
+    def _make_create_frame(self, frame):
+        create_frame = QWidget(frame)
+        pyside6_components._layout(frame).addWidget(create_frame, 1, 5)
+        pyside6_components._layout(create_frame).setColumnStretch(1, 1)
+        return create_frame

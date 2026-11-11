@@ -30,13 +30,13 @@ from huggingface_hub import parse_hf_uri
 from huggingface_hub.errors import GatedRepoError
 
 if TYPE_CHECKING:
-    from modules.ui.TrainUIView import TrainView
+    from modules.ui.TrainUIView import BaseTrainUIView
 
 
 class TrainUIController:
     def __init__(self, config: TrainConfig):
         self.train_config = config
-        self.view: TrainView | None = None
+        self.view: BaseTrainUIView | None = None
 
         self.training_thread = None
         self.training_callbacks: TrainCallbacks | None = None

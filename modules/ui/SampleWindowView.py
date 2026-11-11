@@ -1,3 +1,4 @@
+
 import threading
 
 from modules.modelSampler.BaseModelSampler import (
@@ -7,6 +8,7 @@ from modules.ui.SampleFrameController import SampleFrameController
 from modules.ui.SampleFrameView import SampleFrameView
 from modules.ui.SampleWindowController import SampleWindowController
 from modules.util.enum.FileType import FileType
+from modules.util.ui import pyside6_components
 from modules.util.ui.PySide6UIState import PySide6UIState
 
 from PIL.ImageQt import ImageQt
@@ -15,9 +17,15 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QDialog, QGridLayout, QLabel, QProgressBar, QPushButton
 
 
-class SampleWindowView(QDialog):
+class BaseSampleWindowView:
+    def __init__(self, components):
+        pass
+
+
+class SampleWindowView(BaseSampleWindowView, QDialog):
     def __init__(self, parent, controller: SampleWindowController):
         QDialog.__init__(self, parent)
+        BaseSampleWindowView.__init__(self, pyside6_components)
 
         self.setWindowTitle("Sample")
         self.resize(1200, 800)

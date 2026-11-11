@@ -1,4 +1,5 @@
 import contextlib
+from abc import abstractmethod
 
 from modules.ui.ProfilingWindowController import ProfilingWindowController
 from modules.util.ui import pyside6_components
@@ -7,10 +8,30 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QGridLayout, QWidget
 
 
-class ProfilingWindowView(QWidget):
+class BaseProfilingWindowView:
+    def __init__(self, components):
+        self.components = components
+
+    def build_content(self, frame, bottom_bar, controller):
+        self.components.button(frame, 0, 0, "Dump stack", controller.dump_stack)
+        self._profile_button = self.components.button(
+            frame, 1, 0, "Start Profiling", controller.start_profiler,
+            tooltip="Turns on/off Scalene profiling. Only works when OneTrainer is launched with Scalene!")
+        self._message_label = self.components.label(bottom_bar, 0, 0, "Inactive")
+
+    @abstractmethod
+    def set_message(self, text):
+        pass
+
+    @abstractmethod
+    def set_profiling_active(self, active):
+        pass
+
+
+class ProfilingWindowView(BaseProfilingWindowView, QWidget):
     def __init__(self, parent, controller: ProfilingWindowController):
         QWidget.__init__(self, parent, Qt.WindowType.Window)
-        self.components = pyside6_components
+        BaseProfilingWindowView.__init__(self, pyside6_components)
 
         self._controller = controller
 
@@ -46,10 +67,3 @@ class ProfilingWindowView(QWidget):
     def closeEvent(self, event):
         event.ignore()
         self.hide()
-
-    def build_content(self, frame, bottom_bar, controller):
-        self.components.button(frame, 0, 0, "Dump stack", controller.dump_stack)
-        self._profile_button = self.components.button(
-            frame, 1, 0, "Start Profiling", controller.start_profiler,
-            tooltip="Turns on/off Scalene profiling. Only works when OneTrainer is launched with Scalene!")
-        self._message_label = self.components.label(bottom_bar, 0, 0, "Inactive")

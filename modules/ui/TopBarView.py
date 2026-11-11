@@ -1,4 +1,5 @@
 import os
+from abc import abstractmethod
 from collections.abc import Callable
 
 from modules.ui.TopBarController import TopBarController
@@ -22,75 +23,37 @@ def preset_name_from_filename(filename: str) -> str | None:
     return os.path.splitext(basename)[0]
 
 
-class TopBarView(QWidget):
+class BaseTopBarView:
+    def __init__(self, components):
+        self.components = components
 
-    def __init__(
-            self,
-            master,
-            controller: TopBarController,
-            ui_state,
-            change_model_type_callback: Callable[[ModelType], None],
-            change_training_method_callback: Callable[[TrainingMethod], None],
-            load_preset_callback: Callable[[], None],
-    ):
-        QWidget.__init__(self, master)
-        self.components = pyside6_components
-
-        self.frame = QWidget(self)
-        pyside6_components._layout(self).addWidget(self.frame, 0, 0)
-        pyside6_components._layout(self.frame).setContentsMargins(
-            pyside6_components.PAD, pyside6_components.PAD,
-            pyside6_components.PAD, pyside6_components.PAD,
-        )
-
-        self.build(self.frame, master, controller, ui_state,
-                   change_model_type_callback, change_training_method_callback, load_preset_callback)
-
-        # Theme toggle; the glyph follows the palette's ButtonText.
-        self.theme_button = pyside6_components.button(
-            self.frame, 0, 8, "◐", get_theme_controller().toggle,
-            tooltip="Switch between light and dark mode", sticky="v",
-        )
-        # Use an empty button's height for a fixed square size, independent of glyph metrics.
-        side = QPushButton().sizeHint().height()
-        self.theme_button.setFixedSize(side, side)
-
+    @abstractmethod
     def _setup_frame_column_weight(self):
-        pyside6_components._layout(self.frame).setColumnStretch(5, 1)
+        pass
 
+    @abstractmethod
+    def _forget_dropdown(self, widget):
+        pass
+
+    @abstractmethod
+    def _show_save_dialog(self, initial_dir: str, callback):
+        pass
+
+    @abstractmethod
+    def _show_open_dialog(self, initial_dir: str, callback):
+        pass
+
+    @abstractmethod
     def _show_config_error(self, message: str):
-        QMessageBox.critical(self, "Cannot Load Config", message)
+        pass
+
+    # PySide6 overrides these hooks to display the preset name.
 
     def _init_preset_display(self):
-        # the "Load Preset" button doubles as the display of current preset
-        self.preset_button.setToolTip("Load a preset")
+        pass
 
     def _set_preset_text(self, text: str):
-        # empty means nothing is loaded
-        label = text or "Load Preset"
-        # limit width
-        label = self.preset_button.fontMetrics().elidedText(label, Qt.TextElideMode.ElideRight, 240)
-        self.preset_button.setText(label.replace("&", "&&"))
-        self.preset_button.setToolTip(f"Load a preset\n{text}" if text else "Load a preset")
-
-    def _forget_dropdown(self, widget):
-        lo = pyside6_components._layout(self.frame)
-        lo.removeWidget(widget)
-        widget.hide()
-        widget.deleteLater()
-
-    def _show_save_dialog(self, initial_dir: str, callback):
-        path, _ = QFileDialog.getSaveFileName(self, "Save config", initial_dir, "JSON (*.json)")
-        if path:
-            # the native dialog doesn't reliably append the filter's extension on every platform
-            if not path.endswith(".json"):
-                path += ".json"
-            callback(path)
-
-    def _show_open_dialog(self, initial_dir: str, callback):
-        path, _ = QFileDialog.getOpenFileName(self, "Load config", initial_dir, "JSON (*.json)")
-        if path:
-            callback(path)
+        pass
 
     def build(
             self,
@@ -225,3 +188,74 @@ class TopBarView(QWidget):
 
     def save_default(self):
         self.controller.save_default()
+
+
+class TopBarView(BaseTopBarView, QWidget):
+
+    def __init__(
+            self,
+            master,
+            controller: TopBarController,
+            ui_state,
+            change_model_type_callback: Callable[[ModelType], None],
+            change_training_method_callback: Callable[[TrainingMethod], None],
+            load_preset_callback: Callable[[], None],
+    ):
+        QWidget.__init__(self, master)
+        BaseTopBarView.__init__(self, pyside6_components)
+
+        self.frame = QWidget(self)
+        pyside6_components._layout(self).addWidget(self.frame, 0, 0)
+        pyside6_components._layout(self.frame).setContentsMargins(
+            pyside6_components.PAD, pyside6_components.PAD,
+            pyside6_components.PAD, pyside6_components.PAD,
+        )
+
+        self.build(self.frame, master, controller, ui_state,
+                   change_model_type_callback, change_training_method_callback, load_preset_callback)
+
+        # PySide6-only theme toggle; the glyph follows the palette's ButtonText.
+        self.theme_button = pyside6_components.button(
+            self.frame, 0, 8, "◐", get_theme_controller().toggle,
+            tooltip="Switch between light and dark mode", sticky="v",
+        )
+        # Use an empty button's height for a fixed square size, independent of glyph metrics.
+        side = QPushButton().sizeHint().height()
+        self.theme_button.setFixedSize(side, side)
+
+    def _setup_frame_column_weight(self):
+        pyside6_components._layout(self.frame).setColumnStretch(5, 1)
+
+    def _show_config_error(self, message: str):
+        QMessageBox.critical(self, "Cannot Load Config", message)
+
+    def _init_preset_display(self):
+        # the "Load Preset" button doubles as the display of current preset
+        self.preset_button.setToolTip("Load a preset")
+
+    def _set_preset_text(self, text: str):
+        # empty means nothing is loaded
+        label = text or "Load Preset"
+        # limit width
+        label = self.preset_button.fontMetrics().elidedText(label, Qt.TextElideMode.ElideRight, 240)
+        self.preset_button.setText(label.replace("&", "&&"))
+        self.preset_button.setToolTip(f"Load a preset\n{text}" if text else "Load a preset")
+
+    def _forget_dropdown(self, widget):
+        lo = pyside6_components._layout(self.frame)
+        lo.removeWidget(widget)
+        widget.hide()
+        widget.deleteLater()
+
+    def _show_save_dialog(self, initial_dir: str, callback):
+        path, _ = QFileDialog.getSaveFileName(self, "Save config", initial_dir, "JSON (*.json)")
+        if path:
+            # the native dialog doesn't reliably append the filter's extension on every platform
+            if not path.endswith(".json"):
+                path += ".json"
+            callback(path)
+
+    def _show_open_dialog(self, initial_dir: str, callback):
+        path, _ = QFileDialog.getOpenFileName(self, "Load config", initial_dir, "JSON (*.json)")
+        if path:
+            callback(path)

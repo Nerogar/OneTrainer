@@ -1,15 +1,23 @@
 import threading
 import traceback
+from abc import ABC, abstractmethod
 
 from modules.ui.GenerateCaptionsWindowController import GenerateCaptionsWindowController
 from modules.util.ui import pyside6_components
+from modules.util.ui.pyside6_util import QtABCMeta
 from modules.util.ui.PySide6UIState import PySide6UIState
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QDialog, QFileDialog, QLineEdit, QPushButton, QWidget
 
 
-class GenerateCaptionsWindowView(QDialog):
+class BaseGenerateCaptionsWindowView(ABC):
+    @abstractmethod
+    def set_progress(self, value, max_value):
+        pass
+
+
+class GenerateCaptionsWindowView(BaseGenerateCaptionsWindowView, QDialog, metaclass=QtABCMeta):
     def __init__(self, parent, controller: GenerateCaptionsWindowController, path, parent_include_subdirectories):
         QDialog.__init__(self, parent)
         self.controller = controller

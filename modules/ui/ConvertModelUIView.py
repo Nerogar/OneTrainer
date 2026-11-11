@@ -10,43 +10,9 @@ from modules.util.ui.PySide6UIState import PySide6UIState
 from PySide6.QtWidgets import QDialog, QGridLayout, QWidget
 
 
-class ConvertModelUIView(QDialog):
-    def __init__(self, parent, controller: ConvertModelUIController):
-        QDialog.__init__(self, parent)
-        self.components = pyside6_components
-
-        self.controller = controller
-        self.ui_state = PySide6UIState(controller.convert_model_args)
-        self._dynamic_frame = None
-
-        self.setWindowTitle("Convert models")
-        self.resize(600, 380)
-
-        _pad = pyside6_components.PAD
-        outer = QGridLayout(self)
-        outer.setContentsMargins(_pad, _pad, _pad, _pad)
-
-        self._frame = QWidget(self)
-        self._layout = pyside6_components._layout(self._frame)
-        self._layout.setColumnStretch(1, 1)
-        outer.addWidget(self._frame, 0, 0)
-
-        self.build_content(self._frame, controller, self.ui_state, self._rebuild_dynamic_ui)
-        self._rebuild_dynamic_ui()
-        self._layout.setRowStretch(self._layout.rowCount(), 1)
-
-    def _rebuild_dynamic_ui(self, *args):
-        if self._dynamic_frame is not None:
-            self._dynamic_frame.hide()
-            self._dynamic_frame.deleteLater()
-
-        self._dynamic_frame = QWidget(self._frame)
-        self._layout.addWidget(self._dynamic_frame, 4, 0, 1, 2)
-
-        self.build_dynamic_content(self._dynamic_frame, self.controller, self.ui_state)
-
-    def set_converting(self, active):
-        self.button.setEnabled(not active)
+class BaseConvertModelUIView:
+    def __init__(self, components):
+        self.components = components
 
     def build_content(self, frame, controller, ui_state, on_model_or_method_change):
         # model type
@@ -137,3 +103,42 @@ class ConvertModelUIView(QDialog):
         self.components.label(frame, row, 0, "Output Format",
                          tooltip="Format to use when saving the output model")
         self.components.options_kv(frame, row, 1, controller.get_output_formats(), ui_state, "output_model_format")
+
+
+class ConvertModelUIView(BaseConvertModelUIView, QDialog):
+    def __init__(self, parent, controller: ConvertModelUIController):
+        QDialog.__init__(self, parent)
+        BaseConvertModelUIView.__init__(self, pyside6_components)
+
+        self.controller = controller
+        self.ui_state = PySide6UIState(controller.convert_model_args)
+        self._dynamic_frame = None
+
+        self.setWindowTitle("Convert models")
+        self.resize(600, 380)
+
+        _pad = pyside6_components.PAD
+        outer = QGridLayout(self)
+        outer.setContentsMargins(_pad, _pad, _pad, _pad)
+
+        self._frame = QWidget(self)
+        self._layout = pyside6_components._layout(self._frame)
+        self._layout.setColumnStretch(1, 1)
+        outer.addWidget(self._frame, 0, 0)
+
+        self.build_content(self._frame, controller, self.ui_state, self._rebuild_dynamic_ui)
+        self._rebuild_dynamic_ui()
+        self._layout.setRowStretch(self._layout.rowCount(), 1)
+
+    def _rebuild_dynamic_ui(self, *args):
+        if self._dynamic_frame is not None:
+            self._dynamic_frame.hide()
+            self._dynamic_frame.deleteLater()
+
+        self._dynamic_frame = QWidget(self._frame)
+        self._layout.addWidget(self._dynamic_frame, 4, 0, 1, 2)
+
+        self.build_dynamic_content(self._dynamic_frame, self.controller, self.ui_state)
+
+    def set_converting(self, active):
+        self.button.setEnabled(not active)
