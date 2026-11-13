@@ -93,6 +93,9 @@ cuda = [
 
 # Shared CUDA dependencies are in `cuda`; each CUDA version pins its own PyTorch pair.
 # The `extra-index-urls` options below select the corresponding CUDA wheels.
+# Triton 3.8 and 3.9, the versions these PyTorch versions require, make the 8-bit matmul spill
+# registers on sm_8x (https://github.com/triton-lang/triton/issues/12486). When upgrading to a
+# Triton version that fixes this, remove _skip_prefetch_pass() from modules/util/triton_mm_8bit.py
 cuda12 = [
     "onetrainer[cuda]",
     "torch==2.14.1",
