@@ -428,6 +428,13 @@ class BaseTrainingTabView(ABC):
                               extra_validate=validate_resolution())
         row += 1
 
+        if controller.config.model_type.is_stable_diffusion_xl():
+            self.components.label(frame, row, 0, "Caption Tokens",
+                                  tooltip="Maximum number of content tokens in each SDXL caption.")
+            self.components.options_kv(frame, row, 1, [(str(token_count), token_count) for token_count in (75, 150, 225)],
+                                       ui_state, "sdxl_max_caption_tokens")
+            row += 1
+
         # frames
         if video_training_enabled:
             self.components.label(frame, row, 0, "Frames",

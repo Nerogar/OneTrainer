@@ -20,6 +20,7 @@ class SampleArgs(BaseArgs):
     width: int
     destination: str
     text_encoder_layer_skip: int
+    sdxl_max_caption_tokens: int
     sample_inpainting: bool
     base_image_path:str
     mask_image_path:str
@@ -53,6 +54,7 @@ class SampleArgs(BaseArgs):
         parser.add_argument("--width", type=int, required=False, default=512, dest="width", help="Width of the image in pixel")
         parser.add_argument("--destination", type=str, required=True, dest="destination", help="The destination to save the output")
         parser.add_argument("--text-encoder-layer-skip", type=int, required=False, default=0, dest="text_encoder_layer_skip", help="Skip last layers of the text encoder")
+        parser.add_argument("--sdxl-max-caption-tokens", type=int, choices=(75, 150, 225), default=75, help="SDXL caption token limit")
         parser.add_argument("--sample-inpainting", action="store_true", required=False, default=False, dest="sample_inpainting", help="Enables inpainting sampling. Only available when sampling from an inpainting model.")
         parser.add_argument("--base-image-path", type=str, required=False, default="", dest="base_image_path", help="The base image used when inpainting")
         parser.add_argument("--mask-image-path", type=str, required=False, default="", dest="mask_image_path", help="The mask used when inpainting.")
@@ -78,6 +80,7 @@ class SampleArgs(BaseArgs):
         data.append(("width", 512, int, False))
         data.append(("destination", "", str, False))
         data.append(("text_encoder_layer_skip", 0, int, False))
+        data.append(("sdxl_max_caption_tokens", 75, int, False))
         data.append(("sample_inpainting", False, bool, False))
         data.append(("base_image_path", "", str, False))
         data.append(("mask_image_path", "", str, False))

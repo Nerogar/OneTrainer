@@ -67,6 +67,7 @@ def main():
                 "text_encoder_1_layer_skip": args.text_encoder_layer_skip,
                 "text_encoder_2_layer_skip": args.text_encoder_layer_skip,
                 "text_encoder_3_layer_skip": args.text_encoder_layer_skip,
+                "sdxl_max_caption_tokens": args.sdxl_max_caption_tokens,
                 "sample_inpainting": args.sample_inpainting,
                 "base_image_path": args.base_image_path,
                 "mask_image_path": args.mask_image_path,
