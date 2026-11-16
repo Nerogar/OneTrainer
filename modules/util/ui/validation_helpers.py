@@ -2,6 +2,16 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from modules.util.config.TrainConfig import parse_validation_timesteps
+
+
+def validate_validation_timesteps(value: str) -> str | None:
+    try:
+        parse_validation_timesteps(value)
+    except ValueError as e:
+        return str(e)
+    return None
+
 
 def validate_resolution() -> Callable[[str], str | None]:
     """Return a resolution validator."""
