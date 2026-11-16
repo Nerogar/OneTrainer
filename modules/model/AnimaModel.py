@@ -164,7 +164,8 @@ class AnimaModel(BaseModel):
             text_encoder_dropout_probability: float | None = None,
             text_encoder_output: Tensor = None,
     ) -> Tensor:
-        t5_ids = t5_mask = None
+        t5_ids = None
+        t5_mask = None
         # Two-stage encoding: Qwen3 text encoder → AnimaTextConditioner (with T5 token ids as queries).
         # text_encoder_output, when provided from cache, is already the conditioner output.
         if tokens is None and text is not None:
