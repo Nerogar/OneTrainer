@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from modules.ui.BaseConceptTabView import BaseConceptTabView, BaseConceptWidgetView
 from modules.ui.ConceptTabController import ConceptTabController
 from modules.ui.PySide6ConceptWindowView import PySide6ConceptWindowView
@@ -7,6 +9,7 @@ from modules.util.ui.PySide6UIState import PySide6UIState
 from modules.util.ui.QtVar import QtVar
 
 from PIL.ImageQt import ImageQt
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QWidget
 
@@ -38,6 +41,38 @@ class PySide6ConceptTabView(PySide6ConfigListView, BaseConceptTabView):
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
         return PySide6ConceptWidgetView(master, element, i, open_command, remove_command, clone_command, save_command, self.controller)
+
+    def _create_element_list_frame(self, master):
+        frame = super()._create_element_list_frame(master)
+        viewport = frame._scroll_area.viewport()
+        viewport._drop_filter = pyside6_components._FileDropFilter(
+            viewport, self._add_dropped_folders, Path.is_dir, multiple=True,
+        )
+        self.empty_label = QLabel(
+            "No concept populated for this config, meaning your training will have no data. "
+            "Click 'Add Concept' or drag a folder of images in to add a concept",
+            frame,
+        )
+        self.empty_label.setWordWrap(True)
+        self.empty_label.setAlignment(Qt.AlignCenter)
+        pyside6_components._layout(frame).addWidget(self.empty_label, 0, 0, 1, 7)
+        return frame
+
+    def _add_dropped_folders(self, paths):
+        for path in paths:
+            new_element = self.controller.create_new_element()
+            new_element.path = Path(path).as_posix()
+            self.current_config.append(new_element)
+        self.widgets_initialized = False
+        self._create_element_list()
+        self.save_current_config()
+
+    def _update_widget_visibility(self):
+        super()._update_widget_visibility()
+        self.empty_label.setVisible(not self.current_config)
+        layout = self.element_list.parentWidget().layout()
+        layout.setStretch(0, int(not self.current_config))
+        layout.setStretch(1, int(bool(self.current_config)))
 
     def _add_search_bar(self):
         toolbar = QWidget(self.top_frame)

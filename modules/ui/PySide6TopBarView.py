@@ -40,6 +40,9 @@ class PySide6TopBarView(BaseTopBarView, QWidget):
             self.frame, 0, 8, "◐", get_theme_controller().toggle,
             tooltip="Switch between light and dark mode", sticky="v",
         )
+        font = self.theme_button.font()
+        font.setPointSize(16)
+        self.theme_button.setFont(font)
         # Use an empty button's height for a fixed square size, independent of glyph metrics.
         side = QPushButton().sizeHint().height()
         self.theme_button.setFixedSize(side, side)
