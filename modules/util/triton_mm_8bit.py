@@ -7,6 +7,8 @@
 #dequant scale, a per-column one, a fused low-rank update. Triton specializes a None argument
 #as a constexpr, so each combination compiles to what a separate kernel per epilogue would.
 
+import threading
+
 from modules.util.tqdm_util import tqdm
 
 import torch
@@ -293,6 +295,8 @@ def _mm_kernel(
         xd_ptr=None, up_ptr=None, R=None, stride_xdm=None, stride_upr=None, stride_upn=None,
         BLOCK_R: tl.constexpr = None, R_TILES: tl.constexpr = None,
 ):
+    #compiled without Triton's sm_8x prefetch pass, see _skip_prefetch_pass. Changing this source
+    #also changes Triton's cache keys, so kernels compiled with the pass are not reused
     result, offs_cm, offs_cn = _mm_accumulate(
         a_ptr, b_ptr, M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn,
@@ -318,6 +322,37 @@ def _mm_kernel(
     _store_c(c_ptr, result.to(c_ptr.dtype.element_ty), offs_cm, offs_cn, M, N, stride_cm)
 
 announce_autotuning(_mm_kernel, name="8-bit matmul")
+
+
+#Since Triton 3.8, the prefetch pass (sm_8x only, i.e. Ampere and Ada) carries the 8-bit operands
+#of the next loop iteration one byte per register. _mm_kernel then spills and is ~30% slower:
+#https://github.com/triton-lang/triton/issues/12486. Skip the pass when compiling _mm_kernel
+def _skip_prefetch_pass(kernel_name: str):
+    try:
+        from triton._C.libtriton import passes
+        from triton.backends.nvidia.compiler import CUDABackend
+        add_prefetch = passes.ttgpuir.add_prefetch
+        make_ttgir = CUDABackend.make_ttgir
+    except (ImportError, AttributeError):
+        return
+
+    skip = threading.local()
+
+    def add_prefetch_unless_skipped(pm):
+        if not getattr(skip, "active", False):
+            add_prefetch(pm)
+
+    def make_ttgir_with_skip(mod, metadata, opt, capability):
+        skip.active = mod.get_entry_func_name() == kernel_name
+        try:
+            return make_ttgir(mod, metadata, opt, capability)
+        finally:
+            skip.active = False
+
+    passes.ttgpuir.add_prefetch = add_prefetch_unless_skipped
+    CUDABackend.make_ttgir = staticmethod(make_ttgir_with_skip)
+
+_skip_prefetch_pass("_mm_kernel")
 
 #Opaque custom ops work around pytorch#164124: torch.compile otherwise absorbs the traced
 #@triton.autotune kernels and freezes the config benchmarked for the first shape. Kept opaque,
