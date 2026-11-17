@@ -45,8 +45,9 @@ class PySide6FieldValidator(BaseFieldValidator):
         var_name: str,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
+        allow_empty: bool = False,
     ):
-        super().__init__(ui_state, var_name, extra_validate, required)
+        super().__init__(ui_state, var_name, extra_validate, required, allow_empty)
         self.component = component
         self.var = var
         self._original_style = component.styleSheet()
