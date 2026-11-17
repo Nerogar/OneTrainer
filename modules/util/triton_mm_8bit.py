@@ -90,8 +90,11 @@ announce_autotuning(_transpose_kernel, name="8-bit transpose")
 #(~205 -> ~275 TOPS) but the copy costs 2*K*N bytes of traffic regardless of M, so the rewrite
 #only pays above a token count. Breakeven is shape-dependent - measured on Ada (4070 Ti SUPER)
 #at ~1550 for the widest layers and below 512 for the attention projections - and the wrappers
-#see only M, so this takes the widest layer's breakeven and every shape wins above it
-_TRANSPOSE_MIN_M = 1536
+#see only M, so this takes the widest layer's breakeven and every shape wins above it.
+#On ROCm the rewrite never pays: with the 2-stage configs the n-major mm runs within ~5% of the
+#k-major one, so the copy is pure overhead - direct was faster or equal on every Flux2 backward
+#shape at 512px and 1024px on RDNA3 (7900 XTX) and RDNA4 (9060 XT, R9700)
+_TRANSPOSE_MIN_M = 1536 if torch.version.hip is None else float('inf')
 
 
 _AUTOTUNE_KEY = [
@@ -130,6 +133,18 @@ _AUTOTUNE_CONFIGS = [
     triton.Config({'BLOCK_SIZE_M':  64, 'BLOCK_SIZE_N':  64, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=5, num_warps=4),
     triton.Config({'BLOCK_SIZE_M':  32, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=4, num_warps=4),
     triton.Config({'BLOCK_SIZE_M':  32, 'BLOCK_SIZE_N':  64, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=5, num_warps=2),
+    #ROCm only: ROCm allocates (stages-1)*(BLOCK_M+BLOCK_N)*BLOCK_K bytes of LDS against a 64KB
+    #limit, so several of the configs above don't fit on RDNA and the rest pipeline too deep.
+    #These 2-stage configs were ~14% faster on RDNA4 (RX 9060 XT); they never won on Ada,
+    #where they would only lengthen autotuning
+    *([
+        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K':  64, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=4),
+        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K':  64, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=8),
+        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 256, 'BLOCK_SIZE_K':  64, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=8),
+        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=4),
+        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=8),
+        triton.Config({'BLOCK_SIZE_M':  64, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=4),
+    ] if torch.version.hip is not None else []),
 ]
 
 
@@ -237,7 +252,7 @@ def _prepare_mm(a: torch.Tensor, b: torch.Tensor, out_dtype: torch.dtype):
         #padding the storage of b keeps its layout, padding a transposed view would not
         b = torch.nn.functional.pad(b.t(), (0, pad)).t() if B_K_MAJOR else torch.nn.functional.pad(b, (0, 0, 0, pad))
         K += pad
-    #n-major B runs the mm ~30% slower; for large M a transpose copy pays for itself (see transpose_8bit)
+    #on Ada n-major B runs the mm ~30% slower; for large M a transpose copy pays for itself (see transpose_8bit)
     if not B_K_MAJOR and M >= _TRANSPOSE_MIN_M:
         b = transpose_8bit(b).t()
         B_K_MAJOR = True
