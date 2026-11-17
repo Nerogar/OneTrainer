@@ -14,12 +14,37 @@ from modules.util.ui.PySide6UIState import PySide6UIState
 from PIL.ImageQt import ImageQt
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QDialog, QGridLayout, QLabel, QProgressBar, QPushButton
+from PySide6.QtWidgets import QDialog, QGridLayout, QHBoxLayout, QLabel, QProgressBar, QPushButton, QWidget
 
 
 class BaseSampleWindowView:
     def __init__(self, components):
-        pass
+        self.components = components
+
+        # every image this window has shown, in arrival order, so the user can
+        # scroll back through a batch (or the whole session) with the nav arrows
+        self._gallery = []
+        self._gallery_index = -1
+
+    def gallery_add(self, image):
+        # a freshly produced image always becomes the shown one
+        self._gallery.append(image)
+        self._gallery_index = len(self._gallery) - 1
+
+    def gallery_step(self, delta):
+        self._gallery_index = max(0, min(len(self._gallery) - 1, self._gallery_index + delta))
+
+    @property
+    def gallery_current(self):
+        return self._gallery[self._gallery_index] if self._gallery else None
+
+    @property
+    def gallery_index(self):
+        return self._gallery_index
+
+    @property
+    def gallery_count(self):
+        return len(self._gallery)
 
 
 class SampleWindowView(BaseSampleWindowView, QDialog):
@@ -53,7 +78,20 @@ class SampleWindowView(BaseSampleWindowView, QDialog):
         self._image_label.setFixedSize(512, 512)
         self._image_label.setAlignment(Qt.AlignCenter)
         self._image_label.setStyleSheet("background: black;")
-        outer.addWidget(self._image_label, 1, 1, 3, 1)
+        outer.addWidget(self._image_label, 1, 1, 2, 1)
+
+        # gallery navigation, on the same row as the sample button
+        self._nav_widget = QWidget(self)
+        nav_layout = QHBoxLayout(self._nav_widget)
+        self._prev_button = QPushButton("◀", self._nav_widget)
+        self._prev_button.clicked.connect(lambda: self._step_gallery(-1))
+        self._counter_label = QLabel("", self._nav_widget)
+        self._next_button = QPushButton("▶", self._nav_widget)
+        self._next_button.clicked.connect(lambda: self._step_gallery(1))
+        nav_layout.addWidget(self._prev_button)
+        nav_layout.addWidget(self._counter_label)
+        nav_layout.addWidget(self._next_button)
+        outer.addWidget(self._nav_widget, 3, 1, alignment=Qt.AlignCenter)
 
         self._progress = QProgressBar(self)
         self._progress.setRange(0, 1000)
@@ -83,6 +121,8 @@ class SampleWindowView(BaseSampleWindowView, QDialog):
         sample_btn.clicked.connect(_on_sample)
         outer.addWidget(sample_btn, 3, 0)
 
+        self._render_gallery()
+
 
     def schedule_on_main_thread(self, fn):
         QTimer.singleShot(0, self, fn)
@@ -94,9 +134,24 @@ class SampleWindowView(BaseSampleWindowView, QDialog):
             self.schedule_on_main_thread(lambda: self._do_update_preview(image))
 
     def _do_update_preview(self, image):
-        pixmap = QPixmap.fromImage(ImageQt(image.convert("RGBA")))
-        self._image_label.setFixedSize(pixmap.size())
-        self._image_label.setPixmap(pixmap)
+        # gallery mutation runs on the main thread, so state stays consistent
+        self.gallery_add(image)
+        self._render_gallery()
+
+    def _step_gallery(self, delta):
+        self.gallery_step(delta)
+        self._render_gallery()
+
+    def _render_gallery(self):
+        image = self.gallery_current
+        if image is not None:
+            pixmap = QPixmap.fromImage(ImageQt(image.convert("RGBA")))
+            self._image_label.setFixedSize(pixmap.size())
+            self._image_label.setPixmap(pixmap)
+
+        self._counter_label.setText(f"{self.gallery_index + 1} / {self.gallery_count}")
+        self._prev_button.setEnabled(self.gallery_index > 0)
+        self._next_button.setEnabled(self.gallery_index < self.gallery_count - 1)
 
     def _update_progress(self, progress: int, max_progress: int):
         # Called from training thread — dispatch to main thread

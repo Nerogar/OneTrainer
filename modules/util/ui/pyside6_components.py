@@ -265,6 +265,7 @@ def entry(
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
         placeholder: str = "",
+        allow_empty: bool = False,
 ) -> QLineEdit:
     var = ui_state.get_var(var_name)
 
@@ -289,12 +290,14 @@ def entry(
             component, var, ui_state, var_name,
             extra_validate=extra_validate,
             required=required,
+            allow_empty=allow_empty,
         )
     else:
         validator = PySide6FieldValidator(
             component, var, ui_state, var_name,
             extra_validate=extra_validate,
             required=required,
+            allow_empty=allow_empty,
         )
     validator.display_name = component.accessibleName() or master.accessibleName() or var_name
     validator.attach()

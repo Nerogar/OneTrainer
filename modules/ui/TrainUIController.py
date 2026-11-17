@@ -115,6 +115,7 @@ class TrainUIController:
         else:
             tensorboard_args.append("--host=localhost")
 
+        # discard the child's banner and notices; the UI already shows the tensorboard URL.
         try:
             self.always_on_tensorboard_subprocess = TensorboardProcess(tensorboard_args)
         except Exception:

@@ -133,12 +133,14 @@ class BaseFieldValidator(ABC):
         var_name: str,
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
+        allow_empty: bool = False,
     ):
         self.ui_state = ui_state
         self.var_name = var_name
         self.display_name = var_name
         self._extra_validate = extra_validate
         self._required = required
+        self._allow_empty = allow_empty
         self._bound = False
 
     @abstractmethod
@@ -172,7 +174,7 @@ class BaseFieldValidator(ABC):
             if nullable:
                 return None
             if declared_type is str:
-                if default_val == "":
+                if default_val == "" or self._allow_empty:
                     return None
                 return "Value required"
             return None
