@@ -5,6 +5,7 @@ from collections.abc import Callable
 
 import modules.util.multi_gpu_util as multi
 from modules.model.BaseModel import BaseModel
+from modules.model.util.clip_chunk import validate_sdxl_caption_token_limit
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
 from modules.util import path_util
@@ -52,6 +53,15 @@ from mgds.pipelineModules.VariationSorting import VariationSorting
 import torch
 
 from diffusers import AutoencoderKL
+
+
+def sdxl_text_cache_dir(config: TrainConfig) -> str:
+    cache_dir = os.path.join(config.cache_dir, "text")
+    if config.model_type.is_stable_diffusion_xl():
+        token_limit = validate_sdxl_caption_token_limit(config.sdxl_max_caption_tokens)
+        if token_limit > 75:
+            cache_dir = os.path.join(cache_dir, f"sdxl-{token_limit}")
+    return cache_dir
 
 
 class DataLoaderText2ImageMixin(metaclass=ABCMeta):
@@ -333,7 +343,7 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
             before_cache_image_fun: Callable[[], None] | None = None,
     ):
         image_cache_dir = os.path.join(config.cache_dir, "image")
-        text_cache_dir = os.path.join(config.cache_dir, "text")
+        text_cache_dir = sdxl_text_cache_dir(config)
 
         if before_cache_image_fun is None:
             def prepare_vae():

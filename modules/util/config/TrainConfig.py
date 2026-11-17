@@ -490,6 +490,7 @@ class TrainConfig(BaseConfig):
     text_encoder_2: TrainModelPartConfig
     text_encoder_2_layer_skip: int
     text_encoder_2_sequence_length: int
+    sdxl_max_caption_tokens: int
 
     # text encoder 3
     text_encoder_3: TrainModelPartConfig
@@ -1160,6 +1161,7 @@ class TrainConfig(BaseConfig):
         data.append(("text_encoder_2", text_encoder_2, TrainModelPartConfig, False))
         data.append(("text_encoder_2_layer_skip", 0, int, False))
         data.append(("text_encoder_2_sequence_length", 77, int, True))
+        data.append(("sdxl_max_caption_tokens", 75, int, False))
 
         # text encoder 3
         text_encoder_3 = TrainModelPartConfig.default_values()

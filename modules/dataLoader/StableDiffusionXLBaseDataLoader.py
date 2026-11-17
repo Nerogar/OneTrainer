@@ -2,8 +2,13 @@ import os
 
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.dataLoader.mixin.DataLoaderText2ImageMixin import DataLoaderText2ImageMixin
+from modules.dataLoader.StableDiffusionXLChunkedCLIP import (
+    StableDiffusionXLChunkEncodeClipText,
+    StableDiffusionXLChunkTokenize,
+)
 from modules.model.BaseModel import BaseModel
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
+from modules.model.util.clip_chunk import validate_sdxl_caption_token_limit
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.BaseStableDiffusionXLSetup import BaseStableDiffusionXLSetup
 from modules.util import factory
@@ -31,6 +36,7 @@ class StableDiffusionXLBaseDataLoader(
     DataLoaderText2ImageMixin,
 ):
     def _preparation_modules(self, config: TrainConfig, model: StableDiffusionXLModel):
+        caption_token_limit = validate_sdxl_caption_token_limit(config.sdxl_max_caption_tokens)
         rescale_image = RescaleImageChannels(image_in_name='image', image_out_name='image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         rescale_conditioning_image = RescaleImageChannels(image_in_name='conditioning_image', image_out_name='conditioning_image', in_range_min=0, in_range_max=1, out_range_min=-1, out_range_max=1)
         encode_image = EncodeVAE(in_name='image', out_name='latent_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context, model.vae_autocast_context], dtype=model.vae_train_dtype.torch_dtype())
@@ -40,12 +46,32 @@ class StableDiffusionXLBaseDataLoader(
         add_embeddings_to_prompt_2 = MapData(in_name='prompt', out_name='prompt_2', map_fn=model.add_text_encoder_2_embeddings_to_prompt)
         encode_conditioning_image = EncodeVAE(in_name='conditioning_image', out_name='latent_conditioning_image_distribution', vae=model.vae, autocast_contexts=[model.autocast_context, model.vae_autocast_context], dtype=model.vae_train_dtype.torch_dtype())
         conditioning_image_sample = SampleVAEDistribution(in_name='latent_conditioning_image_distribution', out_name='latent_conditioning_image', mode='mean')
-        tokenize_prompt_1 = Tokenize(in_name='prompt_1', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=model.tokenizer_1.model_max_length)
-        tokenize_prompt_2 = Tokenize(in_name='prompt_2', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=model.tokenizer_2.model_max_length)
-        encode_prompt_1 = EncodeClipText(in_name='tokens_1', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_1_hidden_state', pooled_out_name=None, add_layer_norm=False,
-                                         text_encoder=model.text_encoder_1, hidden_state_output_index=-(2 + config.text_encoder_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
-        encode_prompt_2 = EncodeClipText(in_name='tokens_2', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_2_hidden_state', pooled_out_name='text_encoder_2_pooled_state', add_layer_norm=False,
-                                         text_encoder=model.text_encoder_2, hidden_state_output_index=-(2 + config.text_encoder_2_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        if caption_token_limit == 75:
+            tokenize_prompt_1 = Tokenize(in_name='prompt_1', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1', tokenizer=model.tokenizer_1, max_token_length=model.tokenizer_1.model_max_length)
+            tokenize_prompt_2 = Tokenize(in_name='prompt_2', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2', tokenizer=model.tokenizer_2, max_token_length=model.tokenizer_2.model_max_length)
+            encode_prompt_1 = EncodeClipText(in_name='tokens_1', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_1_hidden_state', pooled_out_name=None, add_layer_norm=False,
+                                             text_encoder=model.text_encoder_1, hidden_state_output_index=-(2 + config.text_encoder_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+            encode_prompt_2 = EncodeClipText(in_name='tokens_2', tokens_attention_mask_in_name=None, hidden_state_out_name='text_encoder_2_hidden_state', pooled_out_name='text_encoder_2_pooled_state', add_layer_norm=False,
+                                             text_encoder=model.text_encoder_2, hidden_state_output_index=-(2 + config.text_encoder_2_layer_skip), autocast_contexts=[model.autocast_context], dtype=model.train_dtype.torch_dtype())
+        else:
+            tokenize_prompt_1 = StableDiffusionXLChunkTokenize(
+                in_name='prompt_1', tokens_out_name='tokens_1', mask_out_name='tokens_mask_1',
+                tokenizer=model.tokenizer_1, token_limit=caption_token_limit,
+            )
+            tokenize_prompt_2 = StableDiffusionXLChunkTokenize(
+                in_name='prompt_2', tokens_out_name='tokens_2', mask_out_name='tokens_mask_2',
+                tokenizer=model.tokenizer_2, token_limit=caption_token_limit,
+            )
+            encode_prompt_1 = StableDiffusionXLChunkEncodeClipText(
+                in_name='tokens_1', hidden_state_out_name='text_encoder_1_hidden_state', pooled_out_name=None,
+                text_encoder=model.text_encoder_1, hidden_state_output_index=-(2 + config.text_encoder_layer_skip),
+                autocast_contexts=[model.autocast_context],
+            )
+            encode_prompt_2 = StableDiffusionXLChunkEncodeClipText(
+                in_name='tokens_2', hidden_state_out_name='text_encoder_2_hidden_state', pooled_out_name='text_encoder_2_pooled_state',
+                text_encoder=model.text_encoder_2, hidden_state_output_index=-(2 + config.text_encoder_2_layer_skip),
+                autocast_contexts=[model.autocast_context],
+            )
 
         modules = [rescale_image, encode_image, image_sample]
 
