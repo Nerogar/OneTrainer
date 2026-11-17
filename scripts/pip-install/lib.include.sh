@@ -242,15 +242,6 @@ function create_conda_env {
     declare -a install_args=()
     install_args+=("python==${OT_CONDA_USE_PYTHON_VERSION}.*")
 
-    # IMPORTANT: We MUST use "conda-forge" and EXPLICITLY switch to the version
-    # of Tk that has libXft support on Linux, otherwise the GUI will have broken
-    # fonts, inability to render Unicode, and no antialiasing! Doesn't affect Macs.
-    # SEE: https://github.com/conda-forge/tk-feedstock/pull/40#issuecomment-2381409555
-    # SEE: https://anaconda.org/conda-forge/tk/files (only Linux has "xft" variant).
-    if [[ "${OT_HOST_OS}" == "Linux" ]]; then
-        install_args+=("tk[build=xft_*]")
-    fi
-
     # NOTE: We install with strict channel priority and an explicit channel list,
     # which ensures that package names which exist in "conda-forge" will never
     # fall back to the "defaults" channel if "conda-forge" lacks the required

@@ -15,13 +15,13 @@ from util.import_util import script_imports
 
 script_imports()
 
-from modules.ui.PySide6TrainUIView import PySide6TrainView
+from modules.ui.TrainUIView import TrainView
 from modules.util.ui.pyside6_util import create_application, set_windows_taskbar_icon
 
 
 def main():
     app = create_application()
-    window = PySide6TrainView()
+    window = TrainView()
     set_windows_taskbar_icon(window)
     window.show()
     sys.exit(app.exec())

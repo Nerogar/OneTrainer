@@ -7,9 +7,9 @@ import time
 import traceback
 import webbrowser
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import scripts.generate_debug_report
-from modules.ui.BaseTrainUIView import BaseTrainUIView
 from modules.ui.CaptionUIController import CaptionUIController
 from modules.ui.ConvertModelUIController import ConvertModelUIController
 from modules.ui.SampleWindowController import SampleWindowController
@@ -28,6 +28,9 @@ import torch
 
 from huggingface_hub import parse_hf_uri
 from huggingface_hub.errors import GatedRepoError
+
+if TYPE_CHECKING:
+    from modules.ui.TrainUIView import BaseTrainUIView
 
 
 class TrainUIController:

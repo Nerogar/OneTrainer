@@ -4,8 +4,7 @@ OneTrainer includes a UI for captioning and masking of your dataset. To access i
 tab. Once the UI is open, click the `Open` button at the top left, and select the directory of your dataset.
 
 To launch the Qt tool on its own, run `python scripts/caption_ui.py` (or `scripts/caption_ui_qt.py`) in your active
-OneTrainer environment. The CustomTkinter version remains available through `python scripts/caption_ui_ctk.py`
-and the CustomTkinter training UI. Both standalone versions accept `--dir` and `--include-subdirectories`.
+OneTrainer environment. The standalone tool accepts `--dir` and `--include-subdirectories`.
 
 In the Qt tool, batch captioning and masking run in the background. Wait for generation to finish before starting
 another batch or closing the tool.
