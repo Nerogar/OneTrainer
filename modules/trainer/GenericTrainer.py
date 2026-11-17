@@ -23,10 +23,12 @@ from modules.util.compile_util import init_compile, reset_compile
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
+from modules.util.entropic import load_or_compute_entropic_schedule
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.EMAMode import EMAMode
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ModelFormat import ModelFormat
+from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.profiling_util import PeakMemoryRecorder, TorchMemoryRecorder, TorchProfiler
@@ -152,6 +154,8 @@ class GenericTrainer(BaseTrainer):
         self.data_loader = self.create_data_loader(
             self.model, self.model_setup, self.model.train_progress
         )
+        self.__setup_entropic_schedule()
+
         self.model_saver = self.create_model_saver()
 
         self.model_sampler = self.create_model_sampler(self.model)
@@ -164,6 +168,23 @@ class GenericTrainer(BaseTrainer):
             self.validation_data_loader = self.create_data_loader(
                 self.model, self.model_setup, self.model.train_progress, is_validation=True
             )
+
+    def __setup_entropic_schedule(self):
+        if self.config.timestep_distribution != TimestepDistribution.ENTROPIC:
+            return
+
+        # A manually selected schedule file takes precedence over the computed one.
+        if self.config.entropic_schedule_path and os.path.isfile(self.config.entropic_schedule_path):
+            return
+
+        self.callbacks.on_update_status("computing the entropic timestep schedule")
+        self.config.entropic_schedule_path = load_or_compute_entropic_schedule(
+            self.model, self.model_setup, self.data_loader, self.config,
+            num_eval_steps=self.config.entropic_num_eval_steps,
+            num_samples=self.config.entropic_num_samples,
+            timestep_chunk_size=self.config.entropic_timestep_chunk_size,
+            schedule_resolution=self.config.entropic_schedule_resolution,
+        )
 
     def __save_config_to_workspace(self):
         path = path_util.canonical_join(self.config.workspace_dir, "config")

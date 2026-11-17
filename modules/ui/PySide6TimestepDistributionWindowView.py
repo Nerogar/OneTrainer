@@ -27,16 +27,16 @@ class PySide6TimestepDistributionWindowView(BaseTimestepDistributionWindowView, 
         lo.setColumnStretch(3, 1)
 
         self.build_content(frame, controller, ui_state)
-        lo.setRowStretch(7, 1)
+        lo.setRowStretch(12, 1)
 
         fig, self._ax = plt.subplots()
         self._canvas = FigureCanvasQTAgg(fig)
-        lo.addWidget(self._canvas, 0, 3, 8, 1)
+        lo.addWidget(self._canvas, 0, 3, 13, 1)
         self._update_preview()
 
         update_btn = QPushButton("Update Preview", frame)
         update_btn.clicked.connect(self._update_preview)
-        lo.addWidget(update_btn, 8, 3)
+        lo.addWidget(update_btn, 13, 3)
 
         outer.addWidget(scroll, 0, 0)
 
