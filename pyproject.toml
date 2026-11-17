@@ -204,6 +204,19 @@ platforms = ["linux-rocm"]
 [tool.pixi.feature.rocm.pypi-options]
 extra-index-urls = ["https://download.pytorch.org/whl/rocm10.0"]
 
+# [tool.pixi.feature.rocm-windows]
+# platforms = ["win-generic"]
+
+# [tool.pixi.feature.rocm-windows.pypi-options]
+# extra-index-urls = ["https://nightly.repo.amd.com/rocm/whl-next/"]
+# prerelease-mode = "allow"
+
+# [tool.pixi.feature.rocm-windows.pypi-dependencies]
+# torch = { version = "==2.15.0", extras = ["device-gfxBLANK_REPLACEME"], index = "https://nightly.repo.amd.com/rocm/whl-next/" }
+# torchvision = { version = "==0.29.2", extras = ["device-gfxBLANK_REPLACEME"], index = "https://nightly.repo.amd.com/rocm/whl-next/" }
+# onnxruntime = "==1.23.2"
+# triton-windows = ">=3.9.0.post30,<3.10"
+
 [tool.pixi.feature.cpu]
 platforms = ["linux-generic", "win-generic", "macos-generic"]
 
@@ -231,3 +244,4 @@ cpu = ["cpu"]
 cuda13 = ["cuda13"]
 cuda12 = ["cuda12"]
 rocm = ["rocm"]
+# rocm-windows = ["rocm-windows"]

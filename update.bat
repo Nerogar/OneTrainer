@@ -1,4 +1,5 @@
 @echo off
+rem set "OT_PLATFORM=rocm-windows"
 
 if "%OT_PIP_INSTALL%" == "true" (
     echo "[OneTrainer] Updating dependencies via pip..."

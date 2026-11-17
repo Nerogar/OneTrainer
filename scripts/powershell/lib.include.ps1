@@ -91,6 +91,20 @@ function Get-Platform {
         return $platform
     }
 
+    # Reuse an explicitly installed AMD environment; never infer a GPU architecture.
+    # Pixi also creates partial/solve environments, which do not have this completion marker.
+    $envsDir = Join-Path $script:SCRIPT_DIR '.pixi\envs'
+    if (Test-Path -LiteralPath $envsDir -PathType Container) {
+        $installed = @(Get-ChildItem -LiteralPath $envsDir -Directory | Where-Object {
+            (Test-Path -LiteralPath (Join-Path $_.FullName 'conda-meta\pixi') -PathType Leaf) -and
+            (Test-Path -LiteralPath (Join-Path $_.FullName 'python.exe') -PathType Leaf)
+        })
+        if ($installed.Count -eq 1 -and $installed[0].Name -eq 'rocm-windows') {
+            Write-OTDebug "Using the only installed Pixi environment: rocm-windows."
+            return 'rocm-windows'
+        }
+    }
+
     # check if nvidia
     if (Test-CommandExists "nvidia-smi") {
         Write-OTDebug "NVIDIA GPU detected via nvidia-smi."
@@ -137,6 +151,10 @@ function Get-OrUpdatePixi {
 }
 
 function Install-Env {
+    if ($script:OT_PLATFORM -eq 'rocm-windows') {
+        # The user's manually selected device extras are not in the upstream lockfile.
+        Invoke-Run pixi lock
+    }
     Invoke-Run pixi install --locked -e $script:OT_PLATFORM
 }
 

@@ -1,11 +1,20 @@
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath (Resolve-Path "$PSScriptRoot\..\.." ).Path
 
+. "$PSScriptRoot\lib.include.ps1"
+
 Write-Host "[OneTrainer] Updating OneTrainer to latest version from Git repository..."
-& git pull
-if ($LASTEXITCODE -ne 0) { throw "git pull failed with exit code $LASTEXITCODE." }
+if ((Get-Platform) -eq 'rocm-windows') {
+    # Keep ROCM selection after git pulling
+    $env:OT_PLATFORM = 'rocm-windows'
+    . "$PSScriptRoot\update-rocm.ps1"
+    Update-RocmCheckout
+} else {
+    Invoke-Run git pull
+}
 
 # reload ps library
+$script:_OT_LIB_INCLUDED = $false
 . "$PSScriptRoot\lib.include.ps1"
 
 Prepare-RuntimeEnvironment "upgrade"

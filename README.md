@@ -52,7 +52,22 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 3. Navigate into the cloned directory `cd OneTrainer`
 4. Perform the installation: `pixi install --locked -e cuda` (Replace `cuda` by `rocm` or `cpu` if needed).
 
-**Note:** We don't support ROCm on Windows currently.
+##### Windows with an AMD GPU
+
+1. Install Pixi, clone the repository, and install a compatible AMD Adrenalin driver.
+2. Navigate into the cloned directory `cd OneTrainer` using PowerShell.
+3. Find your GPU's GFX architecture from [AMD's table](https://github.com/ROCm/TheRock/blob/main/RELEASES.md#supported-python-device--install-extras) (e.g. `gfx1100`).
+4. In `pyproject.toml`, replace both occurrences of `device-gfxBLANK_REPLACEME` with the device extra from step 3. Architecture selection is manual.
+5. Uncomment the `rocm-windows` feature sections and its entry under `[tool.pixi.environments]`. We require AMDs nightly packages for Pytorch 2.15.
+6. In `install.bat`, `start-ui.bat`, and `update.bat`, uncomment the second line by removing `rem `:
+
+```bat
+set "OT_PLATFORM=rocm-windows"
+```
+
+7. Run `install.bat`, then `start-ui.bat`. Installation regenerates `pixi.lock` for your selected architecture. If `rocm-windows` is the only fully installed Pixi environment, the launchers also select it automatically; they do not detect your GPU architecture.
+
+For AMD updates, `update.bat` backs up local changes to `pyproject.toml`, `pixi.lock`, and these three launchers in a Git stash, pulls upstream changes, reapplies the edits, and regenerates the lockfile. The backup remains in `git stash list`. If a configuration conflict occurs, updating stops before dependency installation; resolve it, unstage the resolved files, and rerun `install.bat`. Commit or unstage existing staged changes before updating.
 
 ## Updating
 
