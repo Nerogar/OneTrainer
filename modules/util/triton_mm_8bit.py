@@ -7,6 +7,8 @@
 #dequant scale, a per-column one, a fused low-rank update. Triton specializes a None argument
 #as a constexpr, so each combination compiles to what a separate kernel per epilogue would.
 
+import threading
+
 from modules.util.tqdm_util import tqdm
 
 import torch
@@ -88,8 +90,11 @@ announce_autotuning(_transpose_kernel, name="8-bit transpose")
 #(~205 -> ~275 TOPS) but the copy costs 2*K*N bytes of traffic regardless of M, so the rewrite
 #only pays above a token count. Breakeven is shape-dependent - measured on Ada (4070 Ti SUPER)
 #at ~1550 for the widest layers and below 512 for the attention projections - and the wrappers
-#see only M, so this takes the widest layer's breakeven and every shape wins above it
-_TRANSPOSE_MIN_M = 1536
+#see only M, so this takes the widest layer's breakeven and every shape wins above it.
+#On ROCm the rewrite never pays: with the 2-stage configs the n-major mm runs within ~5% of the
+#k-major one, so the copy is pure overhead - direct was faster or equal on every Flux2 backward
+#shape at 512px and 1024px on RDNA3 (7900 XTX) and RDNA4 (9060 XT, R9700)
+_TRANSPOSE_MIN_M = 1536 if torch.version.hip is None else float('inf')
 
 
 _AUTOTUNE_KEY = [
@@ -128,6 +133,18 @@ _AUTOTUNE_CONFIGS = [
     triton.Config({'BLOCK_SIZE_M':  64, 'BLOCK_SIZE_N':  64, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=5, num_warps=4),
     triton.Config({'BLOCK_SIZE_M':  32, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=4, num_warps=4),
     triton.Config({'BLOCK_SIZE_M':  32, 'BLOCK_SIZE_N':  64, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=5, num_warps=2),
+    #ROCm only: ROCm allocates (stages-1)*(BLOCK_M+BLOCK_N)*BLOCK_K bytes of LDS against a 64KB
+    #limit, so several of the configs above don't fit on RDNA and the rest pipeline too deep.
+    #These 2-stage configs were ~14% faster on RDNA4 (RX 9060 XT); they never won on Ada,
+    #where they would only lengthen autotuning
+    *([
+        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K':  64, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=4),
+        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K':  64, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=8),
+        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 256, 'BLOCK_SIZE_K':  64, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=8),
+        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=4),
+        triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=8),
+        triton.Config({'BLOCK_SIZE_M':  64, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 128, 'GROUP_SIZE_M': 8}, num_stages=2, num_warps=4),
+    ] if torch.version.hip is not None else []),
 ]
 
 
@@ -235,7 +252,7 @@ def _prepare_mm(a: torch.Tensor, b: torch.Tensor, out_dtype: torch.dtype):
         #padding the storage of b keeps its layout, padding a transposed view would not
         b = torch.nn.functional.pad(b.t(), (0, pad)).t() if B_K_MAJOR else torch.nn.functional.pad(b, (0, 0, 0, pad))
         K += pad
-    #n-major B runs the mm ~30% slower; for large M a transpose copy pays for itself (see transpose_8bit)
+    #on Ada n-major B runs the mm ~30% slower; for large M a transpose copy pays for itself (see transpose_8bit)
     if not B_K_MAJOR and M >= _TRANSPOSE_MIN_M:
         b = transpose_8bit(b).t()
         B_K_MAJOR = True
@@ -293,6 +310,8 @@ def _mm_kernel(
         xd_ptr=None, up_ptr=None, R=None, stride_xdm=None, stride_upr=None, stride_upn=None,
         BLOCK_R: tl.constexpr = None, R_TILES: tl.constexpr = None,
 ):
+    #compiled without Triton's sm_8x prefetch pass, see _skip_prefetch_pass. Changing this source
+    #also changes Triton's cache keys, so kernels compiled with the pass are not reused
     result, offs_cm, offs_cn = _mm_accumulate(
         a_ptr, b_ptr, M, N, K,
         stride_am, stride_ak, stride_bk, stride_bn,
@@ -318,6 +337,37 @@ def _mm_kernel(
     _store_c(c_ptr, result.to(c_ptr.dtype.element_ty), offs_cm, offs_cn, M, N, stride_cm)
 
 announce_autotuning(_mm_kernel, name="8-bit matmul")
+
+
+#Since Triton 3.8, the prefetch pass (sm_8x only, i.e. Ampere and Ada) carries the 8-bit operands
+#of the next loop iteration one byte per register. _mm_kernel then spills and is ~30% slower:
+#https://github.com/triton-lang/triton/issues/12486. Skip the pass when compiling _mm_kernel
+def _skip_prefetch_pass(kernel_name: str):
+    try:
+        from triton._C.libtriton import passes
+        from triton.backends.nvidia.compiler import CUDABackend
+        add_prefetch = passes.ttgpuir.add_prefetch
+        make_ttgir = CUDABackend.make_ttgir
+    except (ImportError, AttributeError):
+        return
+
+    skip = threading.local()
+
+    def add_prefetch_unless_skipped(pm):
+        if not getattr(skip, "active", False):
+            add_prefetch(pm)
+
+    def make_ttgir_with_skip(mod, metadata, opt, capability):
+        skip.active = mod.get_entry_func_name() == kernel_name
+        try:
+            return make_ttgir(mod, metadata, opt, capability)
+        finally:
+            skip.active = False
+
+    passes.ttgpuir.add_prefetch = add_prefetch_unless_skipped
+    CUDABackend.make_ttgir = staticmethod(make_ttgir_with_skip)
+
+_skip_prefetch_pass("_mm_kernel")
 
 #Opaque custom ops work around pytorch#164124: torch.compile otherwise absorbs the traced
 #@triton.autotune kernels and freezes the config benchmarked for the first shape. Kept opaque,

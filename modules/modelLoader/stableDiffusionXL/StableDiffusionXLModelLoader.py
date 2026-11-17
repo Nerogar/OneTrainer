@@ -67,6 +67,8 @@ class StableDiffusionXLModelLoader(
             quantization: QuantizationConfig,
             stream_from_disk: bool,
     ):
+        pipeline_config = StableDiffusionXLPipeline.load_config(base_model_name)
+        model.force_zeros_for_empty_prompt = pipeline_config.get("force_zeros_for_empty_prompt", True)
         model.tokenizer_1 = CLIPTokenizer.from_pretrained(
             base_model_name,
             subfolder="tokenizer",
@@ -160,6 +162,7 @@ class StableDiffusionXLModelLoader(
         unet = pipeline.unet.to(dtype=weight_dtypes.unet.torch_dtype())
 
         model.model_type = model_type
+        model.force_zeros_for_empty_prompt = pipeline.config.get("force_zeros_for_empty_prompt", True)
         model.tokenizer_1 = pipeline.tokenizer
         model.orig_tokenizer_1 = copy.deepcopy(pipeline.tokenizer)
         model.tokenizer_2 = pipeline.tokenizer_2
@@ -222,6 +225,7 @@ class StableDiffusionXLModelLoader(
         )
 
         model.model_type = model_type
+        model.force_zeros_for_empty_prompt = pipeline.config.get("force_zeros_for_empty_prompt", True)
         model.tokenizer_1 = pipeline.tokenizer
         model.orig_tokenizer_1 = copy.deepcopy(pipeline.tokenizer)
         model.tokenizer_2 = pipeline.tokenizer_2
@@ -275,7 +279,7 @@ class StableDiffusionXLModelLoader(
 
         if model_names.base_model.endswith(".ckpt"):
             try:
-                self.__load_ckpt(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model)
+                self.__load_ckpt(model, model_type, weight_dtypes, model_names.base_model, model_names.vae_model, quantization)
                 print("Warning: Legacy code is used to load ckpt files. Some features may not be supported.")
                 return
             except Exception:

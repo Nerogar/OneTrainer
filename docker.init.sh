@@ -1,6 +1,9 @@
 #!/bin/bash
 set -eo pipefail
 
+source "${BASH_SOURCE[0]%/*}/lib.include.sh"
+prepare_runtime_environment
+
 setup_env() {
     # Export useful ENV variables, including all Runpod specific vars, to /etc/rp_environment
     # This file can then later be sourced in a login shell
@@ -63,8 +66,7 @@ setup_jupyterlab() {
     fi
     echo "Starting Jupyter Lab..."
     mkdir -p /workspace &&
-    cd / &&
-    nohup jupyter-lab \
+    nohup pixi run --locked -e ${OT_PLATFORM} jupyter-lab -- \
         --allow-root --no-browser --port=8888 --ip=* \
         --FileContentsManager.delete_to_trash=False \
         --ServerApp.terminado_settings='{"shell_command":["/bin/bash"]}' \

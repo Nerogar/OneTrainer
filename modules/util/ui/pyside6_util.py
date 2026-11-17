@@ -1,14 +1,19 @@
+import ctypes
+import html
 import locale
+import logging
 import os
+import re
 import signal
 import sys
 from abc import ABCMeta
 from typing import TYPE_CHECKING
 
+from modules.util.ui import pyside6_components as components
 from modules.util.ui.theme import ThemeController
 
 from PySide6.QtCore import QSettings
-from PySide6.QtWidgets import QApplication, QStyleFactory, QWidget
+from PySide6.QtWidgets import QApplication, QComboBox, QLineEdit, QStyleFactory, QWidget
 
 if TYPE_CHECKING:
     # pyside6 stubs omit qts runtime metaclass; expose ABCMeta to type checkers.
@@ -24,6 +29,25 @@ class OneTrainerApplication(QApplication):
     theme_controller: ThemeController
 
 
+def limit_input_width(entry: QLineEdit, characters: int = 40) -> None:
+    """Cap the visible width without limiting the length of the entered text."""
+    entry.ensurePolished()
+    entry.setMaximumWidth(entry.fontMetrics().horizontalAdvance("0" * characters) + 12)
+
+
+def fit_form(frame: QWidget) -> None:
+    """Fit dropdowns to their options and put surplus space after the form."""
+    for combo in frame.findChildren(QComboBox):
+        combo.ensurePolished()
+        combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        combo.setFixedWidth(combo.sizeHint().width())
+    components._pack_form(frame)
+def format_tooltip(text: str) -> str:
+    # wrap tooltips after 45 characters, supported by studys size
+    wrapped = re.sub(r"(.{65}\S*)[ \t]+", r"\1\n", text)
+    return f'<p style="white-space: pre;">{html.escape(wrapped)}</p>'
+
+
 def get_theme_controller() -> ThemeController:
     app = QApplication.instance()
     if not isinstance(app, OneTrainerApplication):
@@ -37,6 +61,12 @@ def create_application() -> OneTrainerApplication:
     # own SIGINT handler would never get a chance to run while app.exec() is
     # active and Ctrl+C would be ignored.
     signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+    if sys.platform == "win32":
+        try:
+            ctypes.OleDLL("shell32").SetCurrentProcessExplicitAppUserModelID(ctypes.c_wchar_p("OneTrainer.OneTrainer"))
+        except OSError:
+            logging.getLogger(__name__).warning("Could not set the Windows taskbar identity", exc_info=True)
 
     app = OneTrainerApplication(sys.argv)
     app.setOrganizationName("OneTrainer")
@@ -64,3 +94,46 @@ def create_application() -> OneTrainerApplication:
     app.theme_controller = ThemeController(app, QSettings())
 
     return app
+
+
+def set_windows_taskbar_icon(window: QWidget) -> None:
+    """Copy Qt's window icons into the Windows class icons used by the taskbar."""
+    if sys.platform != "win32":
+        return
+
+    from ctypes import wintypes
+
+    try:
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        # Tell Python the input and output types of these Windows functions.
+        # Handles are Windows object IDs; the types must preserve all 64 bits on 64-bit Python.
+        user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        user32.SendMessageW.restype = ctypes.c_ssize_t
+        user32.CopyIcon.argtypes = [wintypes.HICON]
+        user32.CopyIcon.restype = wintypes.HICON
+        user32.DestroyIcon.argtypes = [wintypes.HICON]
+        set_class_icon = user32.SetClassLongPtrW
+        set_class_icon.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+        set_class_icon.restype = ctypes.c_size_t
+        window_handle = int(window.winId())
+        wm_geticon = 0x007F  # Windows message asking a window for its icon.
+
+        # Keep independent copies alive until process exit, even if Qt replaces its icons.
+        # This workaround was AI-driven; no solution was found on the Qt forum and windows ctypes are not my domain but we needed a icon fix
+        for icon_type, class_icon_slot in (
+            (1, -14),  # ICON_BIG -> GCLP_HICON (large class icon)
+            (0, -34),  # ICON_SMALL -> GCLP_HICONSM (small class icon)
+        ):
+            qt_icon = user32.SendMessageW(window_handle, wm_geticon, icon_type, 0)
+            icon_copy = user32.CopyIcon(qt_icon)
+            if not icon_copy:
+                raise ctypes.WinError(ctypes.get_last_error())
+            # A zero return can mean success, so also check Windows' error code.
+            ctypes.set_last_error(0)
+            previous = set_class_icon(window_handle, class_icon_slot, icon_copy)
+            if not previous and ctypes.get_last_error():
+                error = ctypes.WinError(ctypes.get_last_error())
+                user32.DestroyIcon(icon_copy)
+                raise error
+    except OSError:
+        logging.getLogger(__name__).warning("Could not set the Windows taskbar icon", exc_info=True)
