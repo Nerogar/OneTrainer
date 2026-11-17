@@ -9,10 +9,35 @@ OT_FORCE_DARK = os.environ.get("OT_FORCE_DARK") == "1"
 _BASE_STYLESHEET = """
     QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit {
         padding: 2px 2px;
+        border-radius: 2px;
+    }
+    QPushButton[listAction="remove"], QPushButton[listAction="clone"] {
+        border: 1px solid transparent;
+        border-radius: 2px;
+        padding: 0;
+        font-size: 18px;
+    }
+    QPushButton[listAction="remove"] {
+        background-color: #FFECEC;
+        color: #5A0D0D;
+        border-color: #5A0D0D;
+    }
+    QPushButton[listAction="clone"] {
+        background-color: #D7F5EA;
+        color: #0A4933;
+        border-color: #0A4933;
+        font-weight: bold;
+    }
+    QPushButton[listAction="remove"]:focus, QPushButton[listAction="clone"]:focus {
+        border-style: dotted;
     }
     QCheckBox::indicator {
         width: 16px;
         height: 16px;
+    }
+    QCheckBox[largeIndicator="true"]::indicator {
+        width: 20px;
+        height: 20px;
     }
     QToolButton {
         padding-top: 0px;
@@ -31,6 +56,7 @@ _BASE_STYLESHEET = """
 _LIGHT_STYLESHEET = """
     QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit {
         background-color: white;
+        border: 1px solid #c8c8c8;
     }
     QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QTextEdit:disabled, QPlainTextEdit:disabled {
         background-color: #e0e0e0;
@@ -40,12 +66,49 @@ _LIGHT_STYLESHEET = """
     }
 """
 
+_DARK_STYLESHEET = """
+    QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit {
+        background-color: #404040;
+        color: palette(text);
+        border: 1px solid #242424;
+    }
+    QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QTextEdit:disabled, QPlainTextEdit:disabled {
+        background-color: #282828;
+        color: #808080;
+    }
+    /* Include the 1px border in the normal 16px / large 20px indicator size. */
+    QCheckBox::indicator:unchecked {
+        width: 14px;
+        height: 14px;
+        background-color: palette(window);
+        border: 1px solid palette(midlight);
+        border-radius: 2px;
+    }
+    QCheckBox[largeIndicator="true"]::indicator:unchecked {
+        width: 18px;
+        height: 18px;
+    }
+    QCheckBox::indicator:unchecked:enabled:hover,
+    QCheckBox::indicator:unchecked:enabled:focus {
+        border-color: palette(text);
+    }
+    QCheckBox::indicator:unchecked:enabled:pressed {
+        background-color: palette(mid);
+    }
+    QCheckBox::indicator:unchecked:disabled {
+        border-color: palette(mid);
+    }
+"""
+
+
 def apply_theme(app: QApplication) -> None:
     # Scheme selection belongs to ThemeController; styling must not turn a
     # system-following preference into an explicit light-mode override.
     is_dark = app.styleHints().colorScheme() == Qt.ColorScheme.Dark
 
-    app.setStyleSheet(_BASE_STYLESHEET if is_dark else _BASE_STYLESHEET + _LIGHT_STYLESHEET)
+    # Qt's Windows dark checkbox palette uses the accent color for Base. Fusion
+    # fills even unchecked indicators with Base; override only that state's fill.
+    app.setStyleSheet(_BASE_STYLESHEET + (_DARK_STYLESHEET if is_dark else _LIGHT_STYLESHEET))
 
 
 class ThemeController(QObject):

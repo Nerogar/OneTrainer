@@ -10,6 +10,7 @@ from modules.ui.CloudTabView import CloudTabView
 from modules.ui.ConceptTabController import ConceptTabController
 from modules.ui.ConceptTabView import ConceptTabView
 from modules.ui.ConvertModelUIView import ConvertModelUIView
+from modules.ui.GeneralTabController import GeneralTabController
 from modules.ui.GeneralTabView import GeneralTabView
 from modules.ui.LoraTabController import LoraTabController
 from modules.ui.LoraTabView import LoraTabView
@@ -34,7 +35,7 @@ from modules.util.enum.ModelType import ModelType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import pyside6_components
 from modules.util.ui.pyside6_settings import MainWindowSettings
-from modules.util.ui.pyside6_util import QtABCMeta
+from modules.util.ui.pyside6_util import QtABCMeta, fit_form
 from modules.util.ui.PySide6UIState import PySide6UIState
 
 from PySide6.QtCore import QSettings, QTimer
@@ -212,10 +213,10 @@ class BaseTrainUIView(ABC):
         # backup after
         self.components.label(frame, 0, 0, "Backup After",
                          tooltip="The interval used when automatically creating model backups during training")
-        self.components.time_entry(frame, 0, 1, ui_state, "backup_after", "backup_after_unit")
+        self.components.time_entry(frame, 0, 1, ui_state, "backup_after", "backup_after_unit", max_width=5)
 
         # backup now
-        self.components.button(frame, 0, 3, "backup now", self.backup_now)
+        self.components.button(frame, 0, 3, "backup now", self.backup_now, sticky="nw")
 
         # rolling backup
         self.components.label(frame, 1, 0, "Rolling Backup",
@@ -225,7 +226,7 @@ class BaseTrainUIView(ABC):
         # rolling backup count
         self.components.label(frame, 2, 0, "Rolling Backup Count",
                          tooltip="Defines the number of backups to keep if rolling backups are enabled")
-        self.components.entry(frame, 2, 1, ui_state, "rolling_backup_count")
+        self.components.entry(frame, 2, 1, ui_state, "rolling_backup_count", max_width=3)
 
         # backup before save
         self.components.label(frame, 3, 0, "Backup Before Save",
@@ -235,15 +236,15 @@ class BaseTrainUIView(ABC):
         # save after
         self.components.label(frame, 4, 0, "Save Every",
                          tooltip="The interval used when automatically saving the model during training")
-        self.components.time_entry(frame, 4, 1, ui_state, "save_every", "save_every_unit")
+        self.components.time_entry(frame, 4, 1, ui_state, "save_every", "save_every_unit", max_width=5)
 
         # save now
-        self.components.button(frame, 4, 3, "save now", self.save_now)
+        self.components.button(frame, 4, 3, "save now", self.save_now, sticky="nw")
 
         # skip save
         self.components.label(frame, 5, 0, "Skip First",
                          tooltip="Start saving automatically after this interval has elapsed")
-        self.components.entry(frame, 5, 1, ui_state, "save_skip_first", width=50, sticky="nw")
+        self.components.entry(frame, 5, 1, ui_state, "save_skip_first", max_width=5, sticky="nw")
 
     def build_embedding_tab_content(self, frame, controller, ui_state):
         # embedding model name
@@ -321,7 +322,7 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
 
         self.setWindowTitle("OneTrainer")
         self.setWindowIcon(QIcon("resources/icons/icon.png"))
-        self.resize(1100, 740)
+        self.resize(1150, 715)
 
         self.status_label = None
         self.eta_label = None
@@ -497,7 +498,12 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         return tab_page
 
     def _configure_general_frame(self, frame):
-        self.general_tab = GeneralTabView(frame, self.controller, self.ui_state)
+        controller = GeneralTabController(
+            local_gpu_count=self.controller._local_gpu_count,
+            on_workspace_dir_change=self.controller._on_workspace_dir_change,
+            on_always_on_tensorboard_toggle=self.controller._on_always_on_tensorboard_toggle,
+        )
+        self.general_tab = GeneralTabView(frame, controller, self.ui_state)
         lo = pyside6_components._layout(frame)
         lo.setColumnStretch(0, 1)
         lo.addWidget(self.general_tab, 0, 0)
@@ -511,10 +517,9 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
 
     def _configure_backup_frame(self, frame):
         lo = pyside6_components._layout(frame)
-        lo.setColumnStretch(1, 1)
-        lo.setColumnStretch(3, 1)
+        lo.setColumnStretch(4, 1)
         self.build_backup_tab_content(frame, self.controller, self.ui_state)
-        pyside6_components._pack_form(frame)
+        fit_form(frame)
 
     def _configure_tools_frame(self, frame):
         from modules.ui.QueueTrainingUIView import QueueTrainingUIView
@@ -614,6 +619,8 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
             self.training_tab.refresh_ui()
         if self.lora_tab:
             self.lora_tab.refresh_ui()
+        if self.sampling_tab:
+            self.sampling_tab.refresh_ui()
         self._update_additional_embeddings_tab(model_type)
 
     def _update_additional_embeddings_tab(self, model_type: ModelType):

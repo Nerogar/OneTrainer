@@ -14,14 +14,21 @@ class BaseSampleFrameView:
         is_inpainting_model = controller.is_inpainting_model()
         is_video_model = controller.is_video_model()
         if include_prompt:
+            has_clip_text_encoder = controller.has_clip_text_encoder()
             # prompt
             self.components.label(top_frame, 0, 0, "prompt:")
-            self.components.entry(top_frame, 0, 1, ui_state, "prompt")
+            if has_clip_text_encoder:
+                self.components.entry(top_frame, 0, 1, ui_state, "prompt")
+            else:
+                self.components.text_box(top_frame, 0, 1, ui_state, "prompt", lines=5, resizable=True)
 
             # negative prompt
             if controller.supports_negative_prompt():
                 self.components.label(top_frame, 1, 0, "negative prompt:")
-                self.components.entry(top_frame, 1, 1, ui_state, "negative_prompt", allow_empty=True)
+                if has_clip_text_encoder:
+                    self.components.entry(top_frame, 1, 1, ui_state, "negative_prompt", allow_empty=True)
+                else:
+                    self.components.text_box(top_frame, 1, 1, ui_state, "negative_prompt", lines=5, resizable=True)
 
         if include_settings:
             # width

@@ -16,7 +16,7 @@ from modules.util.enum.LossWeight import LossWeight
 from modules.util.enum.Optimizer import Optimizer
 from modules.util.enum.TimestepDistribution import TimestepDistribution
 from modules.util.ui import pyside6_components
-from modules.util.ui.pyside6_util import QtABCMeta
+from modules.util.ui.pyside6_util import QtABCMeta, fit_form
 from modules.util.ui.validation_helpers import check_range, validate_resolution
 
 from PySide6.QtWidgets import QScrollArea, QSizePolicy, QWidget
@@ -309,70 +309,70 @@ class BaseTrainingTabView(ABC):
                               tooltip="The type of optimizer")
         self.components.options_adv(frame, 0, 1, [str(x) for x in list(Optimizer)], ui_state, "optimizer.optimizer",
                                     command=self.restore_optimizer_config,
-                                    adv_command=self.open_optimizer_params)
+                                    adv_command=self.open_optimizer_params, fit_to_selection=True)
 
         # learning rate scheduler
         # Wackiness will ensue when reloading configs if we don't check and clear this first.
         if hasattr(self, "lr_scheduler_comp"):
             delattr(self, "lr_scheduler_comp")
             delattr(self, "lr_scheduler_adv_comp")
-        self.components.label(frame, 1, 0, "Learning Rate Scheduler",
+        self.components.label(frame, 1, 0, "LR Scheduler",
                               tooltip="Learning rate scheduler that automatically changes the learning rate during training")
         _, d = self.components.options_adv(frame, 1, 1, [str(x) for x in list(LearningRateScheduler)], ui_state,
                                            "learning_rate_scheduler",
                                            command=self.restore_scheduler,
-                                           adv_command=self.open_scheduler_params)
+                                           adv_command=self.open_scheduler_params, fit_to_selection=True)
         self.lr_scheduler_comp = d['component']
         self.lr_scheduler_adv_comp = d['button_component']
         # Initial call requires the presence of self.lr_scheduler_adv_comp.
         self.restore_scheduler(ui_state.get_var("learning_rate_scheduler").get())
 
         # learning rate
-        self.components.label(frame, 2, 0, "Learning Rate",
+        self.components.label(frame, 2, 0, "Learning Rate (LR)",
                               tooltip="The base learning rate")
-        self.components.entry(frame, 2, 1, ui_state, "learning_rate", required=True)
+        self.components.entry(frame, 2, 1, ui_state, "learning_rate", max_width=8, required=True)
 
         # learning rate warmup steps
-        self.components.label(frame, 3, 0, "Learning Rate Warmup Steps",
+        self.components.label(frame, 3, 0, "LR Warmup Steps",
                               tooltip="The number of steps it takes to gradually increase the learning rate from 0 to the specified learning rate. Values >1 are interpeted as a fixed number of steps, values <=1 are intepreted as a percentage of the total training steps (ex. 0.2 = 20% of the total step count)")
-        self.components.entry(frame, 3, 1, ui_state, "learning_rate_warmup_steps")
+        self.components.entry(frame, 3, 1, ui_state, "learning_rate_warmup_steps", max_width=5)
 
         # learning rate min factor
-        self.components.label(frame, 4, 0, "Learning Rate Min Factor",
+        self.components.label(frame, 4, 0, "LR Min Factor",
                               tooltip="Unit = float. Method = percentage. For a factor of 0.1, the final LR will be 10% of the initial LR. If the initial LR is 1e-4, the final LR will be 1e-5.")
-        self.components.entry(frame, 4, 1, ui_state, "learning_rate_min_factor",
+        self.components.entry(frame, 4, 1, ui_state, "learning_rate_min_factor", max_width=4,
                               extra_validate=check_range(lower=0, upper=0.99, message="Learning rate min factor must be between 0 and 0.99"))
 
         # learning rate cycles
-        self.components.label(frame, 5, 0, "Learning Rate Cycles",
+        self.components.label(frame, 5, 0, "LR Cycles",
                               tooltip="The number of learning rate cycles. This is only applicable if the learning rate scheduler supports cycles")
-        self.components.entry(frame, 5, 1, ui_state, "learning_rate_cycles")
+        self.components.entry(frame, 5, 1, ui_state, "learning_rate_cycles", max_width=4)
 
         # epochs
         self.components.label(frame, 6, 0, "Epochs",
                               tooltip="The number of epochs for a full training run")
-        self.components.entry(frame, 6, 1, ui_state, "epochs", required=True)
+        self.components.entry(frame, 6, 1, ui_state, "epochs", max_width=4, required=True)
 
         # batch size
         self.components.label(frame, 7, 0, "Local Batch Size",
                               tooltip="The batch size of one training step. If you use multiple GPUs, this is the batch size of each GPU (local batch size).")
-        self.components.entry(frame, 7, 1, ui_state, "batch_size", required=True)
+        self.components.entry(frame, 7, 1, ui_state, "batch_size", max_width=5, required=True)
 
         # accumulation steps
         self.components.label(frame, 8, 0, "Accumulation Steps",
                               tooltip="Number of accumulation steps. Increase this number to trade batch size for training speed")
-        self.components.entry(frame, 8, 1, ui_state, "gradient_accumulation_steps", required=True)
+        self.components.entry(frame, 8, 1, ui_state, "gradient_accumulation_steps", max_width=4, required=True)
 
         # Learning Rate Scaler
-        self.components.label(frame, 9, 0, "Learning Rate Scaler",
+        self.components.label(frame, 9, 0, "LR Scaler",
                               tooltip="Selects the type of learning rate scaling to use during training. Functionally equated as: LR * SQRT(selection)")
         self.components.options(frame, 9, 1, [str(x) for x in list(LearningRateScaler)], ui_state,
-                                "learning_rate_scaler")
+                                "learning_rate_scaler", fit_to_selection=True)
 
         # clip grad norm
         self.components.label(frame, 10, 0, "Clip Grad Norm",
                               tooltip="Clips the gradient norm. Leave empty to disable gradient clipping.")
-        self.components.entry(frame, 10, 1, ui_state, "clip_grad_norm")
+        self.components.entry(frame, 10, 1, ui_state, "clip_grad_norm", max_width=9)
 
     def __create_base2_frame(self, master, row, controller, ui_state, video_training_enabled: bool = False,
                               supports_circular_padding: bool = False):
@@ -389,13 +389,13 @@ class BaseTrainingTabView(ABC):
         # ema
         self.components.label(frame, row, 0, "EMA",
                               tooltip="EMA averages the training progress over many steps, better preserving different concepts in big datasets")
-        self.components.options(frame, row, 1, [str(x) for x in list(EMAMode)], ui_state, "ema")
+        self.components.options(frame, row, 1, [str(x) for x in list(EMAMode)], ui_state, "ema", max_width=8)
         row += 1
 
         # ema decay
         self.components.label(frame, row, 0, "EMA Decay",
                               tooltip="Decay parameter of the EMA model. Higher numbers will average more steps. For datasets of hundreds or thousands of images, set this to 0.9999. For smaller datasets, set it to 0.999 or even 0.998")
-        self.components.entry(frame, row, 1, ui_state, "ema_decay",
+        self.components.entry(frame, row, 1, ui_state, "ema_decay", max_width=8,
                               extra_validate=check_range(lower=0.5, upper=1,
                                                         message="EMA decay must be between 0.5 and 1"))
         row += 1
@@ -403,7 +403,7 @@ class BaseTrainingTabView(ABC):
         # ema update step interval
         self.components.label(frame, row, 0, "EMA Update Step Interval",
                               tooltip="Number of steps between EMA update steps")
-        self.components.entry(frame, row, 1, ui_state, "ema_update_step_interval")
+        self.components.entry(frame, row, 1, ui_state, "ema_update_step_interval", max_width=6)
         row += 1
 
         # train dtype
@@ -435,7 +435,7 @@ class BaseTrainingTabView(ABC):
         # resolution
         self.components.label(frame, row, 0, "Resolution",
                               tooltip="The resolution used for training. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format <width>x<height>")
-        self.components.entry(frame, row, 1, ui_state, "resolution", required=True,
+        self.components.entry(frame, row, 1, ui_state, "resolution", max_width=5, required=True,
                               extra_validate=validate_resolution())
         row += 1
 
@@ -463,7 +463,7 @@ class BaseTrainingTabView(ABC):
         if supports_layer_offloading:
             self.components.label(frame, row, 0, "Layer Offload Fraction",
                                   tooltip="Fraction of this component's layers to offload to CPU to reduce VRAM usage. Increases training time and RAM usage. 0=disabled, 1=all layers")
-            self.components.entry(frame, row, 1, ui_state, f"{part}.offload_fraction")
+            self.components.entry(frame, row, 1, ui_state, f"{part}.offload_fraction", max_width=4)
             row += 1
 
             self.components.label(frame, row, 0, "Simplex Offloading",
@@ -496,7 +496,7 @@ class BaseTrainingTabView(ABC):
             row += 1
         else:
             # no Train switch to act as the frame's header, so add an explicit one
-            self.components.label(frame, row, 0, "Text Encoder")
+            self.components.header_label(frame, row, 0, "Text Encoder")
             row += 1
 
         row = self.__create_offloading_widgets(frame, row, ui_state, "text_encoder", supports_checkpointing=supports_training,
@@ -506,7 +506,7 @@ class BaseTrainingTabView(ABC):
             # dropout
             self.components.label(frame, row, 0, "Caption Dropout Probability",
                                   tooltip="The Probability for dropping the text encoder conditioning")
-            self.components.entry(frame, row, 1, ui_state, "text_encoder.dropout_probability")
+            self.components.entry(frame, row, 1, ui_state, "text_encoder.dropout_probability", max_width=5)
             row += 1
 
         if supports_training:
@@ -578,7 +578,7 @@ class BaseTrainingTabView(ABC):
         # dropout
         self.components.label(frame, row, 0, "Dropout Probability",
                               tooltip=f"The Probability for dropping the text encoder {i} conditioning")
-        self.components.entry(frame, row, 1, ui_state, f"text_encoder{suffix}.dropout_probability")
+        self.components.entry(frame, row, 1, ui_state, f"text_encoder{suffix}.dropout_probability", max_width=5)
         row += 1
 
         # train text encoder epochs
@@ -701,7 +701,7 @@ class BaseTrainingTabView(ABC):
         # transformer learning rate
         self.components.label(frame, row, 0, "Transformer Learning Rate",
                               tooltip="The learning rate of the Transformer. Overrides the base learning rate")
-        self.components.entry(frame, row, 1, ui_state, "transformer.learning_rate")
+        self.components.entry(frame, row, 1, ui_state, "transformer.learning_rate", max_width=7)
         row += 1
 
         if supports_force_attention_mask:
@@ -740,7 +740,7 @@ class BaseTrainingTabView(ABC):
         # offset noise weight
         self.components.label(frame, 0, 0, "Offset Noise Weight",
                               tooltip="The weight of offset noise added to each training step")
-        self.components.entry(frame, 0, 1, ui_state, "offset_noise_weight")
+        self.components.entry(frame, 0, 1, ui_state, "offset_noise_weight", max_width=4)
 
         if supports_generalized_offset_noise:
             # generalized offset noise weight
@@ -752,7 +752,7 @@ class BaseTrainingTabView(ABC):
         # perturbation noise weight
         self.components.label(frame, 2, 0, "Perturbation Noise Weight",
                               tooltip="The weight of perturbation noise added to each training step")
-        self.components.entry(frame, 2, 1, ui_state, "perturbation_noise_weight")
+        self.components.entry(frame, 2, 1, ui_state, "perturbation_noise_weight", max_width=4)
 
         # timestep distribution
         self.components.label(frame, 3, 0, "Timestep Distribution",
@@ -765,27 +765,27 @@ class BaseTrainingTabView(ABC):
         # min noising strength
         self.components.label(frame, 4, 0, "Min Noising Strength",
                               tooltip="Specifies the minimum noising strength used during training. This can help to improve composition, but prevents finer details from being trained")
-        self.components.entry(frame, 4, 1, ui_state, "min_noising_strength", required=True)
+        self.components.entry(frame, 4, 1, ui_state, "min_noising_strength", max_width=4, required=True)
 
         # max noising strength
         self.components.label(frame, 5, 0, "Max Noising Strength",
                               tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
-        self.components.entry(frame, 5, 1, ui_state, "max_noising_strength", required=True)
+        self.components.entry(frame, 5, 1, ui_state, "max_noising_strength", max_width=4, required=True)
 
         # noising weight
         self.components.label(frame, 6, 0, "Noising Weight",
                               tooltip="Controls the weight parameter of the timestep distribution function. Use the preview to see more details.")
-        self.components.entry(frame, 6, 1, ui_state, "noising_weight", required=True)
+        self.components.entry(frame, 6, 1, ui_state, "noising_weight", max_width=4, required=True)
 
         # noising bias
         self.components.label(frame, 7, 0, "Noising Bias",
                               tooltip="Controls the bias parameter of the timestep distribution function. Use the preview to see more details.")
-        self.components.entry(frame, 7, 1, ui_state, "noising_bias", required=True)
+        self.components.entry(frame, 7, 1, ui_state, "noising_bias", max_width=3, required=True)
 
         # timestep shift
         self.components.label(frame, 8, 0, "Timestep Shift",
                               tooltip="Shift the timestep distribution. Use the preview to see more details.")
-        self.components.entry(frame, 8, 1, ui_state, "timestep_shift", required=True)
+        self.components.entry(frame, 8, 1, ui_state, "timestep_shift", max_width=3, required=True)
 
         if supports_dynamic_timestep_shifting:
             # dynamic timestep shifting
@@ -804,13 +804,13 @@ class BaseTrainingTabView(ABC):
         # unmasked probability
         self.components.label(frame, 1, 0, "Unmasked Probability",
                               tooltip="When masked training is enabled, specifies the number of training steps done on unmasked samples")
-        self.components.entry(frame, 1, 1, ui_state, "unmasked_probability",
+        self.components.entry(frame, 1, 1, ui_state, "unmasked_probability", max_width=4,
                               extra_validate=check_range(lower=0, upper=1, message="Unmasked probability must be between 0 and 1"))
 
         # unmasked weight
         self.components.label(frame, 2, 0, "Unmasked Weight",
                               tooltip="When masked training is enabled, specifies the loss weight of areas outside the masked region")
-        self.components.entry(frame, 2, 1, ui_state, "unmasked_weight",
+        self.components.entry(frame, 2, 1, ui_state, "unmasked_weight", max_width=4,
                               extra_validate=check_range(lower=0, upper=1, message="Unmasked weight must be between 0 and 1"))
 
         # normalize masked area loss
@@ -821,7 +821,7 @@ class BaseTrainingTabView(ABC):
         # masked prior preservation
         self.components.label(frame, 4, 0, "Masked Prior Preservation Weight",
                               tooltip="Preserves regions outside the mask using the original untrained model output as a target. Only available for LoRA training. If enabled, use a low unmasked weight.")
-        self.components.entry(frame, 4, 1, ui_state, "masked_prior_preservation_weight",
+        self.components.entry(frame, 4, 1, ui_state, "masked_prior_preservation_weight", max_width=5,
                               extra_validate=check_range(lower=0, upper=1, message="Masked prior preservation weight must be between 0 and 1"))
 
         # use custom conditioning image
@@ -836,27 +836,27 @@ class BaseTrainingTabView(ABC):
         # MSE Strength
         self.components.label(frame, 0, 0, "MSE Strength",
                               tooltip="Mean Squared Error strength for custom loss settings. Strengths should generally sum to 1.")
-        self.components.entry(frame, 0, 1, ui_state, "mse_strength", required=True)
+        self.components.entry(frame, 0, 1, ui_state, "mse_strength", max_width=4, required=True)
 
         # MAE Strength
         self.components.label(frame, 1, 0, "MAE Strength",
                               tooltip="Mean Absolute Error strength for custom loss settings. Strengths should generally sum to 1.")
-        self.components.entry(frame, 1, 1, ui_state, "mae_strength", required=True)
+        self.components.entry(frame, 1, 1, ui_state, "mae_strength", max_width=4, required=True)
 
         # log-cosh Strength
         self.components.label(frame, 2, 0, "log-cosh Strength",
                               tooltip="Log - Hyperbolic cosine Error strength for custom loss settings. Strengths should generally sum to 1.")
-        self.components.entry(frame, 2, 1, ui_state, "log_cosh_strength", required=True)
+        self.components.entry(frame, 2, 1, ui_state, "log_cosh_strength", max_width=4, required=True)
 
         # Huber Strength
         self.components.label(frame, 3, 0, "Huber Strength",
                               tooltip="Huber loss strength for custom loss settings. Less sensitive to outliers than MSE. Strengths should generally sum to 1.")
-        self.components.entry(frame, 3, 1, ui_state, "huber_strength", required=True)
+        self.components.entry(frame, 3, 1, ui_state, "huber_strength", max_width=4, required=True)
 
         # Huber Delta
         self.components.label(frame, 4, 0, "Huber Delta",
                               tooltip="Delta parameter for huber loss")
-        self.components.entry(frame, 4, 1, ui_state, "huber_delta", required=True)
+        self.components.entry(frame, 4, 1, ui_state, "huber_delta", max_width=4, required=True)
 
         if supports_vb_loss:
             # VB Strength
@@ -899,6 +899,7 @@ class BaseTrainingTabView(ABC):
                                            entry_tooltip="Comma-separated list of diffusion layers to train. Regular expressions (if toggled) are supported. Any model layer with a matching name will be trained",
                                            regex_var_name="layer_filter_regex",
                                            regex_tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used.",
+                                           inset=True,
                                            )
 
 
@@ -952,6 +953,7 @@ class TrainingTabView(BaseTrainingTabView, QWidget, metaclass=QtABCMeta):
         pyside6_components._layout(column_2).setColumnStretch(0, 1)
 
         self.build(column_0, column_1, column_2, self.controller, self.ui_state)
+        fit_form(frame)
 
         for col_widget in (column_0, column_1, column_2):
             lo = pyside6_components._layout(col_widget)

@@ -1,18 +1,33 @@
 import contextlib
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions, supported_video_extensions
-from modules.util.ui.pyside6_util import format_tooltip
+from modules.util.ui.pyside6_util import format_tooltip, limit_input_width
 from modules.util.ui.pyside6_validation import PySide6FieldValidator, PySide6PathValidator, PySide6RunNameValidator
+from modules.util.ui.QtQuickSwitch import QtQuickSwitch
+from modules.util.ui.QtTextBox import QtTextBox, QtTextPreview
 from modules.util.ui.UIState import BaseUIState
 
-from PySide6.QtCore import QEvent, QObject, Qt, QTimer
-from PySide6.QtGui import QPixmap, QWheelEvent
+from PySide6.QtCore import (
+    QAbstractAnimation,
+    QEasingCurve,
+    QEvent,
+    QObject,
+    QRectF,
+    QSignalBlocker,
+    QSize,
+    Qt,
+    QTimer,
+    QVariantAnimation,
+    Signal,
+)
+from PySide6.QtGui import QColor, QFont, QFontMetricsF, QPalette, QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -25,21 +40,37 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QStyle,
+    QStyleOptionButton,
+    QStyleOptionComboBox,
+    QStylePainter,
     QToolButton,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
 
 PAD = 10
+FORM_ROW_SPACING = PAD + 4
 PATH_ENTRY_GAP = 8
 
 
-def _set_max_width(widget: QWidget, max_width: int | None) -> None:
-    """Apply an optional cap to the whole input, in Qt logical pixels."""
+def _set_max_width(
+        widget: QWidget,
+        max_width: int | None,
+        *,
+        text_widget: QWidget | None = None,
+        extra_width: int = 0,
+) -> None:
+    """Cap an input in characters, adding accessory space for compound controls."""
     if max_width is None:
         return
-    widget.setMinimumWidth(min(widget.minimumWidth(), max_width))
-    widget.setMaximumWidth(max_width)
+    target = text_widget if text_widget is not None else widget
+    limit_input_width(target, max_width)
+    if target is not widget:
+        pixels = target.maximumWidth() + extra_width
+        widget.setMinimumWidth(min(widget.minimumWidth(), pixels))
+        widget.setMaximumWidth(pixels)
     # A capped input should stay beside its label, not float in its grid cell.
     layout = widget.parentWidget().layout()
     item = layout.itemAt(layout.indexOf(widget)) if layout is not None else None
@@ -50,6 +81,216 @@ def _set_max_width(widget: QWidget, max_width: int | None) -> None:
 # ---------------------------------------------------------------------------
 # PySide6-only helpers
 # ---------------------------------------------------------------------------
+
+def _form_colors() -> tuple[QColor, QColor, QColor, QColor]:
+    """Derive every form surface from the application, never a nested panel."""
+    palette = QApplication.palette()
+    base = palette.color(QPalette.ColorRole.Window)
+    text = palette.color(QPalette.ColorRole.WindowText)
+    dark = base.lightnessF() < 0.5
+
+    def blend(first, second, amount):
+        return QColor(*(round(a + (b - a) * amount) for a, b in zip(
+            first.getRgb()[:3], second.getRgb()[:3], strict=True,
+        )))
+
+    surface = blend(base, QColor("white"), 0.065 if dark else 0.65)
+    border = blend(base, QColor("white" if dark else "black"), 0.13 if dark else 0.12)
+    return surface, border, text, blend(text, base, 0.12)
+
+
+class _SectionFrame(QFrame):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setProperty("formPanel", True)
+        self._apply_colors()
+        QApplication.instance().paletteChanged.connect(self._apply_colors)
+
+    def _apply_colors(self, *_args):
+        surface, border, _, _ = _form_colors()
+        self.setStyleSheet(f"""
+            QFrame[formPanel="true"] {{
+                background-color: {surface.name()};
+                border: 1px solid {border.name()};
+                border-radius: 6px;
+            }}
+        """)
+        # Expose the painted surface to embedded Qt Quick controls.
+        palette = QPalette()
+        palette.setColor(QPalette.ColorRole.Window, surface)
+        self.setPalette(palette)
+
+
+class _InsetFrame(QFrame):
+    """A bordered form inset with Material-style filled text inputs."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setProperty("formInset", True)
+        layout = _layout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setVerticalSpacing(8)
+        layout.setColumnStretch(1, 1)
+        self._apply_colors()
+        QApplication.instance().paletteChanged.connect(self._apply_colors)
+
+    def _apply_colors(self, *_args):
+        surface, _, text, _ = _form_colors()
+        dark = surface.lightnessF() < 0.5
+        palette = QApplication.palette()
+
+        def blend(background, foreground, opacity):
+            return QColor(*(round(a + (b - a) * opacity) for a, b in zip(
+                background.getRgb()[:3], foreground.getRgb()[:3], strict=True,
+            )))
+
+        inset = blend(surface, QColor("black"), 0.12 if dark else 0.025)
+        outline = blend(inset, text, 0.20)
+        fill = blend(inset, text, 0.12 if dark else 0.06)
+        hover = blend(fill, text, 0.08)
+        indicator = blend(fill, text, 0.70)
+        # Material filled fields use 4% on-surface fill and 38% content when disabled.
+        disabled_fill = blend(inset, text, 0.04)
+        disabled_text = blend(disabled_fill, text, 0.38)
+        accent = palette.color(QPalette.ColorRole.Highlight)
+        selection_text = palette.color(QPalette.ColorRole.HighlightedText)
+
+        # Container styling survives validators setting/clearing entry error borders.
+        self.setStyleSheet(f"""
+            QFrame[formInset="true"] {{
+                background-color: {inset.name()};
+                border: 1px solid {outline.name()};
+                border-radius: 6px;
+            }}
+            QLineEdit {{
+                background-color: {fill.name()};
+                color: {text.name()};
+                border: none;
+                border-bottom: 1px solid {indicator.name()};
+                padding: 6px 8px 7px 8px;
+                selection-background-color: {accent.name()};
+                selection-color: {selection_text.name()};
+            }}
+            QLineEdit:enabled:hover {{
+                background-color: {hover.name()};
+                border-bottom-color: {text.name()};
+            }}
+            QLineEdit:enabled:focus {{
+                border-bottom: 2px solid {accent.name()};
+                padding-bottom: 6px;
+            }}
+            QLineEdit:disabled {{
+                background-color: {disabled_fill.name()};
+                color: {disabled_text.name()};
+                border-bottom-color: {disabled_text.name()};
+            }}
+        """)
+
+
+class _FormLabel(QLabel):
+    def __init__(self, text, parent):
+        super().__init__(text, parent)
+        self._heading = False
+        self._apply_font()
+        self._apply_colors()
+        QApplication.instance().paletteChanged.connect(self._apply_colors)
+
+    def set_heading(self):
+        self._heading = True
+        self._apply_font()
+        self._apply_colors()
+
+    def _apply_font(self):
+        font = self.parentWidget().font()
+        font.setPointSizeF(max(10.0, font.pointSizeF()) + (1 if self._heading else 0))
+        font.setWeight(QFont.Weight.Bold if self._heading else QFont.Weight.Normal)
+        self.setFont(font)
+
+    def _apply_colors(self, *_args):
+        _, _, heading, field = _form_colors()
+        color = heading if self._heading else field
+        # Application stylesheet refreshes restore Qt's cached widget palettes.
+        # Keep our color in the stylesheet so repolishing cannot restore an old
+        # theme's text color. Disabled labels retain the native disabled color.
+        self.setStyleSheet(f"QLabel:enabled {{ color: {color.name()}; }}")
+
+
+class CollapsibleForm(QWidget):
+    """Reveal an intact form by clipping its height, preserving values and bindings."""
+
+    transition_finished = Signal()
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.content = QWidget(self)
+        self.content.setEnabled(False)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.expanded = False
+        self._animation = QVariantAnimation(self)
+        self._animation.setDuration(180)
+        self._animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self._animation.valueChanged.connect(self.setFixedHeight)
+        self._animation.finished.connect(self._finish)
+        self.setFixedHeight(0)
+        self.hide()
+
+    @property
+    def is_animating(self) -> bool:
+        return self._animation.state() == QAbstractAnimation.State.Running
+
+    def sizeHint(self):
+        return self.content.sizeHint()
+
+    def minimumSizeHint(self):
+        return QSize(self.content.minimumSizeHint().width(), 0)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.content.setGeometry(0, 0, self.width(), self.content.sizeHint().height())
+
+    def set_expanded(self, expanded: bool, *, animate: bool = True) -> None:
+        if expanded == self.expanded:
+            if not animate:
+                self._animation.stop()
+                self._finish()
+            return
+        self.expanded = expanded
+        height = self.height() if not self.isHidden() else 0
+        self._animation.stop()
+        self.content.setEnabled(expanded)
+        if not animate:
+            self._finish()
+            return
+        self.show()
+        self._animation.setStartValue(height)
+        self._animation.setEndValue(self.content.sizeHint().height() if expanded else 0)
+        self._animation.start()
+
+    def _finish(self):
+        if self.expanded:
+            self.setMinimumHeight(0)
+            self.setMaximumHeight(16777215)
+            self.show()
+        else:
+            self.setFixedHeight(0)
+            self.hide()
+        self.updateGeometry()
+        self.transition_finished.emit()
+
+
+class _DisabledToolTipFilter(QObject):
+    def __init__(self, control: QWidget, *widgets: QWidget):
+        super().__init__(control)
+        for widget in (control, *widgets):
+            widget.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.ToolTip and not self.parent().isEnabled() and watched.toolTip():
+            QToolTip.showText(event.globalPos(), watched.toolTip(), watched)
+            return True
+        return super().eventFilter(watched, event)
+
 
 class _FileDropFilter(QObject):
     def __init__(
@@ -117,7 +358,8 @@ def _layout(master: QWidget) -> QGridLayout:
     if lo is None:
         lo = QGridLayout(master)
         lo.setContentsMargins(0, 0, 0, 0)
-        lo.setSpacing(PAD)
+        lo.setHorizontalSpacing(PAD)
+        lo.setVerticalSpacing(FORM_ROW_SPACING)
         master.setLayout(lo)
     return lo
 
@@ -235,7 +477,7 @@ def label(
         wraplength: int = 0,
         underline: bool = False,
 ) -> QLabel:
-    component = QLabel(text, master)
+    component = _FormLabel(text, master)
     cell_alignment = Qt.AlignVCenter | Qt.AlignLeft
     if wraplength > 0:
         component.setWordWrap(True)
@@ -256,6 +498,21 @@ def label(
     layout = _layout(master)
     layout.addWidget(component, row, column)
     layout.setAlignment(component, cell_alignment)
+    return component
+
+
+def header_label(
+        master: QWidget,
+        row: int,
+        column: int,
+        text: str,
+        *,
+        tooltip: str | None = None,
+        top_spacing: int = 0,
+) -> QLabel:
+    component = cast(_FormLabel, label(master, row, column, text, tooltip=tooltip))
+    component.set_heading()
+    component.setContentsMargins(0, top_spacing, 0, 0)
     return component
 
 
@@ -283,7 +540,7 @@ def entry(
         *,
         max_width: int | None = None,
 ) -> QLineEdit:
-    """Create a text input; max_width also caps the default minimum width."""
+    """Create a text input; width is a pixel minimum, max_width a character cap."""
     var = ui_state.get_var(var_name)
 
     component = QLineEdit(master)
@@ -324,6 +581,53 @@ def entry(
     return component
 
 
+def text_box(
+        master: QWidget,
+        row: int,
+        column: int,
+        ui_state: BaseUIState,
+        var_name: str,
+        *,
+        lines: int = 2,
+        resizable: bool = False,
+) -> QtTextBox:
+    component = QtTextBox(master, lines=lines, resizable=resizable)
+    component.setMinimumWidth(140)
+    _add(_layout(master), component, row, column)
+    var = ui_state.get_var(var_name)
+    component.setPlainText(str(var.get()))
+
+    def update_text(value):
+        # Avoid resetting the cursor and undo history when this editor writes.
+        if component.toPlainText() != str(value):
+            with QSignalBlocker(component):
+                component.setPlainText(str(value))
+
+    binding = var._bind_widget(update_text)
+    component.destroyed.connect(lambda: var._unbind_widget(binding))
+    component.textChanged.connect(lambda: var.set(component.toPlainText()))
+    return component
+
+
+def text_preview(
+        master: QWidget,
+        row: int,
+        column: int,
+        ui_state: BaseUIState,
+        var_name: str,
+        *,
+        lines: int = 2,
+) -> QtTextPreview:
+    component = QtTextPreview(master, lines=lines)
+    component.setMinimumWidth(140)
+    _add(_layout(master), component, row, column)
+    var = ui_state.get_var(var_name)
+    component.setText(str(var.get()))
+    binding = var._bind_widget(lambda value: component.setText(str(value)))
+    component.destroyed.connect(lambda: var._unbind_widget(binding))
+    return component
+
+
 def path_entry(
         master: QWidget,
         row: int,
@@ -344,7 +648,7 @@ def path_entry(
         placeholder: str = "",
         max_width: int | None = None,
 ) -> QWidget:
-    """Create a path input; max_width includes the browse button and its gap."""
+    """Cap the path text in characters with max_width; add space for the browse button."""
     frame = QWidget(master)
     frame_lo = QGridLayout(frame)
     frame_lo.setContentsMargins(0, 0, 0, 0)
@@ -451,9 +755,7 @@ def path_entry(
     btn.clicked.connect(_open_dialog)
     frame_lo.addWidget(btn, 0, 1)
 
-    if max_width is not None:
-        entry_component.setMinimumWidth(min(entry_component.minimumWidth(), max(0, max_width - btn.width() - PATH_ENTRY_GAP)))
-    _set_max_width(frame, max_width)
+    _set_max_width(frame, max_width, text_widget=entry_component, extra_width=btn.width() + PATH_ENTRY_GAP)
     return frame
 
 
@@ -468,19 +770,21 @@ def time_entry(
         *,
         max_width: int | None = None,
 ) -> QWidget:
-    """Create an interval input; max_width includes the unit dropdown."""
+    """Cap the numeric input in characters with max_width; add space for the units."""
     frame = QWidget(master)
     _add(_layout(master), frame, row, column, sticky="new", padx=0, pady=0)
 
-    entry(frame, 0, 0, ui_state, var_name, width=50)
+    value_entry = entry(frame, 0, 0, ui_state, var_name, width=50)
 
     values = [str(x) for x in list(TimeUnit)]
     if not supports_time_units:
         values = [str(x) for x in list(TimeUnit) if not x.is_time_unit()]
 
-    options(frame, 0, 1, values, ui_state, unit_var_name)
+    unit_combo = options(frame, 0, 1, values, ui_state, unit_var_name)
 
-    _set_max_width(frame, max_width)
+    unit_combo.ensurePolished()
+    _set_max_width(frame, max_width, text_widget=value_entry,
+                   extra_width=unit_combo.sizeHint().width() + _layout(frame).horizontalSpacing())
     return frame
 
 
@@ -500,15 +804,22 @@ def layer_filter_entry(
         frame_color=None,
         *,
         max_width: int | None = None,
+        inset: bool = False,
 ) -> QWidget:
-    """Create a layer filter; max_width caps the complete input group."""
-    frame = QWidget(master)
+    """Create a layer filter, optionally in a bordered inset with filled text inputs.
+
+    max_width caps the group using the text field's character width.
+    """
+    frame = _InsetFrame(master) if inset else QWidget(master)
     _layout(master).addWidget(frame, row, column)
 
-    label(frame, 0, 0, preset_label, tooltip=preset_tooltip)
+    preset_heading = label(frame, 0, 0, preset_label, tooltip=preset_tooltip)
+    if inset:
+        _layout(frame).addWidget(preset_heading, 0, 0, 1, 2)
 
-    layer_entry = entry(frame, 1, 0, ui_state, entry_var_name, tooltip=entry_tooltip)
-    _layout(frame).addWidget(layer_entry, 1, 0, 1, 2)  # span 2 columns
+    layer_entry = entry(frame, 1, 1 if inset else 0, ui_state, entry_var_name, tooltip=entry_tooltip)
+    if not inset:
+        _layout(frame).addWidget(layer_entry, 1, 0, 1, 2)  # span 2 columns
 
     regex_label = label(frame, 2, 0, "Use Regex", tooltip=regex_tooltip)
     regex_switch = switch(frame, 2, 1, ui_state, regex_var_name)
@@ -545,9 +856,11 @@ def layer_filter_entry(
     ui_state.remove_all_var_traces(preset_var_name)
 
     layer_selector = options(
-        frame, 0, 1, presets_list, ui_state, preset_var_name,
+        frame, 1 if inset else 0, 0 if inset else 1, presets_list, ui_state, preset_var_name,
         command=preset_set_layer_choice,
     )
+    if inset:
+        _layout(frame).setAlignment(layer_selector, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
     ui_state.add_var_trace(preset_var_name, lambda: preset_set_layer_choice(
         ui_state.get_var(preset_var_name).get()
@@ -555,7 +868,7 @@ def layer_filter_entry(
 
     preset_set_layer_choice(layer_selector.currentText())
 
-    _set_max_width(frame, max_width)
+    _set_max_width(frame, max_width, text_widget=layer_entry)
     return frame
 
 
@@ -564,6 +877,48 @@ def icon_button(master: QWidget, row: int, column: int, text: str, command: Call
     component.setFixedWidth(40)
     component.clicked.connect(command)
     _add(_layout(master), component, row, column, sticky="new")
+    return component
+
+
+class _ListActionButton(QPushButton):
+    def paintEvent(self, event):
+        option = QStyleOptionButton()
+        self.initStyleOption(option)
+        text = "x" if self.property("listAction") == "remove" else option.text
+        option.text = ""
+        painter = QStylePainter(self)
+        painter.drawControl(QStyle.ControlElement.CE_PushButton, option)
+
+        # Center the visible glyph, rather than the font's ascent/descent box.
+        contents = QRectF(self.style().subElementRect(QStyle.SubElement.SE_PushButtonContents, option, self))
+        font = self.font()
+        font.setCapitalization(QFont.Capitalization.MixedCase)
+        bounds = QFontMetricsF(font).tightBoundingRect(text)
+        painter.setFont(font)
+        painter.setPen(option.palette.color(QPalette.ColorRole.ButtonText))
+        painter.drawText(contents.center() - bounds.center(), text)
+
+
+def list_action_button(
+        master: QWidget,
+        action: Literal["remove", "clone"],
+        command: Callable[[], None],
+        *,
+        row: int | None = None,
+        column: int = 0,
+        size: int = 20,
+        tooltip: str | None = None,
+) -> QPushButton:
+    """Create a themed list action, optionally placed in a form grid."""
+    component = _ListActionButton("x" if action == "remove" else "+", master)
+    component.setProperty("listAction", action)
+    component.setFixedSize(size, size)
+    component.setAccessibleName("Remove" if action == "remove" else "Duplicate")
+    if tooltip:
+        _set_tooltip(component, tooltip)
+    component.clicked.connect(command)
+    if row is not None:
+        _add(_layout(master), component, row, column, sticky="new", padx=0, pady=0)
     return component
 
 
@@ -658,6 +1013,28 @@ class NoScrollComboBox(QComboBox):
             event.ignore()
 
 
+class SelectedTextComboBox(NoScrollComboBox):
+    """Prefer the selected text's width, but leave room to shrink in narrow forms."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+        self.currentTextChanged.connect(self.updateGeometry)
+
+    def _text_size(self, text: str) -> QSize:
+        option = QStyleOptionComboBox()
+        self.initStyleOption(option)
+        metrics = self.fontMetrics()
+        size = QSize(metrics.horizontalAdvance(text), metrics.height())
+        return self.style().sizeFromContents(QStyle.ContentsType.CT_ComboBox, option, size, self)
+
+    def sizeHint(self):
+        return self._text_size(self.currentText())
+
+    def minimumSizeHint(self):
+        return self._text_size("…")
+
+
 def options(
         master: QWidget,
         row: int,
@@ -668,9 +1045,11 @@ def options(
         command: Callable[[str], None] | None = None,
         *,
         max_width: int | None = None,
+        fit_to_selection: bool = False,
 ) -> QComboBox:
+    """Create a dropdown with an optional character-based max_width."""
     var = ui_state.get_var(var_name)
-    combo = NoScrollComboBox(master)
+    combo = SelectedTextComboBox(master) if fit_to_selection else NoScrollComboBox(master)
     combo.addItems(values)
     combo.setCurrentText(str(var.get()))
 
@@ -713,15 +1092,17 @@ def options_adv(
         adv_command: Callable[[], None] | None = None,
         *,
         max_width: int | None = None,
+        fit_to_selection: bool = False,
 ) -> tuple[QWidget, dict]:
-    """Create a dropdown with a settings button; max_width includes both."""
+    """Cap the dropdown in characters with max_width; add space for the settings button."""
     frame = QWidget(master)
     frame_lo = QGridLayout(frame)
     frame_lo.setContentsMargins(0, 0, 0, 0)
     frame_lo.setColumnStretch(0, 1)
-    _add(_layout(master), frame, row, column, sticky="new", padx=0, pady=0)
+    _add(_layout(master), frame, row, column, sticky="nw" if fit_to_selection else "new", padx=0, pady=0)
 
-    combo = options(frame, 0, 0, values, ui_state, var_name, command=command)
+    combo = options(frame, 0, 0, values, ui_state, var_name, command=command,
+                    fit_to_selection=fit_to_selection)
 
     adv_btn = QPushButton("…", frame)
     adv_btn.setFixedWidth(20)
@@ -732,7 +1113,8 @@ def options_adv(
     if command:
         command(ui_state.get_var(var_name).get())
 
-    _set_max_width(frame, max_width)
+    _set_max_width(frame, max_width, text_widget=combo,
+                   extra_width=adv_btn.width() + frame_lo.horizontalSpacing())
     return frame, {'component': combo, 'button_component': adv_btn}
 
 
@@ -748,6 +1130,7 @@ def options_kv(
         *,
         max_width: int | None = None,
 ) -> QComboBox:
+    """Create a labelled-value dropdown with an optional character-based max_width."""
     var = ui_state.get_var(var_name)
     keys = [key for key, _ in values]
     str_values = [str(v) for _, v in values]
@@ -821,6 +1204,7 @@ def switch(
         *,
         max_width: int | None = None,
 ) -> QCheckBox:
+    """Create a checkbox; width is fixed pixels, max_width is a character-based cap."""
     var = ui_state.get_var(var_name)
     component = QCheckBox(text, master)
     component.setChecked(bool(var.get()))
@@ -915,10 +1299,8 @@ def double_progress(
     return set_1, set_2
 
 
-def section_frame(parent: QWidget, row: int, col: int = 0, colspan: int = 1) -> "QFrame":
-    from PySide6.QtWidgets import QFrame
-    frame = QFrame(parent)
-    frame.setFrameShape(QFrame.Shape.StyledPanel)
+def section_frame(parent: QWidget, row: int, col: int = 0, colspan: int = 1) -> QFrame:
+    frame = _SectionFrame(parent)
     _layout(parent).addWidget(frame, row, col, 1, colspan)
     frame_lo = _layout(frame)
     frame_lo.setColumnStretch(0, 1)
@@ -931,6 +1313,48 @@ def inline_frame(parent: QWidget, row: int, col: int, columnspan: int = 1) -> QW
     _layout(frame)
     _layout(parent).addWidget(frame, row, col, 1, columnspan)
     return frame
+
+
+def form_section(
+        parent: QWidget,
+        row: int,
+        col: int,
+        title: str,
+        *,
+        panel: bool = True,
+        colspan: int = 1,
+        top_spacing: int = 0,
+) -> QWidget:
+    """Create a titled section and return its body for field construction."""
+    container = (section_frame(parent, row, col, colspan=colspan) if panel
+                 else inline_frame(parent, row, col, columnspan=colspan))
+    if panel:
+        _layout(parent).setAlignment(container, Qt.AlignmentFlag.AlignTop)
+    header_label(container, 0, 0, title, top_spacing=top_spacing)
+    body = inline_frame(container, 1, 0)
+    _layout(body).setColumnStretch(1, 1)
+    _layout(container).setRowStretch(2, 1)
+    return body
+
+
+def toggle_details(
+        parent: QWidget,
+        title: str,
+        ui_state: BaseUIState,
+        var_name: str,
+) -> tuple[QtQuickSwitch, QLabel, CollapsibleForm]:
+    """Build a bound enable row; the caller controls when its details expand."""
+    summary = inline_frame(parent, 0, 0, columnspan=2)
+    field_label = label(summary, 0, 0, title)
+    switch = QtQuickSwitch(summary, ui_state, var_name, title)
+    _add(_layout(summary), switch, 0, 1, sticky="vw")
+    field_label.setBuddy(switch)
+    _pack_form(summary)
+    _DisabledToolTipFilter(switch, summary, field_label)
+    details = CollapsibleForm(parent)
+    _layout(details.content).setColumnStretch(1, 1)
+    _layout(parent).addWidget(details, 1, 0, 1, 2)
+    return switch, field_label, details
 
 
 # ---------------------------------------------------------------------------

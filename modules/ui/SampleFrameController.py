@@ -10,6 +10,9 @@ class SampleFrameController:
     def is_flow_matching(self) -> bool:
         return self.model_type.is_flow_matching()
 
+    def has_clip_text_encoder(self) -> bool:
+        return self.model_type.has_clip_text_encoder()
+
     def is_inpainting_model(self) -> bool:
         return self.model_type.has_conditioning_image_input()
 
