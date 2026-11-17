@@ -1,22 +1,24 @@
 import os
 from math import ceil
-from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("QT_QUICK_BACKEND", "software")
 
+from modules.ui.GeneralTabController import GeneralTabController
 from modules.ui.GeneralTabView import GeneralTabView
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.ui.PySide6UIState import PySide6UIState
 from modules.util.ui.theme import ThemeController
+from modules.util.ui.validation import flush_and_validate_all
 
 import pytest
-from PySide6.QtCore import QAbstractAnimation, QCoreApplication, QEvent, QPoint, QSettings, Qt, QUrl
+from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QSettings, Qt, QUrl
 from PySide6.QtGui import QAccessible, QColor, QHelpEvent, QPalette
 from PySide6.QtQml import QQmlComponent
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLabel, QLineEdit, QToolButton, QToolTip
+from PySide6.QtWidgets import QApplication, QCheckBox, QLabel, QLineEdit, QToolButton, QToolTip
+from shiboken6 import isValid
 
 
 @pytest.fixture(scope="module")
@@ -37,10 +39,10 @@ def make_view(app, monkeypatch, tmp_path):
         config.cloud.enabled = cloud
         config.multi_gpu = enabled
         state = PySide6UIState(config)
-        controller = SimpleNamespace(
-            _local_gpu_count=count,
-            _on_workspace_dir_change=lambda *_: None,
-            _on_always_on_tensorboard_toggle=lambda: None,
+        controller = GeneralTabController(
+            local_gpu_count=count,
+            on_workspace_dir_change=lambda *_: None,
+            on_always_on_tensorboard_toggle=lambda: None,
         )
         view = GeneralTabView(None, controller, state)
         views.append(view)
@@ -48,10 +50,41 @@ def make_view(app, monkeypatch, tmp_path):
 
     yield make
     for view in views:
-        view.deleteLater()
+        if isValid(view):
+            view.deleteLater()
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     theme.deleteLater()
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+
+def test_main_panel_inputs_share_a_flexible_label_column(make_view, app):
+    view, _, _ = make_view(2)
+    workspace = next(entry for entry in view.findChildren(QLineEdit)
+                     if entry._validator.var_name == "workspace_dir")
+    panel = workspace.parentWidget().parentWidget()
+    fields = panel.findChildren(QLineEdit) + panel.findChildren(QCheckBox)
+    assert len(fields) == 10
+    label = next(label for label in panel.findChildren(QLabel) if label.text() == "Debug mode")
+    original_text = label.text()
+    view.show()
+
+    def input_x():
+        QTest.qWait(20)  # Allow nested layout requests and window resizing to settle.
+        positions = {field.mapTo(panel, QPoint(0, 0)).x() for field in fields}
+        assert len(positions) == 1
+        return positions.pop()
+
+    for width in (1400, 950, 1200):
+        view.resize(width, 700)
+        before = input_x()
+        label.setText("A much longer debugging label that needs additional space")
+        assert input_x() > before
+        label.setText(original_text)
+        assert input_x() == before
+    font = label.font()
+    font.setPointSizeF(30)
+    label.setFont(font)
+    assert input_x() > before
 
 
 @pytest.mark.parametrize("count", [0, 1, None])
@@ -145,6 +178,25 @@ def test_moved_validation_fields_and_collapsed_values(make_view):
     assert buffer._validator.flush() is not None
 
 
+@pytest.mark.parametrize(("section", "field", "invalid"), [
+    ("validation", "validation_timesteps", "1000"),
+    ("multi_gpu", "async_gradient_reduce_buffer", "-1"),
+])
+def test_training_preflight_skips_disabled_sections(make_view, section, field, invalid):
+    view, _, state = make_view(2)
+    state.get_var(section).set(True)
+    entry = next(entry for entry in view.findChildren(QLineEdit) if entry._validator.var_name == field)
+    entry.setText(invalid)
+    errors = flush_and_validate_all()
+    assert len(errors) == 1
+    assert errors[0].startswith(entry._validator.display_name)
+
+    state.get_var(section).set(False)
+    assert flush_and_validate_all() == []
+    state.get_var(section).set(True)
+    assert flush_and_validate_all() == errors
+
+
 @pytest.mark.parametrize("name", ["multi_gpu", "validation"])
 def test_disabled_categories_show_only_enable_switch(make_view, name):
     view, config, _ = make_view(2)
@@ -170,7 +222,7 @@ def test_animation_and_rapid_reversal(make_view, app, name):
     panel = details.parentWidget().parentWidget()
     collapsed_height = panel.height()
     switch.click()
-    assert details.animation.state() == QAbstractAnimation.State.Running
+    assert details.is_animating
     QTest.qWait(70)
     assert 0 < details.height() < details.content.sizeHint().height()
     switch.click()
@@ -185,7 +237,7 @@ def test_animation_and_rapid_reversal(make_view, app, name):
     assert not details.content.isEnabled()
     QTest.qWait(240)
     assert details.isHidden()
-    assert details.animation.state() == QAbstractAnimation.State.Stopped
+    assert not details.is_animating
 
 
 def test_disabled_gpu_tooltip_is_shown_on_hover(make_view, app):
@@ -212,12 +264,30 @@ def test_preset_sync_updates_validation_without_animation(make_view, app):
     assert config.validation
     assert view.validation_switch.isChecked()
     assert not view.validation_details.isHidden()
-    assert view.validation_details.animation.state() == QAbstractAnimation.State.Stopped
+    assert not view.validation_details.is_animating
     loaded.validation = False
     state.update(loaded)
     app.processEvents()
     assert view.validation_details.isHidden()
     assert config.validation_timesteps == "100,499,900"
+
+
+def test_destroying_view_during_deferred_preset_refresh_removes_traces(make_view, app, capsys):
+    view, _, state = make_view(1)
+    view.show()
+    loaded = TrainConfig.default_values()
+    loaded.cloud.enabled = True
+    loaded.multi_gpu = True
+    loaded.validation = True
+    state.update(loaded)
+    view.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    assert not isValid(view)
+    state.get_var("cloud.enabled").set(False)
+    state.get_var("validation").set(False)
+    state.get_var("multi_gpu").set(False)
+    app.processEvents()
+    assert "RuntimeError" not in capsys.readouterr().err
 
 
 def test_surface_colors_follow_palette_without_changing_app_style(make_view, app):
@@ -229,13 +299,13 @@ def test_surface_colors_follow_palette_without_changing_app_style(make_view, app
         dark.setColor(QPalette.ColorRole.Window, QColor("#202020"))
         dark.setColor(QPalette.ColorRole.WindowText, QColor("#eeeeee"))
         app.setPalette(dark)
-        assert "#2e2e2e" in view.styleSheet()
+        assert "#2e2e2e" in view.validation_panel.styleSheet()
         assert view.validation_switch.quickWindow().color().name() == "#2e2e2e"
         light = QPalette(original)
         light.setColor(QPalette.ColorRole.Window, QColor("#efefef"))
         light.setColor(QPalette.ColorRole.WindowText, QColor("#202020"))
         app.setPalette(light)
-        assert "#f9f9f9" in view.styleSheet()
+        assert "#f9f9f9" in view.validation_panel.styleSheet()
         assert view.validation_switch.quickWindow().color().name() == "#f9f9f9"
         assert app.styleSheet() == stylesheet
     finally:
@@ -342,13 +412,23 @@ def test_switch_framebuffer_corners_match_panel(make_view, app):
         assert image.pixelColor(image.width() - 1, image.height() - 1) == switch.quickWindow().color()
 
 
-def test_expanded_validation_and_appearance_bottoms_align(make_view, app):
+def test_validation_and_appearance_bottoms_align_in_both_states(make_view, app):
     view, _, state = make_view(2)
     view.show()
 
     def bottom(widget):
         return widget.mapTo(view, QPoint(0, widget.height())).y()
 
+    device_panel = view.device_column.layout().itemAtPosition(0, 0).widget()
+
+    def assert_collapsed_alignment():
+        assert view.appearance_panel.parentWidget() is view.validation_column
+        assert abs(bottom(view.appearance_panel) - bottom(device_panel)) <= 1
+        for panel in (view.validation_panel, view.appearance_panel):
+            assert panel.height() > panel.sizeHint().height()
+
+    QTest.qWait(20)
+    assert_collapsed_alignment()
     for width in (1200, 950, 1400):
         view.resize(width, 700)
         state.get_var("validation").set(True)
@@ -356,10 +436,13 @@ def test_expanded_validation_and_appearance_bottoms_align(make_view, app):
         assert abs(bottom(view.validation_panel) - bottom(view.appearance_panel)) <= 1
         state.get_var("validation").set(False)
         QTest.qWait(240)
-        assert view.appearance_panel.parentWidget() is view.validation_column
-        assert view.validation_panel.height() < view.device_column.height()
+        assert_collapsed_alignment()
     loaded = TrainConfig.default_values()
     loaded.validation = True
     state.update(loaded)
     QTest.qWait(20)  # Allow the deferred preset refresh and layout pass to finish.
     assert abs(bottom(view.validation_panel) - bottom(view.appearance_panel)) <= 1
+    loaded.validation = False
+    state.update(loaded)
+    QTest.qWait(20)
+    assert_collapsed_alignment()

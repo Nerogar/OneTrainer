@@ -19,7 +19,7 @@ from modules.util.ui import pyside6_components
 from modules.util.ui.pyside6_util import QtABCMeta, fit_form
 from modules.util.ui.validation_helpers import check_range, validate_resolution
 
-from PySide6.QtWidgets import QScrollArea, QSizePolicy, QWidget
+from PySide6.QtWidgets import QScrollArea, QWidget
 
 
 class BaseTrainingTabView(ABC):
@@ -935,20 +935,14 @@ class TrainingTabView(BaseTrainingTabView, QWidget, metaclass=QtABCMeta):
         lo.setColumnStretch(2, 1)
 
         column_0 = QWidget(frame)
-        column_0.setMinimumWidth(0)
-        column_0.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         pyside6_components._layout(frame).addWidget(column_0, 0, 0)
         pyside6_components._layout(column_0).setColumnStretch(0, 1)
 
         column_1 = QWidget(frame)
-        column_1.setMinimumWidth(0)
-        column_1.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         pyside6_components._layout(frame).addWidget(column_1, 0, 1)
         pyside6_components._layout(column_1).setColumnStretch(0, 1)
 
         column_2 = QWidget(frame)
-        column_2.setMinimumWidth(0)
-        column_2.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         pyside6_components._layout(frame).addWidget(column_2, 0, 2)
         pyside6_components._layout(column_2).setColumnStretch(0, 1)
 

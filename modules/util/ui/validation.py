@@ -155,6 +155,10 @@ class BaseFieldValidator(ABC):
     def flush(self) -> str | None:
         pass
 
+    @abstractmethod
+    def is_enabled(self) -> bool:
+        pass
+
     def _get_var_safe(self, name: str):
         try:
             return self.ui_state.get_var(name)
@@ -219,6 +223,8 @@ _active_validators: set[BaseFieldValidator] = set()
 def flush_and_validate_all() -> list[str]:
     invalid: list[str] = []
     for v in sorted(_active_validators, key=lambda v: v.var_name == "run_name"):
+        if not v.is_enabled():
+            continue
         error = v.flush()
         if error is not None:
             invalid.append(f"{v.display_name}: {error}")

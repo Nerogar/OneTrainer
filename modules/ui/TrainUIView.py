@@ -322,7 +322,8 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
 
         self.setWindowTitle("OneTrainer")
         self.setWindowIcon(QIcon("resources/icons/icon.png"))
-        self.resize(1150, 715)
+        self.setMinimumWidth(1150)
+        self.resize(self.minimumWidth(), 715)
 
         self.status_label = None
         self.eta_label = None
