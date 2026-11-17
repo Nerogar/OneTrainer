@@ -185,6 +185,9 @@ def replace_linear_with_quantized_layers(
     elif dtype.quantize_intW8A8():
         linear_class = LinearW8A8
         kwargs = {'dtype': torch.int8}
+    elif dtype.quantize_intW8A8_rowwise():
+        linear_class = LinearW8A8
+        kwargs = {'dtype': torch.int8, 'rowwise': True}
     elif dtype.quantize_fpW8A8():
         linear_class=LinearW8A8
         kwargs = {'dtype': torch.float8_e4m3fn}

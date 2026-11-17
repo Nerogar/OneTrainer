@@ -73,6 +73,8 @@ class BaseModelTabView(ABC):
             options.append(("int W8A8", DataType.INT_W8A8))
             if include_compressed:
                 options.append(("int W8A8 compressed", DataType.INT_W8A8_COMPRESSED))
+            #no compressed variant: rowwise int8 compresses much worse with nvCOMP than tensorwise
+            options.append(("int W8A8 rowwise", DataType.INT_W8A8_ROWWISE))
 
         if include_gguf:
             options.append(("GGUF", DataType.GGUF))
