@@ -1100,6 +1100,7 @@ def create_ema(
         decay=config.ema_decay,
         update_step_interval=config.ema_update_step_interval,
         device=device,
+        ema_stochastic_rounding=config.ema_stochastic_rounding,
     )
 
     if state_dict is not None:
