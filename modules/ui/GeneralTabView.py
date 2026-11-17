@@ -1,3 +1,5 @@
+from functools import partial
+
 from modules.ui.GeneralTabController import GeneralTabController
 from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 from modules.util.enum.PathIOType import PathIOType
@@ -14,66 +16,54 @@ class BaseGeneralTabView:
         self.components = components
 
     def _build_main(self, frame, controller, ui_state, start_row: int = 0) -> int:
-        self.components.label(frame, start_row, 0, "Workspace Directory",
-                         tooltip="The directory where all files of this training run are saved")
+        field = partial(self.components.labeled_field, frame, ui_state)
+        field(start_row, self.components.path_entry, "workspace_dir", "Workspace Directory",
+              "The directory where all files of this training run are saved",
+              mode="dir", command=controller.on_workspace_dir_change, io_type=PathIOType.OUTPUT)
 
-        self.components.path_entry(frame, start_row, 1, ui_state, "workspace_dir", mode="dir", command=controller.on_workspace_dir_change, io_type=PathIOType.OUTPUT)
+        field(start_row + 1, self.components.path_entry, "cache_dir", "Cache Directory",
+              "The directory where cached data is saved",
+              mode="dir", io_type=PathIOType.OUTPUT)
 
-        self.components.label(frame, start_row + 1, 0, "Cache Directory",
-                         tooltip="The directory where cached data is saved")
+        field(start_row + 2, self.components.switch, "continue_last_backup", "Resume from backup",
+              "Automatically continues training from the last backup saved in <workspace>/backup")
 
-        self.components.path_entry(frame, start_row + 1, 1, ui_state, "cache_dir", mode="dir", io_type=PathIOType.OUTPUT)
-
-        self.components.label(frame, start_row + 2, 0, "Resume from backup",
-                         tooltip="Automatically continues training from the last backup saved in <workspace>/backup")
-
-        self.components.switch(frame, start_row + 2, 1, ui_state, "continue_last_backup")
-
-        self.components.label(frame, start_row + 3, 0, "Only Cache",
-                         tooltip="Only populate the cache, without any training")
-
-        self.components.switch(frame, start_row + 3, 1, ui_state, "only_cache")
+        field(start_row + 3, self.components.switch, "only_cache", "Only Cache",
+              "Only populate the cache, without any training")
         return start_row + 4
 
     def _build_debugging(self, frame, controller, ui_state, start_row: int = 0) -> int:
-        self.components.label(frame, start_row, 0, "Debug mode",
-                         tooltip="Save debug information during the training into the debug directory")
+        field = partial(self.components.labeled_field, frame, ui_state)
+        field(start_row, self.components.switch, "debug_mode", "Debug mode",
+              "Save debug information during the training into the debug directory")
 
-        self.components.switch(frame, start_row, 1, ui_state, "debug_mode")
-
-        self.components.label(frame, start_row + 1, 0, "Debug Directory",
-                         tooltip="The directory where debug data is saved")
-
-        self.components.path_entry(frame, start_row + 1, 1, ui_state, "debug_dir", mode="dir", io_type=PathIOType.OUTPUT)
+        field(start_row + 1, self.components.path_entry, "debug_dir", "Debug Directory",
+              "The directory where debug data is saved",
+              mode="dir", io_type=PathIOType.OUTPUT)
         return start_row + 2
 
     def _build_tensorboard(self, frame, controller, ui_state, start_row: int = 0) -> int:
-        self.components.label(frame, start_row, 0, "Tensorboard",
-                         tooltip="Starts the Tensorboard Web UI during training")
+        field = partial(self.components.labeled_field, frame, ui_state)
+        field(start_row, self.components.switch, "tensorboard", "Tensorboard",
+              "Starts the Tensorboard Web UI during training")
 
-        self.components.switch(frame, start_row, 1, ui_state, "tensorboard")
+        field(start_row + 1, self.components.switch, "tensorboard_always_on", "Always-On Tensorboard",
+              "Keep Tensorboard accessible even when not training. Useful for monitoring completed training sessions.",
+              command=controller.on_always_on_tensorboard_toggle)
 
-        self.components.label(frame, start_row + 1, 0, "Always-On Tensorboard",
-                         tooltip="Keep Tensorboard accessible even when not training. Useful for monitoring completed training sessions.")
+        field(start_row + 2, self.components.switch, "tensorboard_expose", "Expose Tensorboard",
+              "Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)")
 
-        self.components.switch(frame, start_row + 1, 1, ui_state, "tensorboard_always_on", command=controller.on_always_on_tensorboard_toggle)
-
-        self.components.label(frame, start_row + 2, 0, "Expose Tensorboard",
-                         tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)")
-
-        self.components.switch(frame, start_row + 2, 1, ui_state, "tensorboard_expose")
-
-        self.components.label(frame, start_row + 3, 0, "Tensorboard Port",
-                         tooltip="Port to use for Tensorboard link")
-
-        self.components.entry(frame, start_row + 3, 1, ui_state, "tensorboard_port", max_width=6)
+        field(start_row + 3, self.components.entry, "tensorboard_port", "Tensorboard Port",
+              "Port to use for Tensorboard link",
+              max_width=6)
         return start_row + 4
 
     def _build_validation(self, frame, controller, ui_state):
-        self.components.label(frame, 0, 0, "Validate after",
-                         tooltip="The interval used when validate training")
-
-        self.components.time_entry(frame, 0, 1, ui_state, "validate_after", "validate_after_unit")
+        field = partial(self.components.labeled_field, frame, ui_state)
+        field(0, self.components.time_entry, "validate_after", "Validate after",
+              "The interval used when validate training",
+              unit_var_name="validate_after_unit")
 
         validation_timesteps_tooltip = (
             "Comma-separated validation timesteps from 0 to 999 (for example, 100,499,900). "
@@ -81,93 +71,70 @@ class BaseGeneralTabView:
             "Each distinct timestep gets a separate graph. VAE validation runs once without timesteps."
         )
 
-        self.components.label(frame, 1, 0, "Validation Timesteps", tooltip=validation_timesteps_tooltip)
+        field(1, self.components.entry, "validation_timesteps", "Validation Timesteps",
+              validation_timesteps_tooltip,
+              required=True, extra_validate=validate_validation_timesteps, tooltip=validation_timesteps_tooltip)
 
-        self.components.entry(frame, 1, 1, ui_state, "validation_timesteps", required=True,
-                              extra_validate=validate_validation_timesteps, tooltip=validation_timesteps_tooltip)
+        field(2, self.components.switch, "validation_report_per_concept", "Report per val concept",
+              "Report validation timesteps in a separate Tensorboard accordion for each concept. "
+              "Show the average validation loss and training loss in the loss group.")
 
-        self.components.label(frame, 2, 0, "Report per val concept",
-                              tooltip="Report validation timesteps in a separate Tensorboard accordion for each concept. "
-                                      "Show the average validation loss and training loss in the loss group.")
+        field(3, self.components.entry, "early_stopping_patience", "Early Stopping Patience",
+              "Stop after X epochs without validation loss improvement. "
+              "0 disables early stopping.",
+              required=True, max_width=3)
 
-        self.components.switch(frame, 2, 1, ui_state, "validation_report_per_concept")
-
-        self.components.label(frame, 3, 0, "Early Stopping Patience",
-                              tooltip="Stop after X epochs without validation loss improvement. "
-                                      "0 disables early stopping.")
-
-        self.components.entry(frame, 3, 1, ui_state, "early_stopping_patience", required=True, max_width=3)
-
-        self.components.label(frame, 4, 0, "Minimum Loss Decrease",
-                              tooltip="Minimum absolute decrease required to reset patience. "
-                                      "Leave blank to reset whenever validation loss reaches a new lowest value.")
-
-        self.components.entry(frame, 4, 1, ui_state, "early_stopping_min_delta")
+        field(4, self.components.entry, "early_stopping_min_delta", "Minimum Loss Decrease",
+              "Minimum absolute decrease required to reset patience. "
+              "Leave blank to reset whenever validation loss reaches a new lowest value.")
 
     def _build_device(self, frame, controller, ui_state):
-        self.components.label(frame, 0, 0, "Dataloader Threads",
-                         tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
+        field = partial(self.components.labeled_field, frame, ui_state)
+        field(0, self.components.entry, "dataloader_threads", "Dataloader Threads",
+              "Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.",
+              required=True, max_width=3)
 
-        self.components.entry(frame, 0, 1, ui_state, "dataloader_threads", required=True, max_width=3)
+        field(1, self.components.entry, "train_device", "Train Device",
+              "The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\". Must be \"cuda\" for multi-GPU training.",
+              required=True, max_width=7)
 
-        self.components.label(frame, 1, 0, "Train Device",
-                         tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\". Must be \"cuda\" for multi-GPU training.")
+        field(2, self.components.entry, "temp_device", "Temp Device",
+              "The device used to temporarily offload models while they are not used. Default:\"cpu\"",
+              max_width=7)
 
-        self.components.entry(frame, 1, 1, ui_state, "train_device", required=True, max_width=7)
-
-        self.components.label(frame, 3, 0, "Async Offloading",
-                         tooltip="Overlaps CPU<->GPU transfers with computation using CUDA streams. Applies to every offloaded component")
-
-        self.components.switch(frame, 3, 1, ui_state, "async_offloading")
-
-        self.components.label(frame, 2, 0, "Temp Device",
-                         tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
-
-        self.components.entry(frame, 2, 1, ui_state, "temp_device", max_width=7)
+        field(3, self.components.switch, "async_offloading", "Async Offloading",
+              "Overlaps CPU<->GPU transfers with computation using CUDA streams. Applies to every offloaded component")
 
     def _build_multi_gpu(self, frame, controller, ui_state):
-        self.components.label(frame, 0, 0, "Device Indexes",
-                         tooltip="Multi-GPU: A comma-separated list of device indexes. If empty, all your GPUs are used. With a list such as \"0,1,3,4\" you can omit a GPU, for example an on-board graphics GPU.")
+        field = partial(self.components.labeled_field, frame, ui_state)
+        field(0, self.components.entry, "device_indexes", "Device Indexes",
+              "Multi-GPU: A comma-separated list of device indexes. If empty, all your GPUs are used. With a list such as \"0,1,3,4\" you can omit a GPU, for example an on-board graphics GPU.")
 
-        self.components.entry(frame, 0, 1, ui_state, "device_indexes")
+        field(1, self.components.options, "gradient_reduce_precision", "Gradient Reduce Precision",
+              "WEIGHT_DTYPE: Reduce gradients between GPUs in your weight data type; can be imprecise, but more efficient than float32\n"
+              "WEIGHT_DTYPE_STOCHASTIC: Sum up the gradients in your weight data type, but average them in float32 and stochastically round if your weight data type is bfloat16\n"
+              "FLOAT_32: Reduce gradients in float32\n"
+              "FLOAT_32_STOCHASTIC: Reduce gradients in float32; use stochastic rounding to bfloat16 if your weight data type is bfloat16",
+              values=[str(x) for x in GradientReducePrecision])
 
-        self.components.label(frame, 1, 0, "Gradient Reduce Precision",
-                         tooltip="WEIGHT_DTYPE: Reduce gradients between GPUs in your weight data type; can be imprecise, but more efficient than float32\n"
-                                 "WEIGHT_DTYPE_STOCHASTIC: Sum up the gradients in your weight data type, but average them in float32 and stochastically round if your weight data type is bfloat16\n"
-                                 "FLOAT_32: Reduce gradients in float32\n"
-                                 "FLOAT_32_STOCHASTIC: Reduce gradients in float32; use stochastic rounding to bfloat16 if your weight data type is bfloat16",
-                         wide_tooltip=True)
+        field(2, self.components.switch, "fused_gradient_reduce", "Fused Gradient Reduce",
+              "Multi-GPU: Gradient synchronisation during the backward pass. Can be more efficient, especially with Async Gradient Reduce")
 
-        self.components.options(frame, 1, 1, [str(x) for x in list(GradientReducePrecision)], ui_state,
-                           "gradient_reduce_precision")
+        field(3, self.components.switch, "async_gradient_reduce", "Async Gradient Reduce",
+              "Multi-GPU: Asynchroniously start the gradient reduce operations during the backward pass. Can be more efficient, but requires some VRAM.")
 
-        self.components.label(frame, 2, 0, "Fused Gradient Reduce",
-                         tooltip="Multi-GPU: Gradient synchronisation during the backward pass. Can be more efficient, especially with Async Gradient Reduce")
-
-        self.components.switch(frame, 2, 1, ui_state, "fused_gradient_reduce")
-
-        self.components.label(frame, 3, 0, "Async Gradient Reduce",
-                         tooltip="Multi-GPU: Asynchroniously start the gradient reduce operations during the backward pass. Can be more efficient, but requires some VRAM.")
-
-        self.components.switch(frame, 3, 1, ui_state, "async_gradient_reduce")
-
-        self.components.label(frame, 4, 0, "Buffer size (MB)",
-                         tooltip="Multi-GPU: Maximum VRAM for \"Async Gradient Reduce\", in megabytes. A multiple of this value can be needed if combined with \"Fused Back Pass\" and/or \"Layer offload fraction\"")
-
-        self.components.entry(frame, 4, 1, ui_state, "async_gradient_reduce_buffer")
+        field(4, self.components.entry, "async_gradient_reduce_buffer", "Buffer size (MB)",
+              "Multi-GPU: Maximum VRAM for \"Async Gradient Reduce\", in megabytes. A multiple of this value can be needed if combined with \"Fused Back Pass\" and/or \"Layer offload fraction\"")
 
     def _build_input_validation(self, frame, controller, ui_state):
-        self.components.label(frame, 1, 0, "Prevent Overwrites",
-                         tooltip="When enabled, output paths that already exist on disk will be flagged as invalid to avoid accidental overwrites")
+        field = partial(self.components.labeled_field, frame, ui_state)
+        field(0, self.components.switch, "auto_correct_input", "Clean Up Input",
+              "On leaving a field, pressing Enter, or starting training: trims surrounding whitespace, "
+              "removes matching outer path quotes, expands ~ in local paths, and converts Windows separators. "
+              "Invalid input is flagged for you to fix.")
 
-        self.components.switch(frame, 1, 1, ui_state, "prevent_overwrites")
-
-        self.components.label(frame, 0, 0, "Clean Up Input",
-                              tooltip="On leaving a field, pressing Enter, or starting training: trims surrounding whitespace, "
-                                      "removes matching outer path quotes, expands ~ in local paths, and converts Windows separators. "
-                                      "Invalid input is flagged for you to fix.")
-
-        self.components.switch(frame, 0, 1, ui_state, "auto_correct_input")
+        field(1, self.components.switch, "prevent_overwrites", "Prevent Overwrites",
+              "When enabled, output paths that already exist on disk will be flagged as invalid to avoid accidental overwrites")
 
 
 class GeneralTabView(BaseGeneralTabView, QWidget):

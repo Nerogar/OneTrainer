@@ -155,8 +155,6 @@ class BaseModelTabView:
             entry_tooltip="Comma-separated list of layers to quantize. Regular expressions (if toggled) are supported. Any model layer with a matching name will be quantized",
             regex_var_name="quantization.layer_filter_regex",
             regex_tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used.",
-            frame_color="transparent",
-            inset=True,
         )
         row += 1
 
@@ -165,29 +163,24 @@ class BaseModelTabView:
         self.components.switch(frame, row, 1, ui_state, "compile")
         row += 1
 
-        if "prior" in parts:
-            self.components.label(frame, row, 0, "Prior Data Type", tooltip="The prior weight data type")
-            self.components.options_kv(frame, row, 1, self._create_dtype_options(), ui_state, "prior.weight_dtype")
+        def part_dtype(part, name, *, a8=False, gguf=False, tooltip=None):
+            nonlocal row
+            choices = self._create_dtype_options(include_a8=a8, include_gguf=gguf, include_compressed=include_compressed)
+            self.components.labeled_field(frame, ui_state, row, self.components.options_kv, f"{part}.weight_dtype",
+                                          f"{name} Data Type", tooltip or f"The {name.lower()} weight data type",
+                                          values=choices)
             row += 1
 
-        if "unet" in parts or "transformer" in parts:
-            if "unet" in parts:
-                self.components.label(frame, row, 0, "UNet Data Type", tooltip="The unet weight data type")
-                self.components.options_kv(frame, row, 1,
-                                           self._create_dtype_options(include_a8=True, include_compressed=include_compressed),
-                                           ui_state, "unet.weight_dtype")
-            else:
-                self.components.label(frame, row, 0, "Transformer Data Type", tooltip="The transformer weight data type")
-                self.components.options_kv(frame, row, 1,
-                                           self._create_dtype_options(include_gguf=True, include_a8=True, include_compressed=include_compressed),
-                                           ui_state, "transformer.weight_dtype")
-            row += 1
-
-            self.components.label(frame, row, 0, "Fallback Data Type",
-                                  tooltip="The weight data type used for layers excluded by the quantization layer filter. Can itself be a quantized type.")
-            self.components.options_kv(frame, row, 1,
-                                       self._create_dtype_options(include_a8=True, include_compressed=include_compressed),
-                                       ui_state, "quantization.fallback_dtype")
+        denoiser = model_type.denoising_model_part()
+        if denoiser == "prior":
+            part_dtype(denoiser, "Prior")
+        else:
+            transformer = denoiser == "transformer"
+            part_dtype(denoiser, "Transformer" if transformer else "UNet", a8=True, gguf=transformer)
+            self.components.labeled_field(frame, ui_state, row, self.components.options_kv, "quantization.fallback_dtype",
+                                          "Fallback Data Type", "The weight data type used for layers excluded by the "
+                                          "quantization layer filter. Can itself be a quantized type.",
+                                          values=self._create_dtype_options(include_a8=True, include_compressed=include_compressed))
             row += 1
 
         self.components.label(frame, row, 0, "SVDQuant",
@@ -201,39 +194,18 @@ class BaseModelTabView:
         self.components.entry(frame, row, 1, ui_state, "quantization.svd_rank", max_width=5)
         row += 1
 
-        multiple_encoders = model_type.has_multiple_text_encoders()
-        for part, label, tooltip, available in (
-            ("text_encoder", "Text Encoder 1 Data Type" if multiple_encoders else "Text Encoder Data Type",
-             "The text encoder 1 weight data type" if multiple_encoders else "The text encoder weight data type", True),
-            ("text_encoder_2", "Text Encoder 2 Data Type", "The text encoder 2 weight data type", "text_encoder_2" in parts),
-            ("text_encoder_3", "Text Encoder 3 Data Type", "The text encoder 3 weight data type", "text_encoder_3" in parts),
-            ("text_encoder_4", "Text Encoder 4 Data Type", "The text encoder 4 weight data type", "text_encoder_4" in parts),
-            ("vae", "VAE Data Type", "The vae weight data type", "vae" in parts),
-        ):
-            if available:
-                self.components.label(frame, row, 0, label, tooltip=tooltip)
-                self.components.options_kv(frame, row, 1, self._create_dtype_options(), ui_state, f"{part}.weight_dtype")
-                row += 1
-
+        encoders = model_type.text_encoder_parts()
+        for index, part in enumerate(encoders, start=1):
+            part_dtype(part, f"Text Encoder {index}" if len(encoders) > 1 else "Text Encoder")
+        if "vae" in parts:
+            part_dtype("vae", "VAE")
         if "unconditional_transformer" in parts:
-            self.components.label(frame, row, 0, "Unconditional Transformer Data Type",
-                                  tooltip="The weight data type of the unconditional transformer, used for the negative branch of CFG during sampling")
-            self.components.options_kv(frame, row, 1,
-                                       self._create_dtype_options(include_a8=True, include_compressed=include_compressed),
-                                       ui_state, "unconditional_transformer.weight_dtype")
-            row += 1
-
-        for part, label, tooltip, available in (
-            ("effnet_encoder", "Effnet Encoder Data Type", "The effnet encoder weight data type", "effnet_encoder" in parts),
-            ("decoder", "Decoder Data Type", "The decoder weight data type", "decoder" in parts),
-            ("decoder_text_encoder", "Decoder Text Encoder Data Type", "The decoder text encoder weight data type",
-             "decoder" in parts and "decoder_text_encoder" in parts),
-            ("decoder_vqgan", "Decoder VQGAN Data Type", "The decoder vqgan weight data type", "decoder" in parts),
-        ):
-            if available:
-                self.components.label(frame, row, 0, label, tooltip=tooltip)
-                self.components.options_kv(frame, row, 1, self._create_dtype_options(), ui_state, f"{part}.weight_dtype")
-                row += 1
+            part_dtype("unconditional_transformer", "Unconditional Transformer", a8=True,
+                       tooltip="The weight data type of the unconditional transformer, used for the negative branch of CFG during sampling")
+        for part, name in (("effnet_encoder", "Effnet Encoder"), ("decoder", "Decoder"),
+                           ("decoder_text_encoder", "Decoder Text Encoder"), ("decoder_vqgan", "Decoder VQGAN")):
+            if part in parts:
+                part_dtype(part, name)
 
         self.components.label(frame, row, 0, "Output Data Type", tooltip="Precision to use when saving the output model")
         self.components.options_kv(frame, row, 1, [

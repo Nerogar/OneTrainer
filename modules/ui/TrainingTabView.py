@@ -899,7 +899,6 @@ class BaseTrainingTabView(ABC):
                                            entry_tooltip="Comma-separated list of diffusion layers to train. Regular expressions (if toggled) are supported. Any model layer with a matching name will be trained",
                                            regex_var_name="layer_filter_regex",
                                            regex_tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used.",
-                                           inset=True,
                                            )
 
 

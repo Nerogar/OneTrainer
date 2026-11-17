@@ -1,7 +1,7 @@
 import contextlib
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
@@ -25,9 +25,8 @@ from PySide6.QtCore import (
     QVariantAnimation,
     Signal,
 )
-from PySide6.QtGui import QColor, QFont, QFontMetricsF, QPalette, QPixmap, QWheelEvent
+from PySide6.QtGui import QFont, QFontMetricsF, QPalette, QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
-    QApplication,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -81,140 +80,6 @@ def _set_max_width(
 # ---------------------------------------------------------------------------
 # PySide6-only helpers
 # ---------------------------------------------------------------------------
-
-def _form_colors() -> tuple[QColor, QColor, QColor, QColor]:
-    """Derive every form surface from the application, never a nested panel."""
-    palette = QApplication.palette()
-    base = palette.color(QPalette.ColorRole.Window)
-    text = palette.color(QPalette.ColorRole.WindowText)
-    dark = base.lightnessF() < 0.5
-
-    def blend(first, second, amount):
-        return QColor(*(round(a + (b - a) * amount) for a, b in zip(
-            first.getRgb()[:3], second.getRgb()[:3], strict=True,
-        )))
-
-    surface = blend(base, QColor("white"), 0.065 if dark else 0.65)
-    border = blend(base, QColor("white" if dark else "black"), 0.13 if dark else 0.12)
-    return surface, border, text, blend(text, base, 0.12)
-
-
-class _SectionFrame(QFrame):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setFrameShape(QFrame.Shape.StyledPanel)
-        self.setProperty("formPanel", True)
-        self._apply_colors()
-        QApplication.instance().paletteChanged.connect(self._apply_colors)
-
-    def _apply_colors(self, *_args):
-        surface, border, _, _ = _form_colors()
-        self.setStyleSheet(f"""
-            QFrame[formPanel="true"] {{
-                background-color: {surface.name()};
-                border: 1px solid {border.name()};
-                border-radius: 6px;
-            }}
-        """)
-        # Expose the painted surface to embedded Qt Quick controls.
-        palette = QPalette()
-        palette.setColor(QPalette.ColorRole.Window, surface)
-        self.setPalette(palette)
-
-
-class _InsetFrame(QFrame):
-    """A bordered form inset with Material-style filled text inputs."""
-
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setProperty("formInset", True)
-        layout = _layout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setVerticalSpacing(8)
-        layout.setColumnStretch(1, 1)
-        self._apply_colors()
-        QApplication.instance().paletteChanged.connect(self._apply_colors)
-
-    def _apply_colors(self, *_args):
-        surface, _, text, _ = _form_colors()
-        dark = surface.lightnessF() < 0.5
-        palette = QApplication.palette()
-
-        def blend(background, foreground, opacity):
-            return QColor(*(round(a + (b - a) * opacity) for a, b in zip(
-                background.getRgb()[:3], foreground.getRgb()[:3], strict=True,
-            )))
-
-        inset = blend(surface, QColor("black"), 0.12 if dark else 0.025)
-        outline = blend(inset, text, 0.20)
-        fill = blend(inset, text, 0.12 if dark else 0.06)
-        hover = blend(fill, text, 0.08)
-        indicator = blend(fill, text, 0.70)
-        # Material filled fields use 4% on-surface fill and 38% content when disabled.
-        disabled_fill = blend(inset, text, 0.04)
-        disabled_text = blend(disabled_fill, text, 0.38)
-        accent = palette.color(QPalette.ColorRole.Highlight)
-        selection_text = palette.color(QPalette.ColorRole.HighlightedText)
-
-        # Container styling survives validators setting/clearing entry error borders.
-        self.setStyleSheet(f"""
-            QFrame[formInset="true"] {{
-                background-color: {inset.name()};
-                border: 1px solid {outline.name()};
-                border-radius: 6px;
-            }}
-            QLineEdit {{
-                background-color: {fill.name()};
-                color: {text.name()};
-                border: none;
-                border-bottom: 1px solid {indicator.name()};
-                padding: 6px 8px 7px 8px;
-                selection-background-color: {accent.name()};
-                selection-color: {selection_text.name()};
-            }}
-            QLineEdit:enabled:hover {{
-                background-color: {hover.name()};
-                border-bottom-color: {text.name()};
-            }}
-            QLineEdit:enabled:focus {{
-                border-bottom: 2px solid {accent.name()};
-                padding-bottom: 6px;
-            }}
-            QLineEdit:disabled {{
-                background-color: {disabled_fill.name()};
-                color: {disabled_text.name()};
-                border-bottom-color: {disabled_text.name()};
-            }}
-        """)
-
-
-class _FormLabel(QLabel):
-    def __init__(self, text, parent):
-        super().__init__(text, parent)
-        self._heading = False
-        self._apply_font()
-        self._apply_colors()
-        QApplication.instance().paletteChanged.connect(self._apply_colors)
-
-    def set_heading(self):
-        self._heading = True
-        self._apply_font()
-        self._apply_colors()
-
-    def _apply_font(self):
-        font = self.parentWidget().font()
-        font.setPointSizeF(max(10.0, font.pointSizeF()) + (1 if self._heading else 0))
-        font.setWeight(QFont.Weight.Bold if self._heading else QFont.Weight.Normal)
-        self.setFont(font)
-
-    def _apply_colors(self, *_args):
-        _, _, heading, field = _form_colors()
-        color = heading if self._heading else field
-        # Application stylesheet refreshes restore Qt's cached widget palettes.
-        # Keep our color in the stylesheet so repolishing cannot restore an old
-        # theme's text color. Disabled labels retain the native disabled color.
-        self.setStyleSheet(f"QLabel:enabled {{ color: {color.name()}; }}")
-
 
 class CollapsibleForm(QWidget):
     """Reveal an intact form by clipping its height, preserving values and bindings."""
@@ -476,8 +341,17 @@ def label(
         wide_tooltip: bool = False,
         wraplength: int = 0,
         underline: bool = False,
+        *,
+        heading: bool = False,
 ) -> QLabel:
-    component = _FormLabel(text, master)
+    component = QLabel(text, master)
+    component.setProperty("formLabel", "heading" if heading else "field")
+    font = master.font()
+    font.setPointSizeF(max(10.0, font.pointSizeF()) + int(heading))
+    font.setWeight(QFont.Weight.Bold if heading else QFont.Weight.Normal)
+    if underline:
+        font.setUnderline(True)
+    component.setFont(font)
     cell_alignment = Qt.AlignVCenter | Qt.AlignLeft
     if wraplength > 0:
         component.setWordWrap(True)
@@ -491,10 +365,6 @@ def label(
         cell_alignment = Qt.AlignTop | Qt.AlignLeft
     if tooltip:
         _set_tooltip(component, tooltip, wide_tooltip)
-    if underline:
-        font = component.font()
-        font.setUnderline(True)
-        component.setFont(font)
     layout = _layout(master)
     layout.addWidget(component, row, column)
     layout.setAlignment(component, cell_alignment)
@@ -510,8 +380,7 @@ def header_label(
         tooltip: str | None = None,
         top_spacing: int = 0,
 ) -> QLabel:
-    component = cast(_FormLabel, label(master, row, column, text, tooltip=tooltip))
-    component.set_heading()
+    component = label(master, row, column, text, tooltip=tooltip, heading=True)
     component.setContentsMargins(0, top_spacing, 0, 0)
     return component
 
@@ -519,6 +388,12 @@ def header_label(
 # ---------------------------------------------------------------------------
 # Compound widgets
 # ---------------------------------------------------------------------------
+
+def labeled_field(master: QWidget, ui_state: BaseUIState, row: int, factory: Callable, var_name: str,
+                  title: str, help_text: str, **kwargs):
+    label(master, row, 0, title, tooltip=help_text)
+    return factory(master, row, 1, ui_state=ui_state, var_name=var_name, **kwargs)
+
 
 def entry(
         master: QWidget,
@@ -801,26 +676,18 @@ def layer_filter_entry(
         entry_tooltip: str,
         regex_var_name: str,
         regex_tooltip: str,
-        frame_color=None,
-        *,
-        max_width: int | None = None,
-        inset: bool = False,
 ) -> QWidget:
-    """Create a layer filter, optionally in a bordered inset with filled text inputs.
-
-    max_width caps the group using the text field's character width.
-    """
-    frame = _InsetFrame(master) if inset else QWidget(master)
+    frame = QFrame(master)
+    frame.setProperty("formInset", True)
     _layout(master).addWidget(frame, row, column)
+    layout = _layout(frame)
+    layout.setContentsMargins(12, 12, 12, 12)
+    layout.setVerticalSpacing(8)
+    layout.setColumnStretch(1, 1)
 
     preset_heading = label(frame, 0, 0, preset_label, tooltip=preset_tooltip)
-    if inset:
-        _layout(frame).addWidget(preset_heading, 0, 0, 1, 2)
-
-    layer_entry = entry(frame, 1, 1 if inset else 0, ui_state, entry_var_name, tooltip=entry_tooltip)
-    if not inset:
-        _layout(frame).addWidget(layer_entry, 1, 0, 1, 2)  # span 2 columns
-
+    layout.addWidget(preset_heading, 0, 0, 1, 2)
+    layer_entry = entry(frame, 1, 1, ui_state, entry_var_name, tooltip=entry_tooltip)
     regex_label = label(frame, 2, 0, "Use Regex", tooltip=regex_tooltip)
     regex_switch = switch(frame, 2, 1, ui_state, regex_var_name)
 
@@ -856,11 +723,10 @@ def layer_filter_entry(
     ui_state.remove_all_var_traces(preset_var_name)
 
     layer_selector = options(
-        frame, 1 if inset else 0, 0 if inset else 1, presets_list, ui_state, preset_var_name,
+        frame, 1, 0, presets_list, ui_state, preset_var_name,
         command=preset_set_layer_choice,
     )
-    if inset:
-        _layout(frame).setAlignment(layer_selector, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+    layout.setAlignment(layer_selector, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
     ui_state.add_var_trace(preset_var_name, lambda: preset_set_layer_choice(
         ui_state.get_var(preset_var_name).get()
@@ -868,7 +734,6 @@ def layer_filter_entry(
 
     preset_set_layer_choice(layer_selector.currentText())
 
-    _set_max_width(frame, max_width, text_widget=layer_entry)
     return frame
 
 
@@ -1091,10 +956,8 @@ def options_adv(
         command: Callable[[str], None] | None = None,
         adv_command: Callable[[], None] | None = None,
         *,
-        max_width: int | None = None,
         fit_to_selection: bool = False,
 ) -> tuple[QWidget, dict]:
-    """Cap the dropdown in characters with max_width; add space for the settings button."""
     frame = QWidget(master)
     frame_lo = QGridLayout(frame)
     frame_lo.setContentsMargins(0, 0, 0, 0)
@@ -1113,8 +976,6 @@ def options_adv(
     if command:
         command(ui_state.get_var(var_name).get())
 
-    _set_max_width(frame, max_width, text_widget=combo,
-                   extra_width=adv_btn.width() + frame_lo.horizontalSpacing())
     return frame, {'component': combo, 'button_component': adv_btn}
 
 
@@ -1127,10 +988,7 @@ def options_kv(
         var_name: str,
         command: Callable[[Any], None] | None = None,
         sticky: str = "new",
-        *,
-        max_width: int | None = None,
 ) -> QComboBox:
-    """Create a labelled-value dropdown with an optional character-based max_width."""
     var = ui_state.get_var(var_name)
     keys = [key for key, _ in values]
     str_values = [str(v) for _, v in values]
@@ -1188,7 +1046,6 @@ def options_kv(
                 command(v)
                 break
 
-    _set_max_width(combo, max_width)
     return combo
 
 
@@ -1201,10 +1058,7 @@ def switch(
         command: Callable[[], None] | None = None,
         text: str = "",
         width: int | None = None,
-        *,
-        max_width: int | None = None,
 ) -> QCheckBox:
-    """Create a checkbox; width is fixed pixels, max_width is a character-based cap."""
     var = ui_state.get_var(var_name)
     component = QCheckBox(text, master)
     component.setChecked(bool(var.get()))
@@ -1240,7 +1094,6 @@ def switch(
     lo = _layout(master)
     lo.addWidget(component, row, column)
     lo.setAlignment(component, Qt.AlignVCenter | Qt.AlignLeft)
-    _set_max_width(component, max_width)
     return component
 
 
@@ -1300,7 +1153,9 @@ def double_progress(
 
 
 def section_frame(parent: QWidget, row: int, col: int = 0, colspan: int = 1) -> QFrame:
-    frame = _SectionFrame(parent)
+    frame = QFrame(parent)
+    frame.setFrameShape(QFrame.Shape.StyledPanel)
+    frame.setProperty("formPanel", True)
     _layout(parent).addWidget(frame, row, col, 1, colspan)
     frame_lo = _layout(frame)
     frame_lo.setColumnStretch(0, 1)
@@ -1315,22 +1170,11 @@ def inline_frame(parent: QWidget, row: int, col: int, columnspan: int = 1) -> QW
     return frame
 
 
-def form_section(
-        parent: QWidget,
-        row: int,
-        col: int,
-        title: str,
-        *,
-        panel: bool = True,
-        colspan: int = 1,
-        top_spacing: int = 0,
-) -> QWidget:
-    """Create a titled section and return its body for field construction."""
-    container = (section_frame(parent, row, col, colspan=colspan) if panel
-                 else inline_frame(parent, row, col, columnspan=colspan))
-    if panel:
-        _layout(parent).setAlignment(container, Qt.AlignmentFlag.AlignTop)
-    header_label(container, 0, 0, title, top_spacing=top_spacing)
+def form_section(parent: QWidget, row: int, col: int, title: str, *, colspan: int = 1) -> QWidget:
+    """Create a titled panel and return its body for field construction."""
+    container = section_frame(parent, row, col, colspan=colspan)
+    _layout(parent).setAlignment(container, Qt.AlignmentFlag.AlignTop)
+    header_label(container, 0, 0, title)
     body = inline_frame(container, 1, 0)
     _layout(body).setColumnStretch(1, 1)
     _layout(container).setRowStretch(2, 1)

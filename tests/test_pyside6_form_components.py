@@ -6,10 +6,10 @@ os.environ.setdefault("QT_QUICK_BACKEND", "software")
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.ui import pyside6_components as components
 from modules.util.ui.PySide6UIState import PySide6UIState
-from modules.util.ui.theme import _BASE_STYLESHEET, _LIGHT_STYLESHEET
+from modules.util.ui.theme import ThemeController, apply_theme
 
 import pytest
-from PySide6.QtCore import QCoreApplication, QEvent, QPoint, Qt
+from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QSettings, Qt
 from PySide6.QtGui import QColor, QHelpEvent, QPalette
 from PySide6.QtTest import QSignalSpy, QTest
 from PySide6.QtWidgets import QApplication, QLabel, QToolTip, QWidget
@@ -17,15 +17,17 @@ from shiboken6 import isValid
 
 
 @pytest.fixture
-def form():
+def form(tmp_path):
     app = QApplication.instance() or QApplication([])
     app.setStyle("Fusion")
+    theme = ThemeController(app, QSettings(str(tmp_path / "theme.ini"), QSettings.Format.IniFormat))
     parent = QWidget()
     config = TrainConfig.default_values()
     state = PySide6UIState(config)
     yield app, parent, config, state
     if isValid(parent):
         parent.deleteLater()
+    theme.deleteLater()
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
 
 
@@ -36,7 +38,7 @@ def test_shared_spacing_and_heading_defaults_preserve_explicit_overrides(form):
     assert layout.verticalSpacing() == 14
     layout.setSpacing(3)
     assert components._layout(parent).verticalSpacing() == 3
-    body = components.form_section(parent, 0, 0, "Reusable section", top_spacing=8)
+    body = components.form_section(parent, 0, 0, "Reusable section")
     panel = body.parentWidget()
     assert panel.property("formPanel")
     assert panel.layout().contentsMargins().left() == 10
@@ -47,13 +49,11 @@ def test_shared_spacing_and_heading_defaults_preserve_explicit_overrides(form):
     assert field.font().pointSizeF() >= 10
     assert heading.font().pointSizeF() == field.font().pointSizeF() + 1
     assert heading.font().bold() and not field.font().bold()
-    assert heading.contentsMargins().top() == 8
+    assert components.header_label(parent, 1, 0, "Next section", top_spacing=8).contentsMargins().top() == 8
     assert field.font().underline() and field.wordWrap()
     assert field.maximumWidth() == 100
     assert field.alignment() == Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft
     assert "Help" in field.toolTip()
-    inline = components.form_section(parent, 1, 0, "Inline", panel=False)
-    assert not inline.parentWidget().property("formPanel")
 
 
 @pytest.mark.parametrize("base,text,surface,field_color", [
@@ -63,7 +63,6 @@ def test_shared_spacing_and_heading_defaults_preserve_explicit_overrides(form):
 def test_nested_panel_and_switch_colors_follow_application_palette(form, base, text, surface, field_color):
     app, parent, _, state = form
     original = app.palette()
-    stylesheet = app.styleSheet()
     outer = components.section_frame(parent, 0)
     body = components.form_section(outer, 0, 0, "Nested")
     inner = body.parentWidget()
@@ -87,7 +86,6 @@ def test_nested_panel_and_switch_colors_follow_application_palette(form, base, t
         image = switch.grabFramebuffer()
         assert not image.isNull()
         assert image.pixelColor(0, 0).name() == surface
-        assert app.styleSheet() == stylesheet
     finally:
         app.setPalette(original)
 
@@ -106,7 +104,7 @@ def test_label_colors_survive_theme_stylesheet_refresh(form, initially_dark):
         app.setPalette(palette)
         # ThemeController refreshes the application stylesheet after the native
         # palette change. This repolishes widgets and can restore cached palettes.
-        app.setStyleSheet(_BASE_STYLESHEET + ("" if dark else _LIGHT_STYLESHEET))
+        apply_theme(app)
         app.processEvents()
 
     try:

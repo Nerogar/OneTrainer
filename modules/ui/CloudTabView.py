@@ -110,25 +110,20 @@ class BaseCloudTabView(ABC):
         self.components.switch(frame, 5, 1, ui_state, "cloud.update_onetrainer")
 
     def _build_download(self, frame, controller, ui_state):
-        self.components.label(frame, 0, 0, "Download samples",
-                         tooltip="Download samples from the remote workspace directory to your local machine.")
-        self.components.switch(frame, 0, 1, ui_state, "cloud.download_samples")
-
-        self.components.label(frame, 1, 0, "Download output model",
-                         tooltip="Download the final model after training to the local Final Output Directory, or to the local models/ folder for a cloud: destination. You can disable this if you plan to use an automatically saved checkpoint instead.")
-        self.components.switch(frame, 1, 1, ui_state, "cloud.download_output_model")
-
-        self.components.label(frame, 2, 0, "Download saved checkpoints",
-                         tooltip="Download the automatically saved training checkpoints from the remote workspace directory to your local machine.")
-        self.components.switch(frame, 2, 1, ui_state, "cloud.download_saves")
-
-        self.components.label(frame, 3, 0, "Download backups",
-                         tooltip="Download backups from the remote workspace directory to your local machine. It's usually not necessary to download them, because as long as the backups are still available on the cloud, the training can be restarted using one of the cloud's backups.")
-        self.components.switch(frame, 3, 1, ui_state, "cloud.download_backups")
-
-        self.components.label(frame, 4, 0, "Download tensorboard logs",
-                         tooltip="Download TensorBoard event logs from the remote workspace directory to your local machine. They can then be viewed locally in TensorBoard. It is recommended to disable \"Sample to TensorBoard\" to reduce the event log size.")
-        self.components.switch(frame, 4, 1, ui_state, "cloud.download_tensorboard")
+        self.components._layout(frame).setColumnStretch(1, 0)
+        for row, (key, title, tooltip) in enumerate((
+            ("cloud.download_samples", "Download samples",
+             "Download samples from the remote workspace directory to your local machine."),
+            ("cloud.download_output_model", "Download output model",
+             "Download the final model after training to the local Final Output Directory, or to the local models/ folder for a cloud: destination. You can disable this if you plan to use an automatically saved checkpoint instead."),
+            ("cloud.download_saves", "Download saved checkpoints",
+             "Download the automatically saved training checkpoints from the remote workspace directory to your local machine."),
+            ("cloud.download_backups", "Download backups",
+             "Download backups from the remote workspace directory to your local machine. It's usually not necessary to download them, because as long as the backups are still available on the cloud, the training can be restarted using one of the cloud's backups."),
+            ("cloud.download_tensorboard", "Download tensorboard logs",
+             "Download TensorBoard event logs from the remote workspace directory to your local machine. They can then be viewed locally in TensorBoard. It is recommended to disable \"Sample to TensorBoard\" to reduce the event log size."),
+        )):
+            self.components.labeled_field(frame, ui_state, row, self.components.switch, key, title, tooltip)
 
     def _build_container(self, frame, controller, ui_state):
         self.components.label(frame, 0, 0, "Create cloud via API",
@@ -164,41 +159,22 @@ class BaseCloudTabView(ABC):
         self.components.entry(frame, 5, 1, ui_state, "cloud.min_download", max_width=7)
 
     def _build_completion_actions(self, frame, controller, ui_state):
-        self.components.label(frame, 0, 0, "Delete remote workspace",
-                         tooltip="Delete the workspace directory on the cloud after training has finished successfully and data has been downloaded.")
-        self.components.switch(frame, 0, 1, ui_state, "cloud.delete_workspace")
-
-        self.components.label(frame, 1, 0, "Action on finish",
-                         tooltip="What to do when training finishes and the data has been fully downloaded: Stop or delete the cloud, or do nothing.")
-        self.components.options_kv(frame, 1, 1, [
-            ("None", CloudAction.NONE),
-            ("Stop", CloudAction.STOP),
-            ("Delete", CloudAction.DELETE),
-        ], ui_state, "cloud.on_finish")
-
-        self.components.label(frame, 2, 0, "Action on error",
-                         tooltip="What to do if training stops due to an error: Stop or delete the cloud, or do nothing. Data may be lost.")
-        self.components.options_kv(frame, 2, 1, [
-            ("None", CloudAction.NONE),
-            ("Stop", CloudAction.STOP),
-            ("Delete", CloudAction.DELETE),
-        ], ui_state, "cloud.on_error")
-
-        self.components.label(frame, 3, 0, "Action on detached finish",
-                         tooltip="What to do when training finishes, but the client has been detached and cannot download data. Data may be lost.")
-        self.components.options_kv(frame, 3, 1, [
-            ("None", CloudAction.NONE),
-            ("Stop", CloudAction.STOP),
-            ("Delete", CloudAction.DELETE),
-        ], ui_state, "cloud.on_detached_finish")
-
-        self.components.label(frame, 4, 0, "Action on detached error",
-                         tooltip="What to if training stops due to an error, but the client has been detached and cannot download data. Data may be lost.")
-        self.components.options_kv(frame, 4, 1, [
-            ("None", CloudAction.NONE),
-            ("Stop", CloudAction.STOP),
-            ("Delete", CloudAction.DELETE),
-        ], ui_state, "cloud.on_detached_error")
+        self.components._layout(frame).setColumnStretch(1, 0)
+        self.components.labeled_field(frame, ui_state, 0, self.components.switch, "cloud.delete_workspace",
+                                      "Delete remote workspace",
+                                      "Delete the workspace directory on the cloud after training has finished successfully and data has been downloaded.")
+        choices = [("None", CloudAction.NONE), ("Stop", CloudAction.STOP), ("Delete", CloudAction.DELETE)]
+        for row, (key, title, tooltip) in enumerate((
+            ("cloud.on_finish", "Action on finish",
+             "What to do when training finishes and the data has been fully downloaded: Stop or delete the cloud, or do nothing."),
+            ("cloud.on_error", "Action on error",
+             "What to do if training stops due to an error: Stop or delete the cloud, or do nothing. Data may be lost."),
+            ("cloud.on_detached_finish", "Action on detached finish",
+             "What to do when training finishes, but the client has been detached and cannot download data. Data may be lost."),
+            ("cloud.on_detached_error", "Action on detached error",
+             "What to if training stops due to an error, but the client has been detached and cannot download data. Data may be lost."),
+        ), start=1):
+            self.components.labeled_field(frame, ui_state, row, self.components.options_kv, key, title, tooltip, values=choices)
 
 
 class CloudTabView(BaseCloudTabView, QWidget, metaclass=QtABCMeta):
@@ -232,8 +208,6 @@ class CloudTabView(BaseCloudTabView, QWidget, metaclass=QtABCMeta):
             for row, (title, builder) in enumerate(sections):
                 section = self.components.form_section(column, row, 0, title)
                 builder(section, controller, ui_state)
-                if title in ("Download", "Completion Actions"):
-                    self.components._layout(section).setColumnStretch(1, 0)
                 fit_form(section)
             self.components._pack_form(column)
 

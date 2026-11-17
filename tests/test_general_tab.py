@@ -290,24 +290,19 @@ def test_destroying_view_during_deferred_preset_refresh_removes_traces(make_view
     assert "RuntimeError" not in capsys.readouterr().err
 
 
-def test_surface_colors_follow_palette_without_changing_app_style(make_view, app):
+def test_panel_and_quick_switch_follow_palette(make_view, app):
     view, _, _ = make_view(1)
+    view.show()
     original = app.palette()
-    stylesheet = app.styleSheet()
     try:
-        dark = QPalette(original)
-        dark.setColor(QPalette.ColorRole.Window, QColor("#202020"))
-        dark.setColor(QPalette.ColorRole.WindowText, QColor("#eeeeee"))
-        app.setPalette(dark)
-        assert "#2e2e2e" in view.validation_panel.styleSheet()
-        assert view.validation_switch.quickWindow().color().name() == "#2e2e2e"
-        light = QPalette(original)
-        light.setColor(QPalette.ColorRole.Window, QColor("#efefef"))
-        light.setColor(QPalette.ColorRole.WindowText, QColor("#202020"))
-        app.setPalette(light)
-        assert "#f9f9f9" in view.validation_panel.styleSheet()
-        assert view.validation_switch.quickWindow().color().name() == "#f9f9f9"
-        assert app.styleSheet() == stylesheet
+        for base, text, surface in (("#202020", "#eeeeee", "#2e2e2e"), ("#efefef", "#202020", "#f9f9f9")):
+            palette = QPalette(original)
+            palette.setColor(QPalette.ColorRole.Window, QColor(base))
+            palette.setColor(QPalette.ColorRole.WindowText, QColor(text))
+            app.setPalette(palette)
+            app.processEvents()
+            assert view.validation_panel.palette().color(QPalette.ColorRole.Window).name() == surface
+            assert view.validation_switch.quickWindow().color().name() == surface
     finally:
         app.setPalette(original)
 

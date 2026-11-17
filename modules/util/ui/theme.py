@@ -1,6 +1,7 @@
 import os
 
 from PySide6.QtCore import QObject, QSettings, Qt, Signal, Slot
+from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
 # Lets reviewers whose OS never reports dark still see the dark theme, by pretending it did.
@@ -101,6 +102,60 @@ _DARK_STYLESHEET = """
 """
 
 
+def _form_stylesheet(palette: QPalette) -> str:
+    def blend(background: QColor, foreground: QColor, amount: float) -> QColor:
+        return QColor(*(round(a + (b - a) * amount) for a, b in zip(
+            background.getRgb()[:3], foreground.getRgb()[:3], strict=True,
+        )))
+
+    base = palette.color(QPalette.ColorRole.Window)
+    text = palette.color(QPalette.ColorRole.WindowText)
+    dark = base.lightnessF() < 0.5
+    surface = blend(base, QColor("white"), 0.065 if dark else 0.65)
+    border = blend(base, QColor("white" if dark else "black"), 0.13 if dark else 0.12)
+    dark_inset = surface.lightnessF() < 0.5
+    inset = blend(surface, QColor("black"), 0.12 if dark_inset else 0.025)
+    fill = blend(inset, text, 0.12 if dark_inset else 0.06)
+    disabled_fill = blend(inset, text, 0.04)
+    disabled_text = blend(disabled_fill, text, 0.38)
+    return f"""
+        QLabel[formLabel="heading"]:enabled {{ color: {text.name()}; }}
+        QLabel[formLabel="field"]:enabled {{ color: {blend(text, base, 0.12).name()}; }}
+        QFrame[formPanel="true"] {{
+            background-color: {surface.name()};
+            border: 1px solid {border.name()};
+            border-radius: 6px;
+        }}
+        QFrame[formInset="true"] {{
+            background-color: {inset.name()};
+            border: 1px solid {blend(inset, text, 0.20).name()};
+            border-radius: 6px;
+        }}
+        QFrame[formInset="true"] QLineEdit {{
+            background-color: {fill.name()};
+            color: {text.name()};
+            border: none;
+            border-bottom: 1px solid {blend(fill, text, 0.70).name()};
+            padding: 6px 8px 7px 8px;
+            selection-background-color: palette(highlight);
+            selection-color: palette(highlighted-text);
+        }}
+        QFrame[formInset="true"] QLineEdit:enabled:hover {{
+            background-color: {blend(fill, text, 0.08).name()};
+            border-bottom-color: {text.name()};
+        }}
+        QFrame[formInset="true"] QLineEdit:enabled:focus {{
+            border-bottom: 2px solid palette(highlight);
+            padding-bottom: 6px;
+        }}
+        QFrame[formInset="true"] QLineEdit:disabled {{
+            background-color: {disabled_fill.name()};
+            color: {disabled_text.name()};
+            border-bottom-color: {disabled_text.name()};
+        }}
+    """
+
+
 def apply_theme(app: QApplication) -> None:
     # Scheme selection belongs to ThemeController; styling must not turn a
     # system-following preference into an explicit light-mode override.
@@ -108,7 +163,9 @@ def apply_theme(app: QApplication) -> None:
 
     # Qt's Windows dark checkbox palette uses the accent color for Base. Fusion
     # fills even unchecked indicators with Base; override only that state's fill.
-    app.setStyleSheet(_BASE_STYLESHEET + (_DARK_STYLESHEET if is_dark else _LIGHT_STYLESHEET))
+    stylesheet = _BASE_STYLESHEET + (_DARK_STYLESHEET if is_dark else _LIGHT_STYLESHEET) + _form_stylesheet(app.palette())
+    if app.styleSheet() != stylesheet:
+        app.setStyleSheet(stylesheet)
 
 
 class ThemeController(QObject):
@@ -129,6 +186,7 @@ class ThemeController(QObject):
         # Qt emits colorSchemeChanged before updating its palette. Refresh our
         # existing styling on the next event-loop turn, without changing the preference.
         app.styleHints().colorSchemeChanged.connect(self._refresh_theme, Qt.ConnectionType.QueuedConnection)
+        app.paletteChanged.connect(self._refresh_theme, Qt.ConnectionType.QueuedConnection)
         self._apply_preference()
 
     def _apply_preference(self):

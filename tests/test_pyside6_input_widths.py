@@ -31,36 +31,20 @@ def build_input(kind, parent, state, **kwargs):
         return components.path_entry(parent, 0, 0, state, "workspace_dir", mode="dir", **kwargs)
     if kind == "time_entry":
         return components.time_entry(parent, 0, 0, state, "validate_after", "validate_after_unit", **kwargs)
-    if kind == "layer_filter_entry":
-        return components.layer_filter_entry(
-            parent, 0, 0, state, "layer_filter_preset", "Layer Filter", "", {"full": []},
-            "layer_filter", "", "layer_filter_regex", "", **kwargs,
-        )
-    if kind == "options":
-        return components.options(parent, 0, 0, ["cuda", "cpu"], state, "train_device", **kwargs)
-    if kind == "options_kv":
-        return components.options_kv(parent, 0, 0, [("GPU", "cuda"), ("CPU", "cpu")], state, "train_device", **kwargs)
-    if kind == "options_adv":
-        return components.options_adv(parent, 0, 0, ["cuda", "cpu"], state, "train_device", **kwargs)[0]
-    return components.switch(parent, 0, 0, state, "debug_mode", **kwargs)
+    return components.options(parent, 0, 0, ["cuda", "cpu"], state, "train_device", **kwargs)
 
 
-@pytest.mark.parametrize("kind", ["entry", "path_entry", "time_entry", "layer_filter_entry",
-                                 "options", "options_kv", "options_adv", "switch"])
+@pytest.mark.parametrize("kind", ["entry", "path_entry", "time_entry", "options"])
 def test_optional_caps_survive_layout_and_resize(form, kind):
     app, parent, _, state = form
     widget = build_input(kind, parent, state, max_width=40)
-    if kind == "layer_filter_entry":
-        state.get_var("layer_filter_preset").set("custom")
     parent.show()
     app.processEvents()
     text_widget = widget
     extra_width = 0
-    if kind in ("path_entry", "time_entry", "layer_filter_entry"):
+    if kind in ("path_entry", "time_entry"):
         text_widget = widget.findChild(QLineEdit)
-    elif kind == "options_adv":
-        text_widget = widget.findChild(QComboBox)
-    if kind in ("path_entry", "options_adv"):
+    if kind == "path_entry":
         extra_width = widget.findChild(QPushButton).width() + widget.layout().horizontalSpacing()
     elif kind == "time_entry":
         extra_width = widget.findChild(QComboBox).sizeHint().width() + widget.layout().horizontalSpacing()
