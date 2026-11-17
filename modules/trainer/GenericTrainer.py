@@ -202,14 +202,23 @@ class GenericTrainer(BaseTrainer):
     def __enqueue_sample_during_training(self, fun: Callable):
         self.sample_queue.append(fun)
 
-    def __execute_sample_during_training(self) -> bool:
-        # returns whether any samples were run
-        sampled = bool(self.sample_queue)
+    def __execute_sample_during_training(self, train_progress: TrainProgress, train_device: torch.device):
         with PeakMemoryRecorder("sampling", enabled=False):
             for fun in self.sample_queue:
                 fun()
         self.sample_queue = []
-        return sampled
+
+        # Every rank (gpus) enters this loop at a gradient-free boundary, even when its
+        # local timer/queue didn't request sampling. Conditional collectives here
+        # would deadlock against another rank's next training collective.
+        while True:
+            multi.sync_commands(self.commands)
+            if self.commands.get_stop_command():
+                break
+            sample_commands = self.commands.get_and_reset_sample_custom_commands()
+            if not sample_commands:
+                break
+            self.__sample_during_training(train_progress, train_device, sample_commands)
 
     def __sample_loop(
             self,
@@ -222,63 +231,81 @@ class GenericTrainer(BaseTrainer):
     ):
         on_update_progress = self.callbacks.on_update_sample_custom_progress if is_custom_sample else self.callbacks.on_update_sample_default_progress
 
+        def report_error(index, stage, exc, destination=None):
+            traceback.print_exception(exc)
+            location = f" ({destination})" if destination is not None else ""
+            tqdm.write(f"Error during {stage} for sample {index}{location}; continuing with other samples")
+
         try:
             jobs = []  # (sample_config, destination, index, prompt_label) for this rank's share
             for i, sample_config in multi.distributed(
                 [(i, sample_config) for i, sample_config in enumerate(sample_config_list) if sample_config.enabled],
                 distribute=not self.config.samples_to_tensorboard and not ema_applied
             ):
-                prompt_label = path_util.safe_filename(sample_config.prompt)
+                failed = False
+                try:
+                    prompt_label = path_util.safe_filename(sample_config.prompt)
 
-                if is_custom_sample:
-                    sample_dir = os.path.join(
-                        self.config.workspace_dir,
-                        "samples",
-                        "custom",
+                    if is_custom_sample:
+                        sample_dir = os.path.join(
+                            self.config.workspace_dir,
+                            "samples",
+                            "custom",
+                        )
+                    else:
+                        sample_dir = os.path.join(
+                            self.config.workspace_dir,
+                            "samples",
+                            f"{str(i)} - {prompt_label}{folder_postfix}",
+                        )
+
+                    # Custom samples share a directory and can finish within the same
+                    # second, so keep their original index in the filename.
+                    sample_suffix = f"-{str(i)}" if is_custom_sample else ""
+                    sample_path = os.path.join(
+                        sample_dir,
+                        f"{self.config.get_timestamped_run_name()}-training-sample-{train_progress.filename_string()}{sample_suffix}"
                     )
-                else:
-                    sample_dir = os.path.join(
-                        self.config.workspace_dir,
-                        "samples",
-                        f"{str(i)} - {prompt_label}{folder_postfix}",
-                    )
 
-                # custom samples all share the samples/custom dir (regular ones each get their own
-                # {i} - prompt dir), so add the index here - without it a batch that finishes within the
-                # same second shares one filename (timestamp + filename_string are identical) and overwrites.
-                sample_suffix = f"-{str(i)}" if is_custom_sample else ""
-                sample_path = os.path.join(
-                    sample_dir,
-                    f"{self.config.get_timestamped_run_name()}-training-sample-{train_progress.filename_string()}{sample_suffix}"
-                )
+                    sample_config = copy.copy(sample_config)
+                    sample_config.from_train_config(self.config)
 
-                sample_config = copy.copy(sample_config)
-                sample_config.from_train_config(self.config)
-
-                jobs.append((sample_config, sample_path, i, prompt_label))
+                    jobs.append((sample_config, sample_path, i, prompt_label))
+                except Exception as exc:
+                    report_error(i, "preparation", exc)
+                    failed = True
+                if failed:
+                    torch_gc()
 
             if jobs:
                 self.model.eval()
 
-                sampler_outputs = self.model_sampler.sample_all(
+                def on_sample(index, sampler_output):
+                    _, destination, i, prompt_label = jobs[index]
+                    if is_custom_sample:
+                        self.callbacks.on_sample_custom(sampler_output)
+                    else:
+                        if self.config.samples_to_tensorboard and sampler_output.file_type == FileType.IMAGE:
+                            try:
+                                self.tensorboard.add_image(
+                                    f"sample{str(i)} - {prompt_label}", pil_to_tensor(sampler_output.data),
+                                    train_progress.global_step
+                                )
+                            except Exception as exc:
+                                report_error(i, "TensorBoard delivery", exc, destination)
+                        self.callbacks.on_sample_default(sampler_output)
+
+                self.model_sampler.sample_all(
                     [sample_config for sample_config, _, _, _ in jobs],
                     [destination for _, destination, _, _ in jobs],
                     self.config.sample_image_format,
                     self.config.sample_video_format,
                     self.config.sample_audio_format,
                     on_update_progress=on_update_progress,
+                    on_sample=on_sample,
+                    on_error=lambda index, stage, exc: report_error(jobs[index][2], stage, exc, jobs[index][1]),
+                    offload_intermediates=self.config.sample_offload_intermediates,
                 )
-
-                for (_, _, i, prompt_label), sampler_output in zip(jobs, sampler_outputs, strict=True):
-                    if is_custom_sample:
-                        self.callbacks.on_sample_custom(sampler_output)
-                    else:
-                        if self.config.samples_to_tensorboard and sampler_output.file_type == FileType.IMAGE:
-                            self.tensorboard.add_image(
-                                f"sample{str(i)} - {prompt_label}", pil_to_tensor(sampler_output.data),
-                                train_progress.global_step
-                            )
-                        self.callbacks.on_sample_default(sampler_output)
         except Exception:
             traceback.print_exc()
             tqdm.write("Error during sampling, proceeding without sampling")
@@ -793,16 +820,7 @@ class GenericTrainer(BaseTrainer):
                     torch_gc()
 
                 if not has_gradient:
-                    if self.__execute_sample_during_training():
-                        # a custom sample (UI "sample now") can arrive while that sample was running; it only
-                        # reaches us on the command channel, so keep sampling until none are left instead of
-                        # making it wait for the next training step
-                        while True:
-                            multi.sync_commands(self.commands)
-                            sample_commands = self.commands.get_and_reset_sample_custom_commands()
-                            if not sample_commands:
-                                break
-                            self.__sample_during_training(train_progress, train_device, sample_commands)
+                    self.__execute_sample_during_training(train_progress, train_device)
                     backup = self.commands.get_and_reset_backup_command()
                     save = self.commands.get_and_reset_save_command()
                     if multi.is_master() and (backup or save):

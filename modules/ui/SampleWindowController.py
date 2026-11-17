@@ -151,14 +151,15 @@ class SampleWindowController:
             self.model.eval()
 
             try:
-                self.model_sampler.sample(
-                    sample_config=sample,
-                    destination=sample_path,
+                self.model_sampler.sample_all(
+                    sample_configs=[sample],
+                    destinations=[sample_path],
                     image_format=self.current_train_config.sample_image_format,
                     video_format=self.current_train_config.sample_video_format,
                     audio_format=self.current_train_config.sample_audio_format,
-                    on_sample=on_sample,
+                    on_sample=lambda _index, output: on_sample(output),
                     on_update_progress=on_update_progress,
+                    offload_intermediates=self.current_train_config.sample_offload_intermediates,
                 )
             finally:
                 # the sampler materializes parts on demand; release VRAM now that this

@@ -9,6 +9,8 @@ from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.VideoFormat import VideoFormat
+from modules.util.staged_pipeline import run_staged_pipeline
+from modules.util.torch_util import torch_gc
 
 import torch
 
@@ -81,44 +83,98 @@ class BaseModelSampler(metaclass=ABCMeta):
             video_format: VideoFormat | None = None,
             audio_format: AudioFormat | None = None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
-    ) -> list[ModelSamplerOutput]:
+            *,
+            on_sample: Callable[[int, ModelSamplerOutput], None] | None = None,
+            on_error: Callable[[int, str, Exception], None] | None = None,
+            offload_intermediates: bool = True,
+    ) -> list[ModelSamplerOutput | None]:
+        """Save and publish samples in input order, retaining None slots for reported failures.
+
+        on_sample receives the batch index after saving. Supplying on_error enables
+        per-item recovery; without it, errors propagate to the caller.
+        """
         # Item-major fallback for samplers not split into pipeline stages: run each sample
         # end to end, cycling this model's parts on-device once per sample instead of once
         # per batch. Progress restarts at each sample, matching how these samplers reported
         # when the trainer still sampled one at a time. Samplers that define stages override
         # this with run_staged_pipeline.
-        sampler_outputs = []
-        for sample_config, destination in zip(sample_configs, destinations, strict=True):
-            self.sample(
-                sample_config, destination,
-                image_format, video_format, audio_format,
-                on_sample=sampler_outputs.append,
-                on_update_progress=on_update_progress,
-            )
+        self._validate_sample_destinations(sample_configs, destinations)
+        sampler_outputs = [None] * len(sample_configs)
+        for index, (sample_config, destination) in enumerate(zip(sample_configs, destinations, strict=True)):
+            failed = False
+
+            def publish(output, index=index):
+                if on_sample is not None:
+                    on_sample(index, output)
+                sampler_outputs[index] = output
+
+            try:
+                self.sample(
+                    sample_config, destination,
+                    image_format, video_format, audio_format,
+                    on_sample=publish,
+                    on_update_progress=on_update_progress,
+                )
+            except Exception as exc:
+                sampler_outputs[index] = None
+                if on_error is None:
+                    raise
+                on_error(index, "sampling", exc)
+                failed = True
+            if failed:
+                torch_gc()
         return sampler_outputs
+
+    @staticmethod
+    def _validate_sample_destinations(sample_configs, destinations):
+        if len(sample_configs) != len(destinations):
+            raise ValueError("Each sample must have exactly one destination")
+
+    def _sample_staged(
+            self,
+            stages: list[tuple[str, Callable]],
+            sample_configs: list[SampleConfig],
+            destinations: list[str],
+            image_format: ImageFormat | None,
+            video_format: VideoFormat | None,
+            audio_format: AudioFormat | None,
+            on_update_progress: Callable[[int, int], None],
+            on_sample: Callable[[int, ModelSamplerOutput], None] | None,
+            on_error: Callable[[int, str, Exception], None] | None,
+            offload_intermediates: bool,
+    ) -> list[ModelSamplerOutput | None]:
+        self._validate_sample_destinations(sample_configs, destinations)
+        planned = [max(0, config.diffusion_steps) for config in sample_configs]
+        completed = [0] * len(sample_configs)
+        total_steps = sum(planned)
+
+        def progress_for(index):
+            def progress(step: int, sample_steps: int):
+                completed[index] = max(completed[index], min(planned[index], step * planned[index] // max(1, sample_steps)))
+                on_update_progress(sum(completed), max(1, total_steps))
+            return progress
+
+        def report_error(index: int, stage: str, exc: Exception):
+            completed[index] = planned[index]
+            on_update_progress(sum(completed), max(1, total_steps))
+            on_error(index, stage, exc)
+
+        def publish(index: int, output: ModelSamplerOutput):
+            self.save_sampler_output(output, destinations[index], image_format, video_format, audio_format)
+            if on_sample is not None:
+                on_sample(index, output)
+
+        return run_staged_pipeline(
+            stages,
+            {"sample_config": sample_configs, "on_update_progress": [progress_for(i) for i in range(len(sample_configs))]},
+            on_result=publish,
+            on_error=report_error if on_error is not None else None,
+            offload_intermediates=offload_intermediates,
+        )
 
     @staticmethod
     def quantize_resolution(resolution: int, quantization: int) -> int:
         return round(resolution / quantization) * quantization
-
-    @staticmethod
-    def batch_progress_callback(
-            sample_configs: list[SampleConfig],
-            on_update_progress: Callable[[int, int], None],
-    ) -> Callable[[int, int], None]:
-        # denoise reports its own per-sample step count; the staged pipeline denoises
-        # every sample before any decode, so translate those into one continuous bar
-        # spanning the whole batch rather than restarting at each sample
-        total_steps = sum(sample_config.diffusion_steps for sample_config in sample_configs)
-        completed_steps = 0
-
-        def batch_progress(step: int, sample_steps: int):
-            nonlocal completed_steps
-            on_update_progress(completed_steps + step, total_steps)
-            if step == sample_steps:
-                completed_steps += sample_steps
-
-        return batch_progress
 
     @staticmethod
     def save_sampler_output(
