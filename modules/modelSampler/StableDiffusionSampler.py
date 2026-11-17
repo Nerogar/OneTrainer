@@ -73,14 +73,14 @@ class StableDiffusionSampler(BaseModelSampler):
             vae_scale_factor = self.pipeline.vae_scale_factor
 
             # prepare prompt
-            self.model.materialize_only("text_encoder")
-
-            prompt_embedding = self.model.encode_text(
+            prompt_embedding = self.model.encode_text_cached(
+                "text_encoder",
                 text=prompt,
                 train_device=self.train_device,
                 text_encoder_layer_skip=text_encoder_layer_skip,
             )
-            negative_prompt_embedding = self.model.encode_text(
+            negative_prompt_embedding = self.model.encode_text_cached(
+                "text_encoder",
                 text=negative_prompt,
                 train_device=self.train_device,
                 text_encoder_layer_skip=text_encoder_layer_skip,
@@ -268,14 +268,14 @@ class StableDiffusionSampler(BaseModelSampler):
                 )
 
             # prepare prompt
-            self.model.materialize_only("text_encoder")
-
-            prompt_embedding = self.model.encode_text(
+            prompt_embedding = self.model.encode_text_cached(
+                "text_encoder",
                 text=prompt,
                 train_device=self.train_device,
                 text_encoder_layer_skip=text_encoder_layer_skip,
             )
-            negative_prompt_embedding = self.model.encode_text(
+            negative_prompt_embedding = self.model.encode_text_cached(
+                "text_encoder",
                 text=negative_prompt,
                 train_device=self.train_device,
                 text_encoder_layer_skip=text_encoder_layer_skip,
@@ -362,6 +362,20 @@ class StableDiffusionSampler(BaseModelSampler):
                 file_type=FileType.IMAGE,
                 data=image[0],
             )
+
+    def prepare_text_encoding(self, sample_config: SampleConfig):
+        self.model.encode_text_cached(
+            "text_encoder",
+            text=sample_config.prompt,
+            train_device=self.train_device,
+            text_encoder_layer_skip=sample_config.text_encoder_1_layer_skip,
+        )
+        self.model.encode_text_cached(
+            "text_encoder",
+            text=sample_config.negative_prompt,
+            train_device=self.train_device,
+            text_encoder_layer_skip=sample_config.text_encoder_1_layer_skip,
+        )
 
     def sample(
             self,

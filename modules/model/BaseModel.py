@@ -1,3 +1,6 @@
+import hashlib
+import os
+import traceback
 from abc import ABCMeta
 from contextlib import nullcontext
 from uuid import uuid4
@@ -94,6 +97,7 @@ class BaseModel(metaclass=ABCMeta):
         self.model_spec = None
         self.train_config = None
         self.embedding_state_dicts = {}
+        self.text_encoding_cache = {}
         self.autocast_context = nullcontext()
         self.train_dtype = DataType.FLOAT_32
 
@@ -163,6 +167,46 @@ class BaseModel(metaclass=ABCMeta):
             component = getattr(self, stem)
             if component is not None:
                 component.eval()
+
+    def encode_text_cached(self, parts: str | tuple[str, ...], **kwargs):
+        # materialize_only + encode_text with a two-level cache: an in-memory dict (L1) plus an on-disk
+        # cache (L2) that survives across runs, keyed by (model, prompt, prompt settings). A repeat of the
+        # exact same call returns the stored encoding without materializing the text encoders, so sampling
+        # can reuse encodings of previously sampled prompts. `parts` is the part (or parts) the encoding
+        # depends on.
+        parts = (parts,) if isinstance(parts, str) else tuple(parts)
+        key = (parts, tuple(sorted((k, repr(v)) for k, v in kwargs.items())))
+        cached = self.text_encoding_cache.get(key)
+        if cached is not None:
+            return cached
+        disk_path = self.__text_encoding_disk_path(self.__text_encoding_disk_key(parts, kwargs))
+        if disk_path is not None and os.path.isfile(disk_path):
+            cached = torch.load(disk_path, map_location=kwargs.get("train_device"), weights_only=True)
+            self.text_encoding_cache[key] = cached
+            return cached
+        self.materialize_only(*parts)
+        encoding = self.encode_text(**kwargs)
+        self.text_encoding_cache[key] = encoding
+        if disk_path is not None:
+            os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+            tmp_path = disk_path + ".tmp"
+            torch.save(encoding, tmp_path)
+            os.replace(tmp_path, disk_path)
+        return encoding
+
+    def __text_encoding_disk_key(self, parts: tuple[str, ...], kwargs: dict) -> str:
+        # On-disk cache key: ModelType + prompt + prompt settings. `train_device` is excluded (it is
+        # transient/environment-specific); every other kwarg (the `text` prompt plus the layer/sequence/
+        # mask settings, ...) is part of the key, so changing any prompt setting yields a fresh encoding.
+        settings = tuple(sorted((k, repr(v)) for k, v in kwargs.items() if k != "train_device"))
+        key_str = "\x00".join([self.model_type.name, ",".join(parts), repr(settings)])
+        return hashlib.sha256(key_str.encode("utf-8")).hexdigest()
+
+    def __text_encoding_disk_path(self, disk_key: str) -> str | None:
+        # cache_dir/text_encodings/<key>.pt; None when there is no cache_dir (fall back to memory only).
+        if self.train_config is None or not self.train_config.cache_dir:
+            return None
+        return os.path.join(self.train_config.cache_dir, "text_encodings", f"{disk_key}.pt")
 
     def adapters(self) -> list[LoRAModuleWrapper]:
         # Every LoRA adapter present on a model part, in model_parts() order. Parts without a LoRA

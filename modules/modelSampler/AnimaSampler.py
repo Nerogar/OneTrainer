@@ -65,10 +65,9 @@ class AnimaSampler(BaseModelSampler):
             num_latent_channels = 16
 
             # prepare prompt
-            self.model.materialize_only("text_encoder")
-
             batch_size = 2 if cfg_scale > 1.0 else 1
-            combined_prompt_embedding = self.model.encode_text(
+            combined_prompt_embedding = self.model.encode_text_cached(
+                "text_encoder",
                 text=[prompt, negative_prompt] if cfg_scale > 1.0 else prompt,
                 batch_size=batch_size,
                 train_device=self.train_device,
@@ -130,6 +129,15 @@ class AnimaSampler(BaseModelSampler):
                 file_type=FileType.IMAGE,
                 data=image[0],
             )
+
+    def prepare_text_encoding(self, sample_config: SampleConfig):
+        batch_size = 2 if sample_config.cfg_scale > 1.0 else 1
+        self.model.encode_text_cached(
+            "text_encoder",
+            text=[sample_config.prompt, sample_config.negative_prompt] if batch_size == 2 else sample_config.prompt,
+            batch_size=batch_size,
+            train_device=self.train_device,
+        )
 
     def sample(
             self,

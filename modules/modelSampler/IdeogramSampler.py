@@ -91,8 +91,8 @@ class IdeogramSampler(BaseModelSampler):
                 return max_text_tokens, position_ids, segment_ids, indicator, llm_features, text_z_padding
 
             # encode text (conditional branch, and the empty-prompt negative branch if needed)
-            self.model.materialize_only("text_encoder")
-            text_features, text_lengths = self.model.encode_text(
+            text_features, text_lengths = self.model.encode_text_cached(
+                "text_encoder",
                 train_device=self.train_device,
                 text=prompt,
             )
@@ -101,7 +101,8 @@ class IdeogramSampler(BaseModelSampler):
             )
 
             if use_empty_prompt_negative:
-                neg_text_features, neg_text_lengths = self.model.encode_text(
+                neg_text_features, neg_text_lengths = self.model.encode_text_cached(
+                    "text_encoder",
                     train_device=self.train_device,
                     text="",
                 )
@@ -201,6 +202,19 @@ class IdeogramSampler(BaseModelSampler):
             return ModelSamplerOutput(
                 file_type=FileType.IMAGE,
                 data=image[0],
+            )
+
+    def prepare_text_encoding(self, sample_config: SampleConfig):
+        self.model.encode_text_cached(
+            "text_encoder",
+            train_device=self.train_device,
+            text=sample_config.prompt,
+        )
+        if sample_config.cfg_scale > 1.0 and self.model.unconditional_transformer is None:
+            self.model.encode_text_cached(
+                "text_encoder",
+                train_device=self.train_device,
+                text="",
             )
 
     def sample(

@@ -68,9 +68,8 @@ class HunyuanVideoSampler(BaseModelSampler):
             num_latent_channels = 16
 
             # prepare prompt
-            self.model.materialize_only_text_encoders()
-
-            prompt_embedding, pooled_prompt_embedding, prompt_attention_mask = self.model.encode_text(
+            prompt_embedding, pooled_prompt_embedding, prompt_attention_mask = self.model.encode_text_cached(
+                self.model_type.text_encoder_parts(),
                 text=prompt,
                 train_device=self.train_device,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
@@ -163,6 +162,15 @@ class HunyuanVideoSampler(BaseModelSampler):
                     file_type=FileType.VIDEO,
                     data=image,
                 )
+
+    def prepare_text_encoding(self, sample_config: SampleConfig):
+        self.model.encode_text_cached(
+            self.model_type.text_encoder_parts(),
+            text=sample_config.prompt,
+            train_device=self.train_device,
+            text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
+            text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
+        )
 
     def sample(
             self,

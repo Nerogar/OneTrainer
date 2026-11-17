@@ -71,9 +71,8 @@ class FluxSampler(BaseModelSampler):
             num_latent_channels = 16
 
             # prepare prompt
-            self.model.materialize_only_text_encoders()
-
-            prompt_embedding, pooled_prompt_embedding = self.model.encode_text(
+            prompt_embedding, pooled_prompt_embedding = self.model.encode_text_cached(
+                self.model_type.text_encoder_parts(),
                 text=prompt,
                 train_device=self.train_device,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
@@ -287,9 +286,8 @@ class FluxSampler(BaseModelSampler):
                 )
 
             # prepare prompt
-            self.model.materialize_only_text_encoders()
-
-            prompt_embedding, pooled_prompt_embedding = self.model.encode_text(
+            prompt_embedding, pooled_prompt_embedding = self.model.encode_text_cached(
+                self.model_type.text_encoder_parts(),
                 text=prompt,
                 train_device=self.train_device,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
@@ -379,6 +377,17 @@ class FluxSampler(BaseModelSampler):
                 file_type=FileType.IMAGE,
                 data=image[0],
             )
+
+    def prepare_text_encoding(self, sample_config: SampleConfig):
+        self.model.encode_text_cached(
+            self.model_type.text_encoder_parts(),
+            text=sample_config.prompt,
+            train_device=self.train_device,
+            text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
+            text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
+            text_encoder_2_sequence_length=sample_config.text_encoder_2_sequence_length,
+            apply_attention_mask=sample_config.transformer_attention_mask,
+        )
 
     def sample(
             self,
