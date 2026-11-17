@@ -1,4 +1,5 @@
 import os
+import re
 import traceback
 
 from modules.model.AnimaModel import AnimaModel
@@ -21,6 +22,20 @@ from diffusers import (
     GGUFQuantizationConfig,
 )
 from transformers import Qwen2Tokenizer, Qwen3Model, T5TokenizerFast
+
+
+def _detect_transformer_num_layers(filepath: str) -> int | None:
+    """Reads headers of .safetensors or .gguf to count transformer blocks."""
+    if filepath.endswith(".gguf"):
+        import gguf
+        keys = [t.name for t in gguf.GGUFReader(filepath).tensors]
+    else:
+        from safetensors import safe_open
+        with safe_open(filepath, framework="pt", device="cpu") as f:
+            keys = list(f.keys())
+
+    indices = [int(m.group(1)) for k in keys if (m := re.search(r"blocks\.(\d+)\.", k))]
+    return max(indices) + 1 if indices else None
 
 
 class AnimaModelLoader(
@@ -103,6 +118,14 @@ class AnimaModelLoader(
             )
 
         if transformer_model_name:
+            # Detect block count directly from the safetensors header
+            # Mainly for Anima 2.9B model (40 layers)
+            detected_num_layers = _detect_transformer_num_layers(transformer_model_name)
+            config_overrides = {}
+            if detected_num_layers is not None:
+                print(f"[AnimaModelLoader] Auto-detected {detected_num_layers} layers in {transformer_model_name}")
+                config_overrides["num_layers"] = detected_num_layers
+
             transformer = CosmosTransformer3DModel.from_single_file(
                 transformer_model_name,
                 config=base_model_name,
@@ -110,6 +133,7 @@ class AnimaModelLoader(
                 #avoid loading the transformer in float32:
                 torch_dtype=torch.bfloat16 if weight_dtypes.transformer.torch_dtype() is None else weight_dtypes.transformer.torch_dtype(),
                 quantization_config=GGUFQuantizationConfig(compute_dtype=torch.bfloat16) if weight_dtypes.transformer.is_gguf() else None,
+                **config_overrides,
             )
             transformer = self._convert_diffusers_sub_module_to_dtype(
                 transformer, weight_dtypes.transformer, weight_dtypes.train_dtype, quantization,
