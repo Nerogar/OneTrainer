@@ -42,6 +42,7 @@ class CtkCaptionUIView(BaseCaptionUIView, ctk.CTkToplevel):
         top_frame = ctk.CTkFrame(self)
         top_frame.grid(row=0, column=0, sticky="nsew")
         self.build_top_bar(top_frame, controller, self.config_ui_state)
+        top_frame.grid_columnconfigure(5, weight=1)
 
         self.bottom_frame = ctk.CTkFrame(self)
         self.bottom_frame.grid(row=1, column=0, sticky="nsew")

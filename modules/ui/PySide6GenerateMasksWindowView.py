@@ -1,141 +1,133 @@
-import contextlib
-import tkinter as tk
-from tkinter import filedialog
+import threading
+import traceback
 
 from modules.ui.BaseGenerateMasksWindowView import BaseGenerateMasksWindowView
 from modules.ui.GenerateMasksWindowController import GenerateMasksWindowController
-from modules.util.ui.ui_utils import set_window_icon
+from modules.util.ui import pyside6_components
+from modules.util.ui.pyside6_util import QtABCMeta
+from modules.util.ui.PySide6UIState import PySide6UIState
 
-import customtkinter as ctk
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import QDialog, QFileDialog, QLineEdit, QPushButton, QWidget
 
 
-class CtkGenerateMasksWindowView(BaseGenerateMasksWindowView, ctk.CTkToplevel):
-    def __init__(self, parent, controller: GenerateMasksWindowController, path, parent_include_subdirectories, *args, **kwargs):
-        """
-        Window for generating masks for a folder of images
-
-        Parameters:
-            parent (`Tk`): the parent window
-            path (`str`): the path to the folder
-            parent_include_subdirectories (`bool`): whether to include subdirectories. used to set the default value of the include subdirectories checkbox
-        """
-        ctk.CTkToplevel.__init__(self, parent, *args, **kwargs)
-
+class PySide6GenerateMasksWindowView(BaseGenerateMasksWindowView, QDialog, metaclass=QtABCMeta):
+    def __init__(self, parent, controller: GenerateMasksWindowController, path, parent_include_subdirectories):
+        QDialog.__init__(self, parent)
         self.controller = controller
-        if path is None:
-            path = ""
-
-        self.mode_var = ctk.StringVar(self, "Create if absent")
-        self.modes = ["Replace all masks", "Create if absent", "Add to existing", "Subtract from existing", "Blend with existing"]
-        self.model_var = ctk.StringVar(self, "ClipSeg")
+        self.is_running = False
+        self._worker = None
+        self.ui_state = PySide6UIState({
+            "model": "ClipSeg",
+            "mode": "Create if absent",
+            "include_subdirectories": parent_include_subdirectories,
+        })
         self.models = ["ClipSeg", "Rembg", "Rembg-Human", "Hex Color"]
+        self.modes = ["Replace all masks", "Create if absent", "Add to existing", "Subtract from existing", "Blend with existing"]
 
-        self.title("Batch generate masks")
-        self.geometry("360x430")
-        self.resizable(True, True)
+        self.setWindowTitle("Batch generate masks")
+        self.resize(360, 430)
+        self.setModal(True)
+        self.finished.connect(self.deleteLater)
 
-        self.frame = ctk.CTkFrame(self, width=600, height=300)
-        self.frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        outer = pyside6_components._layout(self)
+        pad = pyside6_components.PAD
+        outer.setContentsMargins(pad, pad, pad, pad)
+        outer.setColumnStretch(1, 1)
+        outer.setRowStretch(3, 1)
+        self.frame = QWidget(self)
+        outer.addWidget(self.frame, 0, 0, 1, 2)
+        layout = pyside6_components._layout(self.frame)
+        layout.setColumnStretch(1, 1)
 
-        self.model_label = ctk.CTkLabel(self.frame, text="Model", width=100)
-        self.model_label.grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.model_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.model_var, values=self.models, dynamic_resizing=False, width=200)
-        self.model_dropdown.grid(row=0, column=1, sticky="w", padx=5, pady=5)
+        pyside6_components.label(self.frame, 0, 0, "Model")
+        self.model_dropdown = pyside6_components.options(self.frame, 0, 1, self.models, self.ui_state, "model")
+        pyside6_components.label(self.frame, 1, 0, "Folder")
+        path_frame = QWidget(self.frame)
+        path_layout = pyside6_components._layout(path_frame)
+        path_layout.setColumnStretch(0, 1)
+        layout.addWidget(path_frame, 1, 1)
+        self.path_entry = QLineEdit(path if path is not None else "", path_frame)
+        self.path_entry.setMinimumWidth(140)
+        self.path_entry.setAccessibleName("Folder")
+        path_layout.addWidget(self.path_entry, 0, 0)
+        pyside6_components.button(path_frame, 0, 1, "...", self.browse_for_path, width=30)
 
-        self.path_label = ctk.CTkLabel(self.frame, text="Folder", width=100)
-        self.path_label.grid(row=1, column=0, sticky="w",padx=5, pady=5)
-        self.path_entry = ctk.CTkEntry(self.frame, width=150)
-        self.path_entry.insert(0, path)
-        self.path_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
-        self.path_button = ctk.CTkButton(self.frame, width=30, text="...", command=lambda: self.browse_for_path(self.path_entry))
-        self.path_button.grid(row=1, column=1, sticky="e", padx=5, pady=5)
-
-        self.prompt_label = ctk.CTkLabel(self.frame, text="Prompt", width=100)
-        self.prompt_label.grid(row=2, column=0, sticky="w",padx=5, pady=5)
-        self.prompt_entry = ctk.CTkEntry(self.frame, width=200)
-        self.prompt_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
-
-        self.mode_label = ctk.CTkLabel(self.frame, text="Mode", width=100)
-        self.mode_label.grid(row=3, column=0, sticky="w", padx=5, pady=5)
-        self.mode_dropdown = ctk.CTkOptionMenu(self.frame, variable=self.mode_var, values=self.modes, dynamic_resizing=False, width=200)
-        self.mode_dropdown.grid(row=3, column=1, sticky="w", padx=5, pady=5)
-
-        self.threshold_label = ctk.CTkLabel(self.frame, text="Threshold", width=100)
-        self.threshold_label.grid(row=4, column=0, sticky="w", padx=5, pady=5)
-        self.threshold_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="0.0 - 1.0")
-        self.threshold_entry.insert(0, "0.3")
-        self.threshold_entry.grid(row=4, column=1, sticky="w", padx=5, pady=5)
-
-        self.smooth_label = ctk.CTkLabel(self.frame, text="Smooth", width=100)
-        self.smooth_label.grid(row=5, column=0, sticky="w", padx=5, pady=5)
-        self.smooth_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="5")
-        self.smooth_entry.insert(0, 5)
-        self.smooth_entry.grid(row=5, column=1, sticky="w", padx=5, pady=5)
-
-        self.expand_label = ctk.CTkLabel(self.frame, text="Expand", width=100)
-        self.expand_label.grid(row=6, column=0, sticky="w", padx=5, pady=5)
-        self.expand_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="10")
-        self.expand_entry.insert(0, 10)
-        self.expand_entry.grid(row=6, column=1, sticky="w", padx=5, pady=5)
-
-        self.alpha_label = ctk.CTkLabel(self.frame, text="Alpha", width=100)
-        self.alpha_label.grid(row=7, column=0, sticky="w", padx=5, pady=5)
-        self.alpha_entry = ctk.CTkEntry(self.frame, width=200, placeholder_text="1")
-        self.alpha_entry.insert(0, 1)
-        self.alpha_entry.grid(row=7, column=1, sticky="w", padx=5, pady=5)
-
-        self.include_subdirectories_label = ctk.CTkLabel(self.frame, text="Include subfolders", width=100)
-        self.include_subdirectories_label.grid(row=8, column=0, sticky="w", padx=5, pady=5)
-        self.include_subdirectories_var = ctk.BooleanVar(self, parent_include_subdirectories)
-        self.include_subdirectories_switch = ctk.CTkSwitch(self.frame, text="", variable=self.include_subdirectories_var)
-        self.include_subdirectories_switch.grid(row=8, column=1, sticky="w", padx=5, pady=5)
-
-        self.progress_label = ctk.CTkLabel(self.frame, text="Progress: 0/0", width=100)
-        self.progress_label.grid(row=9, column=0, sticky="w", padx=5, pady=5)
-        self.progress = ctk.CTkProgressBar(self.frame, orientation="horizontal", mode="determinate", width=200)
-        self.progress.grid(row=9, column=1, sticky="w", padx=5, pady=5)
-
-        self.create_masks_button = ctk.CTkButton(self.frame, text="Create Masks", width=310, command=self._on_create_masks)
-        self.create_masks_button.grid(row=10, column=0, columnspan=2, sticky="w", padx=5, pady=5)
-
-        self.frame.pack(fill="both", expand=True)
-
-        self.wait_visibility()
-        self.grab_set()
-        self.focus_set()
-        self.after(200, lambda: set_window_icon(self))
-
-    def browse_for_path(self, entry_box):
-        # get the path from the user
-        path = filedialog.askdirectory()
-        # set the path to the entry box
-        # delete entry box text
-        entry_box.focus_set()
-        entry_box.delete(0, filedialog.END)
-        entry_box.insert(0, path)
-        self.focus_set()
-
-    def set_progress(self, value, max_value):
-        progress = value / max_value
-        self.progress.set(progress)
-        self.progress_label.configure(text=f"{value}/{max_value}")
-        self.progress.update()
-
-    def _on_create_masks(self):
-        self.controller.create_masks(
-            model_name=self.model_var.get(),
-            path=self.path_entry.get(),
-            prompt=self.prompt_entry.get(),
-            mode_str=self.mode_var.get(),
-            alpha_str=self.alpha_entry.get(),
-            threshold_str=self.threshold_entry.get(),
-            smooth_str=self.smooth_entry.get(),
-            expand_str=self.expand_entry.get(),
-            include_subdirectories=self.include_subdirectories_var.get(),
+        self.prompt_entry = self._entry(2, "Prompt")
+        pyside6_components.label(self.frame, 3, 0, "Mode")
+        self.mode_dropdown = pyside6_components.options(self.frame, 3, 1, self.modes, self.ui_state, "mode")
+        self.threshold_entry = self._entry(4, "Threshold", "0.3", "0.0 - 1.0")
+        self.smooth_entry = self._entry(5, "Smooth", "5", "5")
+        self.expand_entry = self._entry(6, "Expand", "10", "10")
+        self.alpha_entry = self._entry(7, "Alpha", "1", "1")
+        pyside6_components.label(self.frame, 8, 0, "Include subfolders")
+        self.include_subdirectories_switch = pyside6_components.switch(
+            self.frame, 8, 1, self.ui_state, "include_subdirectories",
         )
 
-    def destroy(self):
-        with contextlib.suppress(tk.TclError):
-            self.grab_release()
+        self.progress_label = pyside6_components.label(self, 1, 0, "Progress: 0/0")
+        self.progress = pyside6_components.progress(self, 1, 1)
+        self.progress.setTextVisible(False)
+        outer.setAlignment(self.progress, Qt.AlignVCenter)
+        self.create_masks_button = QPushButton("Create Masks", self)
+        self.create_masks_button.clicked.connect(self._on_create_masks)
+        outer.addWidget(self.create_masks_button, 2, 0, 1, 2)
+        for button in self.findChildren(QPushButton):
+            button.setAutoDefault(False)
 
-        super().destroy()
+    def _entry(self, row, label, text="", placeholder=""):
+        pyside6_components.label(self.frame, row, 0, label)
+        entry = QLineEdit(text, self.frame)
+        entry.setMinimumWidth(140)
+        entry.setPlaceholderText(placeholder)
+        pyside6_components._add(pyside6_components._layout(self.frame), entry, row, 1)
+        return entry
+
+    def browse_for_path(self):
+        self.path_entry.setText(QFileDialog.getExistingDirectory(self))
+
+    def set_progress(self, value, max_value):
+        progress = int(value / max_value * 1000)
+        QTimer.singleShot(0, self, lambda: self._update_progress(value, max_value, progress))
+
+    def _update_progress(self, value, max_value, progress):
+        self.progress.setValue(progress)
+        self.progress_label.setText(f"{value}/{max_value}")
+
+    def _on_create_masks(self):
+        if self.is_running:
+            return
+        arguments = {
+            "model_name": self.model_dropdown.currentText(),
+            "path": self.path_entry.text(),
+            "prompt": self.prompt_entry.text(),
+            "mode_str": self.mode_dropdown.currentText(),
+            "alpha_str": self.alpha_entry.text(),
+            "threshold_str": self.threshold_entry.text(),
+            "smooth_str": self.smooth_entry.text(),
+            "expand_str": self.expand_entry.text(),
+            "include_subdirectories": self.include_subdirectories_switch.isChecked(),
+        }
+        self.is_running = True
+        self.frame.setEnabled(False)
+        self.create_masks_button.setEnabled(False)
+
+        def _run():
+            try:
+                self.controller.create_masks(**arguments)
+            except Exception:
+                traceback.print_exc()
+            finally:
+                QTimer.singleShot(0, self, self._finish_generation)
+
+        self._worker = threading.Thread(target=_run, daemon=True)
+        self._worker.start()
+
+    def _finish_generation(self):
+        self.is_running = False
+        self.frame.setEnabled(True)
+        self.create_masks_button.setEnabled(True)
+
+    def done(self, result):
+        if not self.is_running:
+            super().done(result)

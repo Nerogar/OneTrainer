@@ -39,8 +39,6 @@ class BaseCaptionUIView(ABC):
         self.components.switch(frame, 0, 4, ui_state, "include_subdirectories",
                           text="include subdirectories")
 
-        frame.grid_columnconfigure(5, weight=1)
-
         self.components.button(frame, 0, 6, "Help", controller.print_help,
                           tooltip=controller.help_text)
 
