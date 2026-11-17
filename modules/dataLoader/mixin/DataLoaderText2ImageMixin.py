@@ -4,6 +4,7 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import Callable
 
 import modules.util.multi_gpu_util as multi
+from modules.dataLoader.SelectMaskPath import SelectMaskPath
 from modules.model.BaseModel import BaseModel
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupText2ImageMixin import ModelSetupText2ImageMixin
@@ -70,10 +71,10 @@ class DataLoaderText2ImageMixin(metaclass=ABCMeta):
         collect_paths = CollectPaths(
             concept_in_name='concept', path_in_name='path', include_subdirectories_in_name='concept.include_subdirectories', enabled_in_name='enabled',
             path_out_name='image_path', concept_out_name='concept',
-            extensions=supported_extensions, include_postfix=None, exclude_postfix=['-masklabel','-condlabel']
+            extensions=supported_extensions, include_postfix=None, exclude_postfix=[*path_util.MASK_POSTFIXES, '-condlabel']
         )
 
-        mask_path = ModifyPath(in_name='image_path', out_name='mask_path', postfix='-masklabel', extension='.png')
+        mask_path = SelectMaskPath(in_name='image_path', out_name='mask_path')
         cond_path = ModifyPath(in_name='image_path', out_name='cond_path', postfix='-condlabel', extension='.png')
         sample_prompt_path = ModifyPath(in_name='image_path', out_name='sample_prompt_path', postfix='', extension='.txt')
 
