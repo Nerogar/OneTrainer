@@ -23,6 +23,8 @@ from transformers import AutoTokenizer, Mistral3Model
 
 
 class ErnieModel(BaseModel):
+    supports_caption_dropout = True
+
     # base model data
     tokenizer: AutoTokenizer | None
     noise_scheduler: FlowMatchEulerDiscreteScheduler | None
@@ -92,6 +94,11 @@ class ErnieModel(BaseModel):
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
             tokens_mask = tokenizer_output.attention_mask.to(self.text_encoder.device)
 
+        text_encoder_dropout_mask, tokens, tokens_mask = self._prepare_caption_dropout(
+            "text_encoder", text_encoder_dropout_probability, rand, text_encoder_output,
+            tokens, tokens_mask,
+        )
+
         if text_encoder_output is None and self.text_encoder is not None:
             #this is different from the diffusers pipeline.
             #they accumulate the embeddings for each sample without padding or an attention mask. we use padded with an attention mask, because the dataloader pipeline does the same
@@ -105,8 +112,9 @@ class ErnieModel(BaseModel):
                 )
                 text_encoder_output = output.hidden_states[HIDDEN_STATES_LAYER]  # [B, T, H]
 
-        if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
-            raise NotImplementedError  # needs empty-caption conditioning, not zero-out
+        text_encoder_output, tokens_mask = self._apply_caption_dropout(
+            "text_encoder", text_encoder_dropout_mask, text_encoder_output, tokens_mask,
+        )
 
         text_lengths = tokens_mask.sum(dim=1).long()
         text_encoder_output = text_encoder_output[:, :text_lengths.max().item(), :]
