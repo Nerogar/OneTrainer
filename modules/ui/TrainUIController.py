@@ -6,6 +6,7 @@ import threading
 import time
 import traceback
 import webbrowser
+from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -50,6 +51,13 @@ class TrainUIController:
         # second (non-modal) window - the sample tool isn't designed to run two instances at once.
         self.sample_window = None
         self.queue_controller = None
+
+    @cached_property
+    def _local_gpu_count(self) -> int | None:
+        try:
+            return torch.cuda.device_count()
+        except Exception:
+            return None
 
     def on_update_train_progress(self, train_progress: TrainProgress, max_step: int, max_epoch: int):
         # capture session start on first progress update

@@ -31,6 +31,20 @@ from PySide6.QtWidgets import (
 )
 
 PAD = 10
+PATH_ENTRY_GAP = 8
+
+
+def _set_max_width(widget: QWidget, max_width: int | None) -> None:
+    """Apply an optional cap to the whole input, in Qt logical pixels."""
+    if max_width is None:
+        return
+    widget.setMinimumWidth(min(widget.minimumWidth(), max_width))
+    widget.setMaximumWidth(max_width)
+    # A capped input should stay beside its label, not float in its grid cell.
+    layout = widget.parentWidget().layout()
+    item = layout.itemAt(layout.indexOf(widget)) if layout is not None else None
+    if item is not None and not item.alignment() & Qt.AlignmentFlag.AlignHorizontal_Mask:
+        layout.setAlignment(widget, item.alignment() | Qt.AlignmentFlag.AlignLeft)
 
 
 # ---------------------------------------------------------------------------
@@ -266,7 +280,10 @@ def entry(
         required: bool = False,
         placeholder: str = "",
         allow_empty: bool = False,
+        *,
+        max_width: int | None = None,
 ) -> QLineEdit:
+    """Create a text input; max_width also caps the default minimum width."""
     var = ui_state.get_var(var_name)
 
     component = QLineEdit(master)
@@ -303,6 +320,7 @@ def entry(
     validator.attach()
     component._validator = validator  # type: ignore[attr-defined]
 
+    _set_max_width(component, max_width)
     return component
 
 
@@ -324,11 +342,14 @@ def path_entry(
         required: bool = False,
         columnspan: int = 1,
         placeholder: str = "",
+        max_width: int | None = None,
 ) -> QWidget:
+    """Create a path input; max_width includes the browse button and its gap."""
     frame = QWidget(master)
     frame_lo = QGridLayout(frame)
     frame_lo.setContentsMargins(0, 0, 0, 0)
     frame_lo.setSpacing(0)
+    frame_lo.setHorizontalSpacing(PATH_ENTRY_GAP)
     frame_lo.setColumnStretch(0, 1)
     _add(_layout(master), frame, row, column, sticky="new", padx=0, pady=0, colspan=columnspan)
 
@@ -430,6 +451,9 @@ def path_entry(
     btn.clicked.connect(_open_dialog)
     frame_lo.addWidget(btn, 0, 1)
 
+    if max_width is not None:
+        entry_component.setMinimumWidth(min(entry_component.minimumWidth(), max(0, max_width - btn.width() - PATH_ENTRY_GAP)))
+    _set_max_width(frame, max_width)
     return frame
 
 
@@ -441,7 +465,10 @@ def time_entry(
         var_name: str,
         unit_var_name: str,
         supports_time_units: bool = True,
+        *,
+        max_width: int | None = None,
 ) -> QWidget:
+    """Create an interval input; max_width includes the unit dropdown."""
     frame = QWidget(master)
     _add(_layout(master), frame, row, column, sticky="new", padx=0, pady=0)
 
@@ -453,6 +480,7 @@ def time_entry(
 
     options(frame, 0, 1, values, ui_state, unit_var_name)
 
+    _set_max_width(frame, max_width)
     return frame
 
 
@@ -470,7 +498,10 @@ def layer_filter_entry(
         regex_var_name: str,
         regex_tooltip: str,
         frame_color=None,
+        *,
+        max_width: int | None = None,
 ) -> QWidget:
+    """Create a layer filter; max_width caps the complete input group."""
     frame = QWidget(master)
     _layout(master).addWidget(frame, row, column)
 
@@ -524,6 +555,7 @@ def layer_filter_entry(
 
     preset_set_layer_choice(layer_selector.currentText())
 
+    _set_max_width(frame, max_width)
     return frame
 
 
@@ -634,6 +666,8 @@ def options(
         ui_state: BaseUIState,
         var_name: str,
         command: Callable[[str], None] | None = None,
+        *,
+        max_width: int | None = None,
 ) -> QComboBox:
     var = ui_state.get_var(var_name)
     combo = NoScrollComboBox(master)
@@ -664,6 +698,7 @@ def options(
     cb_id = var._bind_widget(on_var)
     combo.destroyed.connect(lambda: var._unbind_widget(cb_id))
     _add(_layout(master), combo, row, column)
+    _set_max_width(combo, max_width)
     return combo
 
 
@@ -676,7 +711,10 @@ def options_adv(
         var_name: str,
         command: Callable[[str], None] | None = None,
         adv_command: Callable[[], None] | None = None,
+        *,
+        max_width: int | None = None,
 ) -> tuple[QWidget, dict]:
+    """Create a dropdown with a settings button; max_width includes both."""
     frame = QWidget(master)
     frame_lo = QGridLayout(frame)
     frame_lo.setContentsMargins(0, 0, 0, 0)
@@ -694,6 +732,7 @@ def options_adv(
     if command:
         command(ui_state.get_var(var_name).get())
 
+    _set_max_width(frame, max_width)
     return frame, {'component': combo, 'button_component': adv_btn}
 
 
@@ -706,6 +745,8 @@ def options_kv(
         var_name: str,
         command: Callable[[Any], None] | None = None,
         sticky: str = "new",
+        *,
+        max_width: int | None = None,
 ) -> QComboBox:
     var = ui_state.get_var(var_name)
     keys = [key for key, _ in values]
@@ -764,6 +805,7 @@ def options_kv(
                 command(v)
                 break
 
+    _set_max_width(combo, max_width)
     return combo
 
 
@@ -776,6 +818,8 @@ def switch(
         command: Callable[[], None] | None = None,
         text: str = "",
         width: int | None = None,
+        *,
+        max_width: int | None = None,
 ) -> QCheckBox:
     var = ui_state.get_var(var_name)
     component = QCheckBox(text, master)
@@ -812,6 +856,7 @@ def switch(
     lo = _layout(master)
     lo.addWidget(component, row, column)
     lo.setAlignment(component, Qt.AlignVCenter | Qt.AlignLeft)
+    _set_max_width(component, max_width)
     return component
 
 

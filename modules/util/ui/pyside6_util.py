@@ -40,7 +40,7 @@ def fit_form(frame: QWidget) -> None:
     for combo in frame.findChildren(QComboBox):
         combo.ensurePolished()
         combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
-        combo.setFixedWidth(combo.sizeHint().width())
+        combo.setFixedWidth(min(combo.sizeHint().width(), combo.maximumWidth()))
     components._pack_form(frame)
 def format_tooltip(text: str) -> str:
     # wrap tooltips after 45 characters, supported by studys size

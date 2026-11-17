@@ -138,7 +138,8 @@ class QueueTrainingUIView(QDialog):
             path_widget.setToolTip(tooltip)
             entry = path_widget.findChild(QLineEdit)
             limit_input_width(entry, 30 if key == "script_path" else 40)
-            path_widget.setFixedWidth(entry.maximumWidth() + path_widget.findChild(QPushButton).width())
+            path_widget.setFixedWidth(entry.maximumWidth() + path_widget.findChild(QPushButton).width()
+                                     + path_widget.layout().horizontalSpacing())
             if key == "output_dir":
                 self.output_widgets = (label_widget, path_widget)
         tooltip = "Actions apply *only* if training successfully completes"
@@ -156,7 +157,8 @@ class QueueTrainingUIView(QDialog):
         self.base_path_input.setToolTip(tooltip)
         entry = self.base_path_input.findChild(QLineEdit)
         limit_input_width(entry)
-        self.base_path_input.setFixedWidth(entry.maximumWidth() + self.base_path_input.findChild(QPushButton).width())
+        self.base_path_input.setFixedWidth(entry.maximumWidth() + self.base_path_input.findChild(QPushButton).width()
+                                          + self.base_path_input.layout().horizontalSpacing())
         fit_form(frame)
 
     def _open_queue(self):
