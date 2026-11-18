@@ -117,12 +117,13 @@ cuda13 = [
 
 rocm = [
   # pytorch
-  "torch==2.15.0",
-  "torchvision==0.29.2",
+  "torch[device-all]==2.15.0",
+  "torchvision[device-all]==0.29.2",
   "onnxruntime==1.23.2",
 
   # optimizers
   "bitsandbytes==0.50.2",
+  "triton-windows>=3.9.0.post30,<3.10; sys_platform == 'win32'"
 ]
 
 [tool.setuptools]
@@ -199,10 +200,10 @@ platforms = ["linux-cuda12", "win-cuda12"]
 extra-index-urls = ["https://download.pytorch.org/whl/cu126"]
 
 [tool.pixi.feature.rocm]
-platforms = ["linux-rocm"]
+platforms = ["linux-rocm", "win-generic"]
 
 [tool.pixi.feature.rocm.pypi-options]
-extra-index-urls = ["https://download.pytorch.org/whl/rocm10.0"]
+extra-index-urls = ["https://nightly.repo.amd.com/rocm/whl-next/"]
 
 [tool.pixi.feature.cpu]
 platforms = ["linux-generic", "win-generic", "macos-generic"]

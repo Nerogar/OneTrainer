@@ -52,7 +52,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 3. Navigate into the cloned directory `cd OneTrainer`
 4. Perform the installation: `pixi install --locked -e cuda` (Replace `cuda` by `rocm` or `cpu` if needed).
 
-**Note:** We don't support ROCm on Windows currently.
+**Note:** ROCm on Windows is currently experimental.
 
 ## Updating
 
