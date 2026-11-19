@@ -39,4 +39,5 @@ class InternalModelSaverMixin(metaclass=ABCMeta):
                     'epoch_sample': model.train_progress.epoch_sample,
                     'global_step': model.train_progress.global_step,
                 },
+                'last_action_epoch': dict(getattr(model.train_progress, 'last_action_epoch', {})),
             }, meta_file)
