@@ -8,13 +8,9 @@ from contextlib import nullcontext
 import torch
 
 import accelerate
-import packaging.version
-from packaging.version import Version
 
 accelerator = accelerate.Accelerator()
 default_device = accelerator.device
-
-torch_version = packaging.version.parse(torch.__version__)
 
 @contextlib.contextmanager
 def timed(label: str, enabled: bool = True):
@@ -190,10 +186,7 @@ def torch_gc():
 
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-
-        if torch_version > Version("2.6.0"):
-            # TODO: replace with a torch.cuda binding once that's available
-            torch._C._host_emptyCache()
+        torch._C._host_emptyCache()
 
     if torch.backends.mps.is_available():
         torch.mps.empty_cache()
@@ -224,7 +217,6 @@ def torch_sync():
         torch.cuda.synchronize()
     if torch.backends.mps.is_available():
         torch.mps.synchronize()
-        packaging.version.parse(torch.__version__)
 
 
 def create_stream_context(stream: torch.cuda.Stream | None) -> torch.cuda.StreamContext | nullcontext:

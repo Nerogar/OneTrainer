@@ -35,7 +35,6 @@ from modules.util.optimizer.adamw_extensions import patch_adamw
 from modules.util.optimizer.muon_util import split_parameters_for_muon
 from modules.util.optimizer.tag_util import tag_peft_parameters
 from modules.util.TrainProgress import TrainProgress
-from modules.zluda import ZLUDA
 
 import torch
 from torch.nn import Parameter
@@ -1240,7 +1239,6 @@ def create_trainer(
         from modules.trainer.MultiTrainer import MultiTrainer
         trainer = MultiTrainer(config, callbacks, commands)
     else:
-        ZLUDA.initialize_devices(config)
         from modules.trainer.GenericTrainer import GenericTrainer
         trainer = GenericTrainer(config, callbacks, commands)
     return trainer

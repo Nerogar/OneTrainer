@@ -53,7 +53,7 @@ You can download Python at https://www.python.org/downloads/.
 3. Navigate into the cloned directory `cd OneTrainer`
 4. Run `pixi install --locked -e cuda13` (choose `cuda12`, `rocm`, or `cpu` for other hardware).
 
-**Note:** ROCm on Windows is currently experimental.
+**Note:** ROCm on Windows is currently experimental. If `hipInfo` is unavailable, set `OT_PLATFORM=rocm` before running the Windows install, update, or launch scripts. In Command Prompt, use `set OT_PLATFORM=rocm`. In PowerShell, use `$env:OT_PLATFORM = "rocm"`.
 
 ## Updating
 

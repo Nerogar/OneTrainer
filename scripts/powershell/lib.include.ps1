@@ -113,8 +113,7 @@ function Get-Platform {
         return "rocm"
     }
 
-    # fallback to cpu, rocm not supported officially.
-    Write-OTDebug "No supported CUDA GPU detected, falling back to CPU."
+    Write-OTDebug "No supported GPU detected, falling back to CPU."
     return "cpu"
 }
 

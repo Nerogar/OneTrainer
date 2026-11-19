@@ -46,11 +46,6 @@ rem --- Helpers ---
     echo Reminder: Do not rely on installation videos; they are often out of date.
     exit /b 1
 
-:run_or_die
-  echo Executing: %~1
-  cmd /c "%~1" || call :die "Command failed: %~2"
-  exit /b 0
-
 rem --- Main ---
 :main
 echo %CYAN%Searching for a suitable Python installation...%RESET%
@@ -252,18 +247,10 @@ echo.
 echo %CYAN%Checking CUDA availability...%RESET%
 python -c "import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)"
 if errorlevel 1 (
-  echo %YEL%CUDA not found via torch.cuda.is_available.%RESET%
-  set "ans_amd="
-  set /p "ans_amd=AMD GPU? (y/n): "
-  if /i "!ans_amd!"=="y" (
-    echo Executing: python "%SCRIPT_DIR%\scripts\install_zluda.py"
-    python "%SCRIPT_DIR%\scripts\install_zluda.py" || call :die "ZLUDA install failed"
-  ) else (
-    call :die "CUDA unavailable and not an AMD GPU setup - aborting. Please check PyTorch and NVIDIA driver compatibility."
-  )
-) else (
-    echo %GRN%CUDA is available.%RESET%
+  call :die "CUDA unavailable. Check PyTorch and NVIDIA driver compatibility. For AMD GPUs, run pixi install --locked -e rocm."
+  exit /b 1
 )
+echo %GRN%CUDA is available.%RESET%
 
 echo.
 echo %GRN%**** Install successful^^! ****%RESET%
