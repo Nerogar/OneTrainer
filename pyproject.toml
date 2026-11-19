@@ -112,13 +112,13 @@ cuda13 = [
 
 rocm = [
   # pytorch
-  "torch==2.15.0",
-  "torchvision==0.29.2",
+  "torch[device-all]==2.15.0",
+  "torchvision[device-all]==0.29.2",
   "onnxruntime==1.32.0",
-  "triton-rocm; sys_platform == 'linux'",
 
   # optimizers
   "bitsandbytes==0.50.2",
+  "triton-windows>=3.9.0.post30,<3.10; sys_platform == 'win32'",
 ]
 
 [tool.setuptools]
@@ -179,7 +179,7 @@ platforms = [
 requires-pixi = ">=0.84.2"
 
 # track new python patch releases but retain the conda-forge cutoff above
-# Pixi checks upload dates even for pinned versions. The PyTorch indexes use "0d"
+# Pixi checks upload dates even for pinned versions. The PyTorch and AMD indexes use "0d"
 # so Pixi can resolve CUDA and ROCm wheels that have no upload date.
 [tool.pixi.workspace.exclude-newer]
 cutoff = "0d"
@@ -202,10 +202,10 @@ platforms = ["linux-cuda12", "win-cuda12"]
 extra-index-urls = [{ url = "https://download.pytorch.org/whl/cu126", exclude-newer = "0d" }]
 
 [tool.pixi.feature.rocm]
-platforms = ["linux-rocm"]
+platforms = ["linux-rocm", "win-generic"]
 
 [tool.pixi.feature.rocm.pypi-options]
-extra-index-urls = [{ url = "https://download.pytorch.org/whl/rocm10.0", exclude-newer = "0d" }]
+extra-index-urls = [{ url = "https://nightly.repo.amd.com/rocm/whl-next/", exclude-newer = "0d" }]
 
 [tool.pixi.feature.cpu]
 platforms = ["linux-generic", "win-generic", "macos-generic"]

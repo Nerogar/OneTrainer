@@ -53,7 +53,7 @@ You can download Python at https://www.python.org/downloads/.
 3. Navigate into the cloned directory `cd OneTrainer`
 4. Run `pixi install --locked -e cuda13` (choose `cuda12`, `rocm`, or `cpu` for other hardware).
 
-**Note:** We don't support ROCm on Windows currently.
+**Note:** ROCm on Windows is currently experimental.
 
 ## Updating
 
