@@ -10,7 +10,7 @@ pushd "%~dp0..\.." || call :die "Cannot cd to project root"
 set "SCRIPT_DIR=%CD%"
 set "VENV_DIR=%SCRIPT_DIR%\\venv"
 set "VERSION_FILE=%SCRIPT_DIR%\\scripts\\util\\version_check.py"
-set "MIN_PY=3.10" & set "MAX_PY=3.14"
+set "MIN_PY=3.12.0" & set "MAX_PY=3.15"
 
 goto :main
 
@@ -40,7 +40,7 @@ rem --- Helpers ---
 :wrong_python_version_message
     echo.
     echo %RED%No suitable Python version found or selected.%RESET%
-    echo Please install a supported Python version ^(%MIN_PY% - ^< %MAX_PY%^) from:
+    echo Please install Python ^>= %MIN_PY% and ^< %MAX_PY%, excluding 3.14.1, from:
     echo %CYAN%https://www.python.org/downloads/windows/%RESET%
     echo.
     echo Reminder: Do not rely on installation videos; they are often out of date.
@@ -118,7 +118,7 @@ for /f "tokens=2 delims=:" %%L in ('py --list 2^>nul ^| findstr /R /C:"-V:[0-9][
 
 :found_python_via_py_list
 if not defined PYTHON_VERSION_FROM_PY_LIST (
-    echo %YEL%No suitable Python version found via "py --list" that satisfies %MIN_PY% ^>= v ^< %MAX_PY%.%RESET%
+    echo %YEL%No suitable Python version found via "py --list".%RESET%
     rem PYTHON remains unset, script will proceed to the next step
 )
 
@@ -199,7 +199,6 @@ if not defined PYTHON (
   REM The above call prints details and sets errorlevel. Now, exit the main script.
   echo.
   echo %RED%ERROR: Failed to find a supported Python version after all checks.%RESET%
-  echo Please ensure a Python version between %MIN_PY% and %MAX_PY% is available.
   pause
   popd
   exit /b 1
@@ -230,6 +229,11 @@ if not exist "%PYTHON_VENV%" (
     call :die "Virtual environment Python executable not found at '%PYTHON_VENV%' after venv creation/check."
 )
 set "PYTHON=%PYTHON_VENV%"
+"%PYTHON%" "%VERSION_FILE%" %MIN_PY% %MAX_PY%
+if errorlevel 1 (
+    call :die "Unsupported Python in the project venv"
+    exit /b 1
+)
 
 echo Activating virtual environment...
 call "%VENV_DIR%\Scripts\activate.bat"

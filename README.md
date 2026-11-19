@@ -33,10 +33,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 
 ## Installation
 
-> [!IMPORTANT]
-> Installing OneTrainer manually requires Python >=3.10 and <3.14.
-> You can download Python at https://www.python.org/downloads/windows/.
-> Then follow the below manual steps.
+Pixi and Conda default to Python 3.13.x.
 
 #### Automatic installation
 
@@ -47,10 +44,14 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 
 #### Manual installation
 
+Manual pip and Conda installs support Python 3.12–3.14. Python 3.14 may be buggy. Version 3.14.1 is unsupported.
+
+You can download Python at https://www.python.org/downloads/.
+
 1. Install `pixi`: [Guide](https://pixi.prefix.dev/latest/installation/)
 2. Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
 3. Navigate into the cloned directory `cd OneTrainer`
-4. Perform the installation: `pixi install --locked -e cuda` (Replace `cuda` by `rocm` or `cpu` if needed).
+4. Run `pixi install --locked -e cuda13` (choose `cuda12`, `rocm`, or `cpu` for other hardware).
 
 **Note:** We don't support ROCm on Windows currently.
 
@@ -64,7 +65,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 
 1. Cd to folder containing the repo `cd OneTrainer`
 2. Pull changes `git pull`
-3. Recreate the environment `pixi install --locked -e cuda`
+3. Recreate the environment with `pixi install --locked -e cuda13`, using the same environment as during installation.
 
 ## Usage
 
@@ -105,7 +106,7 @@ To learn more about the different parameters, execute `./run-cmd.sh <script-name
 ./run-cmd.ps1 train --config-path ./config.json
 ```
 
-You can also activate a shell, you'd select your gpu env (usually `cuda`: https://pixi.prefix.dev/latest/advanced/pixi_shell/
+To open a shell in the environment you installed, run `pixi shell -e cuda13` with your chosen environment name.
 
 If you are on Mac or Linux, you can also read [the launch script documentation](LAUNCH-SCRIPTS.md) for detailed information about how to run OneTrainer and its various scripts on your system. Windows users are to refer lib.include.ps1, it mostly mirrors linux launch scripts.
 

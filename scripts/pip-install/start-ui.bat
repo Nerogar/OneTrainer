@@ -45,10 +45,10 @@ if errorlevel 1 (
 )
 
 echo.
-%PYTHON% "%SCRIPT_DIR%\scripts\util\version_check.py" 3.10 3.14 2>&1
+%PYTHON% "%SCRIPT_DIR%\scripts\util\version_check.py" 3.12.0 3.15 2>&1
 if errorlevel 1 (
-    echo.
-    goto :wrong_python_version
+    pause
+    exit /b 1
 )
 
 :launch

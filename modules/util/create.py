@@ -853,7 +853,7 @@ def create_optimizer(
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
                 weight_decouple=optimizer_config.decoupled_decay if optimizer_config.decoupled_decay is not None else True,
                 fixed_decay=optimizer_config.fixed_decay if optimizer_config.fixed_decay is not None else False,
-                k=optimizer_config.k if optimizer_config.k is not None else 2,
+                k=optimizer_config.k if optimizer_config.k is not None else 2,  #FIXME: cap k for shared training jobs?
                 xi=optimizer_config.xi if optimizer_config.xi is not None else 1e-20,
                 rectify=optimizer_config.rectify if optimizer_config.rectify is not None else False,
                 n_sma_threshold=optimizer_config.n_sma_threshold if optimizer_config.n_sma_threshold is not None else 5,
@@ -1031,6 +1031,7 @@ def create_lr_scheduler(
             )
         case LearningRateScheduler.CUSTOM:
             # Special case. Unlike the others, we return from here.
+            #FIXME: reject negative warmup_steps for CosineAnnealingWarmupRestarts
             if not config.custom_learning_rate_scheduler:
                 raise AssertionError("Must specify a class when using a custom LR scheduler.")
             if "." not in config.custom_learning_rate_scheduler:
