@@ -186,6 +186,7 @@ class GeneralTabView(BaseGeneralTabView, QWidget):
         self._build_validation(self.validation_details.content, controller, ui_state)
         fit_form(self.validation_details.content)
         self._build_device(self.components.form_section(self.device_column, 0, 0, "Device Settings"), controller, ui_state)
+        self.device_panel = self.device_column.layout().itemAtPosition(0, 0).widget()
         appearance = self.components.form_section(self.validation_column, 1, 0, "Appearance")
         self.appearance_panel = appearance.parentWidget()
         self._build_appearance(appearance, controller, ui_state)
@@ -226,25 +227,46 @@ class GeneralTabView(BaseGeneralTabView, QWidget):
         self.appearance_panel.show()
 
     def _align_top_panels(self):
-        # Animate at natural height. Once settled, fill the upper row: the
-        # collapsed stack shares spare height; expanded Appearance sits below Device.
-        settled = not self.validation_details.is_animating
-        expanded = settled and self.validation_details.expanded
-        collapsed = settled and not self.validation_details.expanded
+        # Keep the two upper columns' bottom borders flush without snapping
+        # Appearance away from the panel above it.
+        animating = self.validation_details.is_animating
+        expanded = self.validation_details.expanded
         validation_layout = self.validation_column.layout()
         device_layout = self.device_column.layout()
-        validation_layout.setRowStretch(0, 1 if settled else 0)
-        validation_layout.setRowStretch(1, 1 if collapsed else 0)
-        validation_layout.setRowStretch(2, 0 if settled else 1)
-        validation_layout.setAlignment(
-            self.validation_panel, Qt.AlignmentFlag(0) if settled else Qt.AlignmentFlag.AlignTop,
-        )
-        device_layout.setRowStretch(1, 1 if expanded else 0)
-        device_layout.setRowStretch(2, 0 if expanded else 1)
-        self.appearance_panel.parentWidget().layout().setAlignment(
-            self.appearance_panel,
-            Qt.AlignmentFlag.AlignBottom if expanded else Qt.AlignmentFlag(0) if collapsed else Qt.AlignmentFlag.AlignTop,
-        )
+
+        if expanded:
+            validation_layout.setRowStretch(0, 1)
+            validation_layout.setRowStretch(1, 0)
+            validation_layout.setRowStretch(2, 0)
+            validation_layout.setAlignment(self.validation_panel, Qt.AlignmentFlag(0))
+
+            device_layout.setRowStretch(0, 0)
+            device_layout.setRowStretch(1, 1)
+            device_layout.setRowStretch(2, 0)
+            device_layout.setAlignment(self.device_panel, Qt.AlignmentFlag.AlignTop)
+            device_layout.setAlignment(self.appearance_panel, Qt.AlignmentFlag(0))
+        elif animating:
+            validation_layout.setRowStretch(0, 0)
+            validation_layout.setRowStretch(1, 0)
+            validation_layout.setRowStretch(2, 1)
+            validation_layout.setAlignment(self.validation_panel, Qt.AlignmentFlag.AlignTop)
+            validation_layout.setAlignment(self.appearance_panel, Qt.AlignmentFlag.AlignTop)
+
+            device_layout.setRowStretch(0, 0)
+            device_layout.setRowStretch(1, 0)
+            device_layout.setRowStretch(2, 1)
+            device_layout.setAlignment(self.device_panel, Qt.AlignmentFlag.AlignTop)
+        else:
+            validation_layout.setRowStretch(0, 0)
+            validation_layout.setRowStretch(1, 1)
+            validation_layout.setRowStretch(2, 0)
+            validation_layout.setAlignment(self.validation_panel, Qt.AlignmentFlag.AlignTop)
+            validation_layout.setAlignment(self.appearance_panel, Qt.AlignmentFlag(0))
+
+            device_layout.setRowStretch(0, 1)
+            device_layout.setRowStretch(1, 0)
+            device_layout.setRowStretch(2, 0)
+            device_layout.setAlignment(self.device_panel, Qt.AlignmentFlag(0))
 
     def refresh_availability(self):
         if self.ui_state.updating:
