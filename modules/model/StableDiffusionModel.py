@@ -53,6 +53,8 @@ class StableDiffusionModelEmbedding:
 
 
 class StableDiffusionModel(BaseModel):
+    supports_caption_dropout = True
+
     # base model data
     tokenizer: CLIPTokenizer | None
     orig_tokenizer: CLIPTokenizer | None
@@ -251,6 +253,11 @@ class StableDiffusionModel(BaseModel):
             )
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
 
+        text_encoder_dropout_mask, tokens = self._prepare_caption_dropout(
+            "text_encoder", text_encoder_dropout_probability, rand, text_encoder_output,
+            tokens,
+        )
+
         text_encoder_output, _ = encode_clip(
             text_encoder=self.text_encoder,
             tokens=tokens,
@@ -269,11 +276,8 @@ class StableDiffusionModel(BaseModel):
             text_encoder_output,
         )
 
-        # apply dropout
-        if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
-            dropout_text_encoder_mask = (torch.tensor(
-                [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)],
-                device=train_device)).float()
-            text_encoder_output = text_encoder_output * dropout_text_encoder_mask[:, None, None]
+        text_encoder_output, = self._apply_caption_dropout(
+            "text_encoder", text_encoder_dropout_mask, text_encoder_output,
+        )
 
         return text_encoder_output

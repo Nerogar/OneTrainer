@@ -88,6 +88,13 @@ def main():
         trainer.start()
         trainer.train()
 
+    except Exception:
+        # print the traceback before end() runs. end() saves the final model, which takes long enough that a log
+        # ending on its "Saving ..." line is indistinguishable from a clean stop until the traceback finally
+        # appears after it.
+        traceback.print_exc()
+        raise
+
     finally:
         if args.command_path:
             stop_event.set()

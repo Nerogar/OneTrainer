@@ -48,7 +48,7 @@ class WuerstchenFineTuneSetup(
         model.decoder_vqgan.requires_grad_(False)
         model.effnet_encoder.requires_grad_(False)
 
-        self._setup_model_part_requires_grad("text_encoder", model.text_encoder, config.text_encoder, model.train_progress)
+        self._setup_model_part_requires_grad("prior_text_encoder", model.prior_text_encoder, config.text_encoder, model.train_progress)
         self._setup_model_part_requires_grad("prior_prior", model.prior_prior, config.prior, model.train_progress)
 
     def setup_model(

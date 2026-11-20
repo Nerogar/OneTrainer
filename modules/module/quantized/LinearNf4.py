@@ -38,7 +38,21 @@ class LinearNf4(
         self.quant_state = None
 
     def original_weight_shape(self) -> tuple[int, ...]:
-        return self.weight.shape
+        # self.weight is repacked to a flat [N, 1] uint8 layout once quantized; self.shape keeps the original.
+        return self.shape
+
+    def mark_needs_requantization(self):
+        self.is_quantized = False
+
+    def predict_offload_bytes(self) -> int:
+        # nf4 packs the weight to 4-bit (2 values per uint8), and with double quant (compress_statistics) stores
+        # quant_state.absmax as one uint8 per block_size elements. Matches get_offload_tensors (packed weight +
+        # quant_state.absmax + optional bias); the small code/offset/nested-absmax buffers are not offload-counted.
+        numel = self.shape.numel()
+        weight_bytes = (numel + 1) // 2
+        absmax_bytes = (numel + self.block_size - 1) // self.block_size
+        bias_bytes = self.bias.numel() * self.bias.element_size() if self.bias is not None else 0
+        return weight_bytes + absmax_bytes + bias_bytes
 
     def unquantized_weight(self,  dtype: torch.dtype, device: torch.device) -> torch.Tensor:
         if self.is_quantized:
