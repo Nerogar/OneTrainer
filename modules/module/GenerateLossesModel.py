@@ -8,11 +8,10 @@ from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.util import create
 from modules.util.config.TrainConfig import QuantizationConfig, TrainConfig
 from modules.util.torch_util import torch_gc
+from modules.util.tqdm_util import tqdm
 from modules.util.TrainProgress import TrainProgress
 
 import torch
-
-from tqdm import tqdm
 
 
 class GenerateLossesModel:

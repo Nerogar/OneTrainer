@@ -1,5 +1,4 @@
 import contextlib
-import html
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
@@ -7,10 +6,11 @@ from typing import Any, Literal
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions, supported_video_extensions
-from modules.util.ui.pyside6_validation import PySide6FieldValidator, PySide6PathValidator
+from modules.util.ui.pyside6_util import format_tooltip
+from modules.util.ui.pyside6_validation import PySide6FieldValidator, PySide6PathValidator, PySide6RunNameValidator
 from modules.util.ui.UIState import BaseUIState
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer
 from PySide6.QtGui import QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -37,6 +37,67 @@ PAD = 10
 # PySide6-only helpers
 # ---------------------------------------------------------------------------
 
+class _FileDropFilter(QObject):
+    def __init__(
+            self,
+            widget: QWidget,
+            command: Callable[[list[str]], None],
+            path_filter: Callable[[Path], bool],
+            multiple: bool = False,
+    ):
+        super().__init__(widget)
+        self.command = command
+        self.path_filter = path_filter
+        self.multiple = multiple
+        widget.setAcceptDrops(True)
+        widget.installEventFilter(self)
+
+    def _set_hover(self, widget, hovered):
+        if isinstance(widget, QLineEdit) and bool(widget.property("drop_hover")) != hovered:
+            widget.setProperty("drop_hover", hovered)
+            widget.style().unpolish(widget)
+            widget.style().polish(widget)
+            widget.update()
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.DragLeave:
+            self._set_hover(watched, False)
+            return False
+        if event.type() not in (QEvent.Type.DragEnter, QEvent.Type.DragMove, QEvent.Type.Drop):
+            return False
+        if not event.mimeData().hasUrls():
+            self._set_hover(watched, False)
+            return False
+
+        event.ignore()
+        if not watched.isEnabled() or isinstance(watched, QLineEdit) and watched.isReadOnly():
+            self._set_hover(watched, False)
+            return True
+        if not event.possibleActions() & Qt.DropAction.CopyAction:
+            self._set_hover(watched, False)
+            return True
+
+        urls = event.mimeData().urls()
+        if not self.multiple and len(urls) != 1:
+            self._set_hover(watched, False)
+            return True
+
+        paths = []
+        for url in urls:
+            if url.isLocalFile():
+                path = url.toLocalFile()
+                with contextlib.suppress(OSError):
+                    if path and self.path_filter(Path(path)):
+                        paths.append(path)
+        self._set_hover(watched, bool(paths) and event.type() != QEvent.Type.Drop)
+        if paths:
+            event.setDropAction(Qt.DropAction.CopyAction)
+            event.accept()
+            if event.type() == QEvent.Type.Drop:
+                self.command(paths)
+        return True
+
+
 def _layout(master: QWidget) -> QGridLayout:
     lo = master.layout()
     if lo is None:
@@ -48,10 +109,7 @@ def _layout(master: QWidget) -> QGridLayout:
 
 
 def _set_tooltip(component: QWidget, text: str, wide: bool = False) -> None:
-    # plain QToolTip text is rendered on a single line; wrap it as rich text
-    # with a max-width so it matches Ctk's wraplength of 180/350px
-    width = 350 if wide else 180
-    component.setToolTip(f'<p style="max-width: {width}px;">{html.escape(text)}</p>')
+    component.setToolTip(format_tooltip(text))
 
 
 def _alignment(sticky: str) -> Qt.AlignmentFlag:
@@ -92,6 +150,9 @@ def _add(
         colspan: int = 1,
 ):
     layout.addWidget(widget, row, col, rowspan, colspan)
+    label_item = layout.itemAtPosition(row, col - 1) if col else None
+    if label_item is not None and isinstance(label_item.widget(), QLabel):
+        widget.setAccessibleName(label_item.widget().text())
     align = _alignment(sticky)
     if align:
         layout.setAlignment(widget, align)
@@ -204,6 +265,7 @@ def entry(
         extra_validate: Callable[[str], str | None] | None = None,
         required: bool = False,
         placeholder: str = "",
+        allow_empty: bool = False,
 ) -> QLineEdit:
     var = ui_state.get_var(var_name)
 
@@ -220,18 +282,24 @@ def entry(
     if tooltip:
         _set_tooltip(component, tooltip, wide_tooltip)
 
+    if validator_factory is None and var_name == "run_name":
+        validator_factory = PySide6RunNameValidator
+
     if validator_factory is not None:
         validator = validator_factory(
             component, var, ui_state, var_name,
             extra_validate=extra_validate,
             required=required,
+            allow_empty=allow_empty,
         )
     else:
         validator = PySide6FieldValidator(
             component, var, ui_state, var_name,
             extra_validate=extra_validate,
             required=required,
+            allow_empty=allow_empty,
         )
+    validator.display_name = component.accessibleName() or master.accessibleName() or var_name
     validator.attach()
     component._validator = validator  # type: ignore[attr-defined]
 
@@ -265,7 +333,8 @@ def path_entry(
     _add(_layout(master), frame, row, column, sticky="new", padx=0, pady=0, colspan=columnspan)
 
     def _path_validator_factory(comp, var, state, name, **kw):
-        return PySide6PathValidator(comp, var, state, name, io_type=io_type, **kw)
+        comp.setStyleSheet('QLineEdit[drop_hover="true"] { border: 1px solid #3b82f6; }')
+        return PySide6PathValidator(comp, var, state, name, io_type=io_type, output_is_dir=mode == "dir", **kw)
 
     entry_component = entry(
         frame, 0, 0, ui_state, var_name,
@@ -292,6 +361,29 @@ def path_entry(
         frame.destroyed.connect(_cleanup_dep_traces)
 
     use_save_dialog = io_type in (PathIOType.OUTPUT, PathIOType.MODEL)
+
+    def _set_path(chosen):
+        if path_modifier:
+            chosen = path_modifier(chosen)
+        chosen_str = str(chosen)
+        entry_component.selectAll()
+        entry_component.insert(chosen_str)
+        entry_component._validator._commit()
+        entry_component._validator.revalidate()
+        if command:
+            command(chosen_str)
+        entry_component.window().activateWindow()
+        entry_component.setFocus(Qt.MouseFocusReason)
+        entry_component.end(False)
+
+    def _accept_path(path):
+        if mode == "dir":
+            return path.is_dir()
+        return path.is_file() or (path_modifier is not None or io_type == PathIOType.MODEL) and path.is_dir()
+
+    entry_component._drop_filter = _FileDropFilter(
+        entry_component, lambda paths: _set_path(paths[0]), _accept_path,
+    )
 
     def _open_dialog():
         current_path_str = ui_state.get_var(var_name).get() or None
@@ -331,12 +423,7 @@ def path_entry(
                 chosen, _ = QFileDialog.getOpenFileName(frame, "", init_path, filter_str)
 
         if chosen:
-            if path_modifier:
-                chosen = path_modifier(chosen)
-            chosen_str = str(chosen)
-            ui_state.get_var(var_name).set(chosen_str)
-            if command:
-                command(chosen_str)
+            _set_path(chosen)
 
     btn = QPushButton("...", frame)
     btn.setFixedWidth(40)

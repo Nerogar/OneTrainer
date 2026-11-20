@@ -72,6 +72,8 @@ class WuerstchenModelEmbedding:
 
 
 class WuerstchenModel(BaseModel):
+    supports_caption_dropout = True
+
     # base model data
     decoder_tokenizer: CLIPTokenizer | None
     decoder_noise_scheduler: DDPMWuerstchenScheduler | None
@@ -260,6 +262,11 @@ class WuerstchenModel(BaseModel):
             tokens = tokenizer_output.input_ids.to(self.prior_text_encoder.device)
             tokens_mask = tokenizer_output.attention_mask.to(self.prior_text_encoder.device)
 
+        text_encoder_dropout_mask, tokens, tokens_mask = self._prepare_caption_dropout(
+            "text_encoder", text_encoder_dropout_probability, rand, text_encoder_output,
+            tokens, tokens_mask,
+        )
+
         if text_encoder_output is None:
             text_encoder_output = self.prior_text_encoder(
                 tokens,
@@ -287,16 +294,7 @@ class WuerstchenModel(BaseModel):
             text_encoder_output,
         )
 
-        # apply dropout
-        if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
-            dropout_text_encoder_mask = (torch.tensor(
-                [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)],
-                device=train_device)).float()
-
-            if self.model_type.is_wuerstchen_v2():
-                text_encoder_output = text_encoder_output * dropout_text_encoder_mask[:, None, None]
-            if self.model_type.is_stable_cascade():
-                pooled_text_encoder_output = pooled_text_encoder_output * dropout_text_encoder_mask[:, None, None]
-                text_encoder_output = text_encoder_output * dropout_text_encoder_mask[:, None, None]
-
+        text_encoder_output, pooled_text_encoder_output = self._apply_caption_dropout(
+            "text_encoder", text_encoder_dropout_mask, text_encoder_output, pooled_text_encoder_output,
+        )
         return text_encoder_output, pooled_text_encoder_output

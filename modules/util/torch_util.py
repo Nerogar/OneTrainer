@@ -1,18 +1,50 @@
+import contextlib
 import gc
+import platform
+import time
 from collections.abc import Callable
 from contextlib import nullcontext
-from typing import Any
 
 import torch
 
 import accelerate
-import packaging
+import packaging.version
 from packaging.version import Version
 
 accelerator = accelerate.Accelerator()
 default_device = accelerator.device
 
 torch_version = packaging.version.parse(torch.__version__)
+
+@contextlib.contextmanager
+def timed(label: str, enabled: bool = True):
+    # wall-clock timing around a block; sync the compute device before and after so the measurement includes the
+    # async device transfer + (re)quantization rather than just the launch overhead. Forces a cuda sync per block,
+    # so enable only for ad-hoc profiling, not on the hot per-step path.
+    if not enabled:
+        yield
+        return
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+    start = time.perf_counter()
+    yield
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+    print(f"[timing] {label}: {time.perf_counter() - start:.3f}s")
+
+
+def supports_mem_pool(device: torch.device) -> bool:
+    return device.type == "cuda" and torch.cuda.memory.get_allocator_backend() == "native"
+
+
+def create_mem_pool(device: torch.device):
+    # a dedicated MemPool the caller can allocate into; None on unsupported devices or allocators (cpu/mps)
+    return torch.cuda.MemPool() if supports_mem_pool(device) else None
+
+
+def mem_pool_context(mem_pool, device: torch.device):
+    # route allocations made in this context into the given MemPool; no-op when it is None. Ensure "cuda" works
+    return torch.cuda.use_mem_pool(mem_pool, device=device.index) if mem_pool is not None else nullcontext()
 
 
 def state_dict_has_prefix(state_dict: dict | None, prefix: str):
@@ -42,79 +74,12 @@ def get_tensor_data(
     return tensors
 
 
-def has_grad_fn(
-        data: torch.Tensor | list | tuple | dict,
-        include_parameter_indices: list[int] | None = None,
-) -> bool:
-    if isinstance(data, torch.Tensor) and include_parameter_indices is None:
-        return data.grad_fn is not None
-    elif isinstance(data, list | tuple):
-        for i, elem in enumerate(data):
-            if include_parameter_indices is None or i in include_parameter_indices:
-                if has_grad_fn(elem):
-                    return True
-    elif isinstance(data, dict) and include_parameter_indices is None:
-        for elem in data.values():
-            if has_grad_fn(elem):
-                return True
-
-    return False
-
-def add_dummy_grad_fn_(
-        data: torch.Tensor | list | tuple | dict,
-) -> Any:
-    if isinstance(data, torch.Tensor):
-        if data.grad_fn is not None:
-            return data
-        grad_tensor = torch\
-            .zeros(size=(0, *data.shape[1:]), requires_grad=True, device=data.device, dtype=data.dtype)
-        return torch.cat([data, grad_tensor], dim=0)
-    if isinstance(data, list):
-        for i, elem in enumerate(data):
-            if isinstance(elem, torch.Tensor):
-                if elem.grad_fn is not None:
-                    return data
-                grad_tensor = torch\
-                    .zeros(size=(0, *elem.shape[1:]), requires_grad=True, device=elem.device, dtype=elem.dtype)
-                data[i] = torch.cat([elem, grad_tensor], dim=0)
-                return data
-            else:
-                data[i] = add_dummy_grad_fn_(elem)
-    if isinstance(data, tuple):
-        for i, elem in enumerate(data):
-            if isinstance(elem, torch.Tensor):
-                if elem.grad_fn is not None:
-                    return data
-                grad_tensor = torch\
-                    .zeros(size=(0, *elem.shape[1:]), requires_grad=True, device=elem.device, dtype=elem.dtype)
-                data = list(data)
-                data[i] = torch.cat([elem, grad_tensor], dim=0)
-                data = tuple(data)
-                return data
-            else:
-                data = list(data)
-                data[i] = add_dummy_grad_fn_(elem)
-                data = tuple(data)
-    elif isinstance(data, dict):
-        for key, elem in data.items():
-            if isinstance(elem, torch.Tensor):
-                if elem.grad_fn is not None:
-                    return data
-                grad_tensor = torch \
-                    .zeros(size=(0, *elem.shape[1:]), requires_grad=True, device=elem.device, dtype=elem.dtype)
-                data[key] = torch.cat([elem, grad_tensor], dim=0)
-                return data
-            else:
-                data[key] = add_dummy_grad_fn_(elem)
-
-    return data
-
 def tensors_to_device_(
         data: torch.Tensor | list | tuple | dict,
         device: torch.device,
         include_parameter_indices: list[int] | None = None,
         non_blocking: bool = False,
-        allocator: Callable[[torch.tensor], torch.tensor] | None = None,
+        allocator: Callable[[torch.Tensor], torch.Tensor] | None = None,
 ) -> bool:
     tensor_transferred = False
 
@@ -148,6 +113,7 @@ def replace_tensors_(
         include_parameter_indices: list[int] | None = None,
 ):
     if isinstance(target_data, torch.Tensor) and include_parameter_indices is None:
+        assert isinstance(source_data, torch.Tensor)
         target_data.data = source_data.data
     elif isinstance(target_data, list | tuple):
         for i, elem in enumerate(target_data):
@@ -208,7 +174,7 @@ def unpin_module(
     return module._apply(convert)
 
 
-def device_equals(device1: torch.device, device2: torch.device) -> bool:
+def device_equals(device1: torch.device | None, device2: torch.device | None) -> bool:
     return device1 is not None and device2 is not None \
         and device1.type == device2.type \
         and (0 if device1.index is None else device1.index) == (0 if device2.index is None else device2.index)
@@ -233,6 +199,26 @@ def torch_gc():
         torch.mps.empty_cache()
 
 
+def print_fragmentation(label: str):
+    # Live (not peak) snapshot of allocator fragmentation for the current device. reserved-allocated is the total free
+    # memory the allocator holds but hasn't handed out; ext_frag is how shattered that free space is -- the fraction
+    # NOT in the single largest contiguous hole. An OOM is about contiguity, not total free bytes, so ext_frag near 1
+    # (free memory in many small holes) is the fragmentation that blocks a large allocation even when free > request.
+    if not torch.cuda.is_available():
+        return
+    segments = torch.cuda.memory_snapshot()
+    reserved = sum(s["total_size"] for s in segments)
+    allocated = sum(b["size"] for s in segments for b in s["blocks"] if b["state"] == "active_allocated")
+    free_total = reserved - allocated
+    largest_free = max(
+        (b["size"] for s in segments for b in s["blocks"] if b["state"] != "active_allocated"),
+        default=0)
+    ext_frag = 1 - largest_free / free_total if free_total > 0 else 0.0
+    gib = 1024 ** 3
+    print(f"[fragmentation] {label}: allocated={allocated / gib:.2f} GiB reserved={reserved / gib:.2f} GiB "
+          f"free={free_total / gib:.2f} GiB largest_free={largest_free / gib:.2f} GiB ext_frag={ext_frag:.1%}")
+
+
 def torch_sync():
     if torch.cuda.is_available():
         torch.cuda.synchronize()
@@ -241,7 +227,7 @@ def torch_sync():
         packaging.version.parse(torch.__version__)
 
 
-def create_stream_context(stream: torch.cuda.Stream) -> torch.cuda.StreamContext | nullcontext:
+def create_stream_context(stream: torch.cuda.Stream | None) -> torch.cuda.StreamContext | nullcontext:
     if isinstance(stream, torch.cuda.Stream):
         return torch.cuda.StreamContext(stream)
     return nullcontext()
@@ -251,14 +237,24 @@ def pin_tensor_(x):
     # not implemented for other device types
     if torch.cuda.is_available():
         cudart = torch.cuda.cudart()
+        num_bytes = x.numel() * x.element_size()
         err = cudart.cudaHostRegister(
             x.data_ptr(),
-            x.numel() * x.element_size(),
+            num_bytes,
             0,
         )
 
         if err.value != 0:
-            raise RuntimeError(f"CUDA Error while trying to pin memory. error: {err.value}, ptr: {x.data_ptr()}, size: {x.numel() * x.element_size()}")
+            hint = ""
+            if err.value == 1 and num_bytes >= 2**31:
+                # the kernel's page list for a registration holds one entry per 4 KiB, so at 2 GiB it reaches
+                # 4 MiB, the largest single kmalloc there is, and the pin is refused whatever the driver or
+                # GPU. cudaErrorInvalidValue at this size has no other cause, so the attribution is safe.
+                hint = (f". A single pinned allocation of {num_bytes / 2**30:.2f} GiB failed: linux "
+                        f"{platform.release()} cannot pin 2 GiB or more in one call, a kernel bug present in "
+                        f"6.11 and 6.12 and fixed in 6.13. Update the kernel, or run on a host with 6.13 or "
+                        f"newer. This attempt leaked {num_bytes / 2**30:.2f} GiB of host memory until reboot")
+            raise RuntimeError(f"CUDA Error while trying to pin memory. error: {err.value}, ptr: {x.data_ptr()}, size: {num_bytes}{hint}")
 
 
 def unpin_tensor_(x):

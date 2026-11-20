@@ -7,7 +7,6 @@ from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.convert_util import fuse
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelType import ModelType
-from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 import torch
 from torch import Tensor
@@ -30,6 +29,8 @@ def format_input(text: str):
 
 
 class ZImageModel(BaseModel):
+    supports_caption_dropout = True
+
     # base model data
     tokenizer: Qwen2Tokenizer | None
     noise_scheduler: FlowMatchEulerDiscreteScheduler | None
@@ -42,8 +43,6 @@ class ZImageModel(BaseModel):
 
     text_encoder_train_dtype: DataType
 
-    text_encoder_offload_conductor: LayerOffloadConductor | None
-    transformer_offload_conductor: LayerOffloadConductor | None
 
     # persistent lora training data
     text_encoder_lora: LoRAModuleWrapper | None
@@ -68,8 +67,6 @@ class ZImageModel(BaseModel):
 
         self.text_encoder_train_dtype = DataType.FLOAT_32 #TODO
 
-        self.text_encoder_offload_conductor = None
-        self.transformer_offload_conductor = None
 
         self.transformer_lora = None
         self.lora_state_dict = None
@@ -136,6 +133,11 @@ class ZImageModel(BaseModel):
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
             tokens_mask = tokenizer_output.attention_mask.to(self.text_encoder.device)
 
+        text_encoder_dropout_mask, tokens, tokens_mask = self._prepare_caption_dropout(
+            "text_encoder", text_encoder_dropout_probability, rand, text_encoder_output,
+            tokens, tokens_mask,
+        )
+
         if text_encoder_output is None and self.text_encoder is not None:
             with self.text_encoder_autocast_context:
                 text_encoder_output = self.text_encoder(
@@ -146,8 +148,9 @@ class ZImageModel(BaseModel):
                 )
                 text_encoder_output = text_encoder_output.hidden_states[-2]
 
-        if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
-            raise NotImplementedError #https://github.com/Nerogar/OneTrainer/issues/957
+        text_encoder_output, tokens_mask = self._apply_caption_dropout(
+            "text_encoder", text_encoder_dropout_mask, text_encoder_output, tokens_mask,
+        )
 
         embeddings_list = []
         bool_attention_mask = tokens_mask.bool()

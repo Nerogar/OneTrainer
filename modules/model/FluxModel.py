@@ -11,7 +11,6 @@ from modules.util.convert_util import chunk_swap
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
-from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 import torch
 from torch import Tensor
@@ -50,6 +49,8 @@ class FluxModelEmbedding:
         )
 
 class FluxModel(BaseModel):
+    supports_caption_dropout = True
+
     # base model data
     tokenizer_1: CLIPTokenizer | None
     orig_tokenizer_1: CLIPTokenizer | None
@@ -66,8 +67,6 @@ class FluxModel(BaseModel):
 
     text_encoder_2_train_dtype: DataType
 
-    text_encoder_2_offload_conductor: LayerOffloadConductor | None
-    transformer_offload_conductor: LayerOffloadConductor | None
 
     # persistent embedding training data
     embedding: FluxModelEmbedding | None
@@ -103,8 +102,6 @@ class FluxModel(BaseModel):
 
         self.text_encoder_2_train_dtype = DataType.FLOAT_32
 
-        self.text_encoder_2_offload_conductor = None
-        self.transformer_offload_conductor = None
 
         self.embedding = None
         self.additional_embeddings = []
@@ -256,6 +253,16 @@ class FluxModel(BaseModel):
             tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
             tokens_mask_2 = tokenizer_output.attention_mask.to(self.text_encoder_2.device)
 
+        text_encoder_1_dropout_mask, tokens_1 = self._prepare_caption_dropout(
+            "text_encoder_1", text_encoder_1_dropout_probability, rand, pooled_text_encoder_1_output,
+            tokens_1,
+        )
+
+        text_encoder_2_dropout_mask, tokens_2, tokens_mask_2 = self._prepare_caption_dropout(
+            "text_encoder_2", text_encoder_2_dropout_probability, rand, text_encoder_2_output,
+            tokens_2, tokens_mask_2,
+        )
+
         _, pooled_text_encoder_1_output = encode_clip(
             text_encoder=self.text_encoder_1,
             tokens=tokens_1,
@@ -308,18 +315,13 @@ class FluxModel(BaseModel):
             text_encoder_2_output,
         )
 
-        # apply dropout
-        if text_encoder_1_dropout_probability is not None and text_encoder_1_dropout_probability > 0.0:
-            dropout_text_encoder_1_mask = (torch.tensor(
-                [rand.random() > text_encoder_1_dropout_probability for _ in range(batch_size)],
-                device=train_device)).float()
-            pooled_text_encoder_1_output = pooled_text_encoder_1_output * dropout_text_encoder_1_mask[:, None]
+        pooled_text_encoder_1_output, = self._apply_caption_dropout(
+            "text_encoder_1", text_encoder_1_dropout_mask, pooled_text_encoder_1_output,
+        )
 
-        if text_encoder_2_dropout_probability is not None and text_encoder_2_dropout_probability > 0.0:
-            dropout_text_encoder_2_mask = (torch.tensor(
-                [rand.random() > text_encoder_2_dropout_probability for _ in range(batch_size)],
-                device=train_device)).float()
-            text_encoder_2_output = text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None]
+        text_encoder_2_output, = self._apply_caption_dropout(
+            "text_encoder_2", text_encoder_2_dropout_mask, text_encoder_2_output,
+        )
 
         return text_encoder_2_output, pooled_text_encoder_1_output
 

@@ -6,9 +6,9 @@ from pathlib import Path
 
 from modules.util import path_util
 from modules.util.image_util import load_image
+from modules.util.tqdm_util import tqdm
 
 from PIL import Image
-from tqdm import tqdm
 
 
 class CaptionSample:
