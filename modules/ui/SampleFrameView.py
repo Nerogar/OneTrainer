@@ -78,8 +78,8 @@ class BaseSampleFrameView:
 
             if is_flow_matching:
                 self.components.label(bottom_frame, 5, 0, "override shift:",
-                                      tooltip="Positive timestep shift factor for this sample. "
-                                              "Leave empty to use the model's default schedule.")
+                                      tooltip="Leave blank to use the model's default the timestep schedule. Enter 1 for a neutral shift. "
+                                              "Values below or above 1 shift in the opposite directions.")
                 self.components.entry(bottom_frame, 5, 1, ui_state, "override_shift", extra_validate=validate_override_shift)
 
             # inpainting
