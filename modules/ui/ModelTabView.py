@@ -147,7 +147,7 @@ class BaseModelTabView:
         include_compressed = model_type.supports_compression()
 
         row = 0
-        quantization_filter = self.components.layer_filter_entry(frame, row, 0, ui_state,
+        self.components.layer_filter_entry(frame, row, 0, ui_state,
             preset_var_name="quantization.layer_filter_preset", presets=controller.get_presets(),
             preset_label="Quantization Layer Filter",
             preset_tooltip="Select a preset defining which layers to quantize. Quantization of certain layers can decrease model quality. Only applies to the transformer/unet",
@@ -155,6 +155,7 @@ class BaseModelTabView:
             entry_tooltip="Comma-separated list of layers to quantize. Regular expressions (if toggled) are supported. Any model layer with a matching name will be quantized",
             regex_var_name="quantization.layer_filter_regex",
             regex_tooltip="If enabled, layer filter patterns are interpreted as regular expressions. Otherwise, simple substring matching is used.",
+            colspan=2,
         )
         row += 1
 
@@ -215,7 +216,6 @@ class BaseModelTabView:
             ("float8", DataType.FLOAT_8),
             ("nfloat4", DataType.NFLOAT_4),
         ], ui_state, "output_dtype")
-        return quantization_filter
 
 
 class ModelTabView(BaseModelTabView, QWidget):
@@ -254,8 +254,7 @@ class ModelTabView(BaseModelTabView, QWidget):
         precision = self.components.form_section(frame, 0, 1, "Precision & Performance")
         self._build_model_source(source, self.controller, self.ui_state)
         self._build_output(output, self.controller, self.ui_state)
-        quantization_filter = self._build_precision(precision, self.controller, self.ui_state)
-        self.components._layout(precision).addWidget(quantization_filter, 0, 0, 1, 2)
+        self._build_precision(precision, self.controller, self.ui_state)
 
         for section in (source, output, precision):
             fit_form(section)

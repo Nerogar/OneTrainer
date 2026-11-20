@@ -343,6 +343,7 @@ def label(
         underline: bool = False,
         *,
         heading: bool = False,
+        colspan: int = 1,
 ) -> QLabel:
     component = QLabel(text, master)
     component.setProperty("formLabel", "heading" if heading else "field")
@@ -366,7 +367,7 @@ def label(
     if tooltip:
         _set_tooltip(component, tooltip, wide_tooltip)
     layout = _layout(master)
-    layout.addWidget(component, row, column)
+    layout.addWidget(component, row, column, 1, colspan)
     layout.setAlignment(component, cell_alignment)
     return component
 
@@ -379,8 +380,9 @@ def header_label(
         *,
         tooltip: str | None = None,
         top_spacing: int = 0,
+        colspan: int = 1,
 ) -> QLabel:
-    component = label(master, row, column, text, tooltip=tooltip, heading=True)
+    component = label(master, row, column, text, tooltip=tooltip, heading=True, colspan=colspan)
     component.setContentsMargins(0, top_spacing, 0, 0)
     return component
 
@@ -683,17 +685,18 @@ def layer_filter_entry(
         entry_tooltip: str,
         regex_var_name: str,
         regex_tooltip: str,
+        *,
+        colspan: int = 1,
 ) -> QWidget:
     frame = QFrame(master)
     frame.setProperty("formInset", True)
-    _layout(master).addWidget(frame, row, column)
+    _layout(master).addWidget(frame, row, column, 1, colspan)
     layout = _layout(frame)
     layout.setContentsMargins(12, 12, 12, 12)
     layout.setVerticalSpacing(8)
     layout.setColumnStretch(1, 1)
 
-    preset_heading = label(frame, 0, 0, preset_label, tooltip=preset_tooltip)
-    layout.addWidget(preset_heading, 0, 0, 1, 2)
+    label(frame, 0, 0, preset_label, tooltip=preset_tooltip, colspan=2)
     layer_entry = entry(frame, 1, 1, ui_state, entry_var_name, tooltip=entry_tooltip)
     regex_label = label(frame, 2, 0, "Use Regex", tooltip=regex_tooltip)
     regex_switch = switch(frame, 2, 1, ui_state, regex_var_name)

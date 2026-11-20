@@ -174,8 +174,7 @@ class GeneralTabView(BaseGeneralTabView, QWidget):
             ("Debugging", self._build_debugging),
             ("Tensorboard", self._build_tensorboard),
         ):
-            heading = self.components.header_label(left, row, 0, title, top_spacing=8 if row else 0)
-            left_layout.addWidget(heading, row, 0, 1, 2)
+            self.components.header_label(left, row, 0, title, top_spacing=8 if row else 0, colspan=2)
             row = builder(left, controller, ui_state, start_row=row + 1)
 
         validation = self.components.form_section(self.validation_column, 0, 0, "Validation Loss")
