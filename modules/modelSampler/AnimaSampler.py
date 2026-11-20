@@ -1,9 +1,9 @@
-import copy
 import inspect
 from collections.abc import Callable
 
 from modules.model.AnimaModel import AnimaModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.modelSampler.flow_matching import prepare_flow_match_scheduler
 from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
@@ -77,8 +77,6 @@ class AnimaSampler(BaseModelSampler):
         else:
             generator.manual_seed(sample_config.seed)
 
-        noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
-
         # prepare latent image
         latent_image = torch.randn(
             size=(1, num_latent_channels, 1, height // vae_scale_factor, width // vae_scale_factor),
@@ -88,7 +86,9 @@ class AnimaSampler(BaseModelSampler):
         )
 
         sigmas = np.linspace(1.0, 1.0 / diffusion_steps, diffusion_steps)
-        noise_scheduler.set_timesteps(sigmas=sigmas, device=self.train_device)
+        noise_scheduler = prepare_flow_match_scheduler(
+            self.model.noise_scheduler, diffusion_steps, self.train_device, sample_config.override_shift, sigmas=sigmas,
+        )
         timesteps = noise_scheduler.timesteps
 
         padding_mask = latent_image.new_zeros(

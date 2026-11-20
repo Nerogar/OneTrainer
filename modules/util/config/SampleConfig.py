@@ -1,7 +1,21 @@
+import math
 from typing import Any
 
-from modules.util.config.BaseConfig import BaseConfig
+from modules.util.config.BaseConfig import BaseConfig, ConfigValueError
 from modules.util.enum.NoiseScheduler import NoiseScheduler
+
+
+def parse_override_shift(value: float | str | None) -> float | None:
+    if value is None or value == "":
+        return None
+    message = "Sampling shift must be a finite number greater than zero."
+    try:
+        shift = float(value)
+    except (TypeError, ValueError, OverflowError) as e:
+        raise ConfigValueError(message) from e
+    if isinstance(value, bool) or not math.isfinite(shift) or shift <= 0:
+        raise ConfigValueError(message)
+    return shift
 
 
 def _get_model_defaults(model_type) -> dict:
@@ -17,6 +31,7 @@ def _get_model_defaults(model_type) -> dict:
         "cfg_scale": 7.0,
         "noise_scheduler": NoiseScheduler.DDIM,
         "negative_prompt": "",
+        "override_shift": None,
     }
 
     if model_type is None:
@@ -170,6 +185,7 @@ class SampleConfig(BaseConfig):
     diffusion_steps: int
     cfg_scale: float
     noise_scheduler: NoiseScheduler
+    override_shift: float | None
 
     text_encoder_1_layer_skip: int
     text_encoder_1_sequence_length: int | None
@@ -186,6 +202,12 @@ class SampleConfig(BaseConfig):
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
+
+    def from_dict(self, data: dict, migrate: bool = True) -> 'SampleConfig':
+        if "override_shift" in data:
+            data = {**data, "override_shift": parse_override_shift(data["override_shift"])}
+        super().from_dict(data, migrate=migrate)
+        return self
 
     def from_train_config(self, train_config):
         self.text_encoder_1_layer_skip = train_config.text_encoder_layer_skip
@@ -214,6 +236,7 @@ class SampleConfig(BaseConfig):
         data.append(("diffusion_steps", defaults["diffusion_steps"], int, False))
         data.append(("cfg_scale", defaults["cfg_scale"], float, False))
         data.append(("noise_scheduler", defaults["noise_scheduler"], NoiseScheduler, False))
+        data.append(("override_shift", defaults["override_shift"], float, True))
 
         data.append(("text_encoder_1_layer_skip", 0, int, False))
         data.append(("text_encoder_1_sequence_length", None, int, True))

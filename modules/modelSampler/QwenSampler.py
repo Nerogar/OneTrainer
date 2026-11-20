@@ -1,10 +1,10 @@
-import copy
 import inspect
 import math
 from collections.abc import Callable
 
 from modules.model.QwenModel import QwenModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.modelSampler.flow_matching import prepare_flow_match_scheduler
 from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
@@ -79,8 +79,6 @@ class QwenSampler(BaseModelSampler):
         else:
             generator.manual_seed(sample_config.seed)
 
-        noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
-
         # prepare latent image
         latent_image = torch.randn(
             size=(1, num_latent_channels, 1, height // vae_scale_factor, width // vae_scale_factor),
@@ -89,10 +87,14 @@ class QwenSampler(BaseModelSampler):
             dtype=torch.float32,
         )
 
-        shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
+        mu = None
+        if sample_config.override_shift is None:
+            mu = math.log(self.model.calculate_timestep_shift(*latent_image.shape[-2:]))
         latent_image = self.model.pack_latents(latent_image)
 
-        noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=math.log(shift))
+        noise_scheduler = prepare_flow_match_scheduler(
+            self.model.noise_scheduler, diffusion_steps, self.train_device, sample_config.override_shift, mu=mu,
+        )
         timesteps = noise_scheduler.timesteps
 
         # denoising loop

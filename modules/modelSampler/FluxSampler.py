@@ -1,10 +1,10 @@
-import copy
 import inspect
 import math
 from collections.abc import Callable
 
 from modules.model.FluxModel import FluxModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.modelSampler.flow_matching import prepare_flow_match_scheduler
 from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
@@ -49,6 +49,7 @@ class FluxSampler(BaseModelSampler):
             diffusion_steps: int,
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
+            override_shift: float | None = None,
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
             text_encoder_2_sequence_length: int | None = None,
@@ -62,7 +63,6 @@ class FluxSampler(BaseModelSampler):
             else:
                 generator.manual_seed(seed)
 
-            noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
             image_processor = self.pipeline.image_processor
             transformer = self.pipeline.transformer
             vae = self.pipeline.vae
@@ -96,11 +96,15 @@ class FluxSampler(BaseModelSampler):
                 self.model.train_dtype.torch_dtype()
             )
 
-            shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
+            mu = None
+            if override_shift is None:
+                mu = math.log(self.model.calculate_timestep_shift(*latent_image.shape[-2:]))
             latent_image = self.model.pack_latents(latent_image)
 
             # prepare timesteps
-            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=math.log(shift))
+            noise_scheduler = prepare_flow_match_scheduler(
+                self.model.noise_scheduler, diffusion_steps, self.train_device, override_shift, mu=mu,
+            )
             timesteps = noise_scheduler.timesteps
 
             # denoising loop
@@ -188,6 +192,7 @@ class FluxSampler(BaseModelSampler):
             diffusion_steps: int,
             cfg_scale: float,
             noise_scheduler: NoiseScheduler,
+            override_shift: float | None = None,
             sample_inpainting: bool = False,
             base_image_path: str = "",
             mask_image_path: str = "",
@@ -204,7 +209,6 @@ class FluxSampler(BaseModelSampler):
             else:
                 generator.manual_seed(seed)
 
-            noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
             image_processor = self.pipeline.image_processor
             transformer = self.pipeline.transformer
             vae = self.pipeline.vae
@@ -312,9 +316,13 @@ class FluxSampler(BaseModelSampler):
                 self.model.train_dtype.torch_dtype()
             )
 
-            shift = self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
+            mu = None
+            if override_shift is None:
+                mu = math.log(self.model.calculate_timestep_shift(*latent_image.shape[-2:]))
             latent_image = self.model.pack_latents(latent_image)
-            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=math.log(shift))
+            noise_scheduler = prepare_flow_match_scheduler(
+                self.model.noise_scheduler, diffusion_steps, self.train_device, override_shift, mu=mu,
+            )
             timesteps = noise_scheduler.timesteps
 
             # denoising loop
@@ -400,6 +408,7 @@ class FluxSampler(BaseModelSampler):
                 diffusion_steps=sample_config.diffusion_steps,
                 cfg_scale=sample_config.cfg_scale,
                 noise_scheduler=sample_config.noise_scheduler,
+                override_shift=sample_config.override_shift,
                 sample_inpainting=sample_config.sample_inpainting,
                 base_image_path=sample_config.base_image_path,
                 mask_image_path=sample_config.mask_image_path,
@@ -420,6 +429,7 @@ class FluxSampler(BaseModelSampler):
                 diffusion_steps=sample_config.diffusion_steps,
                 cfg_scale=sample_config.cfg_scale,
                 noise_scheduler=sample_config.noise_scheduler,
+                override_shift=sample_config.override_shift,
                 text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
                 text_encoder_2_sequence_length=sample_config.text_encoder_2_sequence_length,
