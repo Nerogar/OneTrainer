@@ -256,16 +256,16 @@ class GeneralTabView(BaseGeneralTabView, QWidget):
         try:
             animate = self.isVisible() and not self._loading
             cloud = bool(self.ui_state.get_var("cloud.enabled").get())
+            multi_gpu_enabled = bool(self.ui_state.get_var("multi_gpu").get())
             available, tooltip = self.controller.get_multi_gpu_availability(cloud)
-            self.multi_gpu_switch.setEnabled(available)
-            self.multi_gpu_label.setEnabled(available)
+            if not available and multi_gpu_enabled:
+                tooltip = f"{tooltip} Turn off Multi-GPU or enable Cloud before starting local training."
+            can_toggle = available or multi_gpu_enabled
+            self.multi_gpu_switch.setEnabled(can_toggle)
+            self.multi_gpu_label.setEnabled(can_toggle)
             for widget in (self.multi_gpu_summary, self.multi_gpu_label, self.multi_gpu_switch):
                 widget.setToolTip(tooltip)
-            if not available and self.ui_state.get_var("multi_gpu").get():
-                self.ui_state.get_var("multi_gpu").set(False)
-            self.multi_gpu_details.set_expanded(
-                available and bool(self.ui_state.get_var("multi_gpu").get()), animate=animate,
-            )
+            self.multi_gpu_details.set_expanded(available and multi_gpu_enabled, animate=animate)
             validation_enabled = bool(self.ui_state.get_var("validation").get())
             self._position_appearance(validation_enabled)
             self.validation_details.set_expanded(validation_enabled, animate=animate)

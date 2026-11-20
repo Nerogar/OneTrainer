@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 import scripts.generate_debug_report
 from modules.ui.CaptionUIController import CaptionUIController
 from modules.ui.ConvertModelUIController import ConvertModelUIController
+from modules.ui.GeneralTabController import get_multi_gpu_availability
 from modules.ui.SampleWindowController import SampleWindowController
 from modules.ui.VideoToolUIController import VideoToolUIController
 from modules.util import create
@@ -330,6 +331,10 @@ class TrainUIController:
     def start_training(self):
         if self.training_thread is None:
             errors = flush_and_validate_all()
+            if self.train_config.multi_gpu:
+                available, reason = get_multi_gpu_availability(self._local_gpu_count, self.train_config.cloud.enabled)
+                if not available:
+                    errors.append(f"Multi-GPU: {reason}")
             if errors:
                 self.view.show_validation_errors(errors)
                 return
