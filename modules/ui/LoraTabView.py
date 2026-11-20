@@ -114,6 +114,11 @@ class BaseLoraTabView:
                              tooltip="Combines Weight-Decomposed Low-Rank Adaptation (DoRA) with OFT. By decoupling the weight into magnitude and direction components, it achieves the superior training dynamics of DoRA but with the stability and performance of OFT. Because OFT is norm-preserving, it avoids the heavy re-calculations typically found in standard DoRA, resulting in faster training (same speed as standard OFT) and better convergence.")
             self.components.switch(master, 3, 4, ui_state, "dora_oft")
 
+            # Matrix Exponential Mode
+            self.components.label(master, 4, 3, "Matrix Exponential Mode",
+                                  tooltip="Changes OFT parameterization from Cayley transform to Matrix Exponential. Provides uniform effective learning rates across all rotation angles, avoiding Cayley metric distortion while maintaining the same overhead.")
+            self.components.switch(master, 4, 4, ui_state, "oft_matrix_exp")
+
             # For use with additional embeddings.
             self.components.label(master, 4, 0, "Bundle Embeddings",
                                   tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
