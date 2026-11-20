@@ -340,7 +340,7 @@ class BaseTrainingTabView(ABC):
         # learning rate min factor
         self.components.label(frame, 4, 0, "LR Min Factor",
                               tooltip="Unit = float. Method = percentage. For a factor of 0.1, the final LR will be 10% of the initial LR. If the initial LR is 1e-4, the final LR will be 1e-5.")
-        self.components.entry(frame, 4, 1, ui_state, "learning_rate_min_factor", max_width=4,
+        self.components.entry(frame, 4, 1, ui_state, "learning_rate_min_factor", max_width=5,
                               extra_validate=check_range(lower=0, upper=0.99, message="Learning rate min factor must be between 0 and 0.99"))
 
         # learning rate cycles
@@ -435,7 +435,7 @@ class BaseTrainingTabView(ABC):
         # resolution
         self.components.label(frame, row, 0, "Resolution",
                               tooltip="The resolution used for training. Optionally specify multiple resolutions separated by a comma, or a single exact resolution in the format <width>x<height>")
-        self.components.entry(frame, row, 1, ui_state, "resolution", max_width=5, required=True,
+        self.components.entry(frame, row, 1, ui_state, "resolution", max_width=22, required=True,
                               extra_validate=validate_resolution())
         row += 1
 
@@ -643,7 +643,7 @@ class BaseTrainingTabView(ABC):
         # unet learning rate
         self.components.label(frame, row, 0, "UNet Learning Rate",
                               tooltip="The learning rate of the UNet. Overrides the base learning rate")
-        self.components.entry(frame, row, 1, ui_state, "unet.learning_rate")
+        self.components.entry(frame, row, 1, ui_state, "unet.learning_rate", max_width=9)
         row += 1
 
         # rescale noise scheduler to zero terminal SNR
@@ -701,7 +701,7 @@ class BaseTrainingTabView(ABC):
         # transformer learning rate
         self.components.label(frame, row, 0, "Transformer Learning Rate",
                               tooltip="The learning rate of the Transformer. Overrides the base learning rate")
-        self.components.entry(frame, row, 1, ui_state, "transformer.learning_rate", max_width=7)
+        self.components.entry(frame, row, 1, ui_state, "transformer.learning_rate", max_width=9)
         row += 1
 
         if supports_force_attention_mask:
@@ -740,7 +740,7 @@ class BaseTrainingTabView(ABC):
         # offset noise weight
         self.components.label(frame, 0, 0, "Offset Noise Weight",
                               tooltip="The weight of offset noise added to each training step")
-        self.components.entry(frame, 0, 1, ui_state, "offset_noise_weight", max_width=4)
+        self.components.entry(frame, 0, 1, ui_state, "offset_noise_weight", max_width=5)
 
         if supports_generalized_offset_noise:
             # generalized offset noise weight
@@ -752,7 +752,7 @@ class BaseTrainingTabView(ABC):
         # perturbation noise weight
         self.components.label(frame, 2, 0, "Perturbation Noise Weight",
                               tooltip="The weight of perturbation noise added to each training step")
-        self.components.entry(frame, 2, 1, ui_state, "perturbation_noise_weight", max_width=4)
+        self.components.entry(frame, 2, 1, ui_state, "perturbation_noise_weight", max_width=5)
 
         # timestep distribution
         self.components.label(frame, 3, 0, "Timestep Distribution",
@@ -765,27 +765,27 @@ class BaseTrainingTabView(ABC):
         # min noising strength
         self.components.label(frame, 4, 0, "Min Noising Strength",
                               tooltip="Specifies the minimum noising strength used during training. This can help to improve composition, but prevents finer details from being trained")
-        self.components.entry(frame, 4, 1, ui_state, "min_noising_strength", max_width=4, required=True)
+        self.components.entry(frame, 4, 1, ui_state, "min_noising_strength", max_width=5, required=True)
 
         # max noising strength
         self.components.label(frame, 5, 0, "Max Noising Strength",
                               tooltip="Specifies the maximum noising strength used during training. This can be useful to reduce overfitting, but also reduces the impact of training samples on the overall image composition")
-        self.components.entry(frame, 5, 1, ui_state, "max_noising_strength", max_width=4, required=True)
+        self.components.entry(frame, 5, 1, ui_state, "max_noising_strength", max_width=5, required=True)
 
         # noising weight
         self.components.label(frame, 6, 0, "Noising Weight",
                               tooltip="Controls the weight parameter of the timestep distribution function. Use the preview to see more details.")
-        self.components.entry(frame, 6, 1, ui_state, "noising_weight", max_width=4, required=True)
+        self.components.entry(frame, 6, 1, ui_state, "noising_weight", max_width=5, required=True)
 
         # noising bias
         self.components.label(frame, 7, 0, "Noising Bias",
                               tooltip="Controls the bias parameter of the timestep distribution function. Use the preview to see more details.")
-        self.components.entry(frame, 7, 1, ui_state, "noising_bias", max_width=3, required=True)
+        self.components.entry(frame, 7, 1, ui_state, "noising_bias", max_width=5, required=True)
 
         # timestep shift
         self.components.label(frame, 8, 0, "Timestep Shift",
                               tooltip="Shift the timestep distribution. Use the preview to see more details.")
-        self.components.entry(frame, 8, 1, ui_state, "timestep_shift", max_width=3, required=True)
+        self.components.entry(frame, 8, 1, ui_state, "timestep_shift", max_width=5, required=True)
 
         if supports_dynamic_timestep_shifting:
             # dynamic timestep shifting
@@ -804,13 +804,13 @@ class BaseTrainingTabView(ABC):
         # unmasked probability
         self.components.label(frame, 1, 0, "Unmasked Probability",
                               tooltip="When masked training is enabled, specifies the number of training steps done on unmasked samples")
-        self.components.entry(frame, 1, 1, ui_state, "unmasked_probability", max_width=4,
+        self.components.entry(frame, 1, 1, ui_state, "unmasked_probability", max_width=5,
                               extra_validate=check_range(lower=0, upper=1, message="Unmasked probability must be between 0 and 1"))
 
         # unmasked weight
         self.components.label(frame, 2, 0, "Unmasked Weight",
                               tooltip="When masked training is enabled, specifies the loss weight of areas outside the masked region")
-        self.components.entry(frame, 2, 1, ui_state, "unmasked_weight", max_width=4,
+        self.components.entry(frame, 2, 1, ui_state, "unmasked_weight", max_width=5,
                               extra_validate=check_range(lower=0, upper=1, message="Unmasked weight must be between 0 and 1"))
 
         # normalize masked area loss
@@ -836,33 +836,33 @@ class BaseTrainingTabView(ABC):
         # MSE Strength
         self.components.label(frame, 0, 0, "MSE Strength",
                               tooltip="Mean Squared Error strength for custom loss settings. Strengths should generally sum to 1.")
-        self.components.entry(frame, 0, 1, ui_state, "mse_strength", max_width=4, required=True)
+        self.components.entry(frame, 0, 1, ui_state, "mse_strength", max_width=5, required=True)
 
         # MAE Strength
         self.components.label(frame, 1, 0, "MAE Strength",
                               tooltip="Mean Absolute Error strength for custom loss settings. Strengths should generally sum to 1.")
-        self.components.entry(frame, 1, 1, ui_state, "mae_strength", max_width=4, required=True)
+        self.components.entry(frame, 1, 1, ui_state, "mae_strength", max_width=5, required=True)
 
         # log-cosh Strength
         self.components.label(frame, 2, 0, "log-cosh Strength",
                               tooltip="Log - Hyperbolic cosine Error strength for custom loss settings. Strengths should generally sum to 1.")
-        self.components.entry(frame, 2, 1, ui_state, "log_cosh_strength", max_width=4, required=True)
+        self.components.entry(frame, 2, 1, ui_state, "log_cosh_strength", max_width=5, required=True)
 
         # Huber Strength
         self.components.label(frame, 3, 0, "Huber Strength",
                               tooltip="Huber loss strength for custom loss settings. Less sensitive to outliers than MSE. Strengths should generally sum to 1.")
-        self.components.entry(frame, 3, 1, ui_state, "huber_strength", max_width=4, required=True)
+        self.components.entry(frame, 3, 1, ui_state, "huber_strength", max_width=5, required=True)
 
         # Huber Delta
         self.components.label(frame, 4, 0, "Huber Delta",
                               tooltip="Delta parameter for huber loss")
-        self.components.entry(frame, 4, 1, ui_state, "huber_delta", max_width=4, required=True)
+        self.components.entry(frame, 4, 1, ui_state, "huber_delta", max_width=5, required=True)
 
         if supports_vb_loss:
             # VB Strength
             self.components.label(frame, 5, 0, "VB Strength",
                                   tooltip="Variational lower-bound strength for custom loss settings. Should be set to 1 for variational diffusion models")
-            self.components.entry(frame, 5, 1, ui_state, "vb_loss_strength", required=True)
+            self.components.entry(frame, 5, 1, ui_state, "vb_loss_strength", max_width=5, required=True)
 
         # Loss Weight function
         self.components.label(frame, 6, 0, "Loss Weight Function",
@@ -879,7 +879,7 @@ class BaseTrainingTabView(ABC):
         if not controller.is_flow_matching():
             self.components.label(frame, row, 0, "Gamma",
                                   tooltip="Inverse strength of loss weighting. Range: 1-20, only applies to Min SNR and P2.")
-            self.components.entry(frame, row, 1, ui_state, "loss_weight_strength",
+            self.components.entry(frame, row, 1, ui_state, "loss_weight_strength", max_width=3,
                                   extra_validate=check_range(lower=1, upper=20, message="Gamma must be between 1 and 20"))
             row += 1
 
