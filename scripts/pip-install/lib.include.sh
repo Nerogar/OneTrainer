@@ -22,6 +22,7 @@ cd -- "${SCRIPT_DIR}"
 # since their script shadows "conda" as a shell-function instead of a binary!
 export OT_CONDA_CMD="${OT_CONDA_CMD:-${CONDA_EXE:-conda}}"
 export OT_CONDA_ENV="${OT_CONDA_ENV:-conda_env}"
+export OT_CONDA_USE_PYTHON_VERSION="${OT_CONDA_USE_PYTHON_VERSION:-3.13}"
 export OT_PYTHON_CMD="${OT_PYTHON_CMD:-python}"
 export OT_PYTHON_VENV="${OT_PYTHON_VENV:-venv}"
 export OT_PREFER_VENV="${OT_PREFER_VENV:-true}"
@@ -32,9 +33,8 @@ export OT_SCRIPT_DEBUG="${OT_SCRIPT_DEBUG:-false}"
 
 # Internal environment variables.
 # NOTE: Version check supports "3", "3.1" and "3.1.5" specifier formats.
-export OT_PYTHON_VERSION_MINIMUM="3.10"
-export OT_PYTHON_VERSION_TOO_HIGH="3.14"
-export OT_CONDA_USE_PYTHON_VERSION="3.13"
+export OT_PYTHON_VERSION_MINIMUM="3.12.0"
+export OT_PYTHON_VERSION_TOO_HIGH="3.15"
 export OT_MUST_INSTALL_REQUIREMENTS="false"
 export OT_UPDATE_METADATA_FILE="${SCRIPT_DIR}/update.var"
 export OT_HOST_OS="$(uname -s)"
@@ -234,19 +234,15 @@ function has_conda_global_env {
 function create_conda_env {
     print "Creating Conda environment in \"${OT_CONDA_ENV}\"..."
 
-    # IMPORTANT: The ".*" suffix tells Conda to install the latest bugfix/patch
-    # release of the desired Python version. For example, if we specify "3.12.*",
-    # then it will pick the latest patch release, such as "3.12.5". It also works
-    # correctly if we specify an EXACT patch release ourselves, such as "3.10.14.*",
-    # or if we only specify a major version, such as "3.*" (gets the latest release).
-    declare -a install_args=()
-    install_args+=("python==${OT_CONDA_USE_PYTHON_VERSION}.*")
+    # A minor version selects its latest patch. A full version selects that release.
+    local python_version="${OT_CONDA_USE_PYTHON_VERSION%.\*}"
+    local python_spec="python==${python_version}.*,>=${OT_PYTHON_VERSION_MINIMUM},<${OT_PYTHON_VERSION_TOO_HIGH},!=3.14.1"
 
     # NOTE: We install with strict channel priority and an explicit channel list,
     # which ensures that package names which exist in "conda-forge" will never
     # fall back to the "defaults" channel if "conda-forge" lacks the required
     # version. Protects against mismatched packages built with different settings.
-    run_conda create -y --prefix "${OT_CONDA_ENV}" --override-channels --strict-channel-priority --channel "conda-forge" "${install_args[@]}"
+    run_conda create -y --prefix "${OT_CONDA_ENV}" --override-channels --strict-channel-priority --channel "conda-forge" "${python_spec}"
     export OT_MUST_INSTALL_REQUIREMENTS="true"
 
     # Show a warning if the user has the legacy "ot" environment on their system.
@@ -379,7 +375,7 @@ function install_requirements_in_active_env {
     # when running in existing environments. It ensures that all libraries will
     # be upgraded to the same versions as a fresh reinstall of requirements.txt.
     print "Installing requirements in active environment..."
-    run_pip_in_active_env install --upgrade --upgrade-strategy eager pip setuptools==81.0.0
+    run_pip_in_active_env install --upgrade --upgrade-strategy eager pip
     run_pip_in_active_env install --upgrade --upgrade-strategy eager -r "$(get_platform_requirements_path)"
     export OT_MUST_INSTALL_REQUIREMENTS="false"
 

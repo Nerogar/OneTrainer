@@ -106,8 +106,14 @@ function Get-Platform {
         return "cuda12"
     }
 
-    # fallback to cpu, rocm not supported officially.
-    Write-OTDebug "No supported CUDA GPU detected, falling back to CPU. ROCM is not officially supported on Windows by OneTrainer."
+    # check if AMD
+    if (Test-CommandExists "hipInfo") {
+        Write-OTDebug "AMD GPU detected via hipInfo."
+        Write-OTDebug "ROCm is experimental on Windows."
+        return "rocm"
+    }
+
+    Write-OTDebug "No supported GPU detected, falling back to CPU."
     return "cpu"
 }
 

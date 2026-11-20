@@ -15,11 +15,13 @@
 
 - `OT_CUDA_LOWMEM_MODE`: If set to `true`, it enables aggressive garbage collection in PyTorch to help with low-memory GPUs. Defaults to `false`.
 
-- `OT_PLATFORM`: Allows you to override which platform you want to install for. Defaults to `detect`, which automatically detects whether you have an AMD or NVIDIA GPU, and falls back to CPU on failure. But people with multi-GPU systems can use this setting to force a specific GPU acceleration framework's requirements. Valid values are `rocm` for AMD, `cuda` for NVIDIA, and `default` for non-AMD/NVIDIA systems.
+- `OT_PLATFORM` selects the Pixi environment. The default, `detect`, selects one automatically. Use `cuda13` or `cuda12` for NVIDIA, `rocm` for AMD on Linux, or `cpu`.
 
 - `OT_SCRIPT_DEBUG`: If set to `true`, it enables additional debug logging in the scripts. Defaults to `false`.
 
 - `OT_PIP_INSTALL`: If set to `true`, it enables pip-based installation of dependencies. When running OneTrainer, it assumes that installation is already handled via pip. Defaults to `false`.
+
+- With `OT_PIP_INSTALL=true`, set `OT_PYTHON_CMD` to select the interpreter for a new venv. To create a Conda environment, set `OT_PREFER_VENV=false` and optionally override `OT_CONDA_USE_PYTHON_VERSION` (default `3.13`).
 
 
 ### Examples of how to use the custom environment variables:

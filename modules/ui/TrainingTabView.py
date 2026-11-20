@@ -307,7 +307,7 @@ class BaseTrainingTabView(ABC):
         # optimizer
         self.components.label(frame, 0, 0, "Optimizer",
                               tooltip="The type of optimizer")
-        self.components.options_adv(frame, 0, 1, [str(x) for x in list(Optimizer)], ui_state, "optimizer.optimizer",
+        self.components.options_adv(frame, 0, 1, [str(x) for x in Optimizer.available()], ui_state, "optimizer.optimizer",
                                     command=self.restore_optimizer_config,
                                     adv_command=self.open_optimizer_params)
 
