@@ -1,4 +1,4 @@
-import datetime
+import datetime as dt
 import os
 import platform
 import subprocess
@@ -27,8 +27,9 @@ class MultiTrainer(BaseTrainer):
         os.environ.setdefault('MASTER_ADDR', 'localhost')
         os.environ.setdefault('MASTER_PORT', '12355')
 
-        if platform.system() == 'Linux': #topo is not supported on Windows
-            with suppress(subprocess.CalledProcessError):
+        #topo is not supported on Windows, and nvidia-smi only exists on NVIDIA systems:
+        if platform.system() == 'Linux' and torch.version.cuda is not None:
+            with suppress(subprocess.CalledProcessError, FileNotFoundError):
                 subprocess.run(['nvidia-smi', 'topo', '-p2p', 'rw'], check=True)
                 print("\nWarning: If the matrix above does not show OK everywhere, your GPUs cannot communicate directly with each other. "
                         "Multi-GPU training with values other than OK is still possible, but this can have a major performance impact, "
@@ -44,7 +45,7 @@ class MultiTrainer(BaseTrainer):
 
         #set timeout to 24 hours, because caching is only done on 1 GPU and can take a significant time for large datasets.
         #The other GPU processes have to wait without timing out:
-        timeout = datetime.timedelta(hours=24)
+        timeout = dt.timedelta(hours=24)
 
         torch.distributed.init_process_group(rank=rank, world_size=world_size, device_id=device, timeout=timeout,
             backend='gloo' if platform.system() == 'Windows' else 'nccl',

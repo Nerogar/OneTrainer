@@ -59,6 +59,12 @@ class _FusedLinear(nn.Linear, QuantizedLinearMixin):
     def unquantized_weight(self, dtype: torch.dtype, device: torch.device) -> Tensor:
         return torch.cat([get_unquantized_weight(leaf, dtype, device) for leaf in self._leaves], dim=0)
 
+    def mark_needs_requantization(self):
+        # The synthetic layer owns no packed weight; its leaves own the quantization state.
+        for leaf in self._leaves:
+            if isinstance(leaf, QuantizedLinearMixin):
+                leaf.mark_needs_requantization()
+
 
 class FusedModuleGroup:
     # Type-independent fused-qkv adapter. One inner peft module of the configured type is built on a
@@ -95,6 +101,11 @@ class FusedModuleGroup:
     # recompose the base weight itself (delta_forward returns None) keep going through the slower,
     # generic self.module.forward(x) path.
     def _leaf_output(self, leaf_index: int, start: int, end: int, x, *args, **kwargs):
+        # a leaf that can fold the adapter into its own base matmul returns the finished output, so
+        # neither the full fused delta nor the separate add happens for it
+        fused = self.module.fused_leaf_forward(self.leaves[leaf_index], x, start, end)
+        if fused is not None:
+            return fused
         delta = self.module.delta_forward(x, *args, **kwargs)
         if delta is None:
             return self.module.forward(x)[..., start:end]

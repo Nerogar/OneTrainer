@@ -2,6 +2,7 @@ from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 
 from modules.model.BaseModel import BaseModel
+from modules.modelSetup.mixin.ModelSetupNoiseMixin import ModelSetupNoiseMixin
 from modules.util.config.TrainConfig import TrainConfig, TrainEmbeddingConfig, TrainModelPartConfig
 from modules.util.dtype_util import create_autocast_context, disable_fp16_autocast_context
 from modules.util.enum.AttentionMechanism import AttentionMechanism
@@ -90,6 +91,37 @@ class BaseModelSetup(
             config: TrainConfig,
     ) -> Tensor:
         pass
+
+    @torch.no_grad()
+    def calculate_validation_losses(
+            self,
+            model: BaseModel,
+            batch: dict,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+    ) -> dict[str, float]:
+        # returns the validation losses of a batch, keyed by a label suffix
+        if config.training_method == TrainingMethod.FINE_TUNE_VAE or not isinstance(self, ModelSetupNoiseMixin):
+            return {"": self.__calculate_validation_loss(model, batch, config, train_progress)}
+
+        timesteps = config.parse_validation_timesteps()
+        losses = {}
+        for timestep in timesteps:
+            # timesteps are configured as 0-based indices into 1000 discrete timesteps
+            with self.deterministic_timestep((timestep + 1) / 1000):
+                loss = self.__calculate_validation_loss(model, batch, config, train_progress)
+            losses[f"-{timestep}"] = loss
+        return losses
+
+    def __calculate_validation_loss(
+            self,
+            model: BaseModel,
+            batch: dict,
+            config: TrainConfig,
+            train_progress: TrainProgress,
+    ) -> float:
+        model_output_data = self.predict(model, batch, config, train_progress, deterministic=True)
+        return self.calculate_loss(model, batch, model_output_data, config).item()
 
     @abstractmethod
     def after_optimizer_step(
@@ -235,6 +267,13 @@ class BaseModelSetup(
                                not self.__stop_model_part_training_elapsed(unique_name, config, train_progress)
             model.requires_grad_(train_model_part)
 
+            # a streamed part (loaded as a meta skeleton) with cache-in-ram off is dropped to meta and re-streamed from
+            # the checkpoint on every reload, so training it would discard the update. Refuse the combination early.
+            if train_model_part and not config.cache_in_ram and any(p.is_meta for p in model.parameters()):
+                raise ValueError(
+                    f"'{unique_name}' is trained with 'stream from disk' on and 'cache in ram' off -- the trained "
+                    f"weights would be re-streamed from the checkpoint and lost. Enable 'cache in ram' for this part.")
+
             #even if frozen parameters are not passed to the optimizer, required_grad has to be False.
             #otherwise, gradients accumulate in param.grad and waste vram
             if unique_name in self.frozen_parameters:
@@ -255,10 +294,12 @@ class BaseModelSetup(
         if module is None:
             return
 
+        materialize_fn = model.materialize_fn.get(attr)
+
         if checkpointing_fn is not None:
             conductor = checkpointing_fn(module, config, config_part)
             if conductor is not None:
-                setattr(model, f"{attr}_offload_conductor", conductor)
+                model.offload_conductor[attr] = conductor
 
         if disable_fp16_autocast:
             autocast_context, train_dtype = disable_fp16_autocast_context(
@@ -268,7 +309,10 @@ class BaseModelSetup(
         else:
             train_dtype = model.train_dtype
 
-        quantize_layers(module, self.train_device, train_dtype, config, compress=config_part.weight_dtype.is_compressed())
+        # a streamed module (materialize_fn set) stays on meta until materialized and is quantized per-materialize,
+        # so there is nothing to quantize here; a non-streamed module is quantized now.
+        if materialize_fn is None:
+            quantize_layers(module, self.train_device, train_dtype, config)
 
     @staticmethod
     def _set_attention_backend(component, attn: AttentionMechanism, mask: bool):
