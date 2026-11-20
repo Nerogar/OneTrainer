@@ -9,7 +9,6 @@ import sys
 from abc import ABCMeta
 from typing import TYPE_CHECKING
 
-from modules.util.ui import pyside6_components as components
 from modules.util.ui.theme import ThemeController
 
 from PySide6.QtCore import QSettings
@@ -39,6 +38,8 @@ def limit_input_width(entry: QWidget, characters: int = 40) -> None:
 
 def fit_form(frame: QWidget) -> None:
     """Fit dropdowns to their options and put surplus space after the form."""
+    from modules.util.ui import pyside6_components as components
+
     for combo in frame.findChildren(QComboBox):
         combo.ensurePolished()
         if isinstance(combo, components.SelectedTextComboBox):
