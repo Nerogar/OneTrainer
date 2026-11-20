@@ -8,8 +8,8 @@ from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions, supported_video_extensions
 from modules.util.ui.pyside6_util import format_tooltip, limit_input_width
 from modules.util.ui.pyside6_validation import PySide6FieldValidator, PySide6PathValidator, PySide6RunNameValidator
-from modules.util.ui.QtQuickSwitch import QtQuickSwitch
 from modules.util.ui.QtTextBox import QtTextBox, QtTextPreview
+from modules.util.ui.QtToggleSwitch import QtToggleSwitch
 from modules.util.ui.UIState import BaseUIState
 
 from PySide6.QtCore import (
@@ -1264,11 +1264,11 @@ def toggle_details(
         ui_state: BaseUIState,
         var_name: str,
         tooltip: str | None = None,
-) -> tuple[QtQuickSwitch, QLabel, CollapsibleForm]:
+) -> tuple[QtToggleSwitch, QLabel, CollapsibleForm]:
     """Build a bound enable row; the caller controls when its details expand."""
     summary = inline_frame(parent, 0, 0, columnspan=2)
     field_label = label(summary, 0, 0, title, tooltip=tooltip)
-    switch = QtQuickSwitch(summary, ui_state, var_name, title)
+    switch = QtToggleSwitch(summary, ui_state, var_name, title)
     _add(_layout(summary), switch, 0, 1, sticky="vw")
     if tooltip:
         _set_tooltip(summary, tooltip)
