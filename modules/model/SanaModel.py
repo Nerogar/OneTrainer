@@ -14,8 +14,8 @@ from torch import Tensor
 
 from diffusers import (
     AutoencoderDC,
-    DDIMScheduler,
     DiffusionPipeline,
+    DPMSolverMultistepScheduler,
     SanaPipeline,
     SanaTransformer2DModel,
 )
@@ -44,7 +44,7 @@ class SanaModel(BaseModel):
     # base model data
     tokenizer: GemmaTokenizer | None
     orig_tokenizer: GemmaTokenizer | None
-    noise_scheduler: DDIMScheduler | None
+    noise_scheduler: DPMSolverMultistepScheduler | None
     text_encoder: Gemma2Model | None
     vae: AutoencoderDC | None
     transformer: SanaTransformer2DModel | None

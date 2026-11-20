@@ -85,9 +85,18 @@ class HiDreamModelLoader(
             subfolder="tokenizer_3",
         ) if include_text_encoder_3 else None
 
-        model.tokenizer_4 = LlamaTokenizerFast.from_pretrained(
-            text_encoder_4_model_name,
-        ) if include_text_encoder_4 else None
+        if include_text_encoder_4:
+            if text_encoder_4_model_name:
+                model.tokenizer_4 = LlamaTokenizerFast.from_pretrained(
+                    text_encoder_4_model_name,
+                )
+            else:
+                model.tokenizer_4 = LlamaTokenizerFast.from_pretrained(
+                    base_model_name,
+                    subfolder="tokenizer_4",
+                )
+        else:
+            model.tokenizer_4 = None
 
         model.noise_scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
             base_model_name,
