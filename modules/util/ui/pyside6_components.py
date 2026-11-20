@@ -1192,12 +1192,16 @@ def toggle_details(
         title: str,
         ui_state: BaseUIState,
         var_name: str,
+        tooltip: str | None = None,
 ) -> tuple[QtQuickSwitch, QLabel, CollapsibleForm]:
     """Build a bound enable row; the caller controls when its details expand."""
     summary = inline_frame(parent, 0, 0, columnspan=2)
-    field_label = label(summary, 0, 0, title)
+    field_label = label(summary, 0, 0, title, tooltip=tooltip)
     switch = QtQuickSwitch(summary, ui_state, var_name, title)
     _add(_layout(summary), switch, 0, 1, sticky="vw")
+    if tooltip:
+        _set_tooltip(summary, tooltip)
+        _set_tooltip(switch, tooltip)
     field_label.setBuddy(switch)
     _pack_form(summary)
     _DisabledToolTipFilter(switch, summary, field_label)

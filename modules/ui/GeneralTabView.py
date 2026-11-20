@@ -182,6 +182,7 @@ class GeneralTabView(BaseGeneralTabView, QWidget):
         self.validation_panel = validation.parentWidget()
         self.validation_switch, _, self.validation_details = self.components.toggle_details(
             validation, "Enable Validation", ui_state, "validation",
+            tooltip="Enable validation steps and display val loss in Tensorboard (if TB is enabled)",
         )
         self._build_validation(self.validation_details.content, controller, ui_state)
         self._build_device(self.components.form_section(self.device_column, 0, 0, "Device Settings"), controller, ui_state)
@@ -264,7 +265,7 @@ class GeneralTabView(BaseGeneralTabView, QWidget):
             self.multi_gpu_switch.setEnabled(can_toggle)
             self.multi_gpu_label.setEnabled(can_toggle)
             for widget in (self.multi_gpu_summary, self.multi_gpu_label, self.multi_gpu_switch):
-                widget.setToolTip(tooltip)
+                self.components._set_tooltip(widget, tooltip)
             self.multi_gpu_details.set_expanded(available and multi_gpu_enabled, animate=animate)
             validation_enabled = bool(self.ui_state.get_var("validation").get())
             self._position_appearance(validation_enabled)
