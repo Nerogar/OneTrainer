@@ -76,11 +76,10 @@ class BaseSampleFrameView:
             self.components.label(bottom_frame, 4, 0, "steps:")
             self.components.entry(bottom_frame, 4, 1, ui_state, "diffusion_steps")
 
-            if controller.model_type.supports_sample_shift_override():
+            if is_flow_matching:
                 self.components.label(bottom_frame, 5, 0, "override shift:",
-                                      tooltip="Timestep shift for this sample, as the multiplicative factor "
-                                              "(not mu). Empty uses the model's own shift, which is either "
-                                              "derived from the token count or fixed by the scheduler config.")
+                                      tooltip="Positive timestep shift factor for this sample. "
+                                              "Leave empty to use the model's default schedule.")
                 self.components.entry(bottom_frame, 5, 1, ui_state, "override_shift", extra_validate=validate_override_shift)
 
             # inpainting
