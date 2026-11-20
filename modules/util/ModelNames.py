@@ -43,6 +43,16 @@ class ModelNames:
         self.include_text_encoder_4 = include_text_encoder_4
         self.include_unconditional_transformer = include_unconditional_transformer
 
+    # Reset base-model submodule overrides when continuing a fine-tune from a
+    # backup so overrides do not shadow the backup's saved submodules.
+    # Leave effnet_encoder_model and decoder_model untouched: they are separate
+    # stage models for Wuerstchen / Stable Cascade, not saved in backups.
+    def clear_overrides(self):
+        self.prior_model = ""
+        self.transformer_model = ""
+        self.text_encoder_4 = ""
+        self.vae_model = ""
+
     def all_embedding(self):
         if self.embedding is not None:
             return self.additional_embeddings + [self.embedding]
