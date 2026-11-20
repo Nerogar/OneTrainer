@@ -314,6 +314,33 @@ def _add(
         layout.setAlignment(widget, align)
 
 
+class _ScrollBarGutterFilter(QObject):
+    """Reserve the vertical scrollbar's width while hidden so showing it causes no horizontal shift."""
+
+    def __init__(self, scroll: QScrollArea, container_layout: QVBoxLayout):
+        super().__init__(scroll)
+        self._scroll = scroll
+        self._layout = container_layout
+        self._bar = scroll.verticalScrollBar()
+        self._bar.installEventFilter(self)
+        self._sync(visible=False)
+
+    def _sync(self, *, visible: bool) -> None:
+        reserve = 0 if visible else self._scroll.style().pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent)
+        self._layout.setContentsMargins(PAD, PAD, PAD + reserve, PAD)
+
+    def eventFilter(self, watched, event):
+        if watched is self._bar:
+            event_type = event.type()
+            if event_type == QEvent.Type.Show:
+                self._sync(visible=True)
+            elif event_type == QEvent.Type.Hide:
+                self._sync(visible=False)
+            elif event_type == QEvent.Type.StyleChange:
+                self._sync(visible=self._bar.isVisible())
+        return super().eventFilter(watched, event)
+
+
 def scrollable_frame(parent: QWidget) -> tuple[QScrollArea, QWidget]:
     scroll = QScrollArea(parent)
     scroll.setWidgetResizable(True)
@@ -325,6 +352,7 @@ def scrollable_frame(parent: QWidget) -> tuple[QScrollArea, QWidget]:
     container_layout.addWidget(frame)
     container_layout.addStretch(1)
     scroll.setWidget(container)
+    scroll._scrollbar_gutter_filter = _ScrollBarGutterFilter(scroll, container_layout)  # type: ignore[attr-defined]
     return scroll, frame
 
 
