@@ -492,10 +492,16 @@ def text_preview(
         var_name: str,
         *,
         lines: int = 2,
+        on_click: Callable[[], None] | None = None,
+        tooltip: str | None = None,
 ) -> QtTextPreview:
-    component = QtTextPreview(master, lines=lines)
+    component = QtTextPreview(master, lines=lines, clickable=on_click is not None)
     component.setMinimumWidth(140)
     _add(_layout(master), component, row, column)
+    if on_click is not None:
+        component.clicked.connect(on_click)
+    if tooltip:
+        _set_tooltip(component, tooltip)
     var = ui_state.get_var(var_name)
     component.setText(str(var.get()))
     binding = var._bind_widget(lambda value: component.setText(str(value)))

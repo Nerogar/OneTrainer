@@ -92,14 +92,21 @@ class QtTextBox(QPlainTextEdit):
 class QtTextPreview(QtTextBox):
     """Display the beginning of a prompt without editing or scrolling its text."""
 
-    def __init__(self, parent, *, lines: int = 2):
+    clicked = Signal()
+
+    def __init__(self, parent, *, lines: int = 2, clickable: bool = False):
         self._full_text = ""
+        self._clickable = clickable
+        self._pressed = False
         super().__init__(parent, lines=lines)
+        self.setProperty("textPreview", True)
         self.setReadOnly(True)
         self.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        if clickable:
+            self.viewport().setCursor(Qt.CursorShape.PointingHandCursor)
 
     def setText(self, text: str):
         self._full_text = text
@@ -140,6 +147,22 @@ class QtTextPreview(QtTextBox):
         super().changeEvent(event)
         if event.type() in (QEvent.Type.FontChange, QEvent.Type.StyleChange) and hasattr(self, "_lines"):
             self._update_preview()
+
+    def mousePressEvent(self, event):
+        if self._clickable and self.isEnabled() and event.button() == Qt.MouseButton.LeftButton:
+            self._pressed = True
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self._pressed and event.button() == Qt.MouseButton.LeftButton:
+            self._pressed = False
+            if self.isEnabled() and self.viewport().rect().contains(event.position().toPoint()):
+                self.clicked.emit()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
     def wheelEvent(self, event):
         # Let the surrounding sample list scroll instead.

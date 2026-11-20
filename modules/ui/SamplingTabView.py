@@ -52,7 +52,11 @@ class BaseSampleWidgetView(ABC):
         if self._has_clip_text_encoder:
             self.prompt_entry = self.components.entry(frame, 0, 10, ui_state, "prompt")
         else:
-            self.prompt_entry = self.components.text_preview(frame, 0, 10, ui_state, "prompt", lines=2)
+            self.prompt_entry = self.components.text_preview(
+                frame, 0, 10, ui_state, "prompt", lines=2,
+                on_click=lambda: open_command(self.i, ui_state),
+                tooltip="Click to edit the full sample prompt",
+            )
 
         # button
         self.button = self.components.icon_button(frame, 0, 11, "...", lambda: open_command(self.i, ui_state))

@@ -153,6 +153,13 @@ def _form_stylesheet(palette: QPalette) -> str:
             color: {disabled_text.name()};
             border-bottom-color: {disabled_text.name()};
         }}
+        QPlainTextEdit[textPreview="true"]:enabled {{
+            background-color: {surface.name()};
+            border: 1px solid {border.name()};
+        }}
+        QPlainTextEdit[textPreview="true"]:enabled:hover {{
+            border-color: palette(highlight);
+        }}
     """
 
 
