@@ -136,6 +136,13 @@ def create_optimizer(
     if optimizer_config.optimizer is None:
         return None
 
+    # FIXME https://github.com/bitsandbytes-foundation/bitsandbytes/issues/2150
+    if optimizer_config.optimizer not in Optimizer.available():
+        raise ValueError(
+            f"{optimizer_config.optimizer} is temporarily disabled because bitsandbytes 0.50.2 "
+            "lacks its 8-bit CUDA update. Select another optimizer."
+        )
+
     # a trained, layer-offloaded part has its params evicted during the back pass, so it needs fused_back_pass
     if any(part.offload_fraction > 0 and part.train for part in config.model_part_configs()):
         if (not optimizer_config.optimizer.supports_fused_back_pass() or not optimizer_config.fused_back_pass) \
@@ -203,8 +210,6 @@ def create_optimizer(
                 weight_decay=optimizer_config.weight_decay if optimizer_config.weight_decay is not None else 1e-2,
                 eps=optimizer_config.eps if optimizer_config.eps is not None else 1e-8,
                 min_8bit_size=optimizer_config.min_8bit_size if optimizer_config.min_8bit_size is not None else 4096,
-                percentile_clipping=optimizer_config.percentile_clipping if optimizer_config.percentile_clipping is not None else 100,
-                block_wise=optimizer_config.block_wise if optimizer_config.block_wise is not None else True,
                 is_paged=optimizer_config.is_paged if optimizer_config.is_paged is not None else False,
             )
 
@@ -266,8 +271,6 @@ def create_optimizer(
                 momentum=optimizer_config.momentum if optimizer_config.momentum is not None else 0,
                 centered=optimizer_config.centered if optimizer_config.centered is not None else False,
                 min_8bit_size=optimizer_config.min_8bit_size if optimizer_config.min_8bit_size is not None else 4096,
-                percentile_clipping=optimizer_config.percentile_clipping if optimizer_config.percentile_clipping is not None else 100,
-                block_wise=optimizer_config.block_wise if optimizer_config.block_wise is not None else True,
             )
 
         # LION Optimizer
@@ -306,7 +309,6 @@ def create_optimizer(
                 dampening=optimizer_config.dampening if optimizer_config.dampening is not None else 0,
                 nesterov=optimizer_config.nesterov if optimizer_config.nesterov is not None else False,
                 min_8bit_size=optimizer_config.min_8bit_size if optimizer_config.min_8bit_size is not None else 4096,
-                percentile_clipping=optimizer_config.percentile_clipping if optimizer_config.percentile_clipping is not None else 100,
                 max_unorm=optimizer_config.max_unorm if optimizer_config.max_unorm is not None else 0.02,
             )
 
@@ -325,8 +327,6 @@ def create_optimizer(
                 adam_w_mode=optimizer_config.adam_w_mode if optimizer_config.adam_w_mode is not None else True,
                 optim_bits=optimizer_config.optim_bits if optimizer_config.optim_bits is not None else 32,
                 min_8bit_size=optimizer_config.min_8bit_size if optimizer_config.min_8bit_size is not None else 4096,
-                percentile_clipping=optimizer_config.percentile_clipping if optimizer_config.percentile_clipping is not None else 100,
-                block_wise=optimizer_config.block_wise if optimizer_config.block_wise is not None else False,
                 max_unorm=optimizer_config.max_unorm if optimizer_config.max_unorm is not None else 1.0,
             )
 
@@ -344,8 +344,6 @@ def create_optimizer(
                 amsgrad=optimizer_config.amsgrad if optimizer_config.amsgrad is not None else False,
                 adam_w_mode=optimizer_config.adam_w_mode if optimizer_config.adam_w_mode is not None else True,
                 min_8bit_size=optimizer_config.min_8bit_size if optimizer_config.min_8bit_size is not None else 4096,
-                percentile_clipping=optimizer_config.percentile_clipping if optimizer_config.percentile_clipping is not None else 100,
-                block_wise=optimizer_config.block_wise if optimizer_config.block_wise is not None else False,
                 max_unorm=optimizer_config.max_unorm if optimizer_config.max_unorm is not None else 1.0,
             )
 
@@ -359,8 +357,6 @@ def create_optimizer(
                 betas=(optimizer_config.beta1 if optimizer_config.beta1 is not None else 0.9,
                        optimizer_config.beta2 if optimizer_config.beta2 is not None else 0.999),
                 min_8bit_size=optimizer_config.min_8bit_size if optimizer_config.min_8bit_size is not None else 4096,
-                percentile_clipping=optimizer_config.percentile_clipping if optimizer_config.percentile_clipping is not None else 100,
-                block_wise=optimizer_config.block_wise if optimizer_config.block_wise is not None else True,
                 is_paged=optimizer_config.is_paged if optimizer_config.is_paged is not None else False,
             )
 
