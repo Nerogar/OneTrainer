@@ -1176,7 +1176,11 @@ def section_frame(parent: QWidget, row: int, col: int = 0, colspan: int = 1) -> 
 def inline_frame(parent: QWidget, row: int, col: int, columnspan: int = 1) -> QWidget:
     frame = QWidget(parent)
     _layout(frame)
-    _layout(parent).addWidget(frame, row, col, 1, columnspan)
+    parent_layout = _layout(parent)
+    parent_layout.addWidget(frame, row, col, 1, columnspan)
+    label_item = parent_layout.itemAtPosition(row, col - 1) if col else None
+    if label_item is not None and isinstance(label_item.widget(), QLabel):
+        frame.setAccessibleName(label_item.widget().text())
     return frame
 
 

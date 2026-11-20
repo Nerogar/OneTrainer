@@ -221,5 +221,15 @@ class CloudTabView(BaseCloudTabView, QWidget, metaclass=QtABCMeta):
     def _on_set_gpu_types(self):
         self.gpu_types_menu.clear()
         self.gpu_types_menu.addItems(self.controller.get_gpu_types())
-        # The choices arrive after the form was fitted; allow longer GPU names.
-        self.gpu_types_menu.setFixedWidth(self.gpu_types_menu.sizeHint().width())
+        # The choices arrive after the form was fitted; allow longer GPU names
+        # without collapsing when empty or overflowing the section.
+        gpu_frame = self.gpu_types_menu.parentWidget()
+        gpu_layout = gpu_frame.layout()
+        btn_item = gpu_layout.itemAtPosition(0, 1)
+        btn_width = btn_item.widget().width() if btn_item is not None and btn_item.widget() is not None else 20
+        spacing = max(0, gpu_layout.horizontalSpacing())
+        avail_width = gpu_frame.width() - btn_width - spacing if gpu_frame.width() > 0 else 320
+        min_width = 140
+        max_width = max(min_width, avail_width)
+        width = max(min_width, min(self.gpu_types_menu.sizeHint().width(), max_width))
+        self.gpu_types_menu.setFixedWidth(width)

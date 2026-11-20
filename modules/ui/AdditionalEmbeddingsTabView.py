@@ -32,10 +32,16 @@ class BaseEmbeddingWidgetView:
         self.save_command = save_command
 
         # close button
-        self.components.colored_icon_button(top_frame, 0, 0, "X", "#C00000", lambda: remove_command(self.i))
+        self.components.list_action_button(
+            top_frame, "remove", lambda: remove_command(self.i), row=0, column=0,
+            tooltip="Deletes the embedding",
+        )
 
         # clone button
-        self.components.colored_icon_button(top_frame, 0, 1, "+", "#00C000", lambda: clone_command(self.i, controller.randomize_uuid), padx=5)
+        self.components.list_action_button(
+            top_frame, "clone", lambda: clone_command(self.i, controller.randomize_uuid), row=0, column=1,
+            tooltip="Duplicates the embedding",
+        )
 
         # embedding model names
         self.components.label(top_frame, 0, 2, "base embedding:",
