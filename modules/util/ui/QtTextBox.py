@@ -2,7 +2,15 @@ from math import ceil
 
 from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtGui import QTextLayout, QTextOption
-from PySide6.QtWidgets import QPlainTextEdit, QSizePolicy, QStyle, QStyleOptionSizeGrip, QStylePainter, QWidget
+from PySide6.QtWidgets import (
+    QPlainTextEdit,
+    QScrollArea,
+    QSizePolicy,
+    QStyle,
+    QStyleOptionSizeGrip,
+    QStylePainter,
+    QWidget,
+)
 
 
 class _TextBoxResizeHandle(QWidget):
@@ -12,7 +20,15 @@ class _TextBoxResizeHandle(QWidget):
         self._drag_start = None
         self.setFixedSize(16, 16)
         self.setCursor(Qt.CursorShape.SizeVerCursor)
-        self.setToolTip("Drag to resize the prompt")
+        self.setToolTip("Drag to resize")
+
+    def _inside_scroll_area(self) -> bool:
+        parent = self.editor.parentWidget()
+        while parent is not None:
+            if isinstance(parent, QScrollArea):
+                return True
+            parent = parent.parentWidget()
+        return False
 
     def paintEvent(self, event):
         option = QStyleOptionSizeGrip()
@@ -23,16 +39,28 @@ class _TextBoxResizeHandle(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self._drag_start = (event.globalPosition().y(), self.editor.height())
+            max_height = self.editor.max_height()
+            window = self.editor.window()
+            if window is not None and not self._inside_scroll_area():
+                screen = window.screen()
+                if screen is not None:
+                    avail_height = screen.availableGeometry().height()
+                    window_height = window.frameGeometry().height() or window.height()
+                    screen_cap = max(self.editor.height(), self.editor.height() + max(0, avail_height - window_height))
+                    max_height = screen_cap if max_height is None else min(max_height, screen_cap)
+            self._drag_start = (event.globalPosition().y(), self.editor.height(), max_height)
             event.accept()
         else:
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         if self._drag_start is not None:
-            start_y, start_height = self._drag_start
+            start_y, start_height, max_height = self._drag_start
             height = round(start_height + event.globalPosition().y() - start_y)
-            self.editor.setFixedHeight(max(self.editor.default_height(), height))
+            height = max(self.editor.default_height(), height)
+            if max_height is not None:
+                height = min(max_height, height)
+            self.editor.setFixedHeight(height)
             event.accept()
         else:
             super().mouseMoveEvent(event)
@@ -50,9 +78,10 @@ class QtTextBox(QPlainTextEdit):
 
     editingFinished = Signal()
 
-    def __init__(self, parent, *, lines: int, resizable: bool = False):
+    def __init__(self, parent, *, lines: int, resizable: bool = False, max_lines: int | None = None):
         super().__init__(parent)
         self._lines = lines
+        self._max_lines = max_lines
         self._resize_handle = _TextBoxResizeHandle(self) if resizable else None
         self.setTabChangesFocus(True)
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
@@ -64,18 +93,29 @@ class QtTextBox(QPlainTextEdit):
         self.ensurePolished()
         self.setFixedHeight(self.default_height())
 
-    def default_height(self):
+    def _height_for_lines(self, lines: int) -> int:
         margins = self.contentsMargins()
         handle_height = self._resize_handle.height() if self._resize_handle is not None else 0
         # Qt needs one extra pixel below the last line to avoid scrolling it.
-        return ceil(self._lines * self.fontMetrics().lineSpacing() + 2 * self.document().documentMargin()
+        return ceil(lines * self.fontMetrics().lineSpacing() + 2 * self.document().documentMargin()
                     + margins.top() + margins.bottom() + handle_height) + 1
+
+    def default_height(self) -> int:
+        return self._height_for_lines(self._lines)
+
+    def max_height(self) -> int | None:
+        return self._height_for_lines(self._max_lines) if self._max_lines is not None else None
 
     def changeEvent(self, event):
         super().changeEvent(event)
         if event.type() in (QEvent.Type.FontChange, QEvent.Type.StyleChange) and hasattr(self, "_lines"):
             height = self.default_height()
-            self.setFixedHeight(max(height, self.height()) if self._resize_handle is not None else height)
+            if self._resize_handle is not None:
+                height = max(height, self.height())
+                max_h = self.max_height()
+                if max_h is not None:
+                    height = min(max_h, height)
+            self.setFixedHeight(height)
 
     def eventFilter(self, watched, event):
         if watched == self.viewport() and event.type() == QEvent.Type.Resize and self._resize_handle is not None:

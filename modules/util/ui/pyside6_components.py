@@ -465,8 +465,9 @@ def text_box(
         *,
         lines: int = 2,
         resizable: bool = False,
+        max_lines: int | None = None,
 ) -> QtTextBox:
-    component = QtTextBox(master, lines=lines, resizable=resizable)
+    component = QtTextBox(master, lines=lines, resizable=resizable, max_lines=max_lines)
     component.setMinimumWidth(140)
     _add(_layout(master), component, row, column)
     var = ui_state.get_var(var_name)

@@ -68,7 +68,9 @@ class SampleWindowView(BaseSampleWindowView, QDialog):
         model_type = controller.get_model_type()
         frame_controller = SampleFrameController(controller.sample, model_type)
 
-        prompt_frame = SampleFrameView(self, frame_controller, self.ui_state, include_settings=False)
+        prompt_frame = SampleFrameView(
+            self, frame_controller, self.ui_state, include_settings=False, prompt_lines=3, max_prompt_lines=12,
+        )
         outer.addWidget(prompt_frame, 0, 0, 1, 2)
 
         settings_frame = SampleFrameView(self, frame_controller, self.ui_state, include_prompt=False)
