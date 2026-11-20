@@ -250,13 +250,19 @@ class GeneralTabView(BaseGeneralTabView, QWidget):
             validation_layout.setRowStretch(1, 0)
             validation_layout.setRowStretch(2, 1)
             validation_layout.setAlignment(self.validation_panel, Qt.AlignmentFlag.AlignTop)
-            validation_layout.setAlignment(self.appearance_panel, Qt.AlignmentFlag.AlignTop)
 
             device_layout.setRowStretch(0, 0)
             device_layout.setRowStretch(1, 0)
             device_layout.setRowStretch(2, 1)
             device_layout.setAlignment(self.device_panel, Qt.AlignmentFlag.AlignTop)
+            if self.appearance_panel.parentWidget() is self.device_column:
+                device_layout.setAlignment(self.appearance_panel, Qt.AlignmentFlag.AlignTop)
+            else:
+                validation_layout.setAlignment(self.appearance_panel, Qt.AlignmentFlag.AlignTop)
         else:
+            # Reparent Appearance back only after Validation has collapsed so
+            # the two aren't stacked while Validation is still expanded.
+            self._position_appearance(False)
             validation_layout.setRowStretch(0, 0)
             validation_layout.setRowStretch(1, 1)
             validation_layout.setRowStretch(2, 0)
@@ -291,7 +297,8 @@ class GeneralTabView(BaseGeneralTabView, QWidget):
                 self.components._set_tooltip(widget, tooltip)
             self.multi_gpu_details.set_expanded(available and multi_gpu_enabled, animate=animate)
             validation_enabled = bool(self.ui_state.get_var("validation").get())
-            self._position_appearance(validation_enabled)
+            if validation_enabled or not animate:
+                self._position_appearance(validation_enabled)
             self.validation_details.set_expanded(validation_enabled, animate=animate)
             self._align_top_panels()
         finally:
