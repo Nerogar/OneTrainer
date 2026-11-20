@@ -145,18 +145,21 @@ class BaseTrainUIView(ABC):
         self.eta_label = self.components.label(status_frame, 1, 0, "", pad=0)
 
         self.export_button = self.components.button(frame, 0, 3, "Export", self.export_training,
-                                             width=60, padx=5, pady=(15, 0),
+                                             padx=5, pady=(15, 0), sticky="vew",
                                              tooltip="Export the current configuration as a script to run without a UI")
+        self.export_button.setProperty("compactButton", True)
 
-        self.components.button(frame, 0, 4, "Debug", self.generate_debug_package,
-                                           width=60, padx=(5, 25), pady=(15, 0),
-                                           tooltip="Generate a zip file with config.json, debug_report.log and settings diff, use this to report bugs or issues")
+        debug_button = self.components.button(frame, 0, 4, "Debug", self.generate_debug_package,
+                                             padx=(5, 25), pady=(15, 0), sticky="vew",
+                                             tooltip="Generate a zip file with config.json, debug_report.log and settings diff, use this to report bugs or issues")
+        debug_button.setProperty("compactButton", True)
 
-        self.components.button(frame, 0, 5, "Tensorboard", self.open_tensorboard,
-                                           width=100, padx=(0, 5), pady=(15, 0))
+        tensorboard_button = self.components.button(frame, 0, 6, "Tensorboard", self.open_tensorboard,
+                                                   width=100, padx=(0, 5), pady=(15, 0), sticky="vew")
+        tensorboard_button.setObjectName("tensorboardButton")
 
-        self.training_button = self.components.button(frame, 0, 6, "Start Training", self.start_training,
-                                                 padx=(5, 20), pady=(15, 0))
+        self.training_button = self.components.button(frame, 0, 7, "Start Training", self.start_training,
+                                                 padx=(5, 20), pady=(15, 0), sticky="vew")
 
 
     def build_data_tab_content(self, frame, controller, ui_state):
@@ -478,6 +481,7 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         lo = QGridLayout(frame)
         lo.setColumnStretch(0, 1)
         lo.setColumnStretch(2, 2)
+        lo.setColumnMinimumWidth(5, 10)
 
         status_frame = QWidget(frame)
         status_lo = QGridLayout(status_frame)
@@ -485,6 +489,7 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         lo.addWidget(status_frame, 0, 1)
 
         self.build_bottom_bar_content(frame, status_frame, self.controller, self.ui_state)
+        self.training_button.setObjectName("trainingButton")
         self._set_training_button_style("idle")
         return frame
 
@@ -665,17 +670,18 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         if not self.training_button:
             return
         styles = {
-            "idle":     ("Start Training", True,  "#198754", "white"),
-            "running":  ("Stop Training",  True,  "#dc3545", "white"),
-            "stopping": ("Stopping...",    False, "#dc3545", "white"),
+            "idle":     ("Start Training", True,  "confirm-action"),
+            "running":  ("Stop Training",  True,  "destructive-action"),
+            "stopping": ("Stopping...",    False, "destructive-action"),
         }
-        text, enabled, bg, fg = styles.get(mode, ("Start Training", True, "#198754", "white"))
-        self.training_button.setText(text)
-        self.training_button.setEnabled(enabled)
-        self.training_button.setStyleSheet(
-            f"QPushButton {{ background-color: {bg}; color: {fg}; }}"
-            f"QPushButton:disabled {{ background-color: {bg}; color: {fg}; }}"
-        )
+        text, enabled, action_class = styles.get(mode, styles["idle"])
+        button = self.training_button
+        button.setText(text)
+        button.setEnabled(enabled)
+        button.setProperty("class", action_class)
+        button.style().unpolish(button)
+        button.style().polish(button)
+        button.update()
 
     def export_training(self):
         file_path, _ = QFileDialog.getSaveFileName(

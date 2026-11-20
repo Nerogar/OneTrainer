@@ -12,25 +12,59 @@ _BASE_STYLESHEET = """
         padding: 2px 2px;
         border-radius: 2px;
     }
-    QPushButton[listAction="remove"], QPushButton[listAction="clone"] {
+    QPushButton[class~="destructive-action"], QPushButton[class~="confirm-action"] {
         border: 1px solid transparent;
         border-radius: 2px;
+    }
+    QPushButton[class~="destructive-action"] {
+        background-color: #FFECEC;
+        color: #5A0D0D;
+        border-color: #620303;
+    }
+    QPushButton[class~="confirm-action"] {
+        background-color: #D7F5EA;
+        color: #0A4933;
+        border-color: #045F3F;
+    }
+
+    QPushButton[class~="destructive-action"]:enabled:hover {
+        background-color: #FFD6D6;
+        border-color: #520202;
+    }
+    QPushButton[class~="destructive-action"]:enabled:pressed {
+        background-color: #FFB8B8;
+        color: #470808;
+        border-color: #3D0101;
+    }
+    QPushButton[class~="confirm-action"]:enabled:hover {
+        background-color: #BBEBD9;
+        border-color: #034D33;
+    }
+    QPushButton[class~="confirm-action"]:enabled:pressed {
+        background-color: #9CDFC6;
+        color: #063826;
+        border-color: #023B27;
+    }
+
+    QPushButton[class~="destructive-action"]:focus, QPushButton[class~="confirm-action"]:focus {
+        border-style: dotted;
+    }
+    QPushButton[compactButton="true"] {
+        padding: 3px 8px;
+    }
+    QPushButton#trainingButton, QPushButton#tensorboardButton {
+        font-size: 10pt;
+    }
+    QPushButton#trainingButton {
+        padding: 3px 10px;
+        font-weight: 550;
+    }
+    QPushButton[listAction="remove"], QPushButton[listAction="clone"] {
         padding: 0;
         font-size: 18px;
     }
-    QPushButton[listAction="remove"] {
-        background-color: #FFECEC;
-        color: #5A0D0D;
-        border-color: #5A0D0D;
-    }
     QPushButton[listAction="clone"] {
-        background-color: #D7F5EA;
-        color: #0A4933;
-        border-color: #0A4933;
         font-weight: bold;
-    }
-    QPushButton[listAction="remove"]:focus, QPushButton[listAction="clone"]:focus {
-        border-style: dotted;
     }
     QCheckBox::indicator {
         width: 16px;

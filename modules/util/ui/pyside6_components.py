@@ -850,6 +850,7 @@ def list_action_button(
     """Create a themed list action, optionally placed in a form grid."""
     component = _ListActionButton("x" if action == "remove" else "+", master)
     component.setProperty("listAction", action)
+    component.setProperty("class", "destructive-action" if action == "remove" else "confirm-action")
     component.setFixedSize(size, size)
     component.setAccessibleName("Remove" if action == "remove" else "Duplicate")
     if tooltip:
