@@ -675,6 +675,7 @@ class TrainConfig(BaseConfig):
     dora_oft: bool
     oft_scaled: bool
     oft_clipped_norm: float | None
+    oft_matrix_exp: bool
 
     # lokr
     lokr_dim: int
@@ -1466,6 +1467,7 @@ class TrainConfig(BaseConfig):
         data.append(("dora_oft", False, bool, False))
         data.append(("oft_scaled", False, bool, False))
         data.append(("oft_clipped_norm", None, float, True))
+        data.append(("oft_matrix_exp", False, bool, False))
 
         # lokr
         data.append(("lokr_dim", 16, int, False))
