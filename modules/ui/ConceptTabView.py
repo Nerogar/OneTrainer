@@ -267,7 +267,7 @@ class ConceptWidgetView(BaseConceptWidgetView, QWidget):
             self, "clone", lambda: clone_command(self.i, controller.randomize_seed), size=24,
             tooltip="Duplicates the concept",
         )
-        clone_btn.move(34, control_margin)
+        clone_btn.move(34 + control_margin, control_margin)
 
         enabled_cb = QCheckBox(self)
         enabled_cb.setChecked(concept.enabled)
