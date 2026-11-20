@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QFrame,
+    QGraphicsOpacityEffect,
     QGridLayout,
     QLabel,
     QLineEdit,
@@ -85,18 +86,28 @@ class CollapsibleForm(QWidget):
     """Reveal an intact form by clipping its height, preserving values and bindings."""
 
     transition_finished = Signal()
+    _HEIGHT_DURATION_MS = 180
+    _FADE_IN_DURATION_MS = 230
+    _FADE_OUT_DURATION_MS = 130
 
     def __init__(self, parent):
         super().__init__(parent)
         self.content = QWidget(self)
         self.content.setEnabled(False)
+        self._opacity_effect = QGraphicsOpacityEffect(self.content)
+        self._opacity_effect.setOpacity(0.0)
+        self._opacity_effect.setEnabled(False)
+        self.content.setGraphicsEffect(self._opacity_effect)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.expanded = False
         self._animation = QVariantAnimation(self)
-        self._animation.setDuration(180)
+        self._animation.setDuration(self._HEIGHT_DURATION_MS)
         self._animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
         self._animation.valueChanged.connect(self.setFixedHeight)
         self._animation.finished.connect(self._finish)
+        self._fade_animation = QVariantAnimation(self)
+        self._fade_animation.valueChanged.connect(self._opacity_effect.setOpacity)
+        self._fade_animation.finished.connect(self._finish_fade)
         self.setFixedHeight(0)
         self.hide()
 
@@ -118,19 +129,40 @@ class CollapsibleForm(QWidget):
         if expanded == self.expanded:
             if not animate:
                 self._animation.stop()
+                self._fade_animation.stop()
+                self._opacity_effect.setOpacity(1.0 if expanded else 0.0)
+                self._opacity_effect.setEnabled(False)
                 self._finish()
             return
         self.expanded = expanded
         height = self.height() if not self.isHidden() else 0
+        start_opacity = self._opacity_effect.opacity() if self._opacity_effect.isEnabled() else (0.0 if expanded else 1.0)
         self._animation.stop()
+        self._fade_animation.stop()
         self.content.setEnabled(expanded)
         if not animate:
+            self._opacity_effect.setOpacity(1.0 if expanded else 0.0)
+            self._opacity_effect.setEnabled(False)
             self._finish()
             return
+        self._opacity_effect.setOpacity(start_opacity)
+        self._opacity_effect.setEnabled(True)
         self.show()
         self._animation.setStartValue(height)
         self._animation.setEndValue(self.content.sizeHint().height() if expanded else 0)
         self._animation.start()
+        self._fade_animation.setDuration(self._FADE_IN_DURATION_MS if expanded else self._FADE_OUT_DURATION_MS)
+        self._fade_animation.setEasingCurve(
+            QEasingCurve.Type.InOutCubic if expanded else QEasingCurve.Type.OutCubic
+        )
+        self._fade_animation.setStartValue(start_opacity)
+        self._fade_animation.setEndValue(1.0 if expanded else 0.0)
+        self._fade_animation.start()
+
+    def _finish_fade(self):
+        if self.expanded:
+            self._opacity_effect.setOpacity(1.0)
+            self._opacity_effect.setEnabled(False)
 
     def _finish(self):
         if self.expanded:
@@ -138,6 +170,9 @@ class CollapsibleForm(QWidget):
             self.setMaximumHeight(16777215)
             self.show()
         else:
+            self._fade_animation.stop()
+            self._opacity_effect.setOpacity(0.0)
+            self._opacity_effect.setEnabled(False)
             self.setFixedHeight(0)
             self.hide()
         self.updateGeometry()
