@@ -1,8 +1,8 @@
-import copy
 from collections.abc import Callable
 
 from modules.model.ErnieModel import ErnieModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.modelSampler.flow_matching import prepare_flow_match_scheduler
 from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
@@ -56,9 +56,6 @@ class ErnieSampler(BaseModelSampler):
             else:
                 generator.manual_seed(seed)
 
-            noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
-            if override_shift is not None:
-                noise_scheduler.set_shift(override_shift)
             vae = self.pipeline.vae
 
             vae_scale_factor = 8
@@ -84,7 +81,9 @@ class ErnieSampler(BaseModelSampler):
             latent_image = self.model.patchify_latents(latent_image)
 
             sigmas = np.linspace(1.0, 1 / diffusion_steps, diffusion_steps)
-            noise_scheduler.set_timesteps(sigmas=sigmas, device=self.train_device)
+            noise_scheduler = prepare_flow_match_scheduler(
+                self.model.noise_scheduler, diffusion_steps, self.train_device, override_shift, sigmas=sigmas,
+            )
             timesteps = noise_scheduler.timesteps
 
             self.model.materialize_only("transformer")

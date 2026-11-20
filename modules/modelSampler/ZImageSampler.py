@@ -1,9 +1,9 @@
-import copy
 import inspect
 from collections.abc import Callable
 
 from modules.model.ZImageModel import ZImageModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.modelSampler.flow_matching import prepare_flow_match_scheduler
 from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
@@ -74,10 +74,6 @@ class ZImageSampler(BaseModelSampler):
         else:
             generator.manual_seed(sample_config.seed)
 
-        noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
-        if sample_config.override_shift is not None:
-            noise_scheduler.set_shift(sample_config.override_shift)
-
         # prepare latent image
         latent_image = torch.randn(
             size=(1, num_latent_channels, height // vae_scale_factor, width // vae_scale_factor),
@@ -87,7 +83,9 @@ class ZImageSampler(BaseModelSampler):
         )
 
         # prepare timesteps
-        noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
+        noise_scheduler = prepare_flow_match_scheduler(
+            self.model.noise_scheduler, diffusion_steps, self.train_device, sample_config.override_shift,
+        )
         timesteps = noise_scheduler.timesteps
 
         # denoising loop

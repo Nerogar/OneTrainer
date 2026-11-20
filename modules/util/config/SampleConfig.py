@@ -1,7 +1,21 @@
+import math
 from typing import Any
 
-from modules.util.config.BaseConfig import BaseConfig
+from modules.util.config.BaseConfig import BaseConfig, ConfigValueError
 from modules.util.enum.NoiseScheduler import NoiseScheduler
+
+
+def parse_override_shift(value: float | str | None) -> float | None:
+    if value is None or value == "":
+        return None
+    message = "Sampling shift must be a finite number greater than zero."
+    try:
+        shift = float(value)
+    except (TypeError, ValueError, OverflowError) as e:
+        raise ConfigValueError(message) from e
+    if isinstance(value, bool) or not math.isfinite(shift) or shift <= 0:
+        raise ConfigValueError(message)
+    return shift
 
 
 def _get_model_defaults(model_type) -> dict:
@@ -188,6 +202,12 @@ class SampleConfig(BaseConfig):
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super().__init__(data)
+
+    def from_dict(self, data: dict, migrate: bool = True) -> 'SampleConfig':
+        if "override_shift" in data:
+            data = {**data, "override_shift": parse_override_shift(data["override_shift"])}
+        super().from_dict(data, migrate=migrate)
+        return self
 
     def from_train_config(self, train_config):
         self.text_encoder_1_layer_skip = train_config.text_encoder_layer_skip

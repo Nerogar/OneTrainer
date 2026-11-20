@@ -1,10 +1,10 @@
-import copy
 import inspect
 import math
 from collections.abc import Callable
 
 from modules.model.FluxModel import FluxModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.modelSampler.flow_matching import prepare_flow_match_scheduler
 from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
@@ -63,7 +63,6 @@ class FluxSampler(BaseModelSampler):
             else:
                 generator.manual_seed(seed)
 
-            noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
             image_processor = self.pipeline.image_processor
             transformer = self.pipeline.transformer
             vae = self.pipeline.vae
@@ -97,11 +96,15 @@ class FluxSampler(BaseModelSampler):
                 self.model.train_dtype.torch_dtype()
             )
 
-            shift = override_shift or self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
+            mu = None
+            if override_shift is None:
+                mu = math.log(self.model.calculate_timestep_shift(*latent_image.shape[-2:]))
             latent_image = self.model.pack_latents(latent_image)
 
             # prepare timesteps
-            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=math.log(shift))
+            noise_scheduler = prepare_flow_match_scheduler(
+                self.model.noise_scheduler, diffusion_steps, self.train_device, override_shift, mu=mu,
+            )
             timesteps = noise_scheduler.timesteps
 
             # denoising loop
@@ -206,7 +209,6 @@ class FluxSampler(BaseModelSampler):
             else:
                 generator.manual_seed(seed)
 
-            noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
             image_processor = self.pipeline.image_processor
             transformer = self.pipeline.transformer
             vae = self.pipeline.vae
@@ -314,9 +316,13 @@ class FluxSampler(BaseModelSampler):
                 self.model.train_dtype.torch_dtype()
             )
 
-            shift = override_shift or self.model.calculate_timestep_shift(latent_image.shape[-2], latent_image.shape[-1])
+            mu = None
+            if override_shift is None:
+                mu = math.log(self.model.calculate_timestep_shift(*latent_image.shape[-2:]))
             latent_image = self.model.pack_latents(latent_image)
-            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=math.log(shift))
+            noise_scheduler = prepare_flow_match_scheduler(
+                self.model.noise_scheduler, diffusion_steps, self.train_device, override_shift, mu=mu,
+            )
             timesteps = noise_scheduler.timesteps
 
             # denoising loop

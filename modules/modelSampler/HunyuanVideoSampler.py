@@ -1,9 +1,9 @@
-import copy
 import inspect
 from collections.abc import Callable
 
 from modules.model.HunyuanVideoModel import HunyuanVideoModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.modelSampler.flow_matching import prepare_flow_match_scheduler
 from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
@@ -60,9 +60,6 @@ class HunyuanVideoSampler(BaseModelSampler):
             else:
                 generator.manual_seed(seed)
 
-            noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
-            if override_shift is not None:
-                noise_scheduler.set_shift(override_shift)
             video_processor = self.pipeline.video_processor
             transformer = self.pipeline.transformer
             vae = self.pipeline.vae
@@ -96,9 +93,8 @@ class HunyuanVideoSampler(BaseModelSampler):
             )
 
             # prepare timesteps
-            noise_scheduler.set_timesteps(
-                num_inference_steps=diffusion_steps,
-                device=self.train_device,
+            noise_scheduler = prepare_flow_match_scheduler(
+                self.model.noise_scheduler, diffusion_steps, self.train_device, override_shift,
             )
             timesteps = noise_scheduler.timesteps
 

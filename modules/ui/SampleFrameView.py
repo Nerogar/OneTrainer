@@ -1,6 +1,7 @@
 from modules.ui.SampleFrameController import SampleFrameController
 from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.ui import pyside6_components
+from modules.util.ui.validation_helpers import validate_override_shift
 
 from PySide6.QtWidgets import QWidget
 
@@ -80,7 +81,7 @@ class BaseSampleFrameView:
                                       tooltip="Timestep shift for this sample, as the multiplicative factor "
                                               "(not mu). Empty uses the model's own shift, which is either "
                                               "derived from the token count or fixed by the scheduler config.")
-                self.components.entry(bottom_frame, 5, 1, ui_state, "override_shift")
+                self.components.entry(bottom_frame, 5, 1, ui_state, "override_shift", extra_validate=validate_override_shift)
 
             # inpainting
             if is_inpainting_model:
