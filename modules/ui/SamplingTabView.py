@@ -3,9 +3,11 @@ from abc import ABC, abstractmethod
 from modules.ui.ConfigListView import BaseConfigListView, ConfigListView
 from modules.ui.SampleParamsWindowView import SampleParamsWindowView
 from modules.ui.SamplingTabController import SamplingTabController
+from modules.util.enum.ModelType import ModelType
 from modules.util.ui import pyside6_components
 from modules.util.ui.pyside6_util import QtABCMeta
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 
 
@@ -23,10 +25,12 @@ class BaseSampleWidgetView(ABC):
         self.save_command = save_command
 
         # close button
-        self.components.colored_icon_button(frame, 0, 0, "X", "#C00000", lambda: remove_command(self.i))
+        self.components.list_action_button(frame, "remove", lambda: remove_command(self.i), row=0, column=0,
+                                           tooltip="Deletes the sample")
 
         # clone button
-        self.components.colored_icon_button(frame, 0, 1, "+", "#00C000", lambda: clone_command(self.i), padx=5)
+        self.components.list_action_button(frame, "clone", lambda: clone_command(self.i), row=0, column=1,
+                                           tooltip="Duplicates the sample")
 
         # enabled
         self.enabled_switch = self.components.switch(frame, 0, 2, ui_state, "enabled", self._switch_enabled, width=40)
@@ -45,7 +49,14 @@ class BaseSampleWidgetView(ABC):
 
         # prompt
         self.components.label(frame, 0, 9, "prompt:")
-        self.prompt_entry = self.components.entry(frame, 0, 10, ui_state, "prompt")
+        if self._has_clip_text_encoder:
+            self.prompt_entry = self.components.entry(frame, 0, 10, ui_state, "prompt")
+        else:
+            self.prompt_entry = self.components.text_preview(
+                frame, 0, 10, ui_state, "prompt", lines=2,
+                on_click=lambda: open_command(self.i, ui_state),
+                tooltip="Click to edit the full sample prompt",
+            )
 
         # button
         self.button = self.components.icon_button(frame, 0, 11, "...", lambda: open_command(self.i, ui_state))
@@ -88,28 +99,42 @@ class SamplingTabView(ConfigListView, BaseSamplingTabView):
         return self.controller.open_element_window(self.master, self.current_config[i], ui_state, SampleParamsWindowView)
 
     def create_widget(self, master, element, i, open_command, remove_command, clone_command, save_command):
-        return SampleWidgetView(master, element, i, open_command, remove_command, clone_command, save_command)
+        return SampleWidgetView(master, element, i, open_command, remove_command, clone_command, save_command,
+                                model_type=self.controller.train_config.model_type)
+
+    def refresh_ui(self):
+        self.widgets_initialized = False
+        self._create_element_list()
 
 
 class SampleWidgetView(BaseSampleWidgetView, QWidget, metaclass=QtABCMeta):
 
-    def __init__(self, master, element, i, open_command, remove_command, clone_command, save_command):
+    def __init__(self, master, element, i, open_command, remove_command, clone_command, save_command,
+                 *, model_type: ModelType):
         QWidget.__init__(self, master)
         BaseSampleWidgetView.__init__(self, pyside6_components)
 
         from modules.util.ui.PySide6UIState import PySide6UIState
         self.element = element
         self.ui_state = PySide6UIState(element)
+        self._has_clip_text_encoder = model_type.has_clip_text_encoder()
 
         pyside6_components._layout(self).setColumnStretch(10, 1)
 
         self.build_content(self, element, self.ui_state, i, open_command, remove_command, clone_command, save_command)
 
+        layout = pyside6_components._layout(self)
+        for index in range(layout.count()):
+            item = layout.itemAt(index)
+            layout.setAlignment(item.widget(),
+                                (item.alignment() & Qt.AlignmentFlag.AlignHorizontal_Mask) | Qt.AlignmentFlag.AlignVCenter)
+
     def _bind_save(self, save_command):
         self.width_entry.editingFinished.connect(save_command)
         self.height_entry.editingFinished.connect(save_command)
         self.seed_entry.editingFinished.connect(save_command)
-        self.prompt_entry.editingFinished.connect(save_command)
+        if self._has_clip_text_encoder:
+            self.prompt_entry.editingFinished.connect(save_command)
 
     def _set_enabled(self):
         enabled = self.element.enabled

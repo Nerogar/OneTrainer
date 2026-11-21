@@ -10,19 +10,42 @@ class BaseSampleFrameView:
     def __init__(self, components):
         self.components = components
 
-    def build_content(self, top_frame, bottom_frame, ui_state, controller, include_prompt, include_settings):
+    def build_content(
+            self,
+            top_frame,
+            bottom_frame,
+            ui_state,
+            controller,
+            include_prompt,
+            include_settings,
+            prompt_lines: int = 5,
+            max_prompt_lines: int = 20,
+    ):
         is_flow_matching = controller.is_flow_matching()
         is_inpainting_model = controller.is_inpainting_model()
         is_video_model = controller.is_video_model()
         if include_prompt:
+            has_clip_text_encoder = controller.has_clip_text_encoder()
             # prompt
             self.components.label(top_frame, 0, 0, "prompt:")
-            self.components.entry(top_frame, 0, 1, ui_state, "prompt")
+            if has_clip_text_encoder:
+                self.components.entry(top_frame, 0, 1, ui_state, "prompt")
+            else:
+                self.components.text_box(
+                    top_frame, 0, 1, ui_state, "prompt",
+                    lines=prompt_lines, resizable=True, max_lines=max_prompt_lines,
+                )
 
             # negative prompt
             if controller.supports_negative_prompt():
                 self.components.label(top_frame, 1, 0, "negative prompt:")
-                self.components.entry(top_frame, 1, 1, ui_state, "negative_prompt", allow_empty=True)
+                if has_clip_text_encoder:
+                    self.components.entry(top_frame, 1, 1, ui_state, "negative_prompt", allow_empty=True)
+                else:
+                    self.components.text_box(
+                        top_frame, 1, 1, ui_state, "negative_prompt",
+                        lines=prompt_lines, resizable=True, max_lines=max_prompt_lines,
+                    )
 
         if include_settings:
             # width
@@ -115,6 +138,8 @@ class SampleFrameView(BaseSampleFrameView, QWidget):
             ui_state,
             include_prompt: bool = True,
             include_settings: bool = True,
+            prompt_lines: int = 5,
+            max_prompt_lines: int = 20,
     ):
         QWidget.__init__(self, parent)
         BaseSampleFrameView.__init__(self, pyside6_components)
@@ -140,7 +165,10 @@ class SampleFrameView(BaseSampleFrameView, QWidget):
             row = 1 if include_prompt else 0
             outer.addWidget(bottom_frame, row, 0)
 
-        self.build_content(top_frame, bottom_frame, ui_state, controller, include_prompt, include_settings)
+        self.build_content(
+            top_frame, bottom_frame, ui_state, controller, include_prompt, include_settings,
+            prompt_lines=prompt_lines, max_prompt_lines=max_prompt_lines,
+        )
 
         if top_frame is not None:
             pyside6_components._pack_form(top_frame)

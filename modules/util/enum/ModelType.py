@@ -152,6 +152,10 @@ class ModelType(Enum):
     def has_multiple_text_encoders(self):
         return "text_encoder_2" in self.model_parts()
 
+    def has_clip_text_encoder(self) -> bool:
+        return (self.is_stable_diffusion() or self.is_stable_diffusion_xl() or self.is_stable_diffusion_3()
+                or self.is_wuerstchen() or self.is_flux_1() or self.is_hunyuan_video() or self.is_hi_dream())
+
     def is_sd_v1(self):
         return self == ModelType.STABLE_DIFFUSION_15 \
             or self == ModelType.STABLE_DIFFUSION_15_INPAINTING

@@ -6,17 +6,32 @@ from typing import Any, Literal
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TimeUnit import TimeUnit
 from modules.util.path_util import supported_image_extensions, supported_video_extensions
-from modules.util.ui.pyside6_util import format_tooltip
+from modules.util.ui.pyside6_util import format_tooltip, limit_input_width
 from modules.util.ui.pyside6_validation import PySide6FieldValidator, PySide6PathValidator, PySide6RunNameValidator
+from modules.util.ui.QtTextBox import QtTextBox, QtTextPreview
+from modules.util.ui.QtToggleSwitch import QtToggleSwitch
 from modules.util.ui.UIState import BaseUIState
 
-from PySide6.QtCore import QEvent, QObject, Qt, QTimer
-from PySide6.QtGui import QPixmap, QWheelEvent
+from PySide6.QtCore import (
+    QAbstractAnimation,
+    QEasingCurve,
+    QEvent,
+    QObject,
+    QRectF,
+    QSignalBlocker,
+    QSize,
+    Qt,
+    QTimer,
+    QVariantAnimation,
+    Signal,
+)
+from PySide6.QtGui import QFont, QFontMetricsF, QPalette, QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFileDialog,
     QFrame,
+    QGraphicsOpacityEffect,
     QGridLayout,
     QLabel,
     QLineEdit,
@@ -25,17 +40,157 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QStyle,
+    QStyleOptionButton,
+    QStyleOptionComboBox,
+    QStylePainter,
     QToolButton,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
 
 PAD = 10
+FORM_ROW_SPACING = PAD + 4
+PATH_ENTRY_GAP = 8
+
+
+def _set_max_width(
+        widget: QWidget,
+        max_width: int | None,
+        *,
+        text_widget: QWidget | None = None,
+        extra_width: int = 0,
+) -> None:
+    """Cap an input in characters, adding accessory space for compound controls."""
+    if max_width is None:
+        return
+    target = text_widget if text_widget is not None else widget
+    limit_input_width(target, max_width)
+    if target is not widget:
+        pixels = target.maximumWidth() + extra_width
+        widget.setMinimumWidth(min(widget.minimumWidth(), pixels))
+        widget.setMaximumWidth(pixels)
+    # A capped input should stay beside its label, not float in its grid cell.
+    layout = widget.parentWidget().layout()
+    item = layout.itemAt(layout.indexOf(widget)) if layout is not None else None
+    if item is not None and not item.alignment() & Qt.AlignmentFlag.AlignHorizontal_Mask:
+        layout.setAlignment(widget, item.alignment() | Qt.AlignmentFlag.AlignLeft)
 
 
 # ---------------------------------------------------------------------------
 # PySide6-only helpers
 # ---------------------------------------------------------------------------
+
+class CollapsibleForm(QWidget):
+    """Reveal an intact form by clipping its height, preserving values and bindings."""
+
+    transition_finished = Signal()
+    _HEIGHT_DURATION_MS = 180
+    _FADE_IN_DURATION_MS = 230
+    _FADE_OUT_DURATION_MS = 130
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.content = QWidget(self)
+        self.content.setEnabled(False)
+        self._opacity_effect = QGraphicsOpacityEffect(self.content)
+        self._opacity_effect.setOpacity(0.0)
+        self._opacity_effect.setEnabled(False)
+        self.content.setGraphicsEffect(self._opacity_effect)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.expanded = False
+        self._animation = QVariantAnimation(self)
+        self._animation.setDuration(self._HEIGHT_DURATION_MS)
+        self._animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self._animation.valueChanged.connect(self.setFixedHeight)
+        self._animation.finished.connect(self._finish)
+        self._fade_animation = QVariantAnimation(self)
+        self._fade_animation.valueChanged.connect(self._opacity_effect.setOpacity)
+        self._fade_animation.finished.connect(self._finish_fade)
+        self.setFixedHeight(0)
+        self.hide()
+
+    @property
+    def is_animating(self) -> bool:
+        return self._animation.state() == QAbstractAnimation.State.Running
+
+    def sizeHint(self):
+        return self.content.sizeHint()
+
+    def minimumSizeHint(self):
+        return QSize(self.content.minimumSizeHint().width(), 0)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.content.setGeometry(0, 0, self.width(), self.content.sizeHint().height())
+
+    def set_expanded(self, expanded: bool, *, animate: bool = True) -> None:
+        if expanded == self.expanded:
+            if not animate:
+                self._animation.stop()
+                self._fade_animation.stop()
+                self._opacity_effect.setOpacity(1.0 if expanded else 0.0)
+                self._opacity_effect.setEnabled(False)
+                self._finish()
+            return
+        self.expanded = expanded
+        height = self.height() if not self.isHidden() else 0
+        start_opacity = self._opacity_effect.opacity() if self._opacity_effect.isEnabled() else (0.0 if expanded else 1.0)
+        self._animation.stop()
+        self._fade_animation.stop()
+        self.content.setEnabled(expanded)
+        if not animate:
+            self._opacity_effect.setOpacity(1.0 if expanded else 0.0)
+            self._opacity_effect.setEnabled(False)
+            self._finish()
+            return
+        self._opacity_effect.setOpacity(start_opacity)
+        self._opacity_effect.setEnabled(True)
+        self.show()
+        self._animation.setStartValue(height)
+        self._animation.setEndValue(self.content.sizeHint().height() if expanded else 0)
+        self._animation.start()
+        self._fade_animation.setDuration(self._FADE_IN_DURATION_MS if expanded else self._FADE_OUT_DURATION_MS)
+        self._fade_animation.setEasingCurve(
+            QEasingCurve.Type.InOutCubic if expanded else QEasingCurve.Type.OutCubic
+        )
+        self._fade_animation.setStartValue(start_opacity)
+        self._fade_animation.setEndValue(1.0 if expanded else 0.0)
+        self._fade_animation.start()
+
+    def _finish_fade(self):
+        if self.expanded:
+            self._opacity_effect.setOpacity(1.0)
+            self._opacity_effect.setEnabled(False)
+
+    def _finish(self):
+        if self.expanded:
+            self.setMinimumHeight(0)
+            self.setMaximumHeight(16777215)
+            self.show()
+        else:
+            self._fade_animation.stop()
+            self._opacity_effect.setOpacity(0.0)
+            self._opacity_effect.setEnabled(False)
+            self.setFixedHeight(0)
+            self.hide()
+        self.updateGeometry()
+        self.transition_finished.emit()
+
+
+class _DisabledToolTipFilter(QObject):
+    def __init__(self, control: QWidget, *widgets: QWidget):
+        super().__init__(control)
+        for widget in (control, *widgets):
+            widget.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.ToolTip and not self.parent().isEnabled() and watched.toolTip():
+            QToolTip.showText(event.globalPos(), watched.toolTip(), watched)
+            return True
+        return super().eventFilter(watched, event)
+
 
 class _FileDropFilter(QObject):
     def __init__(
@@ -103,7 +258,8 @@ def _layout(master: QWidget) -> QGridLayout:
     if lo is None:
         lo = QGridLayout(master)
         lo.setContentsMargins(0, 0, 0, 0)
-        lo.setSpacing(PAD)
+        lo.setHorizontalSpacing(PAD)
+        lo.setVerticalSpacing(FORM_ROW_SPACING)
         master.setLayout(lo)
     return lo
 
@@ -158,6 +314,33 @@ def _add(
         layout.setAlignment(widget, align)
 
 
+class _ScrollBarGutterFilter(QObject):
+    """Reserve the vertical scrollbar's width while hidden so showing it causes no horizontal shift."""
+
+    def __init__(self, scroll: QScrollArea, container_layout: QVBoxLayout):
+        super().__init__(scroll)
+        self._scroll = scroll
+        self._layout = container_layout
+        self._bar = scroll.verticalScrollBar()
+        self._bar.installEventFilter(self)
+        self._sync(visible=False)
+
+    def _sync(self, *, visible: bool) -> None:
+        reserve = 0 if visible else self._scroll.style().pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent)
+        self._layout.setContentsMargins(PAD, PAD, PAD + reserve, PAD)
+
+    def eventFilter(self, watched, event):
+        if watched is self._bar:
+            event_type = event.type()
+            if event_type == QEvent.Type.Show:
+                self._sync(visible=True)
+            elif event_type == QEvent.Type.Hide:
+                self._sync(visible=False)
+            elif event_type == QEvent.Type.StyleChange:
+                self._sync(visible=self._bar.isVisible())
+        return super().eventFilter(watched, event)
+
+
 def scrollable_frame(parent: QWidget) -> tuple[QScrollArea, QWidget]:
     scroll = QScrollArea(parent)
     scroll.setWidgetResizable(True)
@@ -169,6 +352,7 @@ def scrollable_frame(parent: QWidget) -> tuple[QScrollArea, QWidget]:
     container_layout.addWidget(frame)
     container_layout.addStretch(1)
     scroll.setWidget(container)
+    scroll._scrollbar_gutter_filter = _ScrollBarGutterFilter(scroll, container_layout)  # type: ignore[attr-defined]
     return scroll, frame
 
 
@@ -220,8 +404,18 @@ def label(
         wide_tooltip: bool = False,
         wraplength: int = 0,
         underline: bool = False,
+        *,
+        heading: bool = False,
+        colspan: int = 1,
 ) -> QLabel:
     component = QLabel(text, master)
+    component.setProperty("formLabel", "heading" if heading else "field")
+    font = master.font()
+    font.setPointSizeF(max(10.0, font.pointSizeF()) + int(heading))
+    font.setWeight(QFont.Weight.Bold if heading else QFont.Weight.Normal)
+    if underline:
+        font.setUnderline(True)
+    component.setFont(font)
     cell_alignment = Qt.AlignVCenter | Qt.AlignLeft
     if wraplength > 0:
         component.setWordWrap(True)
@@ -235,19 +429,36 @@ def label(
         cell_alignment = Qt.AlignTop | Qt.AlignLeft
     if tooltip:
         _set_tooltip(component, tooltip, wide_tooltip)
-    if underline:
-        font = component.font()
-        font.setUnderline(True)
-        component.setFont(font)
     layout = _layout(master)
-    layout.addWidget(component, row, column)
+    layout.addWidget(component, row, column, 1, colspan)
     layout.setAlignment(component, cell_alignment)
+    return component
+
+
+def header_label(
+        master: QWidget,
+        row: int,
+        column: int,
+        text: str,
+        *,
+        tooltip: str | None = None,
+        top_spacing: int = 0,
+        colspan: int = 1,
+) -> QLabel:
+    component = label(master, row, column, text, tooltip=tooltip, heading=True, colspan=colspan)
+    component.setContentsMargins(0, top_spacing, 0, 0)
     return component
 
 
 # ---------------------------------------------------------------------------
 # Compound widgets
 # ---------------------------------------------------------------------------
+
+def labeled_field(master: QWidget, ui_state: BaseUIState, row: int, factory: Callable, var_name: str,
+                  title: str, help_text: str, **kwargs):
+    label(master, row, 0, title, tooltip=help_text)
+    return factory(master, row, 1, ui_state=ui_state, var_name=var_name, **kwargs)
+
 
 def entry(
         master: QWidget,
@@ -266,7 +477,10 @@ def entry(
         required: bool = False,
         placeholder: str = "",
         allow_empty: bool = False,
+        *,
+        max_width: int | None = None,
 ) -> QLineEdit:
+    """Create a text input; width is a pixel minimum, max_width a character cap."""
     var = ui_state.get_var(var_name)
 
     component = QLineEdit(master)
@@ -303,6 +517,61 @@ def entry(
     validator.attach()
     component._validator = validator  # type: ignore[attr-defined]
 
+    _set_max_width(component, max_width)
+    return component
+
+
+def text_box(
+        master: QWidget,
+        row: int,
+        column: int,
+        ui_state: BaseUIState,
+        var_name: str,
+        *,
+        lines: int = 2,
+        resizable: bool = False,
+        max_lines: int | None = None,
+) -> QtTextBox:
+    component = QtTextBox(master, lines=lines, resizable=resizable, max_lines=max_lines)
+    component.setMinimumWidth(140)
+    _add(_layout(master), component, row, column)
+    var = ui_state.get_var(var_name)
+    component.setPlainText(str(var.get()))
+
+    def update_text(value):
+        # Avoid resetting the cursor and undo history when this editor writes.
+        if component.toPlainText() != str(value):
+            with QSignalBlocker(component):
+                component.setPlainText(str(value))
+
+    binding = var._bind_widget(update_text)
+    component.destroyed.connect(lambda: var._unbind_widget(binding))
+    component.textChanged.connect(lambda: var.set(component.toPlainText()))
+    return component
+
+
+def text_preview(
+        master: QWidget,
+        row: int,
+        column: int,
+        ui_state: BaseUIState,
+        var_name: str,
+        *,
+        lines: int = 2,
+        on_click: Callable[[], None] | None = None,
+        tooltip: str | None = None,
+) -> QtTextPreview:
+    component = QtTextPreview(master, lines=lines, clickable=on_click is not None)
+    component.setMinimumWidth(140)
+    _add(_layout(master), component, row, column)
+    if on_click is not None:
+        component.clicked.connect(on_click)
+    if tooltip:
+        _set_tooltip(component, tooltip)
+    var = ui_state.get_var(var_name)
+    component.setText(str(var.get()))
+    binding = var._bind_widget(lambda value: component.setText(str(value)))
+    component.destroyed.connect(lambda: var._unbind_widget(binding))
     return component
 
 
@@ -324,11 +593,14 @@ def path_entry(
         required: bool = False,
         columnspan: int = 1,
         placeholder: str = "",
+        max_width: int | None = None,
 ) -> QWidget:
+    """Cap the path text in characters with max_width; add space for the browse button."""
     frame = QWidget(master)
     frame_lo = QGridLayout(frame)
     frame_lo.setContentsMargins(0, 0, 0, 0)
     frame_lo.setSpacing(0)
+    frame_lo.setHorizontalSpacing(PATH_ENTRY_GAP)
     frame_lo.setColumnStretch(0, 1)
     _add(_layout(master), frame, row, column, sticky="new", padx=0, pady=0, colspan=columnspan)
 
@@ -430,6 +702,7 @@ def path_entry(
     btn.clicked.connect(_open_dialog)
     frame_lo.addWidget(btn, 0, 1)
 
+    _set_max_width(frame, max_width, text_widget=entry_component, extra_width=btn.width() + PATH_ENTRY_GAP)
     return frame
 
 
@@ -441,18 +714,24 @@ def time_entry(
         var_name: str,
         unit_var_name: str,
         supports_time_units: bool = True,
+        *,
+        max_width: int | None = None,
 ) -> QWidget:
+    """Cap the numeric input in characters with max_width; add space for the units."""
     frame = QWidget(master)
     _add(_layout(master), frame, row, column, sticky="new", padx=0, pady=0)
 
-    entry(frame, 0, 0, ui_state, var_name, width=50)
+    value_entry = entry(frame, 0, 0, ui_state, var_name, width=50)
 
     values = [str(x) for x in list(TimeUnit)]
     if not supports_time_units:
         values = [str(x) for x in list(TimeUnit) if not x.is_time_unit()]
 
-    options(frame, 0, 1, values, ui_state, unit_var_name)
+    unit_combo = options(frame, 0, 1, values, ui_state, unit_var_name)
 
+    unit_combo.ensurePolished()
+    _set_max_width(frame, max_width, text_widget=value_entry,
+                   extra_width=unit_combo.sizeHint().width() + _layout(frame).horizontalSpacing())
     return frame
 
 
@@ -469,16 +748,19 @@ def layer_filter_entry(
         entry_tooltip: str,
         regex_var_name: str,
         regex_tooltip: str,
-        frame_color=None,
+        *,
+        colspan: int = 1,
 ) -> QWidget:
-    frame = QWidget(master)
-    _layout(master).addWidget(frame, row, column)
+    frame = QFrame(master)
+    frame.setProperty("formInset", True)
+    _layout(master).addWidget(frame, row, column, 1, colspan)
+    layout = _layout(frame)
+    layout.setContentsMargins(12, 12, 12, 12)
+    layout.setVerticalSpacing(8)
+    layout.setColumnStretch(1, 1)
 
-    label(frame, 0, 0, preset_label, tooltip=preset_tooltip)
-
-    layer_entry = entry(frame, 1, 0, ui_state, entry_var_name, tooltip=entry_tooltip)
-    _layout(frame).addWidget(layer_entry, 1, 0, 1, 2)  # span 2 columns
-
+    label(frame, 0, 0, preset_label, tooltip=preset_tooltip, colspan=2)
+    layer_entry = entry(frame, 1, 1, ui_state, entry_var_name, tooltip=entry_tooltip)
     regex_label = label(frame, 2, 0, "Use Regex", tooltip=regex_tooltip)
     regex_switch = switch(frame, 2, 1, ui_state, regex_var_name)
 
@@ -514,9 +796,10 @@ def layer_filter_entry(
     ui_state.remove_all_var_traces(preset_var_name)
 
     layer_selector = options(
-        frame, 0, 1, presets_list, ui_state, preset_var_name,
+        frame, 1, 0, presets_list, ui_state, preset_var_name,
         command=preset_set_layer_choice,
     )
+    layout.setAlignment(layer_selector, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
     ui_state.add_var_trace(preset_var_name, lambda: preset_set_layer_choice(
         ui_state.get_var(preset_var_name).get()
@@ -532,6 +815,49 @@ def icon_button(master: QWidget, row: int, column: int, text: str, command: Call
     component.setFixedWidth(40)
     component.clicked.connect(command)
     _add(_layout(master), component, row, column, sticky="new")
+    return component
+
+
+class _ListActionButton(QPushButton):
+    def paintEvent(self, event):
+        option = QStyleOptionButton()
+        self.initStyleOption(option)
+        text = "x" if self.property("listAction") == "remove" else option.text
+        option.text = ""
+        painter = QStylePainter(self)
+        painter.drawControl(QStyle.ControlElement.CE_PushButton, option)
+
+        # Center the visible glyph, rather than the font's ascent/descent box.
+        contents = QRectF(self.style().subElementRect(QStyle.SubElement.SE_PushButtonContents, option, self))
+        font = self.font()
+        font.setCapitalization(QFont.Capitalization.MixedCase)
+        bounds = QFontMetricsF(font).tightBoundingRect(text)
+        painter.setFont(font)
+        painter.setPen(option.palette.color(QPalette.ColorRole.ButtonText))
+        painter.drawText(contents.center() - bounds.center(), text)
+
+
+def list_action_button(
+        master: QWidget,
+        action: Literal["remove", "clone"],
+        command: Callable[[], None],
+        *,
+        row: int | None = None,
+        column: int = 0,
+        size: int = 20,
+        tooltip: str | None = None,
+) -> QPushButton:
+    """Create a themed list action, optionally placed in a form grid."""
+    component = _ListActionButton("x" if action == "remove" else "+", master)
+    component.setProperty("listAction", action)
+    component.setProperty("class", "destructive-action" if action == "remove" else "confirm-action")
+    component.setFixedSize(size, size)
+    component.setAccessibleName("Remove" if action == "remove" else "Duplicate")
+    if tooltip:
+        _set_tooltip(component, tooltip)
+    component.clicked.connect(command)
+    if row is not None:
+        _add(_layout(master), component, row, column, sticky="new", padx=0, pady=0)
     return component
 
 
@@ -626,6 +952,28 @@ class NoScrollComboBox(QComboBox):
             event.ignore()
 
 
+class SelectedTextComboBox(NoScrollComboBox):
+    """Prefer the selected text's width, but leave room to shrink in narrow forms."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+        self.currentTextChanged.connect(self.updateGeometry)
+
+    def _text_size(self, text: str) -> QSize:
+        option = QStyleOptionComboBox()
+        self.initStyleOption(option)
+        metrics = self.fontMetrics()
+        size = QSize(metrics.horizontalAdvance(text), metrics.height())
+        return self.style().sizeFromContents(QStyle.ContentsType.CT_ComboBox, option, size, self)
+
+    def sizeHint(self):
+        return self._text_size(self.currentText())
+
+    def minimumSizeHint(self):
+        return self._text_size("…")
+
+
 def options(
         master: QWidget,
         row: int,
@@ -634,9 +982,13 @@ def options(
         ui_state: BaseUIState,
         var_name: str,
         command: Callable[[str], None] | None = None,
+        *,
+        max_width: int | None = None,
+        fit_to_selection: bool = False,
 ) -> QComboBox:
+    """Create a dropdown with an optional character-based max_width."""
     var = ui_state.get_var(var_name)
-    combo = NoScrollComboBox(master)
+    combo = SelectedTextComboBox(master) if fit_to_selection else NoScrollComboBox(master)
     combo.addItems(values)
     combo.setCurrentText(str(var.get()))
 
@@ -664,6 +1016,7 @@ def options(
     cb_id = var._bind_widget(on_var)
     combo.destroyed.connect(lambda: var._unbind_widget(cb_id))
     _add(_layout(master), combo, row, column)
+    _set_max_width(combo, max_width)
     return combo
 
 
@@ -676,14 +1029,17 @@ def options_adv(
         var_name: str,
         command: Callable[[str], None] | None = None,
         adv_command: Callable[[], None] | None = None,
+        *,
+        fit_to_selection: bool = False,
 ) -> tuple[QWidget, dict]:
     frame = QWidget(master)
     frame_lo = QGridLayout(frame)
     frame_lo.setContentsMargins(0, 0, 0, 0)
     frame_lo.setColumnStretch(0, 1)
-    _add(_layout(master), frame, row, column, sticky="new", padx=0, pady=0)
+    _add(_layout(master), frame, row, column, sticky="nw" if fit_to_selection else "new", padx=0, pady=0)
 
-    combo = options(frame, 0, 0, values, ui_state, var_name, command=command)
+    combo = options(frame, 0, 0, values, ui_state, var_name, command=command,
+                    fit_to_selection=fit_to_selection)
 
     adv_btn = QPushButton("…", frame)
     adv_btn.setFixedWidth(20)
@@ -870,10 +1226,10 @@ def double_progress(
     return set_1, set_2
 
 
-def section_frame(parent: QWidget, row: int, col: int = 0, colspan: int = 1) -> "QFrame":
-    from PySide6.QtWidgets import QFrame
+def section_frame(parent: QWidget, row: int, col: int = 0, colspan: int = 1) -> QFrame:
     frame = QFrame(parent)
     frame.setFrameShape(QFrame.Shape.StyledPanel)
+    frame.setProperty("formPanel", True)
     _layout(parent).addWidget(frame, row, col, 1, colspan)
     frame_lo = _layout(frame)
     frame_lo.setColumnStretch(0, 1)
@@ -884,8 +1240,47 @@ def section_frame(parent: QWidget, row: int, col: int = 0, colspan: int = 1) -> 
 def inline_frame(parent: QWidget, row: int, col: int, columnspan: int = 1) -> QWidget:
     frame = QWidget(parent)
     _layout(frame)
-    _layout(parent).addWidget(frame, row, col, 1, columnspan)
+    parent_layout = _layout(parent)
+    parent_layout.addWidget(frame, row, col, 1, columnspan)
+    label_item = parent_layout.itemAtPosition(row, col - 1) if col else None
+    if label_item is not None and isinstance(label_item.widget(), QLabel):
+        frame.setAccessibleName(label_item.widget().text())
     return frame
+
+
+def form_section(parent: QWidget, row: int, col: int, title: str, *, colspan: int = 1) -> QWidget:
+    """Create a titled panel and return its body for field construction."""
+    container = section_frame(parent, row, col, colspan=colspan)
+    _layout(parent).setAlignment(container, Qt.AlignmentFlag.AlignTop)
+    header_label(container, 0, 0, title)
+    body = inline_frame(container, 1, 0)
+    _layout(body).setColumnStretch(1, 1)
+    _layout(container).setRowStretch(2, 1)
+    return body
+
+
+def toggle_details(
+        parent: QWidget,
+        title: str,
+        ui_state: BaseUIState,
+        var_name: str,
+        tooltip: str | None = None,
+) -> tuple[QtToggleSwitch, QLabel, CollapsibleForm]:
+    """Build a bound enable row; the caller controls when its details expand."""
+    summary = inline_frame(parent, 0, 0, columnspan=2)
+    field_label = label(summary, 0, 0, title, tooltip=tooltip)
+    switch = QtToggleSwitch(summary, ui_state, var_name, title)
+    _add(_layout(summary), switch, 0, 1, sticky="vw")
+    if tooltip:
+        _set_tooltip(summary, tooltip)
+        _set_tooltip(switch, tooltip)
+    field_label.setBuddy(switch)
+    _pack_form(summary)
+    _DisabledToolTipFilter(switch, summary, field_label)
+    details = CollapsibleForm(parent)
+    _layout(details.content).setColumnStretch(1, 1)
+    _layout(parent).addWidget(details, 1, 0, 1, 2)
+    return switch, field_label, details
 
 
 # ---------------------------------------------------------------------------

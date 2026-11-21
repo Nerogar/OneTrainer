@@ -10,6 +10,8 @@ from modules.ui.CloudTabView import CloudTabView
 from modules.ui.ConceptTabController import ConceptTabController
 from modules.ui.ConceptTabView import ConceptTabView
 from modules.ui.ConvertModelUIView import ConvertModelUIView
+from modules.ui.GeneralTabController import GeneralTabController
+from modules.ui.GeneralTabView import GeneralTabView
 from modules.ui.LoraTabController import LoraTabController
 from modules.ui.LoraTabView import LoraTabView
 from modules.ui.ModelTabController import ModelTabController
@@ -28,18 +30,15 @@ from modules.ui.VideoToolUIView import VideoToolUIView
 from modules.util import path_util
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.DataType import DataType
-from modules.util.enum.GradientReducePrecision import GradientReducePrecision
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
-from modules.util.enum.PathIOType import PathIOType
 from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.ui import pyside6_components
 from modules.util.ui.pyside6_settings import MainWindowSettings
-from modules.util.ui.pyside6_util import QtABCMeta, get_theme_controller
+from modules.util.ui.pyside6_util import QtABCMeta, fit_form
 from modules.util.ui.PySide6UIState import PySide6UIState
-from modules.util.ui.validation_helpers import validate_validation_timesteps
 
-from PySide6.QtCore import QSettings, QSignalBlocker, QTimer
+from PySide6.QtCore import QSettings, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QFileDialog, QGridLayout, QMainWindow, QMessageBox, QTabWidget, QWidget
 
@@ -146,153 +145,22 @@ class BaseTrainUIView(ABC):
         self.eta_label = self.components.label(status_frame, 1, 0, "", pad=0)
 
         self.export_button = self.components.button(frame, 0, 3, "Export", self.export_training,
-                                             width=60, padx=5, pady=(15, 0),
+                                             padx=5, pady=(15, 0), sticky="vew",
                                              tooltip="Export the current configuration as a script to run without a UI")
+        self.export_button.setProperty("compactButton", True)
 
-        self.components.button(frame, 0, 4, "Debug", self.generate_debug_package,
-                                           width=60, padx=(5, 25), pady=(15, 0),
-                                           tooltip="Generate a zip file with config.json, debug_report.log and settings diff, use this to report bugs or issues")
+        debug_button = self.components.button(frame, 0, 4, "Debug", self.generate_debug_package,
+                                             padx=(5, 25), pady=(15, 0), sticky="vew",
+                                             tooltip="Generate a zip file with config.json, debug_report.log and settings diff, use this to report bugs or issues")
+        debug_button.setProperty("compactButton", True)
 
-        self.components.button(frame, 0, 5, "Tensorboard", self.open_tensorboard,
-                                           width=100, padx=(0, 5), pady=(15, 0))
+        tensorboard_button = self.components.button(frame, 0, 6, "Tensorboard", self.open_tensorboard,
+                                                   width=100, padx=(0, 5), pady=(15, 0), sticky="vew")
+        tensorboard_button.setObjectName("tensorboardButton")
 
-        self.training_button = self.components.button(frame, 0, 6, "Start Training", self.start_training,
-                                                 padx=(5, 20), pady=(15, 0))
+        self.training_button = self.components.button(frame, 0, 7, "Start Training", self.start_training,
+                                                 padx=(5, 20), pady=(15, 0), sticky="vew")
 
-    def build_general_tab_content(self, frame, controller, ui_state):
-        # workspace dir
-        self.components.label(frame, 0, 0, "Workspace Directory",
-                         tooltip="The directory where all files of this training run are saved")
-        self.components.path_entry(frame, 0, 1, ui_state, "workspace_dir", mode="dir", command=controller._on_workspace_dir_change, io_type=PathIOType.OUTPUT)
-
-        # cache dir
-        self.components.label(frame, 0, 2, "Cache Directory",
-                         tooltip="The directory where cached data is saved")
-        self.components.path_entry(frame, 0, 3, ui_state, "cache_dir", mode="dir", io_type=PathIOType.OUTPUT)
-
-        # continue from previous backup
-        self.components.label(frame, 2, 0, "Continue from last backup",
-                         tooltip="Automatically continues training from the last backup saved in <workspace>/backup")
-        self.components.switch(frame, 2, 1, ui_state, "continue_last_backup")
-
-        # only cache
-        self.components.label(frame, 2, 2, "Only Cache",
-                         tooltip="Only populate the cache, without any training")
-        self.components.switch(frame, 2, 3, ui_state, "only_cache")
-
-        # TODO: In Phase 4 rework the general tab.
-        # prevent overwrites
-        self.components.label(frame, 3, 0, "Prevent Overwrites",
-                         tooltip="When enabled, output paths that already exist on disk will be flagged as invalid to avoid accidental overwrites")
-        self.components.switch(frame, 3, 1, ui_state, "prevent_overwrites")
-
-        self.components.label(frame, 3, 2, "Clean Up Input",
-                              tooltip="On leaving a field, pressing Enter, or starting training: trims surrounding whitespace, "
-                                      "removes matching outer path quotes, expands ~ in local paths, and converts Windows separators. "
-                                      "Invalid input is flagged for you to fix.")
-        self.components.switch(frame, 3, 3, ui_state, "auto_correct_input")
-
-        # debug
-        self.components.label(frame, 4, 0, "Debug mode",
-                         tooltip="Save debug information during the training into the debug directory")
-        self.components.switch(frame, 4, 1, ui_state, "debug_mode")
-
-        self.components.label(frame, 4, 2, "Debug Directory",
-                         tooltip="The directory where debug data is saved")
-        self.components.path_entry(frame, 4, 3, ui_state, "debug_dir", mode="dir", io_type=PathIOType.OUTPUT)
-
-        # tensorboard
-        self.components.label(frame, 6, 0, "Tensorboard",
-                         tooltip="Starts the Tensorboard Web UI during training")
-        self.components.switch(frame, 6, 1, ui_state, "tensorboard")
-
-        self.components.label(frame, 6, 2, "Always-On Tensorboard",
-                         tooltip="Keep Tensorboard accessible even when not training. Useful for monitoring completed training sessions.")
-        self.components.switch(frame, 6, 3, ui_state, "tensorboard_always_on", command=controller._on_always_on_tensorboard_toggle)
-
-        self.components.label(frame, 7, 0, "Expose Tensorboard",
-                         tooltip="Exposes Tensorboard Web UI to all network interfaces (makes it accessible from the network)")
-        self.components.switch(frame, 7, 1, ui_state, "tensorboard_expose")
-        self.components.label(frame, 7, 2, "Tensorboard Port",
-                         tooltip="Port to use for Tensorboard link")
-        self.components.entry(frame, 7, 3, ui_state, "tensorboard_port")
-
-        # validation
-        self.components.label(frame, 8, 0, "Validation",
-                         tooltip="Enable validation steps and add new graph in tensorboard")
-        self.components.switch(frame, 8, 1, ui_state, "validation")
-
-        self.components.label(frame, 8, 2, "Validate after",
-                         tooltip="The interval used when validate training")
-        self.components.time_entry(frame, 8, 3, ui_state, "validate_after", "validate_after_unit")
-
-        validation_timesteps_tooltip = (
-            "Comma-separated validation timesteps from 0 to 999 (for example, 100,499,900). "
-            "Higher values test noisier images; lower values test finer details. "
-            "Each distinct timestep gets a separate graph. VAE validation runs once without timesteps."
-        )
-        self.components.label(frame, 9, 0, "Validation Timesteps", tooltip=validation_timesteps_tooltip)
-        self.components.entry(frame, 9, 1, ui_state, "validation_timesteps", required=True,
-                              extra_validate=validate_validation_timesteps, tooltip=validation_timesteps_tooltip)
-
-        self.components.label(frame, 9, 2, "Report per val concept",
-                              tooltip="Report validation timesteps in a separate Tensorboard accordion for each concept. "
-                                      "Show the average validation loss and training loss in the loss group.")
-        self.components.switch(frame, 9, 3, ui_state, "validation_report_per_concept")
-
-        self.components.label(frame, 10, 0, "Early Stopping Patience",
-                              tooltip="Stop after X epochs without validation loss improvement. "
-                                      "0 disables early stopping.")
-        self.components.entry(frame, 10, 1, ui_state, "early_stopping_patience", required=True)
-
-        self.components.label(frame, 10, 2, "Minimum Loss Decrease",
-                              tooltip="Minimum absolute decrease required to reset patience. "
-                                      "Leave blank to reset whenever validation loss reaches a new lowest value.")
-        self.components.entry(frame, 10, 3, ui_state, "early_stopping_min_delta")
-
-        # device
-        self.components.label(frame, 11, 0, "Dataloader Threads",
-                         tooltip="Number of threads used for the data loader. Increase if your GPU has room during caching, decrease if it's going out of memory during caching.")
-        self.components.entry(frame, 11, 1, ui_state, "dataloader_threads", required=True)
-
-        self.components.label(frame, 12, 0, "Train Device",
-                         tooltip="The device used for training. Can be \"cuda\", \"cuda:0\", \"cuda:1\" etc. Default:\"cuda\". Must be \"cuda\" for multi-GPU training.")
-        self.components.entry(frame, 12, 1, ui_state, "train_device", required=True)
-
-        self.components.label(frame, 12, 2, "Async Offloading",
-                         tooltip="Overlaps CPU<->GPU transfers with computation using CUDA streams. Applies to every offloaded component")
-        self.components.switch(frame, 12, 3, ui_state, "async_offloading")
-
-        self.components.label(frame, 13, 0, "Multi-GPU",
-                         tooltip="Enable multi-GPU training")
-        self.components.switch(frame, 13, 1, ui_state, "multi_gpu")
-        self.components.label(frame, 13, 2, "Device Indexes",
-                         tooltip="Multi-GPU: A comma-separated list of device indexes. If empty, all your GPUs are used. With a list such as \"0,1,3,4\" you can omit a GPU, for example an on-board graphics GPU.")
-        self.components.entry(frame, 13, 3, ui_state, "device_indexes")
-
-        self.components.label(frame, 14, 0, "Gradient Reduce Precision",
-                         tooltip="WEIGHT_DTYPE: Reduce gradients between GPUs in your weight data type; can be imprecise, but more efficient than float32\n"
-                                 "WEIGHT_DTYPE_STOCHASTIC: Sum up the gradients in your weight data type, but average them in float32 and stochastically round if your weight data type is bfloat16\n"
-                                 "FLOAT_32: Reduce gradients in float32\n"
-                                 "FLOAT_32_STOCHASTIC: Reduce gradients in float32; use stochastic rounding to bfloat16 if your weight data type is bfloat16",
-                         wide_tooltip=True)
-        self.components.options(frame, 14, 1, [str(x) for x in list(GradientReducePrecision)], ui_state,
-                           "gradient_reduce_precision")
-
-        self.components.label(frame, 14, 2, "Fused Gradient Reduce",
-                         tooltip="Multi-GPU: Gradient synchronisation during the backward pass. Can be more efficient, especially with Async Gradient Reduce")
-        self.components.switch(frame, 14, 3, ui_state, "fused_gradient_reduce")
-
-        self.components.label(frame, 15, 0, "Async Gradient Reduce",
-                         tooltip="Multi-GPU: Asynchroniously start the gradient reduce operations during the backward pass. Can be more efficient, but requires some VRAM.")
-        self.components.switch(frame, 15, 1, ui_state, "async_gradient_reduce")
-        self.components.label(frame, 15, 2, "Buffer size (MB)",
-                         tooltip="Multi-GPU: Maximum VRAM for \"Async Gradient Reduce\", in megabytes. A multiple of this value can be needed if combined with \"Fused Back Pass\" and/or \"Layer offload fraction\"")
-        self.components.entry(frame, 15, 3, ui_state, "async_gradient_reduce_buffer")
-
-        self.components.label(frame, 16, 0, "Temp Device",
-                         tooltip="The device used to temporarily offload models while they are not used. Default:\"cpu\"")
-        self.components.entry(frame, 16, 1, ui_state, "temp_device")
 
     def build_data_tab_content(self, frame, controller, ui_state):
         # aspect ratio bucketing
@@ -342,10 +210,10 @@ class BaseTrainUIView(ABC):
         # backup after
         self.components.label(frame, 0, 0, "Backup After",
                          tooltip="The interval used when automatically creating model backups during training")
-        self.components.time_entry(frame, 0, 1, ui_state, "backup_after", "backup_after_unit")
+        self.components.time_entry(frame, 0, 1, ui_state, "backup_after", "backup_after_unit", max_width=5)
 
         # backup now
-        self.components.button(frame, 0, 3, "backup now", self.backup_now)
+        self.components.button(frame, 0, 3, "backup now", self.backup_now, sticky="nw")
 
         # rolling backup
         self.components.label(frame, 1, 0, "Rolling Backup",
@@ -355,7 +223,7 @@ class BaseTrainUIView(ABC):
         # rolling backup count
         self.components.label(frame, 2, 0, "Rolling Backup Count",
                          tooltip="Defines the number of backups to keep if rolling backups are enabled")
-        self.components.entry(frame, 2, 1, ui_state, "rolling_backup_count")
+        self.components.entry(frame, 2, 1, ui_state, "rolling_backup_count", max_width=3)
 
         # backup before save
         self.components.label(frame, 3, 0, "Backup Before Save",
@@ -365,15 +233,15 @@ class BaseTrainUIView(ABC):
         # save after
         self.components.label(frame, 4, 0, "Save Every",
                          tooltip="The interval used when automatically saving the model during training")
-        self.components.time_entry(frame, 4, 1, ui_state, "save_every", "save_every_unit")
+        self.components.time_entry(frame, 4, 1, ui_state, "save_every", "save_every_unit", max_width=5)
 
         # save now
-        self.components.button(frame, 4, 3, "save now", self.save_now)
+        self.components.button(frame, 4, 3, "save now", self.save_now, sticky="nw")
 
         # skip save
         self.components.label(frame, 5, 0, "Skip First",
                          tooltip="Start saving automatically after this interval has elapsed")
-        self.components.entry(frame, 5, 1, ui_state, "save_skip_first", width=50, sticky="nw")
+        self.components.entry(frame, 5, 1, ui_state, "save_skip_first", max_width=5, sticky="nw")
 
     def build_embedding_tab_content(self, frame, controller, ui_state):
         # embedding model name
@@ -451,7 +319,8 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
 
         self.setWindowTitle("OneTrainer")
         self.setWindowIcon(QIcon("resources/icons/icon.png"))
-        self.resize(1100, 740)
+        self.setMinimumWidth(1150)
+        self.resize(self.minimumWidth(), 715)
 
         self.status_label = None
         self.eta_label = None
@@ -460,6 +329,7 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         self.tabview: QTabWidget | None = None
         self._tab_widgets: dict[str, QWidget] = {}
 
+        self.general_tab = None
         self.model_tab = None
         self.training_tab = None
         self.lora_tab = None
@@ -605,6 +475,7 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         lo = QGridLayout(frame)
         lo.setColumnStretch(0, 1)
         lo.setColumnStretch(2, 2)
+        lo.setColumnMinimumWidth(5, 10)
 
         status_frame = QWidget(frame)
         status_lo = QGridLayout(status_frame)
@@ -612,6 +483,7 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         lo.addWidget(status_frame, 0, 1)
 
         self.build_bottom_bar_content(frame, status_frame, self.controller, self.ui_state)
+        self.training_button.setObjectName("trainingButton")
         self._set_training_button_style("idle")
         return frame
 
@@ -626,27 +498,15 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         return tab_page
 
     def _configure_general_frame(self, frame):
-        lo = pyside6_components._layout(frame)
-        lo.setColumnStretch(1, 1)
-        lo.setColumnStretch(3, 1)
-        self.build_general_tab_content(frame, self.controller, self.ui_state)
-        row = lo.rowCount()
-        pyside6_components.label(frame, row, 0, "Theme", tooltip="Application appearance, saved independently of training presets")
-        self.theme_dropdown = pyside6_components.NoScrollComboBox(frame)
-        for label, preference in (("Dark", "dark"), ("Light", "light"), ("Match system", "system")):
-            self.theme_dropdown.addItem(label, preference)
-        theme_controller = get_theme_controller()
-        self._update_theme_dropdown(theme_controller.preference)
-        self.theme_dropdown.currentIndexChanged.connect(
-            lambda _: theme_controller.set_preference(self.theme_dropdown.currentData())
+        controller = GeneralTabController(
+            local_gpu_count=self.controller._local_gpu_count,
+            on_workspace_dir_change=self.controller._on_workspace_dir_change,
+            on_always_on_tensorboard_toggle=self.controller._on_always_on_tensorboard_toggle,
         )
-        theme_controller.preference_changed.connect(self._update_theme_dropdown)
-        pyside6_components._add(lo, self.theme_dropdown, row, 1)
-        pyside6_components._pack_form(frame)
-
-    def _update_theme_dropdown(self, preference: str):
-        with QSignalBlocker(self.theme_dropdown):
-            self.theme_dropdown.setCurrentIndex(self.theme_dropdown.findData(preference))
+        self.general_tab = GeneralTabView(frame, controller, self.ui_state)
+        lo = pyside6_components._layout(frame)
+        lo.setColumnStretch(0, 1)
+        lo.addWidget(self.general_tab, 0, 0)
 
     def _configure_data_frame(self, frame):
         lo = pyside6_components._layout(frame)
@@ -657,10 +517,9 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
 
     def _configure_backup_frame(self, frame):
         lo = pyside6_components._layout(frame)
-        lo.setColumnStretch(1, 1)
-        lo.setColumnStretch(3, 1)
+        lo.setColumnStretch(4, 1)
         self.build_backup_tab_content(frame, self.controller, self.ui_state)
-        pyside6_components._pack_form(frame)
+        fit_form(frame)
 
     def _configure_tools_frame(self, frame):
         from modules.ui.QueueTrainingUIView import QueueTrainingUIView
@@ -760,6 +619,8 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
             self.training_tab.refresh_ui()
         if self.lora_tab:
             self.lora_tab.refresh_ui()
+        if self.sampling_tab:
+            self.sampling_tab.refresh_ui()
         self._update_additional_embeddings_tab(model_type)
 
     def _update_additional_embeddings_tab(self, model_type: ModelType):
@@ -794,6 +655,8 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
             self._tab_widgets['embedding'] = tab_page
 
     def load_preset(self):
+        if self.general_tab:
+            self.general_tab.refresh_availability()
         if self.additional_embeddings_tab:
             self.additional_embeddings_tab.refresh_ui()
 
@@ -801,17 +664,18 @@ class TrainView(BaseTrainUIView, QMainWindow, metaclass=QtABCMeta):
         if not self.training_button:
             return
         styles = {
-            "idle":     ("Start Training", True,  "#198754", "white"),
-            "running":  ("Stop Training",  True,  "#dc3545", "white"),
-            "stopping": ("Stopping...",    False, "#dc3545", "white"),
+            "idle":     ("Start Training", True,  "confirm-action"),
+            "running":  ("Stop Training",  True,  "destructive-action"),
+            "stopping": ("Stopping...",    False, "destructive-action"),
         }
-        text, enabled, bg, fg = styles.get(mode, ("Start Training", True, "#198754", "white"))
-        self.training_button.setText(text)
-        self.training_button.setEnabled(enabled)
-        self.training_button.setStyleSheet(
-            f"QPushButton {{ background-color: {bg}; color: {fg}; }}"
-            f"QPushButton:disabled {{ background-color: {bg}; color: {fg}; }}"
-        )
+        text, enabled, action_class = styles.get(mode, styles["idle"])
+        button = self.training_button
+        button.setText(text)
+        button.setEnabled(enabled)
+        button.setProperty("class", action_class)
+        button.style().unpolish(button)
+        button.style().polish(button)
+        button.update()
 
     def export_training(self):
         file_path, _ = QFileDialog.getSaveFileName(
