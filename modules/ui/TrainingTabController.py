@@ -1,7 +1,4 @@
 
-from modules.ui.OptimizerParamsWindowController import OptimizerParamsWindowController
-from modules.ui.SchedulerParamsWindowController import SchedulerParamsWindowController
-from modules.ui.TimestepDistributionWindowController import TimestepDistributionWindowController
 from modules.util import create
 from modules.util.config.TrainConfig import TrainConfig
 from modules.util.enum.AttentionMechanism import AttentionMechanism
@@ -33,12 +30,3 @@ class TrainingTabController:
 
     def is_custom_scheduler_value(self, value: str) -> bool:
         return value == "CUSTOM"
-
-    def open_optimizer_params_window(self, parent, ui_state, view_cls):
-        return view_cls(parent, OptimizerParamsWindowController(self.config), ui_state)
-
-    def open_scheduler_params_window(self, parent, ui_state, view_cls):
-        return view_cls(parent, SchedulerParamsWindowController(self.config), ui_state)
-
-    def open_timestep_distribution_window(self, parent, ui_state, view_cls):
-        return view_cls(parent, TimestepDistributionWindowController(self.config), ui_state)

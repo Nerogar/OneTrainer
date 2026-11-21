@@ -8,7 +8,6 @@ from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
-from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 import torch
 from torch import Tensor
@@ -39,6 +38,8 @@ class ChromaModelEmbedding:
         )
 
 class ChromaModel(BaseModel):
+    supports_caption_dropout = True
+
     # base model data
     tokenizer: T5Tokenizer | None
     orig_tokenizer: T5Tokenizer | None
@@ -52,8 +53,6 @@ class ChromaModel(BaseModel):
 
     text_encoder_train_dtype: DataType
 
-    text_encoder_offload_conductor: LayerOffloadConductor | None
-    transformer_offload_conductor: LayerOffloadConductor | None
 
     # persistent embedding training data
     embedding: ChromaModelEmbedding | None
@@ -84,8 +83,6 @@ class ChromaModel(BaseModel):
 
         self.text_encoder_train_dtype = DataType.FLOAT_32
 
-        self.text_encoder_offload_conductor = None
-        self.transformer_offload_conductor = None
 
         self.embedding = None
         self.additional_embeddings = []
@@ -206,6 +203,11 @@ class ChromaModel(BaseModel):
             bool_attention_mask = tokens_mask.bool()
 
 
+        text_encoder_dropout_mask, tokens, bool_attention_mask = self._prepare_caption_dropout(
+            "text_encoder", text_encoder_dropout_probability, rand, text_encoder_output,
+            tokens, bool_attention_mask,
+        )
+
         with self.text_encoder_autocast_context:
             text_encoder_output = encode_t5(
                 text_encoder=self.text_encoder,
@@ -224,12 +226,9 @@ class ChromaModel(BaseModel):
             text_encoder_output,
         )
 
-        # apply dropout FIXME not a real dropout
-        if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
-            dropout_text_encoder_mask = (torch.tensor(
-                [rand.random() > text_encoder_dropout_probability for _ in range(batch_size)],
-                device=train_device)).float()
-            text_encoder_output = text_encoder_output * dropout_text_encoder_mask[:, None, None]
+        text_encoder_output, bool_attention_mask = self._apply_caption_dropout(
+            "text_encoder", text_encoder_dropout_mask, text_encoder_output, bool_attention_mask,
+        )
 
         #prune tokens that are masked in all batch samples:
         seq_lengths = bool_attention_mask.sum(dim=1)

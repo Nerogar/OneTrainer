@@ -5,7 +5,7 @@ from modules.model.BaseModel import BaseModel
 from modules.modelSampler.BaseModelSampler import (
     BaseModelSampler,
 )
-from modules.util import create
+from modules.util import create, huggingface_util
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.compile_util import init_compile
@@ -36,6 +36,10 @@ class SampleWindowController:
             # remove some settings to speed up model loading for sampling
             self.initial_train_config.optimizer.optimizer = None
             self.initial_train_config.ema = EMAMode.OFF
+            for part in self.initial_train_config.model_part_configs():
+                part.train = False
+                part.gradient_checkpointing = False
+                part.activation_offloading = False
         else:
             self.initial_train_config = None
 
@@ -54,6 +58,12 @@ class SampleWindowController:
         return self.current_train_config.model_type
 
     def load_model(self) -> BaseModel:
+        huggingface_util.configure_hub(
+            self.initial_train_config.secrets.huggingface_token,
+            offline_mode=self.initial_train_config.offline_mode,
+            cache_dir=self.initial_train_config.huggingface_cache_dir,
+        )
+
         model_loader = create.create_model_loader(
             model_type=self.initial_train_config.model_type,
             training_method=self.initial_train_config.training_method,
@@ -77,6 +87,8 @@ class SampleWindowController:
                     model_names.embedding.model_name = last_backup_path
                 else:  # fine-tunes
                     model_names.base_model = last_backup_path
+                    # drop submodule overrides so the backup is loaded in full
+                    model_names.clear_overrides()
 
                 print(f"Loading from backup '{last_backup_path}'...")
             else:
@@ -91,6 +103,8 @@ class SampleWindowController:
             model_names=model_names,
             weight_dtypes=self.initial_train_config.weight_dtypes(),
             quantization=self.initial_train_config.quantization,
+            stream_from_disk=self.initial_train_config.stream_from_disk,
+            cache_in_ram=self.initial_train_config.cache_in_ram(),
         )
         model.train_config = self.initial_train_config
 

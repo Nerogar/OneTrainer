@@ -1,16 +1,17 @@
 import copy
+import math
 from collections.abc import Callable
 
 from modules.model.IdeogramModel import IdeogramModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
 from modules.util import factory
-from modules.util.config.SampleConfig import SampleConfig
+from modules.util.config.SampleConfig import SampleConfig, parse_override_shift
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
-from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
+from modules.util.tqdm_util import tqdm
 
 import torch
 
@@ -18,7 +19,6 @@ from diffusers.pipelines.ideogram4.pipeline_ideogram4 import _logit_normal_sigma
 
 import numpy as np
 from PIL import Image as PILImage
-from tqdm import tqdm
 
 
 @factory.register(BaseModelSampler, ModelType.IDEOGRAM_4)
@@ -47,7 +47,7 @@ class IdeogramSampler(BaseModelSampler):
             random_seed: bool,
             diffusion_steps: int,
             cfg_scale: float,
-            noise_scheduler: NoiseScheduler,
+            override_shift: float | None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
         with self.model.autocast_context:
@@ -132,7 +132,8 @@ class IdeogramSampler(BaseModelSampler):
             del text_features
 
             # resolution-aware logit-normal Euler schedule (pipeline overrides the scheduler's default sigmas)
-            schedule_mu = _resolution_aware_mu(height=height, width=width, base_mu=0.0)
+            shift = parse_override_shift(override_shift)
+            schedule_mu = _resolution_aware_mu(height=height, width=width, base_mu=0.0) if shift is None else math.log(shift)
             sigmas = _logit_normal_sigmas(diffusion_steps, schedule_mu, std=1.5, device=self.train_device)
             noise_scheduler.set_timesteps(sigmas=sigmas.tolist(), device=self.train_device)
             timesteps = noise_scheduler.timesteps
@@ -222,7 +223,7 @@ class IdeogramSampler(BaseModelSampler):
             random_seed=sample_config.random_seed,
             diffusion_steps=sample_config.diffusion_steps,
             cfg_scale=sample_config.cfg_scale,
-            noise_scheduler=sample_config.noise_scheduler,
+            override_shift=sample_config.override_shift,
             on_update_progress=on_update_progress,
         )
 

@@ -7,12 +7,13 @@ import torch
 
 
 class CompressedWeightMixin(metaclass=ABCMeta):
-    def _init_compressed_state(self):
-        self.compress = False
+    def _init_compressed_state(self, compress: bool):
+        self.compress = compress
         self._compressed = False
         self._weight_shape = None
         self._uncompressed_bytes = 0
         self._compressed_dtype = None
+        self._compressed_bytes = None
 
     def _decompress(self, blob: torch.Tensor) -> torch.Tensor:
         # decoding only runs on the GPU. DoRA calls this during initialization, when the weight can
@@ -25,9 +26,20 @@ class CompressedWeightMixin(metaclass=ABCMeta):
     def uncompressed_bytes(self) -> int:
         # bytes the weight occupies decompressed; weight.nbytes is the stored size and drops to the
         # blob length once compressed
-        if not self._compressed:
+        if self._compressed_bytes is None:
             return self.weight.nbytes
         return self._uncompressed_bytes
+
+    def compressed_bytes(self) -> int | None:
+        # None until the layer has been compressed once. Measured rather than read off self.weight, which no
+        # longer holds the blob after an eviction.
+        return self._compressed_bytes
+
+    def mark_needs_recompression(self):
+        # a re-quantize rebuilds the weight from the checkpoint and drops the blob; without this, _compress_weight's
+        # early-out would leave an uncompressed weight flagged compressed and forward() would decode non-blob bytes.
+        # _compressed_bytes stays: the length belongs to the checkpoint weight, not to this materialize.
+        self._compressed = False
 
     @torch.no_grad()
     def _compress_weight(self, device: torch.device | None = None):
@@ -43,6 +55,7 @@ class CompressedWeightMixin(metaclass=ABCMeta):
         self._weight_shape = tuple(gpu_weight.shape)
         self._compressed_dtype = gpu_weight.dtype
         blob, self._uncompressed_bytes = nvcomp_util.compress(gpu_weight.contiguous())
+        self._compressed_bytes = blob.numel()
         self._compressed = True
 
         if device is not None:

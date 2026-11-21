@@ -1,21 +1,19 @@
-import copy
 import inspect
 from collections.abc import Callable
 
 from modules.model.HiDreamModel import HiDreamModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.modelSampler.flow_matching import prepare_flow_match_scheduler
 from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
 from modules.util.enum.FileType import FileType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
-from modules.util.enum.NoiseScheduler import NoiseScheduler
 from modules.util.enum.VideoFormat import VideoFormat
+from modules.util.tqdm_util import tqdm
 
 import torch
-
-from tqdm import tqdm
 
 
 @factory.register(BaseModelSampler, ModelType.HI_DREAM_FULL)
@@ -44,7 +42,7 @@ class HiDreamSampler(BaseModelSampler):
             random_seed: bool,
             diffusion_steps: int,
             cfg_scale: float,
-            noise_scheduler: NoiseScheduler,
+            override_shift: float | None,
             text_encoder_3_layer_skip: int = 0,
             transformer_attention_mask: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
@@ -56,7 +54,6 @@ class HiDreamSampler(BaseModelSampler):
             else:
                 generator.manual_seed(seed)
 
-            noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
             image_processor = self.pipeline.image_processor
             transformer = self.pipeline.transformer
             vae = self.pipeline.vae
@@ -99,7 +96,9 @@ class HiDreamSampler(BaseModelSampler):
                 dtype=torch.float32,
             )
 
-            noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
+            noise_scheduler = prepare_flow_match_scheduler(
+                self.model.noise_scheduler, diffusion_steps, self.train_device, override_shift,
+            )
             timesteps = noise_scheduler.timesteps
 
             # denoising loop
@@ -171,7 +170,7 @@ class HiDreamSampler(BaseModelSampler):
             random_seed=sample_config.random_seed,
             diffusion_steps=sample_config.diffusion_steps,
             cfg_scale=sample_config.cfg_scale,
-            noise_scheduler=sample_config.noise_scheduler,
+            override_shift=sample_config.override_shift,
             text_encoder_3_layer_skip=sample_config.text_encoder_3_layer_skip,
             transformer_attention_mask=sample_config.transformer_attention_mask,
             on_update_progress=on_update_progress,
