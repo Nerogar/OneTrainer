@@ -1,9 +1,9 @@
-import copy
 import inspect
 from collections.abc import Callable
 
 from modules.model.AnimaModel import AnimaModel
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.modelSampler.flow_matching import prepare_flow_match_scheduler
 from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
@@ -11,7 +11,7 @@ from modules.util.enum.FileType import FileType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.VideoFormat import VideoFormat
-from modules.util.staged_pipeline import move_tensors
+from modules.util.staged_pipeline import run_staged_pipeline
 from modules.util.tqdm_util import tqdm
 
 import torch
@@ -63,7 +63,6 @@ class AnimaSampler(BaseModelSampler):
             on_update_progress: Callable[[int, int], None],
     ) -> dict:
         self.model.materialize_only("transformer")
-        combined_prompt_embedding = move_tensors(combined_prompt_embedding, self.train_device)
         transformer = self.model.transformer
         vae_scale_factor = 8
         num_latent_channels = 16
@@ -78,8 +77,6 @@ class AnimaSampler(BaseModelSampler):
         else:
             generator.manual_seed(sample_config.seed)
 
-        noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
-
         # prepare latent image
         latent_image = torch.randn(
             size=(1, num_latent_channels, 1, height // vae_scale_factor, width // vae_scale_factor),
@@ -89,7 +86,9 @@ class AnimaSampler(BaseModelSampler):
         )
 
         sigmas = np.linspace(1.0, 1.0 / diffusion_steps, diffusion_steps)
-        noise_scheduler.set_timesteps(sigmas=sigmas, device=self.train_device)
+        noise_scheduler = prepare_flow_match_scheduler(
+            self.model.noise_scheduler, diffusion_steps, self.train_device, sample_config.override_shift, sigmas=sigmas,
+        )
         timesteps = noise_scheduler.timesteps
 
         padding_mask = latent_image.new_zeros(
@@ -132,7 +131,6 @@ class AnimaSampler(BaseModelSampler):
             latent_image: torch.Tensor,
     ) -> ModelSamplerOutput:
         self.model.materialize_only("vae")
-        latent_image = move_tensors(latent_image, self.train_device)
         vae = self.model.vae
 
         latents = self.model.unscale_latents(latent_image)
@@ -154,17 +152,23 @@ class AnimaSampler(BaseModelSampler):
             video_format: VideoFormat | None = None,
             audio_format: AudioFormat | None = None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
-            *,
-            on_sample: Callable[[int, ModelSamplerOutput], None] | None = None,
-            on_error: Callable[[int, str, Exception], None] | None = None,
-            offload_intermediates: bool = True,
-    ) -> list[ModelSamplerOutput | None]:
+    ) -> list[ModelSamplerOutput]:
+        batch_progress = self.batch_progress_callback(sample_configs, on_update_progress)
+
         with self.model.autocast_context:
-            return self._sample_staged(
+            sampler_outputs = run_staged_pipeline(
                 [("encoding", self.__encode), ("denoising", self.__denoise), ("decoding", self.__decode)],
-                sample_configs, destinations, image_format, video_format, audio_format,
-                on_update_progress, on_sample, on_error, offload_intermediates,
+                {"sample_config": sample_configs},
+                {"on_update_progress": batch_progress},
             )
+
+        for sampler_output, destination in zip(sampler_outputs, destinations, strict=True):
+            self.save_sampler_output(
+                sampler_output, destination,
+                image_format, video_format, audio_format,
+            )
+
+        return sampler_outputs
 
     def sample(
             self,
@@ -183,5 +187,4 @@ class AnimaSampler(BaseModelSampler):
             on_update_progress=on_update_progress,
         )[0]
 
-        assert sampler_output is not None  # single-sample calls propagate errors
         on_sample(sampler_output)

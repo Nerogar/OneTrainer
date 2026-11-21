@@ -8,10 +8,10 @@ import parse
 # The LoRA value-suffix taxonomy, shared by the save-side flatten (kohya_flatten) and the load-side split
 # (_split_value_suffix) so the two never drift. A key's value suffix is either a single trailing segment
 # hanging straight off the module, or two segments (a param segment + this tail). Grouped by that arity, NOT
-# by value type -- scaled_oft is a marker buffer, not a weight, but it is two-segment (oft_R.scaled_oft) so
-# it lives with .weight.
+# by value type -- scaled_oft and matrix_exp_oft are marker buffers, not weights, but they are two-segment
+# (oft_R.scaled_oft / oft_R.matrix_exp_oft) so they live with .weight.
 SINGLE_SEGMENT_SUFFIXES = (".alpha", ".dora_scale", ".dora_log_multiplier")
-DOUBLE_SEGMENT_SUFFIXES = (".weight", ".scaled_oft")
+DOUBLE_SEGMENT_SUFFIXES = (".weight", ".scaled_oft", ".matrix_exp_oft")
 
 # The single-segment adapter factors (LoHa hada_*, LoKr lokr_*) serialize as one bare param segment with no
 # .weight, so both sides detect them by prefix (their exact names vary: hada_w1_a, lokr_w2_b, ...). LoRA/OFT

@@ -120,6 +120,8 @@ class GenericTrainer(BaseTrainer):
                     model_names.embedding.model_name = last_backup_path
                 else:  # fine-tunes
                     model_names.base_model = last_backup_path
+                    # drop submodule overrides so the backup is loaded in full
+                    model_names.clear_overrides()
 
                 print(f"Continuing training from backup '{last_backup_path}'...")
             else:
@@ -231,81 +233,63 @@ class GenericTrainer(BaseTrainer):
     ):
         on_update_progress = self.callbacks.on_update_sample_custom_progress if is_custom_sample else self.callbacks.on_update_sample_default_progress
 
-        def report_error(index, stage, exc, destination=None):
-            traceback.print_exception(exc)
-            location = f" ({destination})" if destination is not None else ""
-            tqdm.write(f"Error during {stage} for sample {index}{location}; continuing with other samples")
-
         try:
             jobs = []  # (sample_config, destination, index, prompt_label) for this rank's share
             for i, sample_config in multi.distributed(
                 [(i, sample_config) for i, sample_config in enumerate(sample_config_list) if sample_config.enabled],
                 distribute=not self.config.samples_to_tensorboard and not ema_applied
             ):
-                failed = False
-                try:
-                    prompt_label = path_util.safe_filename(sample_config.prompt)
+                prompt_label = path_util.safe_filename(sample_config.prompt)
 
-                    if is_custom_sample:
-                        sample_dir = os.path.join(
-                            self.config.workspace_dir,
-                            "samples",
-                            "custom",
-                        )
-                    else:
-                        sample_dir = os.path.join(
-                            self.config.workspace_dir,
-                            "samples",
-                            f"{str(i)} - {prompt_label}{folder_postfix}",
-                        )
-
-                    # Custom samples share a directory and can finish within the same
-                    # second, so keep their original index in the filename.
-                    sample_suffix = f"-{str(i)}" if is_custom_sample else ""
-                    sample_path = os.path.join(
-                        sample_dir,
-                        f"{self.config.get_timestamped_run_name()}-training-sample-{train_progress.filename_string()}{sample_suffix}"
+                if is_custom_sample:
+                    sample_dir = os.path.join(
+                        self.config.workspace_dir,
+                        "samples",
+                        "custom",
+                    )
+                else:
+                    sample_dir = os.path.join(
+                        self.config.workspace_dir,
+                        "samples",
+                        f"{str(i)} - {prompt_label}{folder_postfix}",
                     )
 
-                    sample_config = copy.copy(sample_config)
-                    sample_config.from_train_config(self.config)
+                # custom samples all share the samples/custom dir (regular ones each get their own
+                # {i} - prompt dir), so add the index here - without it a batch that finishes within the
+                # same second shares one filename (timestamp + filename_string are identical) and overwrites.
+                sample_suffix = f"-{str(i)}" if is_custom_sample else ""
+                sample_path = os.path.join(
+                    sample_dir,
+                    f"{self.config.get_timestamped_run_name()}-training-sample-{train_progress.filename_string()}{sample_suffix}"
+                )
 
-                    jobs.append((sample_config, sample_path, i, prompt_label))
-                except Exception as exc:
-                    report_error(i, "preparation", exc)
-                    failed = True
-                if failed:
-                    torch_gc()
+                sample_config = copy.copy(sample_config)
+                sample_config.from_train_config(self.config)
+
+                jobs.append((sample_config, sample_path, i, prompt_label))
 
             if jobs:
                 self.model.eval()
 
-                def on_sample(index, sampler_output):
-                    _, destination, i, prompt_label = jobs[index]
-                    if is_custom_sample:
-                        self.callbacks.on_sample_custom(sampler_output)
-                    else:
-                        if self.config.samples_to_tensorboard and sampler_output.file_type == FileType.IMAGE:
-                            try:
-                                self.tensorboard.add_image(
-                                    f"sample{str(i)} - {prompt_label}", pil_to_tensor(sampler_output.data),
-                                    train_progress.global_step
-                                )
-                            except Exception as exc:
-                                report_error(i, "TensorBoard delivery", exc, destination)
-                        self.callbacks.on_sample_default(sampler_output)
-
-                self.model_sampler.sample_all(
+                sampler_outputs = self.model_sampler.sample_all(
                     [sample_config for sample_config, _, _, _ in jobs],
                     [destination for _, destination, _, _ in jobs],
                     self.config.sample_image_format,
                     self.config.sample_video_format,
                     self.config.sample_audio_format,
                     on_update_progress=on_update_progress,
-                    on_sample=on_sample,
-                    on_error=lambda index, stage, exc: report_error(jobs[index][2], stage, exc, jobs[index][1]),
-                    offload_intermediates=self.config.sample_offload_intermediates,
                 )
+
+                for (_, _, i, prompt_label), sampler_output in zip(jobs, sampler_outputs, strict=True):
+                    if is_custom_sample:
+                        self.callbacks.on_sample_custom(sampler_output)
+                    else:
+                        if self.config.samples_to_tensorboard and sampler_output.file_type == FileType.IMAGE:
+                            self.tensorboard.add_image(
+                                f"sample{str(i)} - {prompt_label}", pil_to_tensor(sampler_output.data),
+                                train_progress.global_step
+                            )
+                        self.callbacks.on_sample_default(sampler_output)
         except Exception:
             traceback.print_exc()
             tqdm.write("Error during sampling, proceeding without sampling")

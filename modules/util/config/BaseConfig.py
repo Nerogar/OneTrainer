@@ -5,6 +5,10 @@ from typing import Any, get_args, get_origin
 from modules.util.type_util import issubclass_safe
 
 
+class ConfigValueError(ValueError):
+    """A validation error that must also reach callers loading nested configs."""
+
+
 class BaseConfig:
     config_version: int
     config_migrations: dict[int, Callable[[dict], dict]]
@@ -131,6 +135,8 @@ class BaseConfig:
                         setattr(self, name, None if data[name] is None else float(data[name]))
                     else:
                         setattr(self, name, float(data[name]))
+            except ConfigValueError:
+                raise
             except Exception:  # noqa: PERF203
                 if name in data:
                     print(f"Could not set {name} as {str(data[name])}")

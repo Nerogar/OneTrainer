@@ -1,9 +1,9 @@
-import copy
 import inspect
 from collections.abc import Callable
 
 from modules.model.Flux2Model import Flux2Model
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.modelSampler.flow_matching import prepare_flow_match_scheduler
 from modules.util import factory
 from modules.util.config.SampleConfig import SampleConfig
 from modules.util.enum.AudioFormat import AudioFormat
@@ -11,7 +11,7 @@ from modules.util.enum.FileType import FileType
 from modules.util.enum.ImageFormat import ImageFormat
 from modules.util.enum.ModelType import ModelType
 from modules.util.enum.VideoFormat import VideoFormat
-from modules.util.staged_pipeline import move_tensors
+from modules.util.staged_pipeline import run_staged_pipeline
 from modules.util.tqdm_util import tqdm
 
 import torch
@@ -69,7 +69,6 @@ class Flux2Sampler(BaseModelSampler):
             on_update_progress: Callable[[int, int], None],
     ) -> dict:
         self.model.materialize_only("transformer")
-        prompt_embedding = move_tensors(prompt_embedding, self.train_device)
         transformer = self.pipeline.transformer
         height = self.quantize_resolution(sample_config.height, 64)
         width = self.quantize_resolution(sample_config.width, 64)
@@ -96,13 +95,14 @@ class Flux2Sampler(BaseModelSampler):
 
         latent_image = self.model.pack_latents(latent_image)
         image_seq_len = latent_image.shape[1]
-        mu = compute_empirical_mu(image_seq_len, diffusion_steps)
+        mu = compute_empirical_mu(image_seq_len, diffusion_steps) if sample_config.override_shift is None else None
 
         # prepare timesteps
-        noise_scheduler = copy.deepcopy(self.model.noise_scheduler)
         #TODO for other models, too? This is different than with sigmas=None
         sigmas = np.linspace(1.0, 1 / diffusion_steps, diffusion_steps)
-        noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device, mu=mu, sigmas=sigmas)
+        noise_scheduler = prepare_flow_match_scheduler(
+            self.model.noise_scheduler, diffusion_steps, self.train_device, sample_config.override_shift, mu=mu, sigmas=sigmas,
+        )
         timesteps = noise_scheduler.timesteps
 
         extra_step_kwargs = {} #TODO remove
@@ -148,7 +148,6 @@ class Flux2Sampler(BaseModelSampler):
             latent_image: torch.Tensor,
     ) -> ModelSamplerOutput:
         self.model.materialize_only("vae")
-        latent_image = move_tensors(latent_image, self.train_device)
         image_processor = self.pipeline.image_processor
         vae = self.pipeline.vae
 
@@ -176,17 +175,23 @@ class Flux2Sampler(BaseModelSampler):
             video_format: VideoFormat | None = None,
             audio_format: AudioFormat | None = None,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
-            *,
-            on_sample: Callable[[int, ModelSamplerOutput], None] | None = None,
-            on_error: Callable[[int, str, Exception], None] | None = None,
-            offload_intermediates: bool = True,
-    ) -> list[ModelSamplerOutput | None]:
+    ) -> list[ModelSamplerOutput]:
+        batch_progress = self.batch_progress_callback(sample_configs, on_update_progress)
+
         with self.model.autocast_context:
-            return self._sample_staged(
+            sampler_outputs = run_staged_pipeline(
                 [("encoding", self.__encode), ("denoising", self.__denoise), ("decoding", self.__decode)],
-                sample_configs, destinations, image_format, video_format, audio_format,
-                on_update_progress, on_sample, on_error, offload_intermediates,
+                {"sample_config": sample_configs},
+                {"on_update_progress": batch_progress},
             )
+
+        for sampler_output, destination in zip(sampler_outputs, destinations, strict=True):
+            self.save_sampler_output(
+                sampler_output, destination,
+                image_format, video_format, audio_format,
+            )
+
+        return sampler_outputs
 
     def sample(
             self,
@@ -205,5 +210,4 @@ class Flux2Sampler(BaseModelSampler):
             on_update_progress=on_update_progress,
         )[0]
 
-        assert sampler_output is not None  # single-sample calls propagate errors
         on_sample(sampler_output)

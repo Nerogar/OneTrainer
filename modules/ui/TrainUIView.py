@@ -206,12 +206,6 @@ class BaseTrainUIView(ABC):
                          tooltip="Whether to include sample images in the Tensorboard output.")
         self.components.switch(sub_frame, 0, 3, ui_state, "samples_to_tensorboard")
 
-        self.components.label(sub_frame, 0, 4, "Offload sample intermediates",
-                              tooltip="Store queued embeddings and latents in CPU RAM during staged sampling to reduce VRAM use. "
-                                      "Disable to keep them on the training device and avoid CPU/GPU transfers. "
-                                      "Applies to Flux2, Krea2, Anima, Qwen Image and Z-Image.")
-        self.components.switch(sub_frame, 0, 5, ui_state, "sample_offload_intermediates")
-
     def build_backup_tab_content(self, frame, controller, ui_state):
         # backup after
         self.components.label(frame, 0, 0, "Backup After",

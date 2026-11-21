@@ -15,7 +15,7 @@ dependencies = [
     "imagesize==1.4.1",
     "tqdm==4.67.1",
     "pyyaml==6.0.2",
-    "huggingface-hub==1.22.0",
+    "huggingface-hub==1.32.0",
     "scipy==1.17.1",
     "matplotlib==3.10.3",
     "av==16.1.0",
@@ -29,7 +29,7 @@ dependencies = [
     "tensorboard==2.21.0",
 
     # diffusion models
-    "diffusers @ git+https://github.com/huggingface/diffusers.git@1ffa4236a48af8d1d2eaeed6c84027af19acfc39",
+    "diffusers @ git+https://github.com/huggingface/diffusers.git@578c9b2c6636ab2424a0e56186268b83623656b2",
     "gguf==0.17.1",
     "transformers==5.5.4",
     "sentencepiece==0.2.1",  # transitive dependency of transformers for tokenizer loading
@@ -44,7 +44,6 @@ dependencies = [
     "mgds @ git+https://github.com/Nerogar/mgds.git@3a6994ad18a490acc4f3876658167525b7d88da7",
 
     # optimizers
-    "dadaptation==3.2",
     "lion-pytorch==0.2.3",
     "prodigyopt==1.1.2",
     "schedulefree==1.4.1",

@@ -675,6 +675,7 @@ class TrainConfig(BaseConfig):
     dora_oft: bool
     oft_scaled: bool
     oft_clipped_norm: float | None
+    oft_matrix_exp: bool
 
     # lokr
     lokr_dim: int
@@ -700,7 +701,6 @@ class TrainConfig(BaseConfig):
     sample_video_format: VideoFormat
     sample_audio_format: AudioFormat
     samples_to_tensorboard: bool
-    sample_offload_intermediates: bool
     non_ema_sampling: bool
 
     # cloud settings
@@ -1467,6 +1467,7 @@ class TrainConfig(BaseConfig):
         data.append(("dora_oft", False, bool, False))
         data.append(("oft_scaled", False, bool, False))
         data.append(("oft_clipped_norm", None, float, True))
+        data.append(("oft_matrix_exp", False, bool, False))
 
         # lokr
         data.append(("lokr_dim", 16, int, False))
@@ -1492,7 +1493,6 @@ class TrainConfig(BaseConfig):
         data.append(("sample_video_format", VideoFormat.MP4, VideoFormat, False))
         data.append(("sample_audio_format", AudioFormat.MP3, AudioFormat, False))
         data.append(("samples_to_tensorboard", True, bool, False))
-        data.append(("sample_offload_intermediates", True, bool, False))
         data.append(("non_ema_sampling", True, bool, False))
 
         # backup settings
