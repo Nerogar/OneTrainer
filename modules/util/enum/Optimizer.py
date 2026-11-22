@@ -60,6 +60,11 @@ class Optimizer(Enum):
     ADABELIEF = 'ADABELIEF'
     AIDA = 'AIDA'
 
+    @classmethod
+    def available(cls):
+        # FIXME bitsandbytes 0.50.2 lacks CUDA blockwise updates for these two optimizers: https://github.com/bitsandbytes-foundation/bitsandbytes/issues/2150
+        return [opt for opt in cls if opt not in (cls.LAMB_8BIT, cls.LARS_8BIT)]
+
     @property
     def is_adaptive(self):
         return self in [

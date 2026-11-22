@@ -17,11 +17,6 @@ export OT_CUDA_LOWMEM_MODE="${OT_CUDA_LOWMEM_MODE:-false}"
 export OT_PLATFORM="${OT_PLATFORM:-detect}"
 export OT_SCRIPT_DEBUG="${OT_SCRIPT_DEBUG:-false}"
 
-# Internal environment variables.
-# NOTE: Version check supports "3", "3.1" and "3.1.5" specifier formats.
-export OT_PYTHON_VERSION_MINIMUM="3.11.1"
-export OT_PYTHON_VERSION_TOO_HIGH="3.14"
-export OT_UPDATE_METADATA_FILE="${SCRIPT_DIR}/update.var"
 export OT_HOST_OS="$(uname -s)"
 
 # Force PyTorch to use fallbacks on Mac systems.
@@ -62,52 +57,6 @@ function print_debug {
 function print_command {
     # NOTE: "%s" prints the escaped command as-is without parsing escape-seqs.
     printf "[OneTrainer] + %s\n" "$(escape_shell_command "$@")"
-}
-
-# Retrieves the most recent Git commit's hash.
-function get_current_git_hash {
-    # NOTE: Will not detect local code changes, only the newest commit's hash.
-    git rev-parse HEAD
-}
-
-# Writes update-check metadata to disk.
-function save_update_metadata {
-    get_current_git_hash >"${OT_UPDATE_METADATA_FILE}"
-}
-
-# Checks whether the current Git state matches the last-seen metadata state.
-function is_update_metadata_changed {
-    if [[ -f "${OT_UPDATE_METADATA_FILE}" ]]; then
-        local saved_hash="$(<"${OT_UPDATE_METADATA_FILE}")"
-        local current_hash="$(get_current_git_hash)"
-        print_debug "Saved Metadata Hash=\"${saved_hash}\", Current Hash=\"${current_hash}\""
-        if [[ "${saved_hash}" == "${current_hash}" ]]; then
-            # Signal "failure", meaning "metadata is NOT outdated, abort".
-            return 1
-        fi
-    fi
-
-    return 0
-}
-
-# Escapes all special regex characters in string.
-function regex_escape {
-    sed 's/[][\.|$(){}?+*^]/\\&/g' <<<"$*"
-}
-
-# Resolves the absolute path for an absolute or relative input path.
-function absolute_path {
-    if [[ -z "$1" ]]; then
-        print_error "absolute_path requires 1 argument."
-        return 1
-    fi
-
-    if [[ ! -d "$1" ]]; then
-        print_error "absolute_path argument is not a directory: \"$1\"."
-        return 1
-    fi
-
-    echo "$(cd -- "$1" &>/dev/null && pwd)"
 }
 
 # Checks if a command exists and is executable.

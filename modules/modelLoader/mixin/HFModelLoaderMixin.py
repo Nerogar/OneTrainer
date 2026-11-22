@@ -461,7 +461,8 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             new_state_dict = {}
             for k, v in state_dict.items():
                 new_k, _ = rename_source_key(
-                    k, weight_renamings, [], prefix=sub_module.base_model_prefix, meta_state_dict=meta_state_dict,
+                    k, weight_renamings, [],
+                    base_model_prefix=sub_module.base_model_prefix, meta_state_dict=meta_state_dict,
                 )
                 new_state_dict[new_k] = v
             state_dict = new_state_dict
@@ -598,7 +599,8 @@ class HFModelLoaderMixin(metaclass=ABCMeta):
             source_key_map = {}
             for key, file in key_to_file.items():
                 renamed = rename_source_key(
-                    key, weight_renamings, [], prefix=sub_module.base_model_prefix, meta_state_dict=meta_state_dict,
+                    key, weight_renamings, [],
+                    base_model_prefix=sub_module.base_model_prefix, meta_state_dict=meta_state_dict,
                 )[0]
                 renamed_key_to_file[renamed] = file
                 source_key_map[renamed] = key

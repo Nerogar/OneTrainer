@@ -34,9 +34,8 @@ too_high_ver = str_to_tuple(sys.argv[2])
 # Set to a version tuple such as (3, 12) to warn about versions below it.
 deprecated_ver = None
 
-# Specifically exclude Python 3.11.0 as Scalene does NOT support it https://pypi.org/project/scalene/
-if sys.version_info[:3] == (3, 11, 0):
-    exit_err("Python 3.11.0 specifically is not supported (due to Scalene). Please use a different Python version.")
+if sys.version_info[:3] == (3, 14, 1):
+    exit_err("torchvision does not support Python 3.14.1. Please use a different Python version.")
 
 if sys.version_info < min_ver:
     exit_wrong_version("too low", min_ver, too_high_ver)

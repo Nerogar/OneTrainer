@@ -243,7 +243,7 @@ class VideoToolUIController:
                 detector=scenedetect.AdaptiveDetector(),
                 start_time=int(timestamp_min_frame),
                 end_time=int(timestamp_max_frame))
-            scene_list = [(x[0].get_frames(), x[1].get_frames()) for x in timecode_list]
+            scene_list = [(start.frame_num, end.frame_num) for start, end in timecode_list]
             if not scene_list:
                 scene_list = [(timestamp_min_frame, timestamp_max_frame)]
         else:
