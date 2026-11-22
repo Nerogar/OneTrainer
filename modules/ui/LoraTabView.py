@@ -3,6 +3,7 @@ from modules.ui.LoraTabController import LoraTabController
 from modules.util import path_util
 from modules.util.enum.ModelType import PeftType
 from modules.util.ui import pyside6_components
+from modules.util.ui.pyside6_util import fit_form
 from modules.util.ui.validation_helpers import check_range
 
 from PySide6.QtWidgets import QWidget
@@ -34,7 +35,7 @@ class BaseLoraTabView:
         self.components.path_entry(
             master, 0, 1, ui_state, "lora_model_name",
             mode="file", path_modifier=path_util.json_path_modifier,
-            columnspan=4,
+            columnspan=3
         )
 
         # LoRA decomposition
@@ -51,38 +52,22 @@ class BaseLoraTabView:
             self.components.switch(master, 3, 4, ui_state, "lora_decompose_output_axis")
 
         # LoRA and LoHA shared settings
-        if peft_type == PeftType.LORA or peft_type == PeftType.LOHA:
+        if peft_type in (PeftType.LORA, PeftType.LOHA):
+            shared_row = 3
+
             # rank
             self.components.label(master, 1, 0, f"{name} rank",
                                   tooltip=f"The rank parameter used when creating a new {name}")
-            self.components.entry(master, 1, 1, ui_state, "lora_rank", required=True, extra_validate=check_range(lower=1, message="Rank must be at least 1"))
-
-            # alpha
-            self.components.label(master, 2, 0, f"{name} alpha",
-                                  tooltip=f"The alpha parameter used when creating a new {name}")
-            self.components.entry(master, 2, 1, ui_state, "lora_alpha", required=True)
-
-            # Dropout Percentage
-            self.components.label(master, 3, 0, "Dropout Probability",
-                                  tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
-            self.components.entry(master, 3, 1, ui_state, "dropout_probability")
-
-            # weight dtype
-            self.components.label(master, 4, 0, f"{name} Weight Data Type",
-                                  tooltip=f"The {name} weight data type used for training. This can reduce memory consumption, but reduces precision")
-            self.components.options_kv(master, 4, 1, controller.get_lora_weight_dtypes(), ui_state, "lora_weight_dtype")
-
-            # For use with additional embeddings.
-            self.components.label(master, 5, 0, "Bundle Embeddings",
-                                  tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
-            self.components.switch(master, 5, 1, ui_state, "bundle_additional_embeddings")
+            self.components.entry(master, 1, 1, ui_state, "lora_rank", required=True, max_width=3, extra_validate=check_range(lower=1, message="Rank must be at least 1"))
 
         # OFTv2
         elif peft_type == PeftType.OFT_2:
+            shared_row = 2
+
             # Block Size
             self.components.label(master, 1, 0, f"{name} Block Size",
                                   tooltip=f"The block size parameter used when creating a new {name}")
-            self.components.entry(master, 1, 1, ui_state, "oft_block_size", required=True)
+            self.components.entry(master, 1, 1, ui_state, "oft_block_size", required=True, max_width=4)
 
             # Block Share
             self.components.label(master, 1, 3, "Block Share",
@@ -97,22 +82,17 @@ class BaseLoraTabView:
             # Clip OFT max norm
             self.components.label(master, 5, 0, "Spectral Norm Clipping",
                                   tooltip="Limits the spectral norm of the OFT matrix using a power iteration estimate. Start at 0.95 for longer runs. Lower values limit adaptation; keep below 1 for stability. Leave blank to disable (default).")
-            self.components.entry(master, 5, 1, ui_state, "oft_clipped_norm")
-
-            # Dropout Percentage
-            self.components.label(master, 2, 0, "Dropout Probability",
-                                  tooltip="Dropout probability. This percentage of the rotated adapter nodes that will be randomly restored to the base model initial statue. Helps with overfitting. 0 disables, 1 maximum.")
-            self.components.entry(master, 2, 1, ui_state, "dropout_probability")
-
-            # OFT weight dtype
-            self.components.label(master, 3, 0, f"{name} Weight Data Type",
-                                  tooltip=f"The {name} weight data type used for training. This can reduce memory consumption, but reduces precision")
-            self.components.options_kv(master, 3, 1, controller.get_lora_weight_dtypes(), ui_state, "lora_weight_dtype")
+            self.components.entry(master, 5, 1, ui_state, "oft_clipped_norm", max_width=7)
 
             # DoRA-OFT (DOFT)
             self.components.label(master, 3, 3, "DoRA OFT (DOFT)",
                              tooltip="Combines Weight-Decomposed Low-Rank Adaptation (DoRA) with OFT. By decoupling the weight into magnitude and direction components, it achieves the superior training dynamics of DoRA but with the stability and performance of OFT. Because OFT is norm-preserving, it avoids the heavy re-calculations typically found in standard DoRA, resulting in faster training (same speed as standard OFT) and better convergence.")
             self.components.switch(master, 3, 4, ui_state, "dora_oft")
+
+            # Matrix Exponential Mode
+            self.components.label(master, 4, 3, "Matrix Exponential Mode",
+                                  tooltip="Changes OFT parameterization from Cayley transform to Matrix Exponential. Provides uniform effective learning rates across all rotation angles, avoiding Cayley metric distortion while maintaining the same overhead.")
+            self.components.switch(master, 4, 4, ui_state, "oft_matrix_exp")
 
             # For use with additional embeddings.
             self.components.label(master, 4, 0, "Bundle Embeddings",
@@ -121,29 +101,16 @@ class BaseLoraTabView:
 
         # LoKr
         elif peft_type == PeftType.LOKR:
+            shared_row = 4
+
             # LoKr Main Settings
             self.components.label(master, 1, 0, f"{name} dimension",
                                   tooltip="The dimension parameter used for the secondary decomposition. Analogous to rank in LoRA.")
-            self.components.entry(master, 1, 1, ui_state, "lokr_dim")
+            self.components.entry(master, 1, 1, ui_state, "lokr_dim", max_width=5)
 
             self.components.label(master, 2, 0, "Decomposition Factor",
                                   tooltip="Factor for Kronecker product decomposition. -1 for auto, which is recommended. Changing this drastically affects parameter count.")
-            self.components.entry(master, 2, 1, ui_state, "lokr_decompose_factor", extra_validate=lambda _: None)
-
-            # alpha
-            self.components.label(master, 3, 0, f"{name} alpha",
-                                  tooltip=f"The alpha parameter used when creating a new {name}")
-            self.components.entry(master, 3, 1, ui_state, "lora_alpha")
-
-            # Dropout Percentage
-            self.components.label(master, 4, 0, "Dropout Probability",
-                                  tooltip="Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum.")
-            self.components.entry(master, 4, 1, ui_state, "dropout_probability")
-
-            # LoKr weight dtype
-            self.components.label(master, 5, 0, f"{name} Weight Data Type",
-                                  tooltip=f"The {name} weight data type used for training. This can reduce memory consumption, but reduces precision")
-            self.components.options_kv(master, 5, 1, controller.get_lora_weight_dtypes(), ui_state, "lora_weight_dtype")
+            self.components.entry(master, 2, 1, ui_state, "lokr_decompose_factor", max_width=5, extra_validate=lambda _: None)
 
             # LoKr Vectorization trick
             self.components.label(master, 6, 0, "Kronecker-Vec Trick",
@@ -172,10 +139,33 @@ class BaseLoraTabView:
                                   tooltip="Apply the DoRA weight decomposition on the output axis instead of the input axis.")
             self.components.switch(master, 5, 4, ui_state, "lokr_dora_on_output")
 
-            # Additional embeddings
-            self.components.label(master, 6, 3, "Bundle Embeddings",
-                                  tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
-            self.components.switch(master, 6, 4, ui_state, "bundle_additional_embeddings")
+        else:
+            return
+
+        # Alpha is shared by the low-rank adapters, but does not apply to OFT.
+        if peft_type in (PeftType.LORA, PeftType.LOHA, PeftType.LOKR):
+            self.components.label(master, shared_row - 1, 0, f"{name} alpha",
+                                  tooltip=f"The alpha parameter used when creating a new {name}")
+            self.components.entry(master, shared_row - 1, 1, ui_state, "lora_alpha",
+                                  required=peft_type in (PeftType.LORA, PeftType.LOHA), max_width=3)
+
+        # Common PEFT settings follow the type-specific parameters.
+        if peft_type == PeftType.OFT_2:
+            dropout_tooltip = "Dropout probability. This percentage of the rotated adapter nodes that will be randomly restored to the base model initial statue. Helps with overfitting. 0 disables, 1 maximum."
+        else:
+            dropout_tooltip = "Dropout probability. This percentage of model nodes will be randomly ignored at each training step. Helps with overfitting. 0 disables, 1 maximum."
+        self.components.label(master, shared_row, 0, "Dropout Probability", tooltip=dropout_tooltip)
+        self.components.entry(master, shared_row, 1, ui_state, "dropout_probability", max_width=7)
+
+        self.components.label(master, shared_row + 1, 0, f"{name} Weight Data Type",
+                              tooltip=f"The {name} weight data type used for training. This can reduce memory consumption, but reduces precision")
+        self.components.options_kv(master, shared_row + 1, 1, controller.get_lora_weight_dtypes(), ui_state, "lora_weight_dtype")
+
+        # LoKr uses the left column of this row for its vectorization setting.
+        embeddings_column = 3 if peft_type == PeftType.LOKR else 0
+        self.components.label(master, shared_row + 2, embeddings_column, "Bundle Embeddings",
+                              tooltip=f"Bundles any additional embeddings into the {name} output file, rather than as separate files")
+        self.components.switch(master, shared_row + 2, embeddings_column + 1, ui_state, "bundle_additional_embeddings")
 
 
 class LoraTabView(BaseLoraTabView, QWidget):
@@ -203,7 +193,7 @@ class LoraTabView(BaseLoraTabView, QWidget):
         lo.setColumnStretch(1, 1)
         lo.setColumnStretch(2, 2)
         self.build(self.scroll_frame, self.controller, self.ui_state, self.setup_lora)
-        pyside6_components._pack_form(self.scroll_frame)
+        fit_form(self.scroll_frame)
 
     def setup_lora(self, peft_type: PeftType):
         if self.options_frame is not None:
@@ -216,4 +206,4 @@ class LoraTabView(BaseLoraTabView, QWidget):
         lo.setColumnStretch(1, 1)
         lo.setColumnStretch(4, 1)
         self.build_lora_options(self.options_frame, self.controller, self.ui_state, peft_type)
-        pyside6_components._pack_form(self.options_frame)
+        fit_form(self.options_frame)

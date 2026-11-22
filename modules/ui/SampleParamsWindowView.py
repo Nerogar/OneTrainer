@@ -24,8 +24,11 @@ class SampleParamsWindowView(BaseSampleParamsWindowView, QDialog):
         outer.setRowStretch(0, 1)
         outer.setColumnStretch(0, 1)
 
-        frame = SampleFrameView(self, SampleFrameController(controller.sample, controller.model_type), ui_state)
-        outer.addWidget(frame, 0, 0)
+        scroll, content = pyside6_components.scrollable_frame(self)
+        pyside6_components._layout(content).setColumnStretch(0, 1)
+        frame = SampleFrameView(content, SampleFrameController(controller.sample, controller.model_type), ui_state)
+        pyside6_components._layout(content).addWidget(frame, 0, 0)
+        outer.addWidget(scroll, 0, 0)
 
         ok = QPushButton("ok", self)
         ok.clicked.connect(self.accept)

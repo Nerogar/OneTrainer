@@ -180,6 +180,9 @@ class PySide6FieldValidator(BaseFieldValidator):
         if self._bound:
             self._validate_and_style(self.component.text())
 
+    def is_enabled(self) -> bool:
+        return self.component.isEnabled()
+
     def flush(self) -> str | None:
         self._debounce.stop()
         value = self._prepare_commit()

@@ -56,7 +56,10 @@ class KvWidget(QWidget):
         lo.setColumnStretch(1, 1)
         lo.setColumnStretch(2, 1)
 
-        pyside6_components.colored_icon_button(self, 0, 0, "X", "#C00000", lambda: remove_command(self.i))
+        pyside6_components.list_action_button(
+            self, "remove", lambda: remove_command(self.i), row=0, column=0,
+            tooltip="Removes the parameter",
+        )
 
         # Key
         self.key = pyside6_components.entry(self, 0, 1, self.ui_state, "key",

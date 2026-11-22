@@ -77,8 +77,8 @@ class StableDiffusionFineTuneVaeDataLoader(BaseDataLoader):
         return modules
 
     def __load_input_modules(self, config: TrainConfig) -> list:
-        load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=-1.0, range_max=1.0, supported_extensions=path_util.supported_image_extensions())
-        load_mask = LoadImage(path_in_name='mask_path', image_out_name='latent_mask', range_min=0, range_max=1, channels=1, supported_extensions=path_util.supported_image_extensions())
+        load_image = LoadImage(path_in_name='image_path', image_out_name='image', range_min=-1.0, range_max=1.0, supported_extensions=path_util.supported_image_extensions(), skip_corrupt=config.skip_corrupt_images)
+        load_mask = LoadImage(path_in_name='mask_path', image_out_name='latent_mask', range_min=0, range_max=1, channels=1, supported_extensions=path_util.supported_image_extensions(), skip_corrupt=config.skip_corrupt_images)
 
         modules = [load_image]
 

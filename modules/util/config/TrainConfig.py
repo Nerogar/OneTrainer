@@ -532,6 +532,7 @@ class TrainConfig(BaseConfig):
     aspect_ratio_bucketing: bool
     latent_caching: bool
     clear_cache_before_training: bool
+    skip_corrupt_images: bool
 
     # training settings
     learning_rate_scheduler: LearningRateScheduler
@@ -671,6 +672,7 @@ class TrainConfig(BaseConfig):
     dora_oft: bool
     oft_scaled: bool
     oft_clipped_norm: float | None
+    oft_matrix_exp: bool
 
     # lokr
     lokr_dim: int
@@ -1273,6 +1275,7 @@ class TrainConfig(BaseConfig):
         data.append(("aspect_ratio_bucketing", True, bool, False))
         data.append(("latent_caching", True, bool, False))
         data.append(("clear_cache_before_training", True, bool, False))
+        data.append(("skip_corrupt_images", True, bool, False))
 
         # training settings
         data.append(("learning_rate_scheduler", LearningRateScheduler.CONSTANT, LearningRateScheduler, False))
@@ -1462,6 +1465,7 @@ class TrainConfig(BaseConfig):
         data.append(("dora_oft", False, bool, False))
         data.append(("oft_scaled", False, bool, False))
         data.append(("oft_clipped_norm", None, float, True))
+        data.append(("oft_matrix_exp", False, bool, False))
 
         # lokr
         data.append(("lokr_dim", 16, int, False))

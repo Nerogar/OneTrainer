@@ -2,7 +2,7 @@ import os
 
 from modules.util.enum.PathIOType import PathIOType
 from modules.util.ui import pyside6_components as components
-from modules.util.ui.pyside6_util import fit_form, limit_input_width
+from modules.util.ui.pyside6_util import fit_form
 from modules.util.ui.PySide6UIState import PySide6UIState
 
 from PySide6.QtCore import QEvent, Qt
@@ -133,12 +133,10 @@ class QueueTrainingUIView(QDialog):
             label_widget = components.label(frame, row, 0, label, tooltip=tooltip)
             path_widget = components.path_entry(
                 frame, row, 1, state, key, mode=mode, allow_model_files=False,
-                io_type=PathIOType.OUTPUT,
+                io_type=PathIOType.OUTPUT, max_width=30 if key == "script_path" else 40,
             )
             path_widget.setToolTip(tooltip)
-            entry = path_widget.findChild(QLineEdit)
-            limit_input_width(entry, 30 if key == "script_path" else 40)
-            path_widget.setFixedWidth(entry.maximumWidth() + path_widget.findChild(QPushButton).width())
+            path_widget.setFixedWidth(path_widget.maximumWidth())
             if key == "output_dir":
                 self.output_widgets = (label_widget, path_widget)
         tooltip = "Actions apply *only* if training successfully completes"
@@ -152,11 +150,9 @@ class QueueTrainingUIView(QDialog):
         components.options(frame, 0, 1, ["Current UI", "Config file", "Saved snapshot"], state, "source").setToolTip(tooltip)
         tooltip = "Copy this config as the Sweep base. The source file stays unchanged."
         self.base_path_label = components.label(frame, 1, 0, "Config file", tooltip=tooltip)
-        self.base_path_input = components.path_entry(frame, 1, 1, state, "base_path", allow_model_files=False)
+        self.base_path_input = components.path_entry(frame, 1, 1, state, "base_path", allow_model_files=False, max_width=40)
         self.base_path_input.setToolTip(tooltip)
-        entry = self.base_path_input.findChild(QLineEdit)
-        limit_input_width(entry)
-        self.base_path_input.setFixedWidth(entry.maximumWidth() + self.base_path_input.findChild(QPushButton).width())
+        self.base_path_input.setFixedWidth(self.base_path_input.maximumWidth())
         fit_form(frame)
 
     def _open_queue(self):

@@ -256,23 +256,24 @@ class ConceptWidgetView(BaseConceptWidgetView, QWidget):
         self.name_label.setFixedWidth(140)
         self.name_label.move(5, 153)
 
-        close_btn = QPushButton("X", self)
-        close_btn.setFixedSize(24, 24)
-        close_btn.setStyleSheet("background-color: #C00000; color: white;")
-        close_btn.move(5, 0)
-        close_btn.clicked.connect(lambda: remove_command(self.i))
+        control_margin = 4
+        close_btn = pyside6_components.list_action_button(
+            self, "remove", lambda: remove_command(self.i), size=24,
+            tooltip="Deletes the concept",
+        )
+        close_btn.move(5 + control_margin, control_margin)
 
-        clone_btn = QPushButton("+", self)
-        clone_btn.setFixedSize(24, 24)
-        clone_btn.setStyleSheet("background-color: #00C000; color: white;")
-        clone_btn.move(34, 0)
-        clone_btn.clicked.connect(lambda: clone_command(self.i, controller.randomize_seed))
+        clone_btn = pyside6_components.list_action_button(
+            self, "clone", lambda: clone_command(self.i, controller.randomize_seed), size=24,
+            tooltip="Duplicates the concept",
+        )
+        clone_btn.move(34 + control_margin, control_margin)
 
         enabled_cb = QCheckBox(self)
         enabled_cb.setChecked(concept.enabled)
         enabled_cb.setFixedSize(20, 20)
-        enabled_cb.setStyleSheet("QCheckBox::indicator { width: 20px; height: 20px; }")
-        enabled_cb.move(135, 0)
+        enabled_cb.setProperty("largeIndicator", True)
+        enabled_cb.move(135 - control_margin, control_margin)
         enabled_cb.stateChanged.connect(lambda state: (
             setattr(concept, 'enabled', bool(state)),
             save_command(),
