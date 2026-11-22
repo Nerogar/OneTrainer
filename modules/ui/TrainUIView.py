@@ -178,6 +178,11 @@ class BaseTrainUIView(ABC):
                          tooltip="Clears the cache directory before starting to train. Only disable this if you want to continue using the same cached data. Disabling this can lead to errors, if other settings are changed during a restart")
         self.components.switch(frame, 2, 1, ui_state, "clear_cache_before_training")
 
+        # skip corrupt images
+        self.components.label(frame, 3, 0, "Skip Corrupt Images",
+                         tooltip="Gracefully skip corrupt or unreadable images during data loading instead of aborting training")
+        self.components.switch(frame, 3, 1, ui_state, "skip_corrupt_images")
+
     def build_sampling_tab_header(self, top_frame, sub_frame, controller, ui_state):
         self.components.label(top_frame, 0, 0, "Sample After",
                          tooltip="The interval used when automatically sampling from the model during training")

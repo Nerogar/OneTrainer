@@ -41,7 +41,7 @@ dependencies = [
     "open-clip-torch==2.32.0",
 
     # data loader
-    "mgds @ git+https://github.com/Nerogar/mgds.git@3a6994ad18a490acc4f3876658167525b7d88da7",
+    "mgds @ git+https://github.com/Nerogar/mgds.git@a5f35a3e292c200a3d13111f7c74362422df1a24",
 
     # optimizers
     "lion-pytorch==0.2.3",

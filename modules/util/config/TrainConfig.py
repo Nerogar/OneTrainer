@@ -536,6 +536,7 @@ class TrainConfig(BaseConfig):
     aspect_ratio_bucketing: bool
     latent_caching: bool
     clear_cache_before_training: bool
+    skip_corrupt_images: bool
 
     # training settings
     learning_rate_scheduler: LearningRateScheduler
@@ -1278,6 +1279,7 @@ class TrainConfig(BaseConfig):
         data.append(("aspect_ratio_bucketing", True, bool, False))
         data.append(("latent_caching", True, bool, False))
         data.append(("clear_cache_before_training", True, bool, False))
+        data.append(("skip_corrupt_images", True, bool, False))
 
         # training settings
         data.append(("learning_rate_scheduler", LearningRateScheduler.CONSTANT, LearningRateScheduler, False))
