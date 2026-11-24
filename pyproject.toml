@@ -221,13 +221,17 @@ no_proxy = "localhost,127.0.0.1,::1"
 
 [tool.pixi.dependencies]
 python = "3.13.*"
-c-compiler = "*"
-cxx-compiler = "*"
 
 [tool.pixi.target.linux-64.dependencies]
+c-compiler = "*"
+cxx-compiler = "*"
 libgl = "*"
 libglib = "*"
 pyside6 = "==6.11.3"
+
+[tool.pixi.target.osx-arm64.dependencies]
+c-compiler = "*"
+cxx-compiler = "*"
 
 [tool.pixi.pypi-options]
 index-strategy = "unsafe-best-match"

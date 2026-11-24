@@ -717,10 +717,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.10.23-h4c7d964_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.13-9_cp313.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2026e-h5d301ff_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/vswhere-3.1.7-h40126e0_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/bzip2-1.0.8-h0ad9c76_10.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/c-compiler-2.0.0-h528c1b4_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/cxx-compiler-2.0.0-h1c1089f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libexpat-2.9.0-hac47afa_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libffi-3.7.0-h3d046cb_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.3-hfd05255_1.conda
@@ -735,7 +732,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc-14.5-ha367084_42.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc14_runtime-14.51.36247-habf1de7_42.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vcomp14-14.51.36247-habf1de7_42.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/vs2022_win-64-19.44.35207-ha74f236_42.conda
       - pypi: git+https://github.com/KellerJordan/Muon.git?rev=f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd#f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd
       - pypi: git+https://github.com/Nerogar/mgds.git?rev=a5f35a3e292c200a3d13111f7c74362422df1a24#a5f35a3e292c200a3d13111f7c74362422df1a24
       - pypi: git+https://github.com/huggingface/diffusers.git?rev=578c9b2c6636ab2424a0e56186268b83623656b2#578c9b2c6636ab2424a0e56186268b83623656b2
@@ -1365,10 +1361,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.10.23-h4c7d964_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.13-9_cp313.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2026e-h5d301ff_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/vswhere-3.1.7-h40126e0_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/bzip2-1.0.8-h0ad9c76_10.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/c-compiler-2.0.0-h528c1b4_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/cxx-compiler-2.0.0-h1c1089f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libexpat-2.9.0-hac47afa_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libffi-3.7.0-h3d046cb_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.3-hfd05255_1.conda
@@ -1383,7 +1376,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc-14.5-ha367084_42.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc14_runtime-14.51.36247-habf1de7_42.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vcomp14-14.51.36247-habf1de7_42.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/vs2022_win-64-19.44.35207-ha74f236_42.conda
       - pypi: git+https://github.com/KellerJordan/Muon.git?rev=f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd#f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd
       - pypi: git+https://github.com/Nerogar/mgds.git?rev=a5f35a3e292c200a3d13111f7c74362422df1a24#a5f35a3e292c200a3d13111f7c74362422df1a24
       - pypi: git+https://github.com/huggingface/diffusers.git?rev=578c9b2c6636ab2424a0e56186268b83623656b2#578c9b2c6636ab2424a0e56186268b83623656b2
@@ -2019,10 +2011,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.10.23-h4c7d964_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.13-9_cp313.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2026e-h5d301ff_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/vswhere-3.1.7-h40126e0_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/bzip2-1.0.8-h0ad9c76_10.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/c-compiler-2.0.0-h528c1b4_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/cxx-compiler-2.0.0-h1c1089f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libexpat-2.9.0-hac47afa_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libffi-3.7.0-h3d046cb_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.3-hfd05255_1.conda
@@ -2037,7 +2026,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc-14.5-ha367084_42.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc14_runtime-14.51.36247-habf1de7_42.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vcomp14-14.51.36247-habf1de7_42.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/vs2022_win-64-19.44.35207-ha74f236_42.conda
       - pypi: git+https://github.com/KellerJordan/Muon.git?rev=f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd#f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd
       - pypi: git+https://github.com/Nerogar/mgds.git?rev=a5f35a3e292c200a3d13111f7c74362422df1a24#a5f35a3e292c200a3d13111f7c74362422df1a24
       - pypi: git+https://github.com/huggingface/diffusers.git?rev=578c9b2c6636ab2424a0e56186268b83623656b2#578c9b2c6636ab2424a0e56186268b83623656b2
@@ -4080,10 +4068,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.10.23-h4c7d964_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.13-9_cp313.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2026e-h5d301ff_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/vswhere-3.1.7-h40126e0_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/bzip2-1.0.8-h0ad9c76_10.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/c-compiler-2.0.0-h528c1b4_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/cxx-compiler-2.0.0-h1c1089f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libexpat-2.9.0-hac47afa_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libffi-3.7.0-h3d046cb_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.3-hfd05255_1.conda
@@ -4098,7 +4083,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc-14.5-ha367084_42.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc14_runtime-14.51.36247-habf1de7_42.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vcomp14-14.51.36247-habf1de7_42.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/vs2022_win-64-19.44.35207-ha74f236_42.conda
       - pypi: git+https://github.com/KellerJordan/Muon.git?rev=f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd#f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd
       - pypi: git+https://github.com/Nerogar/mgds.git?rev=a5f35a3e292c200a3d13111f7c74362422df1a24#a5f35a3e292c200a3d13111f7c74362422df1a24
       - pypi: git+https://github.com/huggingface/diffusers.git?rev=578c9b2c6636ab2424a0e56186268b83623656b2#578c9b2c6636ab2424a0e56186268b83623656b2
@@ -4339,10 +4323,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.10.23-h4c7d964_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.13-9_cp313.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2026e-h5d301ff_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/vswhere-3.1.7-h40126e0_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/bzip2-1.0.8-h0ad9c76_10.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/c-compiler-2.0.0-h528c1b4_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/cxx-compiler-2.0.0-h1c1089f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libexpat-2.9.0-hac47afa_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libffi-3.7.0-h3d046cb_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.3-hfd05255_1.conda
@@ -4357,7 +4338,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc-14.5-ha367084_42.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc14_runtime-14.51.36247-habf1de7_42.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vcomp14-14.51.36247-habf1de7_42.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/vs2022_win-64-19.44.35207-ha74f236_42.conda
       - pypi: git+https://github.com/KellerJordan/Muon.git?rev=f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd#f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd
       - pypi: git+https://github.com/Nerogar/mgds.git?rev=a5f35a3e292c200a3d13111f7c74362422df1a24#a5f35a3e292c200a3d13111f7c74362422df1a24
       - pypi: git+https://github.com/huggingface/diffusers.git?rev=578c9b2c6636ab2424a0e56186268b83623656b2#578c9b2c6636ab2424a0e56186268b83623656b2
@@ -4598,10 +4578,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.10.23-h4c7d964_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.13-9_cp313.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2026e-h5d301ff_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/vswhere-3.1.7-h40126e0_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/bzip2-1.0.8-h0ad9c76_10.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/c-compiler-2.0.0-h528c1b4_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/cxx-compiler-2.0.0-h1c1089f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libexpat-2.9.0-hac47afa_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libffi-3.7.0-h3d046cb_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.3-hfd05255_1.conda
@@ -4616,7 +4593,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc-14.5-ha367084_42.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc14_runtime-14.51.36247-habf1de7_42.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vcomp14-14.51.36247-habf1de7_42.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/vs2022_win-64-19.44.35207-ha74f236_42.conda
       - pypi: git+https://github.com/KellerJordan/Muon.git?rev=f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd#f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd
       - pypi: git+https://github.com/Nerogar/mgds.git?rev=a5f35a3e292c200a3d13111f7c74362422df1a24#a5f35a3e292c200a3d13111f7c74362422df1a24
       - pypi: git+https://github.com/huggingface/diffusers.git?rev=578c9b2c6636ab2424a0e56186268b83623656b2#578c9b2c6636ab2424a0e56186268b83623656b2
@@ -5319,10 +5295,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.10.23-h4c7d964_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.13-9_cp313.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2026e-h5d301ff_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/vswhere-3.1.7-h40126e0_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/bzip2-1.0.8-h0ad9c76_10.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/c-compiler-2.0.0-h528c1b4_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/cxx-compiler-2.0.0-h1c1089f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libexpat-2.9.0-hac47afa_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libffi-3.7.0-h3d046cb_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.3-hfd05255_1.conda
@@ -5337,7 +5310,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc-14.5-ha367084_42.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc14_runtime-14.51.36247-habf1de7_42.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vcomp14-14.51.36247-habf1de7_42.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/vs2022_win-64-19.44.35207-ha74f236_42.conda
       - pypi: git+https://github.com/KellerJordan/Muon.git?rev=f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd#f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd
       - pypi: git+https://github.com/Nerogar/mgds.git?rev=a5f35a3e292c200a3d13111f7c74362422df1a24#a5f35a3e292c200a3d13111f7c74362422df1a24
       - pypi: git+https://github.com/huggingface/diffusers.git?rev=578c9b2c6636ab2424a0e56186268b83623656b2#578c9b2c6636ab2424a0e56186268b83623656b2
@@ -7589,17 +7561,6 @@ packages:
   run_exports: {}
   size: 119208
   timestamp: 1792758382821
-- conda: https://conda.anaconda.org/conda-forge/noarch/vswhere-3.1.7-h40126e0_1.conda
-  sha256: b72270395326dc56de9bd6ca82f63791b3c8c9e2b98e25242a9869a4ca821895
-  md5: f622897afff347b715d046178ad745a5
-  depends:
-  - __win
-  license: MIT
-  license_family: MIT
-  purls: []
-  run_exports: {}
-  size: 238764
-  timestamp: 1745560912727
 - conda: https://conda.anaconda.org/conda-forge/osx-arm64/bzip2-1.0.8-h4e30115_10.conda
   sha256: 8ec22f0ba25cbfc2e64d70cf29459eccd7ffdf6436f6a6ff15bbfef799f7d4f6
   md5: b50612e7d190b8061ab4e7dc119cf4d5
@@ -8288,28 +8249,6 @@ packages:
     - bzip2 >=1.0.8,<2.0a0
   size: 55919
   timestamp: 1785906343696
-- conda: https://conda.anaconda.org/conda-forge/win-64/c-compiler-2.0.0-h528c1b4_0.conda
-  sha256: 3516b8cde71867a760751b13da272067d1b24c5ffbbfe29cf2684543c818acc1
-  md5: b5f15b40f1869ae67daddf65d50d657d
-  depends:
-  - vs2022_win-64
-  license: BSD-3-Clause
-  license_family: BSD
-  purls: []
-  run_exports: {}
-  size: 7275
-  timestamp: 1786642197645
-- conda: https://conda.anaconda.org/conda-forge/win-64/cxx-compiler-2.0.0-h1c1089f_0.conda
-  sha256: 6382c5c446544a7a82e5f6b1f3943982e2b4ab3a636e4a83c0cf36a37453e62d
-  md5: 0fc344714ed17f2eededa97737731a83
-  depends:
-  - vs2022_win-64
-  license: BSD-3-Clause
-  license_family: BSD
-  purls: []
-  run_exports: {}
-  size: 7320
-  timestamp: 1786642198521
 - conda: https://conda.anaconda.org/conda-forge/win-64/libexpat-2.9.0-hac47afa_0.conda
   sha256: d4a8e5aac8999a90cd71aa6f9f5c40d8594ed2b89cd7f898f997767ecc6cd52d
   md5: 74ac404611024dc488ae71cfb7a5bf8f
@@ -8526,25 +8465,6 @@ packages:
     - vcomp14 >=14.51.36247
   size: 155686
   timestamp: 1793305669217
-- conda: https://conda.anaconda.org/conda-forge/win-64/vs2022_win-64-19.44.35207-ha74f236_42.conda
-  sha256: 872123d66fbc41898bea34973cbf64544c41cdcd5123a00abe747c5f35b92898
-  md5: 410be03ef3a0eb26e1b20cb90be5493c
-  depends:
-  - vswhere
-  constrains:
-  - vs_win-64 2022.14
-  track_features:
-  - vc14
-  license: BSD-3-Clause
-  license_family: BSD
-  purls: []
-  run_exports:
-    strong:
-    - vc >=14.3,<15
-    - vc14_runtime >=14.44.35208
-    - ucrt >=10.0.20348.0
-  size: 25374
-  timestamp: 1793120002126
 - pypi: git+https://github.com/KellerJordan/Muon.git?rev=f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd#f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd
   name: muon-optimizer
   version: 0.1.0
