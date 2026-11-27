@@ -170,16 +170,16 @@ section-order = [
 channels = [{ channel = "conda-forge", exclude-newer = "14d" }]
 # Order here matters, first match wins
 platforms = [
-    { name = "linux-cuda13", platform = "linux-64", glibc = "2.34", cuda = "13.0" },
-    { name = "linux-cuda12", platform = "linux-64", glibc = "2.34", cuda = "12.6" },
-    { name = "linux-rocm", platform = "linux-64", glibc = "2.34", amdgpu = true },
-    { name = "linux-generic", platform = "linux-64", glibc = "2.34" },
-    { name = "win-cuda13", platform = "win-64", cuda = "13.0" },
-    { name = "win-cuda12", platform = "win-64", cuda = "12.6" },
-    { name = "win-generic", platform = "win-64" },
-    { name = "macos-generic", platform = "osx-arm64", macos = "26.0" },
+    { name = "linux-cuda13", subdir = "linux-64", glibc = "2.34", cuda = "13.0" },
+    { name = "linux-cuda12", subdir = "linux-64", glibc = "2.34", cuda = "12.6" },
+    { name = "linux-rocm", subdir = "linux-64", glibc = "2.34", amdgpu = true },
+    { name = "linux-generic", subdir = "linux-64", glibc = "2.34" },
+    { name = "win-cuda13", subdir = "win-64", cuda = "13.0" },
+    { name = "win-cuda12", subdir = "win-64", cuda = "12.6" },
+    { name = "win-generic", subdir = "win-64" },
+    { name = "macos-generic", subdir = "osx-arm64", macos = "26.0" },
 ]
-requires-pixi = ">=0.84.2"
+requires-pixi = ">=0.85.0"
 
 # track new python patch releases but retain the conda-forge cutoff above
 # Pixi checks upload dates even for pinned versions. The PyTorch and AMD indexes use "0d"
