@@ -9,8 +9,12 @@ version = "0.1.0"
 
 dependencies = [
     # base requirements
+
+    # Match `py-opencv` in tool.pixi.dependencies to this version (for cv2 conda-forge omits build suffix),
+    # match numpy, av and pillow too
+    "opencv-python-headless==5.1.0.*",
     "numpy==2.5.5",
-    "opencv-python-headless==5.1.0.95",
+    "av==19.0.2",
     "pillow==13.0.0",
     "imagesize==1.5.0", # Never bump, instead implement ourselves if forced, imagesize 2.x adds vulnerable URL img parsing.
     "tqdm==4.70.1",
@@ -18,7 +22,6 @@ dependencies = [
     "huggingface-hub==1.33.0",
     "scipy==1.18.1",
     "matplotlib==3.11.2",
-    "av==19.0.2",
     "yt-dlp",
     "scenedetect==0.7.3",
     "parse==1.22.4",
@@ -168,7 +171,8 @@ section-order = [
 
 [tool.pixi.workspace]
 channels = [{ channel = "conda-forge", exclude-newer = "14d" }]
-# Order here matters, first match wins
+# For environments with multiple platforms for the same subdir, Pixi tries
+# GPU first (and highest version first) then falls back. Each environment below targets one platform per subdir.
 platforms = [
     { name = "linux-cuda13", subdir = "linux-64", glibc = "2.34", cuda = "13.0" },
     { name = "linux-cuda12", subdir = "linux-64", glibc = "2.34", cuda = "12.6" },
@@ -176,6 +180,7 @@ platforms = [
     { name = "linux-generic", subdir = "linux-64", glibc = "2.34" },
     { name = "win-cuda13", subdir = "win-64", cuda = "13.0" },
     { name = "win-cuda12", subdir = "win-64", cuda = "12.6" },
+    { name = "win-rocm", subdir = "win-64", amdgpu = true },
     { name = "win-generic", subdir = "win-64" },
     { name = "macos-generic", subdir = "osx-arm64", macos = "26.0" },
 ]
@@ -186,7 +191,7 @@ requires-pixi = ">=0.85.0"
 # so Pixi can resolve CUDA and ROCm wheels that have no upload date.
 [tool.pixi.workspace.exclude-newer]
 cutoff = "0d" # specifically required
-exemptions = { python = "3.13.*", libpython = "3.13.*" }
+exemptions = { python = "3.13.*", libpython = "3.13.*", numpy = "==2.5.5", py-opencv = "==5.1.0", libopencv = "==5.1.0" }
 
 [tool.pixi.tasks]
 train = { cmd = "python scripts/train.py", cwd = "." }
@@ -205,7 +210,7 @@ platforms = ["linux-cuda12", "win-cuda12"]
 extra-index-urls = [{ url = "https://download.pytorch.org/whl/cu126", exclude-newer = "0d" }]
 
 [tool.pixi.feature.rocm]
-platforms = ["linux-rocm", "win-generic"]
+platforms = ["linux-rocm", "win-rocm"]
 
 [tool.pixi.feature.rocm.pypi-options]
 extra-index-urls = [{ url = "https://nightly.repo.amd.com/rocm/whl-next/", exclude-newer = "0d" }]
@@ -221,13 +226,17 @@ no_proxy = "localhost,127.0.0.1,::1"
 
 [tool.pixi.dependencies]
 python = "3.13.*"
+numpy = "==2.5.5"
+pillow = "==13.0.0"
+py-opencv = { version = "==5.1.0", build = "headless_*" }
+av = "==19.0.2"
+pyside6 = "==6.11.3"
 
 [tool.pixi.target.linux-64.dependencies]
 c-compiler = "*"
 cxx-compiler = "*"
 libgl = "*"
 libglib = "*"
-pyside6 = "==6.11.3"
 
 [tool.pixi.target.osx-arm64.dependencies]
 c-compiler = "*"
