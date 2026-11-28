@@ -3,6 +3,7 @@ from random import Random
 
 import modules.util.multi_gpu_util as multi
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel, StableDiffusionXLModelEmbedding
+from modules.model.util.clip_chunk import sdxl_chunk_aware_unet_prediction
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.modelSetup.mixin.ModelSetupDebugMixin import ModelSetupDebugMixin
 from modules.modelSetup.mixin.ModelSetupDiffusionLossMixin import ModelSetupDiffusionLossMixin
@@ -191,7 +192,7 @@ class BaseStableDiffusionXLSetup(
 
             vae_scaling_factor = model.vae.config['scaling_factor']
 
-            text_encoder_output, pooled_text_encoder_2_output = model.combine_text_encoder_output(*model.encode_text(
+            encoded_text = model.encode_text(
                 train_device=self.train_device,
                 batch_size=batch['latent_image'].shape[0],
                 rand=rand,
@@ -207,7 +208,13 @@ class BaseStableDiffusionXLSetup(
                     'text_encoder_2_pooled_state'] if not config.train_text_encoder_2_or_embedding() else None,
                 text_encoder_1_dropout_probability=config.text_encoder.dropout_probability if not deterministic else None,
                 text_encoder_2_dropout_probability=config.text_encoder_2.dropout_probability if not deterministic else None,
-            ))
+                max_caption_tokens=config.sdxl_max_caption_tokens,
+                return_chunk_attention_mask=True,
+            )
+            text_encoder_output, pooled_text_encoder_2_output = model.combine_text_encoder_output(
+                *encoded_text[:3]
+            )
+            chunk_attention_mask = encoded_text[3]
 
             latent_image = batch['latent_image']
             scaled_latent_image = latent_image * vae_scaling_factor
@@ -269,12 +276,14 @@ class BaseStableDiffusionXLSetup(
                 latent_input = scaled_noisy_latent_image
 
             added_cond_kwargs = {"text_embeds": pooled_text_encoder_2_output, "time_ids": add_time_ids}
-            predicted_latent_noise = model.unet(
+            predicted_latent_noise = sdxl_chunk_aware_unet_prediction(
+                unet=model.unet,
                 sample=latent_input.to(dtype=model.train_dtype.torch_dtype()),
                 timestep=timestep,
                 encoder_hidden_states=text_encoder_output.to(dtype=model.train_dtype.torch_dtype()),
                 added_cond_kwargs=added_cond_kwargs,
-            ).sample
+                chunk_attention_mask=chunk_attention_mask,
+            )
 
             model_output_data = {}
 

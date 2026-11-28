@@ -2,6 +2,14 @@ from contextlib import nullcontext
 from random import Random
 
 from modules.model.BaseModel import BaseModel, BaseModelEmbedding
+from modules.model.util.clip_chunk import (
+    CLIP_CHUNK_TOKENS,
+    CLIP_CONTENT_TOKENS,
+    encode_clip_chunks,
+    sdxl_chunk_attention_mask,
+    tokenize_clip_chunks,
+    validate_sdxl_caption_token_limit,
+)
 from modules.model.util.clip_util import encode_clip
 from modules.module.AdditionalEmbeddingWrapper import AdditionalEmbeddingWrapper
 from modules.module.LoRAModule import LoRAModuleWrapper
@@ -237,49 +245,112 @@ class StableDiffusionXLModel(BaseModel):
             text_encoder_1_dropout_probability: float | None = None,
             text_encoder_2_dropout_probability: float | None = None,
             pooled_text_encoder_2_output: Tensor = None,
-    ) -> tuple[Tensor, Tensor, Tensor]:
+            max_caption_tokens: int = 75,
+            return_chunk_attention_mask: bool = False,
+    ) -> tuple[Tensor, Tensor, Tensor] | tuple[Tensor, Tensor, Tensor, Tensor | None]:
+        max_caption_tokens = validate_sdxl_caption_token_limit(max_caption_tokens)
+        expected_token_length = (max_caption_tokens // CLIP_CONTENT_TOKENS) * CLIP_CHUNK_TOKENS
+        for encoder_name, tokens in (("CLIP-L", tokens_1), ("CLIP-G", tokens_2)):
+            if tokens is not None and tokens.shape[-1] != expected_token_length:
+                raise ValueError(
+                    f"{encoder_name} tokens have length {tokens.shape[-1]}, expected {expected_token_length} "
+                    f"for an SDXL caption capacity of {max_caption_tokens}"
+                )
+        for encoder_name, output in (("CLIP-L", text_encoder_1_output), ("CLIP-G", text_encoder_2_output)):
+            if output is not None and output.shape[-2] != expected_token_length:
+                raise ValueError(
+                    f"{encoder_name} embeddings have sequence length {output.shape[-2]}, expected "
+                    f"{expected_token_length} for an SDXL caption capacity of {max_caption_tokens}"
+                )
+
         if tokens_1 is None and text is not None:
-            tokenizer_output = self.tokenizer_1(
-                self.add_text_encoder_1_embeddings_to_prompt(text),
-                padding='max_length',
-                truncation=True,
-                max_length=77,
-                return_tensors="pt",
-            )
-            tokens_1 = tokenizer_output.input_ids.to(self.text_encoder_1.device)
+            prompt_1 = self.add_text_encoder_1_embeddings_to_prompt(text)
+            if max_caption_tokens > 75:
+                tokens_1, _ = tokenize_clip_chunks(self.tokenizer_1, prompt_1, max_caption_tokens)
+                tokens_1 = tokens_1.unsqueeze(0).to(self.text_encoder_1.device)
+            else:
+                tokenizer_output = self.tokenizer_1(
+                    prompt_1,
+                    padding='max_length',
+                    truncation=True,
+                    max_length=77,
+                    return_tensors="pt",
+                )
+                tokens_1 = tokenizer_output.input_ids.to(self.text_encoder_1.device)
 
         if tokens_2 is None and text is not None:
-            tokenizer_output = self.tokenizer_2(
-                self.add_text_encoder_2_embeddings_to_prompt(text),
-                padding='max_length',
-                truncation=True,
-                max_length=77,
-                return_tensors="pt",
+            prompt_2 = self.add_text_encoder_2_embeddings_to_prompt(text)
+            if max_caption_tokens > 75:
+                tokens_2, _ = tokenize_clip_chunks(self.tokenizer_2, prompt_2, max_caption_tokens)
+                tokens_2 = tokens_2.unsqueeze(0).to(self.text_encoder_2.device)
+            else:
+                tokenizer_output = self.tokenizer_2(
+                    prompt_2,
+                    padding='max_length',
+                    truncation=True,
+                    max_length=77,
+                    return_tensors="pt",
+                )
+                tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
+
+        chunk_attention_mask = None
+        if max_caption_tokens > 75 and tokens_1 is not None and tokens_2 is not None:
+            chunk_attention_mask = sdxl_chunk_attention_mask(
+                self.tokenizer_1,
+                tokens_1,
+                self.tokenizer_2,
+                tokens_2,
+                max_caption_tokens,
+            ).to(device=train_device)
+        elif return_chunk_attention_mask and max_caption_tokens > 75:
+            if tokens_1 is None or tokens_2 is None:
+                raise ValueError("Chunked SDXL attention masking requires tokens for both text encoders")
+
+        if tokens_1 is not None and tokens_1.shape[-1] > 77:
+            if text_encoder_1_output is None:
+                text_encoder_1_output, _ = encode_clip_chunks(
+                    self.text_encoder_1,
+                    tokens_1,
+                    hidden_state_output_index=-(2 + text_encoder_1_layer_skip),
+                    chunk_attention_mask=chunk_attention_mask,
+                )
+        else:
+            text_encoder_1_output, _ = encode_clip(
+                text_encoder=self.text_encoder_1,
+                tokens=tokens_1,
+                default_layer=-2,
+                layer_skip=text_encoder_1_layer_skip,
+                text_encoder_output=text_encoder_1_output,
+                add_pooled_output=False,
+                use_attention_mask=False,
+                add_layer_norm=False,
             )
-            tokens_2 = tokenizer_output.input_ids.to(self.text_encoder_2.device)
 
-        text_encoder_1_output, _ = encode_clip(
-            text_encoder=self.text_encoder_1,
-            tokens=tokens_1,
-            default_layer=-2,
-            layer_skip=text_encoder_1_layer_skip,
-            text_encoder_output=text_encoder_1_output,
-            add_pooled_output=False,
-            use_attention_mask=False,
-            add_layer_norm=False,
-        )
-
-        text_encoder_2_output, pooled_text_encoder_2_output = encode_clip(
-            text_encoder=self.text_encoder_2,
-            tokens=tokens_2,
-            default_layer=-2,
-            layer_skip=text_encoder_2_layer_skip,
-            text_encoder_output=text_encoder_2_output,
-            add_pooled_output=True,
-            pooled_text_encoder_output=pooled_text_encoder_2_output,
-            use_attention_mask=False,
-            add_layer_norm=False,
-        )
+        if tokens_2 is not None and tokens_2.shape[-1] > 77:
+            if text_encoder_2_output is None or pooled_text_encoder_2_output is None:
+                chunk_output, chunk_pooled_output = encode_clip_chunks(
+                    self.text_encoder_2,
+                    tokens_2,
+                    hidden_state_output_index=-(2 + text_encoder_2_layer_skip),
+                    add_pooled_output=True,
+                    chunk_attention_mask=chunk_attention_mask,
+                )
+                if text_encoder_2_output is None:
+                    text_encoder_2_output = chunk_output
+                if pooled_text_encoder_2_output is None:
+                    pooled_text_encoder_2_output = chunk_pooled_output
+        else:
+            text_encoder_2_output, pooled_text_encoder_2_output = encode_clip(
+                text_encoder=self.text_encoder_2,
+                tokens=tokens_2,
+                default_layer=-2,
+                layer_skip=text_encoder_2_layer_skip,
+                text_encoder_output=text_encoder_2_output,
+                add_pooled_output=True,
+                pooled_text_encoder_output=pooled_text_encoder_2_output,
+                use_attention_mask=False,
+                add_layer_norm=False,
+            )
 
         text_encoder_1_output = self._apply_output_embeddings(
             self.all_text_encoder_1_embeddings(),
@@ -309,7 +380,10 @@ class StableDiffusionXLModel(BaseModel):
             pooled_text_encoder_2_output = pooled_text_encoder_2_output * dropout_text_encoder_2_mask[:, None]
             text_encoder_2_output = text_encoder_2_output * dropout_text_encoder_2_mask[:, None, None]
 
-        return text_encoder_1_output, text_encoder_2_output, pooled_text_encoder_2_output
+        outputs = (text_encoder_1_output, text_encoder_2_output, pooled_text_encoder_2_output)
+        if return_chunk_attention_mask:
+            return outputs + (chunk_attention_mask,)
+        return outputs
 
     def combine_text_encoder_output(
             self,

@@ -2,6 +2,7 @@ import inspect
 from collections.abc import Callable
 
 from modules.model.StableDiffusionXLModel import StableDiffusionXLModel
+from modules.model.util.clip_chunk import sdxl_chunk_aware_unet_prediction
 from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
 from modules.util import create, factory
 from modules.util.config.SampleConfig import SampleConfig
@@ -51,6 +52,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             cfg_rescale: float = 0.7,
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
+            sdxl_max_caption_tokens: int = 75,
             force_last_timestep: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
@@ -70,22 +72,37 @@ class StableDiffusionXLSampler(BaseModelSampler):
             # prepare prompt
             self.model.materialize_only_text_encoders()
 
-            prompt_embedding, pooled_text_encoder_2_output = self.model.combine_text_encoder_output(*self.model.encode_text(
+            prompt_encoded = self.model.encode_text(
                 text=prompt,
                 train_device=self.train_device,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-            ))
+                max_caption_tokens=sdxl_max_caption_tokens,
+                return_chunk_attention_mask=True,
+            )
+            prompt_embedding, pooled_text_encoder_2_output = self.model.combine_text_encoder_output(
+                *prompt_encoded[:3]
+            )
 
-            negative_prompt_embedding, negative_pooled_text_encoder_2_output = self.model.combine_text_encoder_output(*self.model.encode_text(
+            negative_prompt_encoded = self.model.encode_text(
                 text=negative_prompt,
                 train_device=self.train_device,
                 text_encoder_1_layer_skip=text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-            ))
+                max_caption_tokens=sdxl_max_caption_tokens,
+                return_chunk_attention_mask=True,
+            )
+            negative_prompt_embedding, negative_pooled_text_encoder_2_output = self.model.combine_text_encoder_output(
+                *negative_prompt_encoded[:3]
+            )
 
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
                 .to(dtype=self.model.train_dtype.torch_dtype())
+            combined_prompt_attention_mask = None
+            if prompt_encoded[3] is not None and negative_prompt_encoded[3] is not None:
+                combined_prompt_attention_mask = torch.cat(
+                    [negative_prompt_encoded[3], prompt_encoded[3]], dim=0
+                )
 
             # prepare timesteps
             noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
@@ -146,12 +163,14 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 latent_model_input = noise_scheduler.scale_model_input(latent_model_input, timestep)
 
                 # predict the noise residual
-                noise_pred = unet(
+                noise_pred = sdxl_chunk_aware_unet_prediction(
+                    unet=unet,
                     sample=latent_model_input,
                     timestep=timestep,
                     encoder_hidden_states=combined_prompt_embedding,
                     added_cond_kwargs=added_cond_kwargs,
-                )[0]
+                    chunk_attention_mask=combined_prompt_attention_mask,
+                )
 
                 # cfg
                 noise_pred_negative, noise_pred_positive = noise_pred.chunk(2)
@@ -220,6 +239,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
             mask_image_path: str = "",
             text_encoder_1_layer_skip: int = 0,
             text_encoder_2_layer_skip: int = 0,
+            sdxl_max_caption_tokens: int = 75,
             force_last_timestep: bool = False,
             on_update_progress: Callable[[int, int], None] = lambda _, __: None,
     ) -> ModelSamplerOutput:
@@ -296,24 +316,37 @@ class StableDiffusionXLSampler(BaseModelSampler):
             # prepare prompt
             self.model.materialize_only_text_encoders()
 
+            prompt_encoded = self.model.encode_text(
+                text=prompt,
+                train_device=self.train_device,
+                text_encoder_1_layer_skip=text_encoder_1_layer_skip,
+                text_encoder_2_layer_skip=text_encoder_2_layer_skip,
+                max_caption_tokens=sdxl_max_caption_tokens,
+                return_chunk_attention_mask=True,
+            )
             prompt_embedding, pooled_text_encoder_2_output = self.model.combine_text_encoder_output(
-                *self.model.encode_text(
-                    text=prompt,
-                    train_device=self.train_device,
-                    text_encoder_1_layer_skip=text_encoder_1_layer_skip,
-                    text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-                ))
+                *prompt_encoded[:3]
+            )
 
+            negative_prompt_encoded = self.model.encode_text(
+                text=negative_prompt,
+                train_device=self.train_device,
+                text_encoder_1_layer_skip=text_encoder_1_layer_skip,
+                text_encoder_2_layer_skip=text_encoder_2_layer_skip,
+                max_caption_tokens=sdxl_max_caption_tokens,
+                return_chunk_attention_mask=True,
+            )
             negative_prompt_embedding, negative_pooled_text_encoder_2_output = self.model.combine_text_encoder_output(
-                *self.model.encode_text(
-                    text=negative_prompt,
-                    train_device=self.train_device,
-                    text_encoder_1_layer_skip=text_encoder_1_layer_skip,
-                    text_encoder_2_layer_skip=text_encoder_2_layer_skip,
-                ))
+                *negative_prompt_encoded[:3]
+            )
 
             combined_prompt_embedding = torch.cat([negative_prompt_embedding, prompt_embedding]) \
                 .to(dtype=self.model.train_dtype.torch_dtype())
+            combined_prompt_attention_mask = None
+            if prompt_encoded[3] is not None and negative_prompt_encoded[3] is not None:
+                combined_prompt_attention_mask = torch.cat(
+                    [negative_prompt_encoded[3], prompt_encoded[3]], dim=0
+                )
 
             # prepare timesteps
             noise_scheduler.set_timesteps(diffusion_steps, device=self.train_device)
@@ -385,12 +418,14 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 latent_model_input = torch.cat([latent_model_input] * 2)
 
                 # predict the noise residual
-                noise_pred = unet(
+                noise_pred = sdxl_chunk_aware_unet_prediction(
+                    unet=unet,
                     sample=latent_model_input,
                     timestep=timestep,
                     encoder_hidden_states=combined_prompt_embedding,
                     added_cond_kwargs=added_cond_kwargs,
-                )[0]
+                    chunk_attention_mask=combined_prompt_attention_mask,
+                )
 
                 # cfg
                 noise_pred_negative, noise_pred_positive = noise_pred.chunk(2)
@@ -454,6 +489,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 mask_image_path=sample_config.mask_image_path,
                 text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
+                sdxl_max_caption_tokens=getattr(sample_config, "sdxl_max_caption_tokens", 75),
                 force_last_timestep=sample_config.force_last_timestep,
                 on_update_progress=on_update_progress,
             )
@@ -471,6 +507,7 @@ class StableDiffusionXLSampler(BaseModelSampler):
                 cfg_rescale=0.7 if sample_config.force_last_timestep else 0.0,
                 text_encoder_1_layer_skip=sample_config.text_encoder_1_layer_skip,
                 text_encoder_2_layer_skip=sample_config.text_encoder_2_layer_skip,
+                sdxl_max_caption_tokens=getattr(sample_config, "sdxl_max_caption_tokens", 75),
                 force_last_timestep=sample_config.force_last_timestep,
                 on_update_progress=on_update_progress,
             )
