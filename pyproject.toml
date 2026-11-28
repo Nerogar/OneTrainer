@@ -10,9 +10,7 @@ version = "0.1.0"
 dependencies = [
     # base requirements
 
-    # Match `py-opencv` in tool.pixi.dependencies to this version (for cv2 conda-forge omits build suffix),
-    # match numpy, av and pillow too
-    "opencv-python-headless==5.1.0.*",
+    "opencv-python-headless==5.1.0.95",
     "numpy==2.5.5",
     "av==19.0.2",
     "pillow==13.0.0",
@@ -191,7 +189,7 @@ requires-pixi = ">=0.85.0"
 # so Pixi can resolve CUDA and ROCm wheels that have no upload date.
 [tool.pixi.workspace.exclude-newer]
 cutoff = "0d" # specifically required
-exemptions = { python = "3.13.*", libpython = "3.13.*", numpy = "==2.5.5", py-opencv = "==5.1.0", libopencv = "==5.1.0" }
+exemptions = { python = "3.13.*", libpython = "3.13.*"}
 
 [tool.pixi.tasks]
 train = { cmd = "python scripts/train.py", cwd = "." }
@@ -226,11 +224,6 @@ no_proxy = "localhost,127.0.0.1,::1"
 
 [tool.pixi.dependencies]
 python = "3.13.*"
-numpy = "==2.5.5"
-pillow = "==13.0.0"
-py-opencv = { version = "==5.1.0", build = "headless_*" }
-av = "==19.0.2"
-pyside6 = "==6.11.3"
 
 [tool.pixi.target.linux-64.dependencies]
 c-compiler = "*"
