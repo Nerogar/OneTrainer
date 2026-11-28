@@ -1,20 +1,23 @@
 import torch
 
-try:
-    from modules.util.nvcomp_util_lowlevel import compress as compress
-    from modules.util.nvcomp_util_lowlevel import decompress_into
-    _AVAILABLE = True
-    print("nvCOMP: low-level batched-ANS backend loaded")
-except Exception as lowlevel_error:
+if torch.cuda.is_available() and torch.version.cuda is not None:
     try:
-        from modules.util.nvcomp_util_highlevel import compress as compress
-        from modules.util.nvcomp_util_highlevel import decompress_into
+        from modules.util.nvcomp_util_lowlevel import compress as compress
+        from modules.util.nvcomp_util_lowlevel import decompress_into
         _AVAILABLE = True
-        print(f"nvCOMP: high-level Codec backend loaded (low-level unavailable: {type(lowlevel_error).__name__}: {lowlevel_error})")
-    except Exception as highlevel_error:
-        _AVAILABLE = False
-        print(f"nvCOMP: no backend available (low-level: {type(lowlevel_error).__name__}: {lowlevel_error}; "
-              f"high-level: {type(highlevel_error).__name__}: {highlevel_error})")
+        print("nvCOMP: low-level batched-ANS backend loaded")
+    except Exception as lowlevel_error:
+        try:
+            from modules.util.nvcomp_util_highlevel import compress as compress
+            from modules.util.nvcomp_util_highlevel import decompress_into
+            _AVAILABLE = True
+            print(f"nvCOMP: high-level Codec backend loaded (low-level unavailable: {type(lowlevel_error).__name__}: {lowlevel_error})")
+        except Exception as highlevel_error:
+            _AVAILABLE = False
+            print(f"nvCOMP: no backend available (low-level: {type(lowlevel_error).__name__}: {lowlevel_error}; "
+                  f"high-level: {type(highlevel_error).__name__}: {highlevel_error})")
+else:
+    _AVAILABLE = False
 
 
 def available() -> bool:

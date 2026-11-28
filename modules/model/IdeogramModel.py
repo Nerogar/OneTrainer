@@ -7,7 +7,6 @@ PROMPT_MAX_LENGTH = 2048
 from modules.model.BaseModel import BaseModel
 from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.ModelType import ModelType
-from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 import torch
 from torch import Tensor
@@ -36,9 +35,6 @@ class IdeogramModel(BaseModel):
     # autocast context
     text_encoder_autocast_context: torch.autocast | nullcontext
 
-    text_encoder_offload_conductor: LayerOffloadConductor | None
-    transformer_offload_conductor: LayerOffloadConductor | None
-    unconditional_transformer_offload_conductor: LayerOffloadConductor | None
 
     transformer_lora: LoRAModuleWrapper | None
     lora_state_dict: dict | None
@@ -60,9 +56,6 @@ class IdeogramModel(BaseModel):
 
         self.text_encoder_autocast_context = nullcontext()
 
-        self.text_encoder_offload_conductor = None
-        self.transformer_offload_conductor = None
-        self.unconditional_transformer_offload_conductor = None
 
         self.transformer_lora = None
         self.lora_state_dict = None
@@ -143,7 +136,10 @@ class IdeogramModel(BaseModel):
                 text_encoder_output = torch.stack(selected, dim=0).permute(1, 2, 3, 0).reshape(tokens.shape[0], tokens.shape[1], -1)
 
         if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
-            raise NotImplementedError  # needs empty-caption conditioning, not zero-out
+            raise NotImplementedError(
+                "Ideogram 4 uses a separate unconditional transformer with zero text features; "
+                "empty-prompt caption dropout is not equivalent. Set caption dropout to zero."
+            )
 
         # Run unconditionally in both the fresh and cached paths: zero out padding positions.
         text_encoder_output = text_encoder_output * tokens_mask.to(text_encoder_output.dtype).unsqueeze(-1)

@@ -1,5 +1,132 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
 [project]
-requires-python = ">=3.11.1"
+name = "onetrainer"
+requires-python = ">=3.12.0,!=3.14.1,<3.15"
+version = "0.1.0"
+
+dependencies = [
+    # base requirements
+
+    "opencv-python-headless==5.1.0.95",
+    "numpy==2.5.5",
+    "av==19.0.2",
+    "pillow==13.0.0",
+    "imagesize==1.5.0", # Never bump, instead implement ourselves if forced, imagesize 2.x adds vulnerable URL img parsing.
+    "tqdm==4.70.1",
+    "pyyaml==6.0.3",
+    "huggingface-hub==1.33.0",
+    "scipy==1.18.1",
+    "matplotlib==3.11.2",
+    "yt-dlp",
+    "scenedetect==0.7.3",
+    "parse==1.22.4",
+
+    # pytorch
+    "accelerate==1.16.0",
+    "sympy==1.14.0",
+    "safetensors==0.8.0",
+    "tensorboard==2.21.0",
+    "absl-py==2.5.1", # for tensorboard_main.py
+
+    # diffusion models
+    "diffusers @ git+https://github.com/huggingface/diffusers.git@578c9b2c6636ab2424a0e56186268b83623656b2",
+    "gguf==0.19.0",
+    "transformers==5.5.4",
+    "sentencepiece==0.2.1",  # transitive dependency of transformers for tokenizer loading
+
+    # other models
+    "pooch==1.9.0",
+
+    # data loader
+    "mgds @ git+https://github.com/Nerogar/mgds.git@d9bc8ce9199c4cbce20777e46d866c92c4842314",
+
+    # optimizers
+    "timm==1.0.31",
+    "lion-pytorch==0.2.5",
+    "prodigyopt==1.1.2",
+    "schedulefree==1.4.1",
+    "pytorch-optimizer==4.1.1",
+    "prodigy-plus-schedule-free==2.0.1",
+    "adv-optm==2.6.3",
+    "muon-optimizer @ git+https://github.com/KellerJordan/Muon.git@f90a42b28e00b8d9d2d05865fe90d9f39abcbcbd",
+
+    # profiling
+    "scalene==2.4.0",
+
+    "friendlywords==1.3.0",
+
+    # ui
+    "pydantic==2.14.3",
+    # Match `pyside6` below to this version
+    "PySide6==6.12.0.*",
+
+    # cloud
+    "runpod==2.3.0",
+    "fabric==3.2.3",
+
+    # debug
+    "psutil==7.2.2",
+    "requests==2.34.2",
+    "deepdiff==9.2.1",
+
+    # JupyterLab
+    "jupyterlab==4.6.6",
+]
+
+[project.optional-dependencies]
+cpu = [
+  "torch==2.15.0",
+  "torchvision==0.29.2",
+  "onnxruntime==1.32.0",
+  "bitsandbytes==0.50.2; sys_platform == 'darwin'",
+]
+
+cuda = [
+  "bitsandbytes==0.50.2",
+  "triton; sys_platform == 'linux'",  # PyTorch constrains the version for each CUDA backend.
+]
+
+# Shared CUDA dependencies are in `cuda`; each CUDA version pins its own PyTorch pair.
+# The `extra-index-urls` options below select the corresponding CUDA wheels.
+# Triton 3.8 and 3.9, the versions these PyTorch versions require, make the 8-bit matmul spill
+# registers on sm_8x (https://github.com/triton-lang/triton/issues/12486). When upgrading to a
+# Triton version that fixes this, remove _skip_prefetch_pass() from modules/util/triton_mm_8bit.py
+cuda12 = [
+    "onetrainer[cuda]",
+    "torch==2.14.1",
+    "torchvision==0.29.1",
+    "onnxruntime-gpu==1.26.0",  # Last PyPI release built for CUDA 12.
+    "nvidia-nvcomp-cu12==5.3.0.16",
+    # pytorch 2.14 requires 3.8 for win32. Allows minor fixes
+    "triton-windows>=3.8.0.post29,<3.9; sys_platform == 'win32'",
+]
+
+cuda13 = [
+    "onetrainer[cuda]",
+    "torch==2.15.0",
+    "torchvision==0.29.2",
+    "onnxruntime-gpu==1.32.0",
+    "nvidia-nvcomp-cu13==5.3.0.16",
+    # pytorch 2.15 requires 3.9 for win32. Allows minor fixes
+    "triton-windows>=3.9.0.post30,<3.10; sys_platform == 'win32'",
+]
+
+rocm = [
+  # pytorch
+  "torch[device-all]==2.15.0",
+  "torchvision[device-all]==0.29.2",
+  "onnxruntime==1.32.0",
+
+  # optimizers
+  "bitsandbytes==0.50.2",
+  "triton-windows>=3.9.0.post30,<3.10; sys_platform == 'win32'",
+]
+
+[tool.setuptools]
+packages = []
 
 [tool.ruff]
 extend-exclude = [
@@ -39,3 +166,81 @@ section-order = [
     "third-party",
     "local-folder",
 ]
+
+[tool.pixi.workspace]
+channels = [{ channel = "conda-forge", exclude-newer = "14d" }]
+# For environments with multiple platforms for the same subdir, Pixi tries
+# GPU first (and highest version first) then falls back. Each environment below targets one platform per subdir.
+platforms = [
+    { name = "linux-cuda13", subdir = "linux-64", glibc = "2.34", cuda = "13.0" },
+    { name = "linux-cuda12", subdir = "linux-64", glibc = "2.34", cuda = "12.6" },
+    { name = "linux-rocm", subdir = "linux-64", glibc = "2.34", amdgpu = true },
+    { name = "linux-generic", subdir = "linux-64", glibc = "2.34" },
+    { name = "win-cuda13", subdir = "win-64", cuda = "13.0" },
+    { name = "win-cuda12", subdir = "win-64", cuda = "12.6" },
+    { name = "win-rocm", subdir = "win-64", amdgpu = true },
+    { name = "win-generic", subdir = "win-64" },
+    { name = "macos-generic", subdir = "osx-arm64", macos = "26.0" },
+]
+requires-pixi = ">=0.85.0"
+
+# track new python patch releases but retain the conda-forge cutoff above
+# Pixi checks upload dates even for pinned versions. The PyTorch and AMD indexes use "0d"
+# so Pixi can resolve CUDA and ROCm wheels that have no upload date.
+[tool.pixi.workspace.exclude-newer]
+cutoff = "0d" # specifically required
+exemptions = { python = "*", pyside6 = "*"}
+
+[tool.pixi.tasks]
+train = { cmd = "python scripts/train.py", cwd = "." }
+ui = { cmd = "python scripts/train_ui.py", cwd = "." }
+
+[tool.pixi.feature.cuda13]
+platforms = ["linux-cuda13", "win-cuda13"]
+
+[tool.pixi.feature.cuda13.pypi-options]
+extra-index-urls = [{ url = "https://download.pytorch.org/whl/cu134", exclude-newer = "0d" }]
+
+[tool.pixi.feature.cuda12]
+platforms = ["linux-cuda12", "win-cuda12"]
+
+[tool.pixi.feature.cuda12.pypi-options]
+extra-index-urls = [{ url = "https://download.pytorch.org/whl/cu126", exclude-newer = "0d" }]
+
+[tool.pixi.feature.rocm]
+platforms = ["linux-rocm", "win-rocm"]
+
+[tool.pixi.feature.rocm.pypi-options]
+extra-index-urls = [{ url = "https://nightly.repo.amd.com/rocm/whl-next/", exclude-newer = "0d" }]
+
+[tool.pixi.feature.cpu]
+platforms = ["linux-generic", "win-generic", "macos-generic"]
+
+[tool.pixi.feature.cpu.pypi-options]
+extra-index-urls = [{ url = "https://download.pytorch.org/whl/cpu", exclude-newer = "0d" }]
+
+[tool.pixi.activation.env]
+no_proxy = "localhost,127.0.0.1,::1"
+
+[tool.pixi.dependencies]
+python = "3.13.*"
+
+[tool.pixi.target.linux-64.dependencies]
+c-compiler = "*"
+cxx-compiler = "*"
+libgl = "*"
+libglib = "*"
+pyside6 = "6.12.0.*"
+
+[tool.pixi.target.osx-arm64.dependencies]
+c-compiler = "*"
+cxx-compiler = "*"
+
+[tool.pixi.pypi-options]
+index-strategy = "unsafe-best-match"
+
+[tool.pixi.environments]
+cpu = ["cpu"]
+cuda13 = ["cuda13"]
+cuda12 = ["cuda12"]
+rocm = ["rocm"]

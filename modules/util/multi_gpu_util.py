@@ -3,10 +3,9 @@ from collections import deque
 from modules.util.bf16_stochastic_rounding import copy_stochastic_
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.enum.GradientReducePrecision import GradientReducePrecision
+from modules.util.tqdm_util import tqdm
 
 import torch
-
-from tqdm import tqdm
 
 
 def is_enabled() -> bool:

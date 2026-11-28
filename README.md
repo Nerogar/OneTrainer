@@ -33,10 +33,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 
 ## Installation
 
-> [!IMPORTANT]
-> Installing OneTrainer requires Python >=3.11.1 and <3.14.
-> You can download Python at https://www.python.org/downloads/windows/.
-> Then follow the below steps.
+Pixi and Conda default to Python 3.13.x.
 
 #### Automatic installation
 
@@ -47,23 +44,16 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 
 #### Manual installation
 
-1. Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
-2. Navigate into the cloned directory `cd OneTrainer`
-3. Set up a virtual environment `python -m venv venv`
-4. Activate the new venv:
-    - Windows: `venv\scripts\activate`
-    - Linux and Mac: Depends on your shell, activate the venv accordingly
-5. Install the requirements `pip install -r requirements.txt`
+Manual pip and Conda installs support Python 3.12–3.14. Python 3.14 may be buggy. Version 3.14.1 is unsupported.
 
-> [!Tip]
-> Some Linux distributions are missing required packages for instance: On Ubuntu you must install `libGL`:
->
-> ```bash
-> sudo apt-get update
-> sudo apt-get install libgl1
-> ```
->
-> Additionally it's been reported Alpine, Arch and Xubuntu Linux may be missing `tkinter`. Install it via `apk add py3-tk` for Alpine and `sudo pacman -S tk` for Arch.
+You can download Python at https://www.python.org/downloads/.
+
+1. Install `pixi`: [Guide](https://pixi.prefix.dev/latest/installation/)
+2. Clone the repository `git clone https://github.com/Nerogar/OneTrainer.git`
+3. Navigate into the cloned directory `cd OneTrainer`
+4. Run `pixi install --locked -e cuda13` (choose `cuda12`, `rocm`, or `cpu` for other hardware).
+
+**Note:** ROCm on Windows is currently experimental. If `hipInfo` is unavailable, set `OT_PLATFORM=rocm` before running the Windows install, update, or launch scripts. In Command Prompt, use `set OT_PLATFORM=rocm`. In PowerShell, use `$env:OT_PLATFORM = "rocm"`.
 
 ## Updating
 
@@ -75,8 +65,7 @@ OneTrainer is a one-stop solution for all your Diffusion training needs.
 
 1. Cd to folder containing the repo `cd OneTrainer`
 2. Pull changes `git pull`
-3. Activate the venv `venv/scripts/activate`
-4. Re-install all requirements `pip install -r requirements.txt --force-reinstall`
+3. Recreate the environment with `pixi install --locked -e cuda13`, using the same environment as during installation.
 
 ## Usage
 
@@ -96,13 +85,13 @@ For a technically focused quick start, see the [Quick Start Guide](docs/QuickSta
 
 ### CLI Mode
 
-If you need more control or a headless approach OT also supports the command-line interface. All commands **need** to be run inside the active venv created during installation.
+If you need more control or a headless approach OT also supports the command-line interface. All commands **need** to be run inside the active pixi environment created during installation.
 
 All functionality is split into different scripts located in the `scripts` directory. This currently includes:
 
 -   `train.py` The central training script
 -   `train_ui.py` A UI for training
--   `caption_ui.py` A UI for manual or automatic captioning and mask creation for masked training
+-   `caption_ui.py` The Qt UI for manual or automatic captioning and mask creation for masked training
 -   `convert_model_ui.py` A UI for model conversions
 -   `convert_model.py` A utility to convert between different model formats
 -   `sample.py` A utility to sample any model
@@ -111,9 +100,17 @@ All functionality is split into different scripts located in the `scripts` direc
 -   `generate_masks.py` A utility to automatically create masks for your dataset
 -   `calculate_loss.py` A utility to calculate the training loss of every image in your dataset
 
-To learn more about the different parameters, execute `<script-name> -h`. For example `python scripts\train.py -h`
+To learn more about the different parameters, execute `./run-cmd.sh <script-name> -h`, without the `.py` extension. For example `./run-cmd.sh scripts/train -h`. On Windows, you can do `./run-cmd.ps1 <script-name> -h`. An example of running training scripts on Windows is:
 
-If you are on Mac or Linux, you can also read [the launch script documentation](LAUNCH-SCRIPTS.md) for detailed information about how to run OneTrainer and its various scripts on your system.
+```sh
+./run-cmd.ps1 train --config-path ./config.json
+```
+
+To open a shell in the environment you installed, run `pixi shell -e cuda13` with your chosen environment name.
+
+If you are on Mac or Linux, you can also read [the launch script documentation](LAUNCH-SCRIPTS.md) for detailed information about how to run OneTrainer and its various scripts on your system. Windows users are to refer lib.include.ps1, it mostly mirrors linux launch scripts.
+
+
 
 ## Troubleshooting
 
@@ -142,9 +139,7 @@ You also **NEED** to **install the required developer dependencies** for your cu
 > Be sure to run those commands _without activating your venv or Conda environment_, since [pre-commit](https://pre-commit.com/) is supposed to be installed outside any environment.
 
 ```sh
-cd OneTrainer
-pip install -r requirements-dev.txt
-pre-commit install
+pixi global install pre-commit
 ```
 
 Now all of your commits will automatically be verified for common errors and code style issues, so that code reviewers can focus on the architecture of your changes without wasting time on style/formatting issues, thus greatly improving the chances that your pull request will be accepted quickly and effortlessly.

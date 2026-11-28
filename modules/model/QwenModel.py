@@ -7,7 +7,6 @@ from modules.module.LoRAModule import LoRAModuleWrapper
 from modules.util.enum.DataType import DataType
 from modules.util.enum.ModelFormat import ModelFormat
 from modules.util.enum.ModelType import ModelType
-from modules.util.LayerOffloadConductor import LayerOffloadConductor
 
 import torch
 from torch import Tensor
@@ -26,6 +25,8 @@ DEFAULT_PROMPT_TEMPLATE_CROP_START = 34
 PROMPT_MAX_LENGTH = 512
 
 class QwenModel(BaseModel):
+    supports_caption_dropout = True
+
     # base model data
     tokenizer: Qwen2Tokenizer | None
     noise_scheduler: FlowMatchEulerDiscreteScheduler | None
@@ -38,8 +39,6 @@ class QwenModel(BaseModel):
 
     text_encoder_train_dtype: DataType
 
-    text_encoder_offload_conductor: LayerOffloadConductor | None
-    transformer_offload_conductor: LayerOffloadConductor | None
 
     # persistent lora training data
     text_encoder_lora: LoRAModuleWrapper | None
@@ -64,8 +63,6 @@ class QwenModel(BaseModel):
 
         self.text_encoder_train_dtype = DataType.FLOAT_32
 
-        self.text_encoder_offload_conductor = None
-        self.transformer_offload_conductor = None
 
         self.text_encoder_lora = None
         self.transformer_lora = None
@@ -117,6 +114,11 @@ class QwenModel(BaseModel):
             tokens = tokenizer_output.input_ids.to(self.text_encoder.device)
             tokens_mask = tokenizer_output.attention_mask.to(self.text_encoder.device)
 
+        text_encoder_dropout_mask, tokens, tokens_mask = self._prepare_caption_dropout(
+            "text_encoder", text_encoder_dropout_probability, rand, text_encoder_output,
+            tokens, tokens_mask,
+        )
+
         if text_encoder_output is None:
             with self.text_encoder_autocast_context:
                 text_encoder_output = self.text_encoder(
@@ -135,8 +137,9 @@ class QwenModel(BaseModel):
                 #set masked state to 0 should not make a difference, but this seems to be the only effect of the diffusers code links above
                 text_encoder_output = text_encoder_output[:, DEFAULT_PROMPT_TEMPLATE_CROP_START:,:] * tokens_mask.unsqueeze(-1)
 
-        if text_encoder_dropout_probability is not None and text_encoder_dropout_probability > 0.0:
-            raise NotImplementedError #https://github.com/Nerogar/OneTrainer/issues/957
+        text_encoder_output, tokens_mask = self._apply_caption_dropout(
+            "text_encoder", text_encoder_dropout_mask, text_encoder_output, tokens_mask,
+        )
 
         #prune tokens that are masked in all batch samples:
         #this is good for efficiency, but also FIXME currently required by the diffusers pipeline:

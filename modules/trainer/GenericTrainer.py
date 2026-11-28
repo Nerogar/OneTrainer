@@ -2,6 +2,7 @@ import copy
 import json
 import math
 import os
+import re
 import shutil
 import traceback
 from collections.abc import Callable
@@ -11,17 +12,18 @@ import modules.util.multi_gpu_util as multi
 from modules.dataLoader.BaseDataLoader import BaseDataLoader
 from modules.model.BaseModel import BaseModel
 from modules.modelLoader.BaseModelLoader import BaseModelLoader
-from modules.modelSampler.BaseModelSampler import BaseModelSampler, ModelSamplerOutput
+from modules.modelSampler.BaseModelSampler import BaseModelSampler
 from modules.modelSaver.BaseModelSaver import BaseModelSaver
 from modules.modelSetup.BaseModelSetup import BaseModelSetup
 from modules.trainer.BaseTrainer import BaseTrainer
 from modules.util import create, huggingface_util, path_util
+from modules.util.async_tensor_exchange import AsyncTensorExchange
 from modules.util.bf16_stochastic_rounding import set_seed as bf16_stochastic_rounding_set_seed
 from modules.util.callbacks.TrainCallbacks import TrainCallbacks
 from modules.util.commands.TrainCommands import TrainCommands
 from modules.util.compile_util import init_compile, reset_compile
 from modules.util.config.SampleConfig import SampleConfig
-from modules.util.config.TrainConfig import TrainConfig
+from modules.util.config.TrainConfig import TrainConfig, get_output_model_destination
 from modules.util.dtype_util import create_grad_scaler, enable_grad_scaling
 from modules.util.enum.ConceptType import ConceptType
 from modules.util.enum.EMAMode import EMAMode
@@ -32,6 +34,7 @@ from modules.util.enum.TrainingMethod import TrainingMethod
 from modules.util.profiling_util import PeakMemoryRecorder, TorchMemoryRecorder, TorchProfiler
 from modules.util.time_util import get_string_timestamp
 from modules.util.torch_util import torch_gc
+from modules.util.tqdm_util import tqdm
 from modules.util.TrainProgress import TrainProgress
 
 import torch
@@ -40,8 +43,6 @@ from torch.nn import Parameter
 from torch.utils.hooks import RemovableHandle
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms.functional import pil_to_tensor
-
-from tqdm import tqdm
 
 # OT_DEBUG_PROFILES=1 dumps a CUDA memory snapshot for the first two steps, where the allocator is still
 # growing, and a profiler trace at steps 10 and 40, past compilation and warmup.
@@ -77,15 +78,20 @@ class GenericTrainer(BaseTrainer):
         if multi.is_master():
             tensorboard_log_dir = os.path.join(config.workspace_dir, "tensorboard")
             os.makedirs(Path(tensorboard_log_dir).absolute(), exist_ok=True)
-            self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, f"{config.save_filename_prefix}{get_string_timestamp()}"))
+            self.tensorboard = SummaryWriter(os.path.join(tensorboard_log_dir, config.run_name))
             if config.tensorboard and not config.tensorboard_always_on:
                 super()._start_tensorboard()
 
         self.model = None
         self.one_step_trained = False
         self.grad_hook_handles = []
+        self.__early_stopping_loss: float | None = None
+        self.__early_stopping_epoch = 0
 
     def start(self):
+        if self.config.validation:
+            self.config.parse_validation_timesteps()
+
         if multi.is_master():
             self.__save_config_to_workspace()
 
@@ -114,6 +120,8 @@ class GenericTrainer(BaseTrainer):
                     model_names.embedding.model_name = last_backup_path
                 else:  # fine-tunes
                     model_names.base_model = last_backup_path
+                    # drop submodule overrides so the backup is loaded in full
+                    model_names.clear_overrides()
 
                 print(f"Continuing training from backup '{last_backup_path}'...")
             else:
@@ -137,6 +145,8 @@ class GenericTrainer(BaseTrainer):
             model_names=model_names,
             weight_dtypes=self.config.weight_dtypes(),
             quantization=self.config.quantization,
+            stream_from_disk=self.config.stream_from_disk,
+            cache_in_ram=self.config.cache_in_ram(),
         )
         self.model.train_config = self.config
 
@@ -146,6 +156,7 @@ class GenericTrainer(BaseTrainer):
         self.model_setup.setup_train_device(self.model, self.config)
         self.model_setup.setup_model(self.model, self.config)
         self.model.eval()
+        self.model.cache_unconditional(self.config)
 
         self.callbacks.on_update_status("creating the data loader/caching")
 
@@ -168,7 +179,7 @@ class GenericTrainer(BaseTrainer):
     def __save_config_to_workspace(self):
         path = path_util.canonical_join(self.config.workspace_dir, "config")
         os.makedirs(Path(path).absolute(), exist_ok=True)
-        path = path_util.canonical_join(path, f"{self.config.save_filename_prefix}{get_string_timestamp()}.json")
+        path = path_util.canonical_join(path, f"{self.config.run_name}.json")
         with open(path, "w") as f:
             json.dump(self.config.to_pack_dict(secrets=False), f, indent=4)
 
@@ -184,31 +195,32 @@ class GenericTrainer(BaseTrainer):
                     shutil.rmtree(path)
 
     def __prune_backups(self, backups_to_keep: int):
-        backup_dirpath = os.path.join(self.config.workspace_dir, "backup")
-        if os.path.exists(backup_dirpath):
-            backup_directories = sorted(
-                [dirpath for dirpath in os.listdir(backup_dirpath) if
-                 os.path.isdir(os.path.join(backup_dirpath, dirpath))],
-                reverse=True,
-            )
-
-            for dirpath in backup_directories[backups_to_keep:]:
-                dirpath = os.path.join(backup_dirpath, dirpath)
-                try:
-                    shutil.rmtree(dirpath)
-                except Exception:
-                    tqdm.write(f"Could not delete old rolling backup {dirpath}")
-
-        return
+        for dirpath in self.config.get_backup_paths()[backups_to_keep:]:
+            try:
+                shutil.rmtree(dirpath)
+            except OSError:  # noqa: PERF203 - continue pruning after a filesystem error
+                tqdm.write(f"Could not delete old rolling backup {dirpath}")
 
     def __enqueue_sample_during_training(self, fun: Callable):
         self.sample_queue.append(fun)
 
-    def __execute_sample_during_training(self):
+    def __execute_sample_during_training(self, train_progress: TrainProgress, train_device: torch.device):
         with PeakMemoryRecorder("sampling", enabled=False):
             for fun in self.sample_queue:
                 fun()
         self.sample_queue = []
+
+        # Every rank (gpus) enters this loop at a gradient-free boundary, even when its
+        # local timer/queue didn't request sampling. Conditional collectives here
+        # would deadlock against another rank's next training collective.
+        while True:
+            multi.sync_commands(self.commands)
+            if self.commands.get_stop_command():
+                break
+            sample_commands = self.commands.get_and_reset_sample_custom_commands()
+            if not sample_commands:
+                break
+            self.__sample_during_training(train_progress, train_device, sample_commands)
 
     def __sample_loop(
             self,
@@ -219,12 +231,15 @@ class GenericTrainer(BaseTrainer):
             folder_postfix: str = "",
             is_custom_sample: bool = False,
     ):
-        for i, sample_config in multi.distributed(
-            [(i, sample_config) for i, sample_config in enumerate(sample_config_list) if sample_config.enabled],
-            distribute=not self.config.samples_to_tensorboard and not ema_applied
-        ):
-            try:
-                safe_prompt = path_util.safe_filename(sample_config.prompt)
+        on_update_progress = self.callbacks.on_update_sample_custom_progress if is_custom_sample else self.callbacks.on_update_sample_default_progress
+
+        try:
+            jobs = []  # (sample_config, destination, index, prompt_label) for this rank's share
+            for i, sample_config in multi.distributed(
+                [(i, sample_config) for i, sample_config in enumerate(sample_config_list) if sample_config.enabled],
+                distribute=not self.config.samples_to_tensorboard and not ema_applied
+            ):
+                prompt_label = path_util.safe_filename(sample_config.prompt)
 
                 if is_custom_sample:
                     sample_dir = os.path.join(
@@ -236,47 +251,50 @@ class GenericTrainer(BaseTrainer):
                     sample_dir = os.path.join(
                         self.config.workspace_dir,
                         "samples",
-                        f"{str(i)} - {safe_prompt}{folder_postfix}",
+                        f"{str(i)} - {prompt_label}{folder_postfix}",
                     )
 
+                # custom samples all share the samples/custom dir (regular ones each get their own
+                # {i} - prompt dir), so add the index here - without it a batch that finishes within the
+                # same second shares one filename (timestamp + filename_string are identical) and overwrites.
+                sample_suffix = f"-{str(i)}" if is_custom_sample else ""
                 sample_path = os.path.join(
                     sample_dir,
-                    f"{self.config.save_filename_prefix}{get_string_timestamp()}-training-sample-{train_progress.filename_string()}"
+                    f"{self.config.get_timestamped_run_name()}-training-sample-{train_progress.filename_string()}{sample_suffix}"
                 )
-
-                def on_sample_default(sampler_output: ModelSamplerOutput):
-                    if self.config.samples_to_tensorboard and sampler_output.file_type == FileType.IMAGE:
-                        self.tensorboard.add_image(
-                            f"sample{str(i)} - {safe_prompt}", pil_to_tensor(sampler_output.data),  # noqa: B023
-                            train_progress.global_step
-                        )
-                    self.callbacks.on_sample_default(sampler_output)
-
-                def on_sample_custom(sampler_output: ModelSamplerOutput):
-                    self.callbacks.on_sample_custom(sampler_output)
-
-                on_sample = on_sample_custom if is_custom_sample else on_sample_default
-                on_update_progress = self.callbacks.on_update_sample_custom_progress if is_custom_sample else self.callbacks.on_update_sample_default_progress
-
-                self.model.eval()
 
                 sample_config = copy.copy(sample_config)
                 sample_config.from_train_config(self.config)
 
-                self.model_sampler.sample(
-                    sample_config=sample_config,
-                    destination=sample_path,
-                    image_format=self.config.sample_image_format,
-                    video_format=self.config.sample_video_format,
-                    audio_format=self.config.sample_audio_format,
-                    on_sample=on_sample,
+                jobs.append((sample_config, sample_path, i, prompt_label))
+
+            if jobs:
+                self.model.eval()
+
+                sampler_outputs = self.model_sampler.sample_all(
+                    [sample_config for sample_config, _, _, _ in jobs],
+                    [destination for _, destination, _, _ in jobs],
+                    self.config.sample_image_format,
+                    self.config.sample_video_format,
+                    self.config.sample_audio_format,
                     on_update_progress=on_update_progress,
                 )
-            except Exception:
-                traceback.print_exc()
-                tqdm.write("Error during sampling, proceeding without sampling")
 
-            torch_gc()
+                for (_, _, i, prompt_label), sampler_output in zip(jobs, sampler_outputs, strict=True):
+                    if is_custom_sample:
+                        self.callbacks.on_sample_custom(sampler_output)
+                    else:
+                        if self.config.samples_to_tensorboard and sampler_output.file_type == FileType.IMAGE:
+                            self.tensorboard.add_image(
+                                f"sample{str(i)} - {prompt_label}", pil_to_tensor(sampler_output.data),
+                                train_progress.global_step
+                            )
+                        self.callbacks.on_sample_default(sampler_output)
+        except Exception:
+            traceback.print_exc()
+            tqdm.write("Error during sampling, proceeding without sampling")
+
+        torch_gc()
 
     def __sample_during_training(
             self,
@@ -345,6 +363,32 @@ class GenericTrainer(BaseTrainer):
 
         torch_gc()
 
+    @staticmethod
+    def __validation_concept_labels(concepts: set[tuple[str, str, int]]) -> dict[tuple[str, str, int], str]:
+        labels = {}
+        for concept in sorted(concepts):
+            name, path, _ = concept
+            label = name.strip()
+            if not label:
+                label = next(folder for folder in reversed(path.split('/')) if folder and not re.fullmatch(
+                    r"(?:val|valid|validation)(?:[-_ ]?(?:set|data|dataset))?(?:[-_ ]?\d+)?",
+                    folder, re.IGNORECASE,
+                ))
+                label = label[:1].upper() + label[1:]
+            labels[concept] = label
+
+        reserved_labels = set(labels.values())
+        used_labels = set()
+        for concept, label in labels.items():
+            unique_label = label
+            suffix = 2
+            while unique_label in used_labels or (unique_label != label and unique_label in reserved_labels):
+                unique_label = f"{label} ({suffix})"
+                suffix += 1
+            labels[concept] = unique_label
+            used_labels.add(unique_label)
+        return labels
+
     def __validate(self, train_progress: TrainProgress):
         if self.__needs_validate(train_progress):
             self.validation_data_loader.get_data_set().start_next_epoch()
@@ -363,59 +407,71 @@ class GenericTrainer(BaseTrainer):
                 desc="validation_step",
                 total=current_epoch_length_validation)
 
-            accumulated_loss_per_concept = {}
-            concept_counts = {}
-            mapping_seed_to_label = {}
-            mapping_label_to_seed = {}
+            accumulated_loss_per_concept_task = {}
+            concept_task_counts = {}
 
             for validation_batch in step_tqdm_validation:
                 if self.__needs_gc(train_progress):
                     torch_gc()
 
-                with torch.no_grad():
-                    model_output_data = self.model_setup.predict(
-                        self.model, validation_batch, self.config, train_progress, deterministic=True)
-                    loss_validation = self.model_setup.calculate_loss(
-                        self.model, validation_batch, model_output_data, self.config)
+                losses = self.model_setup.calculate_validation_losses(
+                    self.model, validation_batch, self.config, train_progress)
 
                 # since validation batch size = 1
                 concept_name = validation_batch["concept_name"][0]
-                concept_path = validation_batch["concept_path"][0]
-                concept_seed = validation_batch["concept_seed"].item()
-                loss = loss_validation.item()
+                concept_path = os.path.normpath(validation_batch["concept_path"][0].replace('\\', '/')).replace('\\', '/')
+                concept_seed = int(validation_batch["concept_seed"][0])
+                concept = (concept_name, concept_path, concept_seed)
 
-                label = concept_name if concept_name else os.path.basename(concept_path)
-                # check and fix collision to display both graphs in tensorboard
-                if label in mapping_label_to_seed and mapping_label_to_seed[label] != concept_seed:
-                    suffix = 1
-                    new_label = f"{label}({suffix})"
-                    while new_label in mapping_label_to_seed and mapping_label_to_seed[new_label] != concept_seed:
-                        suffix += 1
-                        new_label = f"{label}({suffix})"
-                    label = new_label
+                for task, loss in losses.items():
+                    key = (concept, task)
+                    accumulated_loss_per_concept_task[key] = accumulated_loss_per_concept_task.get(key, 0) + loss
+                    concept_task_counts[key] = concept_task_counts.get(key, 0) + 1
 
-                if concept_seed not in mapping_seed_to_label:
-                    mapping_seed_to_label[concept_seed] = label
-                    mapping_label_to_seed[label] = concept_seed
+            report_per_concept = self.config.validation_report_per_concept
+            labels = self.__validation_concept_labels({concept for concept, _ in concept_task_counts}) \
+                if report_per_concept else {}
+            tag_losses = {}
+            tag_counts = {}
+            for (concept, task), total_loss in accumulated_loss_per_concept_task.items():
+                if report_per_concept:
+                    tag = f"{labels[concept]}: val_loss/step{task}" if task else f"{labels[concept]}: val_loss/loss"
+                else:
+                    tag = f"loss/validation_step/{task.removeprefix('-')}" if task else "loss/validation_step"
+                tag_losses[tag] = tag_losses.get(tag, 0) + total_loss
+                tag_counts[tag] = tag_counts.get(tag, 0) + concept_task_counts[(concept, task)]
 
-                accumulated_loss_per_concept[concept_seed] = accumulated_loss_per_concept.get(concept_seed, 0) + loss
-                concept_counts[concept_seed] = concept_counts.get(concept_seed, 0) + 1
-
-            for concept_seed, total_loss in accumulated_loss_per_concept.items():
-                average_loss = total_loss / concept_counts[concept_seed]
-
-                self.tensorboard.add_scalar(f"loss/validation_step/{mapping_seed_to_label[concept_seed]}",
-                                            average_loss,
+            for tag, total_loss in tag_losses.items():
+                self.tensorboard.add_scalar(tag,
+                                            total_loss / tag_counts[tag],
                                             train_progress.global_step)
 
-            if len(concept_counts) > 1:
-                total_loss = sum(accumulated_loss_per_concept[key] for key in concept_counts)
-                total_count = sum(concept_counts[key] for key in concept_counts)
+            if concept_task_counts:
+                total_loss = sum(accumulated_loss_per_concept_task[key] for key in concept_task_counts)
+                total_count = sum(concept_task_counts[key] for key in concept_task_counts)
                 total_average_loss = total_loss / total_count
 
-                self.tensorboard.add_scalar("loss/validation_step/total_average",
-                                            total_average_loss,
-                                            train_progress.global_step)
+                if report_per_concept or len(concept_task_counts) > 1:
+                    self.tensorboard.add_scalar("loss/avg_val_loss" if report_per_concept else "loss/validation_step/total_average",
+                                                total_average_loss,
+                                                train_progress.global_step)
+
+                self.__check_early_stopping(total_average_loss, train_progress)
+
+    def __check_early_stopping(self, loss: float, train_progress: TrainProgress):
+        if not self.config.validation or self.config.early_stopping_patience <= 0 or not math.isfinite(loss):
+            return
+
+        delta = self.config.early_stopping_min_delta or 0.0
+        if self.__early_stopping_loss is None or loss < self.__early_stopping_loss - delta:
+            self.__early_stopping_loss = loss
+            self.__early_stopping_epoch = train_progress.epoch
+        elif train_progress.epoch - self.__early_stopping_epoch >= self.config.early_stopping_patience:
+            tqdm.write(f"Early stopping: validation loss has not improved for {self.config.early_stopping_patience} epochs.")
+            if multi.is_enabled():
+                multi.global_commands.stop()
+            else:
+                self.commands.stop()
 
     def __save_backup_config(self, backup_path):
         config_path = os.path.join(backup_path, "onetrainer_config")
@@ -437,7 +493,8 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("Creating backup")
 
-        backup_name = f"{get_string_timestamp()}-backup-{train_progress.filename_string()}"
+        save_name = path_util.safe_filename(self.config.get_timestamped_run_name(), max_length=None)
+        backup_name = f"{save_name}-backup-{train_progress.filename_string()}"
         backup_path = os.path.join(self.config.workspace_dir, "backup", backup_name)
 
         # Special case for schedule-free optimizers.
@@ -484,10 +541,11 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("Saving")
 
+        save_name = path_util.safe_filename(self.config.get_timestamped_run_name(), max_length=None)
         save_path = os.path.join(
             self.config.workspace_dir,
             "save",
-            f"{self.config.save_filename_prefix}{get_string_timestamp()}-save-{train_progress.filename_string()}{self.config.output_model_format.file_extension()}"
+            f"{save_name}-save-{train_progress.filename_string()}{self.config.output_model_format.file_extension()}"
         )
         if print_msg:
             tqdm.write("Saving " + save_path)
@@ -634,14 +692,41 @@ class GenericTrainer(BaseTrainer):
         has_gradient = False
 
         lr_scheduler = None
-        accumulated_loss = torch.tensor(0.0, device=train_device)
+        accum_loss = torch.tensor(0.0, device=train_device)
         ema_loss = None
         ema_loss_steps = 0
+
+        accum_loss_exchange = AsyncTensorExchange(train_device)
+
+        def report_loss(loss_cpu, loss_step, progress_bar=None):
+            nonlocal ema_loss, ema_loss_steps
+            if loss_cpu is None:
+                return
+
+            loss_value = loss_cpu.item()
+            if math.isnan(loss_value):
+                raise RuntimeError("Training loss became NaN. This may be due to invalid parameters, precision issues, or a bug in the loss computation.")
+
+            self.tensorboard.add_scalar("loss/train_step", loss_value, loss_step)
+            ema_loss = ema_loss or loss_value
+            ema_loss_steps += 1
+            ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
+            ema_loss = (ema_loss * ema_loss_decay) + (loss_value * (1 - ema_loss_decay))
+            if progress_bar is not None:
+                progress_bar.set_postfix({
+                    'loss': loss_value,
+                    'smooth loss': ema_loss,
+                })
+            self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, loss_step)
+
         epochs = range(train_progress.epoch, self.config.epochs, 1)
 
-        for _epoch in tqdm(epochs, desc="epoch") if multi.is_master() else epochs:
+        if multi.is_master():
+            epochs = tqdm(epochs, desc="epoch", initial=train_progress.epoch, total=self.config.epochs)
+        for _epoch in epochs:
             multi.sync_commands(self.commands)
             if self.commands.get_stop_command():
+                report_loss(*accum_loss_exchange.drain())
                 return
             self.callbacks.on_update_status("Starting epoch/caching")
 
@@ -664,7 +749,9 @@ class GenericTrainer(BaseTrainer):
                 torch.clear_autocast_cache()
                 self.model.optimizer.train()
 
-            torch_gc()
+            # no torch_gc here: setup_train_device above ends in materialize_only(), which collects whenever a
+            # part actually moved. On an epoch that changed nothing (the usual case once the caches are warm)
+            # there is nothing to reclaim, and this collection cost ~350ms of the epoch gap on a large model.
 
             if lr_scheduler is None:
                 lr_scheduler = create.create_lr_scheduler(
@@ -717,7 +804,7 @@ class GenericTrainer(BaseTrainer):
                     torch_gc()
 
                 if not has_gradient:
-                    self.__execute_sample_during_training()
+                    self.__execute_sample_during_training(train_progress, train_device)
                     backup = self.commands.get_and_reset_backup_command()
                     save = self.commands.get_and_reset_save_command()
                     if multi.is_master() and (backup or save):
@@ -765,7 +852,7 @@ class GenericTrainer(BaseTrainer):
                     has_gradient = True
                     detached_loss = loss.detach()
                     multi.reduce_tensor_mean(detached_loss)
-                    accumulated_loss += detached_loss
+                    accum_loss += detached_loss
 
                     if self.__is_update_step(train_progress):
                         if self.config.fused_gradient_reduce:
@@ -796,22 +883,11 @@ class GenericTrainer(BaseTrainer):
                                 self.model, self.config, lr_scheduler, self.tensorboard
                             )
 
-                            accumulated_loss_cpu = accumulated_loss.item()
-                            if math.isnan(accumulated_loss_cpu):
-                                raise RuntimeError("Training loss became NaN. This may be due to invalid parameters, precision issues, or a bug in the loss computation.")
+                            accum_loss_cpu, accum_loss_step = accum_loss_exchange.exchange(accum_loss, train_progress.global_step)
+                            # Runs one update behind to avoid synchronizing the current step.
+                            report_loss(accum_loss_cpu, accum_loss_step, step_tqdm)
 
-                            self.tensorboard.add_scalar("loss/train_step",accumulated_loss_cpu , train_progress.global_step)
-                            ema_loss = ema_loss or accumulated_loss_cpu
-                            ema_loss_steps += 1
-                            ema_loss_decay = min(0.99, 1 - (1 / ema_loss_steps))
-                            ema_loss = (ema_loss * ema_loss_decay) + (accumulated_loss_cpu * (1 - ema_loss_decay))
-                            step_tqdm.set_postfix({
-                                'loss': accumulated_loss_cpu,
-                                'smooth loss': ema_loss,
-                            })
-                            self.tensorboard.add_scalar("smooth_loss/train_step", ema_loss, train_progress.global_step)
-
-                        accumulated_loss = 0.0
+                        accum_loss = 0.0
                         self.model_setup.after_optimizer_step(self.model, self.config, train_progress)
 
                         if self.model.ema:
@@ -836,13 +912,18 @@ class GenericTrainer(BaseTrainer):
                 self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
 
                 if self.commands.get_stop_command():
+                    report_loss(*accum_loss_exchange.drain())
                     return
 
             train_progress.next_epoch()
             self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.config.epochs)
 
             if self.commands.get_stop_command():
+                report_loss(*accum_loss_exchange.drain())
                 return
+
+        # Check and log the last update before the caller saves the final model.
+        report_loss(*accum_loss_exchange.drain())
 
     def end(self):
         if self.one_step_trained:
@@ -861,13 +942,11 @@ class GenericTrainer(BaseTrainer):
 
                 if self.model.ema:
                     self.model.ema.copy_ema_to(self.parameters, store_temp=False)
-                if os.path.isdir(self.config.output_model_destination) and self.config.output_model_format.is_single_file():
-                    save_path = os.path.join(
-                        self.config.output_model_destination,
-                        f"{self.config.save_filename_prefix}{get_string_timestamp()}{self.config.output_model_format.file_extension()}"
-                    )
-                else:
-                    save_path = self.config.output_model_destination
+                save_path = get_output_model_destination(
+                    self.config.final_output_dir,
+                    self.config.run_name,
+                    self.config.output_model_format,
+                )
                 print("Saving " + save_path)
 
                 self.model_saver.save(
