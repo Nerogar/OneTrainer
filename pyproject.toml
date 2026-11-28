@@ -61,7 +61,7 @@ dependencies = [
     # ui
     "pydantic==2.14.3",
     # Match `pyside6` below to this version
-    "PySide6==6.11.3",
+    "PySide6==6.12.0.*",
 
     # cloud
     "runpod==2.3.0",
@@ -189,7 +189,7 @@ requires-pixi = ">=0.85.0"
 # so Pixi can resolve CUDA and ROCm wheels that have no upload date.
 [tool.pixi.workspace.exclude-newer]
 cutoff = "0d" # specifically required
-exemptions = { python = "3.13.*", libpython = "3.13.*"}
+exemptions = { python = "*", pyside6 = "*"}
 
 [tool.pixi.tasks]
 train = { cmd = "python scripts/train.py", cwd = "." }
@@ -230,6 +230,7 @@ c-compiler = "*"
 cxx-compiler = "*"
 libgl = "*"
 libglib = "*"
+pyside6 = "6.12.0.*"
 
 [tool.pixi.target.osx-arm64.dependencies]
 c-compiler = "*"
