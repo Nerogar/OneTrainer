@@ -40,7 +40,7 @@ dependencies = [
     "pooch==1.9.0",
 
     # data loader
-    "mgds @ git+https://github.com/Nerogar/mgds.git@a5f35a3e292c200a3d13111f7c74362422df1a24",
+    "mgds @ git+https://github.com/Nerogar/mgds.git@d9bc8ce9199c4cbce20777e46d866c92c4842314",
 
     # optimizers
     "timm==1.0.31",
